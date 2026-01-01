@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient'; // Nécessaire pour le nettoyage
 import { 
   Settings, Moon, Sun, Type, Download, Upload, 
-  RefreshCw, CheckCircle2, AlertTriangle, User 
+  RefreshCw, CheckCircle2, AlertTriangle, User, Loader2
 } from 'lucide-react';
 
-export default function DataSettings({ data, loadExternalData }) {
+export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
     // --- ETATS LOCAUX ---
     const [appName, setAppName] = useState(data.customLabels?.appName || 'LocalApp');
     const [userName, setUserName] = useState(data.customLabels?.userName || 'Utilisateur');
     const [isSaved, setIsSaved] = useState(false);
     
     // Pour l'import de fichier
-    const [importStatus, setImportStatus] = useState(null); // 'success', 'error', null
+    const [importStatus, setImportStatus] = useState(null); // 'success', 'error', 'loading', null
 
     // Synchronisation initiale
     useEffect(() => {
@@ -29,24 +30,23 @@ export default function DataSettings({ data, loadExternalData }) {
             ...data,
             customLabels: { ...data.customLabels, appName, userName }
         };
-        loadExternalData(newSettings); // Déclenche la sauvegarde Supabase via App.jsx
+        loadExternalData(newSettings); 
         
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 2000);
     };
 
     // 2. Changer le Thème
-    const toggleTheme = (theme) => {
-        const newSettings = {
-            ...data,
-            settings: { ...data.settings, theme }
-        };
-        loadExternalData(newSettings);
+    const handleThemeChange = (theme) => {
+        if ((theme === 'dark' && !darkMode) || (theme === 'light' && darkMode)) {
+            toggleTheme();
+        }
     };
 
     // 3. EXPORT (Télécharger JSON)
     const handleExport = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const cleanData = JSON.parse(JSON.stringify(data));
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanData, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
         const date = new Date().toISOString().split('T')[0];
@@ -56,37 +56,65 @@ export default function DataSettings({ data, loadExternalData }) {
         downloadAnchorNode.remove();
     };
 
-    // 4. IMPORT (Lire JSON)
-    const handleImport = (event) => {
+    // 4. IMPORT INTELLIGENT (Nettoyage + Import)
+    const handleImport = async (event) => {
         const fileReader = new FileReader();
         const file = event.target.files[0];
 
         if (!file) return;
 
         fileReader.readAsText(file, "UTF-8");
-        fileReader.onload = (e) => {
+        fileReader.onload = async (e) => {
             try {
                 const parsedData = JSON.parse(e.target.result);
-                // Petite vérification de structure
+                
+                // Vérification de structure
                 if (parsedData.budget && parsedData.projects) {
-                    if (window.confirm("Attention : Importer un fichier va écraser les données actuelles de l'interface. Confirmer ?")) {
-                        loadExternalData(parsedData);
-                        setImportStatus('success');
-                        setTimeout(() => setImportStatus(null), 3000);
+                    if (window.confirm("ATTENTION : Cette action va EFFACER toutes les données actuelles pour les remplacer par celles du fichier. Continuer ?")) {
+                        setImportStatus('loading');
+                        
+                        // 1. NETTOYAGE (Grand ménage via Supabase)
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user) {
+                            // On supprime dans l'ordre pour éviter les conflits de clés étrangères si possible
+                            await Promise.all([
+                                supabase.from('transactions').delete().eq('user_id', user.id),
+                                supabase.from('recurring').delete().eq('user_id', user.id),
+                                supabase.from('scheduled').delete().eq('user_id', user.id),
+                                supabase.from('planner_items').delete().eq('user_id', user.id),
+                                supabase.from('projects').delete().eq('user_id', user.id),
+                                supabase.from('notes').delete().eq('user_id', user.id),
+                                supabase.from('todos').delete().eq('user_id', user.id),
+                                supabase.from('accounts').delete().eq('user_id', user.id),
+                                supabase.from('safety_bases').delete().eq('user_id', user.id)
+                            ]);
+                        }
+
+                        // 2. INJECTION DES NOUVELLES DONNÉES
+                        // On attend un peu que Supabase ait fini de nettoyer
+                        setTimeout(() => {
+                            loadExternalData(parsedData); // Mise à jour de l'état local -> Déclenche la sauvegarde dans App.jsx
+                            setImportStatus('success');
+                            setTimeout(() => setImportStatus(null), 3000);
+                            alert("Restauration terminée avec succès !");
+                        }, 1500);
                     }
                 } else {
-                    alert("Format de fichier invalide.");
+                    alert("Format de fichier invalide (structure JSON incorrecte).");
                     setImportStatus('error');
                 }
             } catch (error) {
-                console.error(error);
+                console.error("Erreur Import:", error);
                 setImportStatus('error');
+                alert("Erreur lors de la lecture du fichier.");
             }
         };
+        // Reset de l'input pour permettre de réimporter le même fichier si besoin
+        event.target.value = null;
     };
 
     return (
-        <div className="fade-in p-6 pb-20 max-w-4xl mx-auto space-y-8">
+        <div className="fade-in p-6 pb-24 md:pb-20 max-w-4xl mx-auto space-y-8">
             
             {/* EN-TÊTE */}
             <div className="flex items-center gap-3 mb-2">
@@ -113,14 +141,14 @@ export default function DataSettings({ data, loadExternalData }) {
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Thème de l'interface</span>
                         <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                             <button 
-                                onClick={() => toggleTheme('light')} 
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${data.settings?.theme !== 'dark' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => handleThemeChange('light')} 
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${!darkMode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
                                 <Sun size={14}/> Clair
                             </button>
                             <button 
-                                onClick={() => toggleTheme('dark')} 
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${data.settings?.theme === 'dark' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                                onClick={() => handleThemeChange('dark')} 
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${darkMode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
                             >
                                 <Moon size={14}/> Sombre
                             </button>
@@ -216,7 +244,7 @@ export default function DataSettings({ data, loadExternalData }) {
                             </div>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                            <span className="font-bold text-orange-500 flex items-center gap-1 inline-flex"><AlertTriangle size={10}/> Attention :</span> Ceci remplacera les données actuelles de l'application.
+                            <span className="font-bold text-orange-500 flex items-center gap-1 inline-flex"><AlertTriangle size={10}/> Attention :</span> Ceci remplacera TOUTES les données actuelles.
                         </p>
                         
                         <div className="relative">
@@ -225,9 +253,17 @@ export default function DataSettings({ data, loadExternalData }) {
                                 accept=".json" 
                                 onChange={handleImport}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                disabled={importStatus === 'loading'}
                             />
-                            <div className={`w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-sm font-medium text-center transition-colors ${importStatus === 'success' ? 'bg-green-50 text-green-600 border-green-200' : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
-                                {importStatus === 'success' ? 'Restauration réussie !' : 'Choisir un fichier...'}
+                            <div className={`w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl text-sm font-medium text-center transition-colors 
+                                ${importStatus === 'success' ? 'bg-green-50 text-green-600 border-green-200' : 
+                                  importStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
+                                  importStatus === 'loading' ? 'bg-slate-100 text-slate-500 animate-pulse' :
+                                  'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
+                                {importStatus === 'success' ? 'Restauration réussie !' : 
+                                 importStatus === 'loading' ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin"/> Nettoyage et Importation...</span> : 
+                                 importStatus === 'error' ? 'Erreur (voir console)' : 
+                                 'Choisir un fichier...'}
                             </div>
                         </div>
                     </div>
