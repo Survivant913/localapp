@@ -9,7 +9,7 @@ import BudgetManager from './BudgetManager';
 import NotesManager from './NotesManager';
 import TodoList from './TodoList';
 import DataSettings from './DataSettings';
-import ClientHub from './ClientHub'; // --- REMPLACEMENT : C'est le nouveau Hub ---
+import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
 import { Loader2, Lock } from 'lucide-react';
 
@@ -31,18 +31,13 @@ export default function App() {
     todos: [], projects: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
-    // --- NOUVELLES DONNÉES ERP ---
-    clients: [], 
-    quotes: [], 
-    invoices: [], 
-    catalog: [], 
-    profile: {}
+    clients: [], quotes: [], invoices: [], catalog: [], profile: {}
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Outil robuste pour les dates
+  // --- UTILS ---
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
@@ -54,7 +49,6 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
-  // Comparaison de date souple
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
@@ -64,13 +58,17 @@ export default function App() {
       return checkDate <= today;
   };
 
+  // --- SAUVEGARDE ROBUSTE ---
   const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
     if (!items || items.length === 0) return;
     const mappedItems = items.map(mapFunction);
     for (let i = 0; i < mappedItems.length; i += batchSize) {
       const batch = mappedItems.slice(i, i + batchSize);
       const { error } = await supabase.from(table).upsert(batch);
-      if (error) console.error(`Erreur sauvegarde lot ${table}:`, error);
+      if (error) {
+          console.error(`ERREUR SAUVEGARDE ${table}:`, error);
+          throw error; // On remonte l'erreur
+      }
     }
   };
 
@@ -107,7 +105,6 @@ export default function App() {
     setLoading(true);
 
     try {
-      // --- CHARGEMENT DE TOUTES LES TABLES (Y COMPRIS LES NOUVELLES) ---
       const results = await Promise.all([
         supabase.from('profiles').select('*').single(),
         supabase.from('todos').select('*'),
@@ -120,10 +117,10 @@ export default function App() {
         supabase.from('events').select('*'),
         supabase.from('planner_items').select('*'),
         supabase.from('safety_bases').select('*'),
-        supabase.from('clients').select('*'),       // Clients
-        supabase.from('quotes').select('*'),        // Devis
-        supabase.from('invoices').select('*'),      // Factures
-        supabase.from('catalog_items').select('*')  // Catalogue
+        supabase.from('clients').select('*'),
+        supabase.from('quotes').select('*'),
+        supabase.from('invoices').select('*'),
+        supabase.from('catalog_items').select('*')
       ]);
 
       const [
@@ -133,13 +130,13 @@ export default function App() {
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog }
       ] = results;
 
-      // --- MOTEUR DE RATTRAPAGE PAIEMENTS (EXISTANT) ---
+      // --- MOTEUR DE RATTRAPAGE ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
       
       const validAccounts = accounts || [];
-      const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : (scheduled?.[0]?.account_id || 'offline-account');
+      const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : 'offline-account';
 
       // 1. Rattrapage PLANIFIÉS
       (scheduled || []).forEach(s => {
@@ -210,7 +207,7 @@ export default function App() {
           if (hasChanged) updatedDBRecurring.push(tempR);
       });
 
-      // --- APPLICATION DES CHANGEMENTS ---
+      // --- APPLICATION ---
       let finalTransactions = [...(transactions || []), ...newDBTransactions];
       let finalScheduled = (scheduled || []).map(s => { const updated = updatedDBScheduled.find(u => u.id == s.id); return updated || s; });
       let finalRecurring = (recurring || []).map(r => { const updated = updatedDBRecurring.find(u => u.id == r.id); return updated || r; });
@@ -229,6 +226,7 @@ export default function App() {
           syncAsync();
       }
 
+      // Mapping final pour l'affichage
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -242,16 +240,12 @@ export default function App() {
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
         budget: {
-          accounts: validAccounts,
+          accounts: validAccounts, // Les comptes chargés depuis Supabase
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
           recurring: mappedRecurring, scheduled: mappedScheduled,
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
-        // --- NOUVELLES DONNÉES INJECTÉES ICI ---
-        clients: clients || [],
-        quotes: quotes || [],
-        invoices: invoices || [],
-        catalog: catalog || [],
+        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
         profile: profile || {},
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
         customLabels: profile?.custom_labels || {}, mainNote: ""
@@ -284,33 +278,38 @@ export default function App() {
     try {
       const { user } = session;
       
-      // Profil & Entreprise
+      // Profil
       await supabase.from('profiles').upsert({ 
-          id: user.id, 
-          settings: data.settings, 
-          custom_labels: data.customLabels,
-          company_name: data.profile?.company_name,
-          siret: data.profile?.siret,
-          address: data.profile?.address,
-          email_contact: data.profile?.email_contact,
-          phone_contact: data.profile?.phone_contact,
-          iban: data.profile?.iban,
-          bic: data.profile?.bic,
-          tva_number: data.profile?.tva_number
+          id: user.id, settings: data.settings, custom_labels: data.customLabels,
+          company_name: data.profile?.company_name, siret: data.profile?.siret, address: data.profile?.address,
+          email_contact: data.profile?.email_contact, phone_contact: data.profile?.phone_contact,
+          iban: data.profile?.iban, bic: data.profile?.bic, tva_number: data.profile?.tva_number
       });
 
-      // --- NOUVELLES TABLES ERP ---
+      // --- CORRECTION CRITIQUE : SAUVEGARDE COMPTES ---
+      // On s'assure que les comptes ont bien un ID et un nom avant d'être envoyés
+      const accountsToSave = data.budget.accounts.filter(a => a.id && a.name).map(a => ({ 
+          id: a.id, 
+          user_id: user.id, 
+          name: a.name 
+      }));
+      await upsertInBatches('accounts', accountsToSave, 50, a => a);
+
+      // Autres tables
       await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
       await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
+      
+      // Transactions (avec correction account_id)
+      await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ 
+          id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, 
+          date: t.date, account_id: t.accountId || t.account_id, archived: t.archived 
+      }));
 
-      // Tables existantes
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
-      await upsertInBatches('accounts', data.budget.accounts, 50, a => ({ id: a.id, user_id: user.id, name: a.name }));
-      await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, date: t.date, account_id: t.accountId, archived: t.archived }));
       await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
@@ -319,9 +318,10 @@ export default function App() {
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
       
       setUnsavedChanges(false);
+      setNotifMessage(null);
     } catch (err) { 
         console.error("Erreur sauvegarde critique", err); 
-        setNotifMessage("Erreur sauvegarde (voir console)"); 
+        setNotifMessage("Erreur : " + (err.message || "Sauvegarde échouée")); 
     } finally { setIsSaving(false); }
   };
 
@@ -336,8 +336,7 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
-      // --- REMPLACEMENT ICI : ClientManager -> ClientHub ---
-      case 'clients': return <ClientHub data={data} updateData={updateData} />; 
+      case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
@@ -347,7 +346,11 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
         {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>}
-        {notifMessage && notifMessage.includes('Erreur') && <div className={`px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100`}>{notifMessage}</div>}
+        {notifMessage && notifMessage.includes('Erreur') && (
+            <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100">
+                {notifMessage}
+            </div>
+        )}
       </div>
       {isLocked && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
