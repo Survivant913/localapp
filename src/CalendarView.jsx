@@ -37,12 +37,11 @@ export default function CalendarView({ data }) {
                d1.getDate() === d2.getDate();
     };
 
-    // --- 1. INTELLIGENCE VISUELLE (ICÔNES & COULEURS) ---
+    // --- 1. INTELLIGENCE VISUELLE ---
     const getContextDisplay = (item) => {
         // VUE GLOBALE
         if (calendarFilter === 'total') {
             if (item.type === 'transfer') {
-                // Virement Interne (Neutre)
                 return { 
                     colorClass: 'text-blue-600 dark:text-blue-400', 
                     bgClass: 'bg-blue-100 dark:bg-blue-900/30', 
@@ -73,7 +72,7 @@ export default function CalendarView({ data }) {
         return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Dépense', isExpense: true, isIncome: false };
     };
 
-    // --- 2. CALCUL DU SOLDE ACTUEL (POINT DE DÉPART) ---
+    // --- 2. CALCUL DU SOLDE ACTUEL ---
     const currentBalance = useMemo(() => {
         return budget.transactions
             .filter(t => {
@@ -102,25 +101,18 @@ export default function CalendarView({ data }) {
         today.setHours(0,0,0,0);
 
         // --- CORRECTION : CALCUL DU SOLDE DE DÉBUT DE MOIS ---
-        // On projette ce qu'il se passe entre "Aujourd'hui" et le "1er du mois affiché"
         let startOfMonthProjection = currentBalance;
-        
         const firstDayOfView = new Date(year, month, 1);
         
-        // Si on regarde un mois futur, on doit simuler l'évolution entre aujourd'hui et ce futur
         if (firstDayOfView > today) {
             let simDate = new Date(today);
-            simDate.setDate(simDate.getDate() + 1); // Commencer simulation demain
+            simDate.setDate(simDate.getDate() + 1); 
             
             while (simDate < firstDayOfView) {
-                // Simuler Recurrents & Scheduled pour ce jour intermédiaire
                 const simDayOfMonth = simDate.getDate();
-                
-                // Scheduled
                 budget.scheduled.forEach(s => {
                     if (s.status === 'pending' && isSameDay(parseLocalDate(s.date), simDate)) {
                         if (calendarFilter === 'total' || s.accountId === calendarFilter || (s.type === 'transfer' && s.targetAccountId === calendarFilter)) {
-                            // Calcul impact
                             let impact = 0;
                             const amt = parseFloat(s.amount || 0);
                             const disp = getContextDisplay(s);
@@ -136,7 +128,6 @@ export default function CalendarView({ data }) {
                     }
                 });
 
-                // Recurring
                 budget.recurring.forEach(r => {
                     if (r.dayOfMonth === simDayOfMonth && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
                         if (calendarFilter === 'total' || r.accountId === calendarFilter || (r.type === 'transfer' && r.targetAccountId === calendarFilter)) {
@@ -154,11 +145,9 @@ export default function CalendarView({ data }) {
                         }
                     }
                 });
-                
                 simDate.setDate(simDate.getDate() + 1);
             }
         }
-        // --- FIN CORRECTION ---
 
         const daysMap = {};
 
@@ -185,7 +174,6 @@ export default function CalendarView({ data }) {
                 events.push({ data: item, type, source, impact, display });
             };
 
-            // Filtrage et ajout des événements
             budget.transactions.forEach(t => {
                 const tDate = parseLocalDate(t.date);
                 if (isSameDay(tDate, date)) {
@@ -206,7 +194,6 @@ export default function CalendarView({ data }) {
                 }
             });
 
-            // Pour les récurrents, on affiche seulement à partir d'aujourd'hui
             if (date >= today) {
                 budget.recurring.forEach(r => {
                     if (r.dayOfMonth === d && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
@@ -224,13 +211,10 @@ export default function CalendarView({ data }) {
             daysMap[d] = { date, events, dailyChange, extras, endBalance: 0 };
         }
 
-        // Projection finale avec le solde corrigé
         let runningBalance = (firstDayOfView > today) ? startOfMonthProjection : currentBalance;
 
-        // Si on est sur le mois courant
         if (today.getMonth() === month && today.getFullYear() === year) {
             const todayDay = today.getDate();
-            // Futur
             let futureBalance = runningBalance;
             for (let d = todayDay + 1; d <= daysInMonth; d++) {
                 if (daysMap[d]) {
@@ -238,7 +222,6 @@ export default function CalendarView({ data }) {
                     daysMap[d].endBalance = futureBalance;
                 }
             }
-            // Passé
             let pastBalance = runningBalance;
             if (daysMap[todayDay]) daysMap[todayDay].endBalance = pastBalance;
             for (let d = todayDay; d >= 1; d--) {
@@ -248,7 +231,6 @@ export default function CalendarView({ data }) {
                 }
             }
         } else if (firstDayOfView > today) {
-            // Mois futur complet
             let projected = startOfMonthProjection; 
             for (let d = 1; d <= daysInMonth; d++) {
                 if (daysMap[d]) {
@@ -257,7 +239,6 @@ export default function CalendarView({ data }) {
                 }
             }
         } else {
-            // Mois passé (on n'affiche pas les soldes prévisionnels pour éviter la confusion avec l'historique réel non reconstitué)
             for (let d = 1; d <= daysInMonth; d++) if (daysMap[d]) daysMap[d].endBalance = null;
         }
 
@@ -279,28 +260,30 @@ export default function CalendarView({ data }) {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date();
 
+    const daysLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
     return (
-        <div className="space-y-6 fade-in p-4 pb-20 max-w-[1600px] mx-auto h-full flex flex-col">
+        <div className="space-y-6 fade-in p-4 pb-24 md:pb-20 max-w-[1600px] mx-auto h-full flex flex-col">
             
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm">
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full md:w-auto">
+                    <div className="flex items-center justify-between w-full sm:w-auto bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
                         <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"><ChevronLeft size={20}/></button>
                         <button onClick={() => setViewDate(new Date())} className="px-4 text-sm font-bold text-gray-700 dark:text-gray-200">Aujourd'hui</button>
                         <button onClick={() => changeMonth(1)} className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"><ChevronRight size={20}/></button>
                     </div>
-                    <h2 className="text-2xl font-bold capitalize text-slate-800 dark:text-white">
+                    <h2 className="text-xl md:text-2xl font-bold capitalize text-slate-800 dark:text-white text-center">
                         {viewDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
                     </h2>
                 </div>
                 
-                <div className="flex items-center gap-3 bg-blue-50 dark:bg-slate-700/50 px-4 py-2 rounded-xl">
-                    <Wallet size={20} className="text-blue-600 dark:text-blue-400"/>
+                <div className="flex items-center gap-3 bg-blue-50 dark:bg-slate-700/50 px-4 py-2 rounded-xl w-full md:w-auto">
+                    <Wallet size={20} className="text-blue-600 dark:text-blue-400 shrink-0"/>
                     <select 
                         value={calendarFilter} 
                         onChange={(e) => setCalendarFilter(e.target.value)} 
-                        className="bg-transparent text-sm font-bold text-slate-700 dark:text-white outline-none cursor-pointer"
+                        className="bg-transparent text-sm font-bold text-slate-700 dark:text-white outline-none cursor-pointer w-full md:w-auto"
                         style={{ colorScheme: 'dark' }}
                     >
                         <option value="total" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Vue Globale</option>
@@ -314,11 +297,14 @@ export default function CalendarView({ data }) {
             </div>
 
             {/* Grille Calendrier */}
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[700px]">
+            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[500px] md:min-h-[700px]">
                 <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
-                    {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map(day => (
-                        <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                            {day}
+                    {daysLabels.map((day, i) => (
+                        <div key={day} className="py-2 md:py-3 text-center">
+                            {/* Version Mobile: LUN, MAR... */}
+                            <span className="md:hidden text-[9px] font-bold text-slate-500 uppercase tracking-wide">{day.substring(0, 3)}</span>
+                            {/* Version PC: Lundi, Mardi... */}
+                            <span className="hidden md:block text-xs font-bold text-slate-500 uppercase tracking-wider">{day}</span>
                         </div>
                     ))}
                 </div>
@@ -338,49 +324,49 @@ export default function CalendarView({ data }) {
                                 key={d}
                                 onClick={() => setSelectedDateDetails(dayData)}
                                 className={`
-                                    bg-white dark:bg-slate-800 p-2 relative flex flex-col gap-2 cursor-pointer transition-colors group
+                                    bg-white dark:bg-slate-800 p-1 md:p-2 relative flex flex-col gap-1 md:gap-2 cursor-pointer transition-colors group min-h-[90px] md:min-h-[120px]
                                     ${isToday ? 'bg-blue-50/40 dark:bg-slate-800 ring-inset ring-2 ring-blue-500' : 'hover:bg-gray-50 dark:hover:bg-slate-700'}
                                 `}
                             >
-                                <div className="flex justify-between items-center">
-                                    <span className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300'}`}>
+                                <div className="flex justify-between items-start">
+                                    <span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-7 md:h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300'}`}>
                                         {d}
                                     </span>
                                     {dayData.dailyChange !== 0 && (
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${dayData.dailyChange > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
+                                        <span className={`text-[8px] md:text-[10px] font-bold px-1 py-0.5 rounded ${dayData.dailyChange > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
                                             {dayData.dailyChange > 0 ? '+' : ''}{Math.round(dayData.dailyChange)}€
                                         </span>
                                     )}
                                 </div>
 
-                                <div className="flex-1 flex flex-col gap-1 overflow-hidden min-h-[60px]">
+                                <div className="flex-1 flex flex-col gap-0.5 md:gap-1 overflow-hidden min-h-[40px] md:min-h-[60px]">
                                     {dayData.events.slice(0, 4).map((e, idx) => {
                                         const d = e.display;
                                         const Icon = d.icon;
                                         return (
-                                            <div key={idx} className={`text-[10px] px-1.5 py-1 rounded border flex justify-between items-center gap-1 ${d.bgClass} ${d.colorClass} ${d.borderClass}`}>
+                                            <div key={idx} className={`text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 md:py-1 rounded border flex justify-between items-center gap-1 ${d.bgClass} ${d.colorClass} ${d.borderClass}`}>
                                                 <div className="flex items-center gap-1 min-w-0">
-                                                    <Icon size={10} className="shrink-0"/>
-                                                    <span className="truncate font-medium">{e.data.description}</span>
+                                                    <Icon size={8} className="shrink-0 md:w-[10px] md:h-[10px]"/>
+                                                    <span className="truncate font-medium max-w-[40px] md:max-w-none">{e.data.description}</span>
                                                 </div>
-                                                <span className="font-bold whitespace-nowrap">{Math.round(e.data.amount)}€</span>
+                                                <span className="font-bold whitespace-nowrap hidden sm:inline">{Math.round(e.data.amount)}€</span>
                                             </div>
                                         );
                                     })}
                                     {dayData.extras.map((ex, idx) => (
-                                        <div key={`ex-${idx}`} className="flex items-center gap-1 text-[9px] text-slate-500 px-1">
-                                            {ex.type === 'todo' ? <CheckSquare size={10} className="text-orange-500"/> : <Target size={10} className="text-purple-500"/>}
+                                        <div key={`ex-${idx}`} className="flex items-center gap-1 text-[8px] md:text-[9px] text-slate-500 px-1">
+                                            {ex.type === 'todo' ? <CheckSquare size={8} className="text-orange-500"/> : <Target size={8} className="text-purple-500"/>}
                                             <span className="truncate">{ex.text}</span>
                                         </div>
                                     ))}
                                     {(dayData.events.length > 4) && (
-                                        <span className="text-[9px] text-slate-400 text-center">+ {dayData.events.length - 4} autres</span>
+                                        <span className="text-[8px] md:text-[9px] text-slate-400 text-center">+ {dayData.events.length - 4}</span>
                                     )}
                                 </div>
 
                                 {dayData.endBalance !== null && dayData.endBalance !== undefined && (
-                                    <div className="mt-auto pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex justify-end">
-                                        <span className={`text-xs font-extrabold ${dayData.endBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                    <div className="mt-auto pt-1 md:pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex justify-end">
+                                        <span className={`text-[9px] md:text-xs font-extrabold ${dayData.endBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
                                             {formatCurrency(dayData.endBalance)}
                                         </span>
                                     </div>
