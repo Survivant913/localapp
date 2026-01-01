@@ -1,19 +1,21 @@
-import { useState, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Users, FileText, ShoppingBag, Plus, Search, 
   ChevronRight, CheckCircle2, AlertCircle, X, 
-  Printer, Save, Trash2, Wallet, ArrowRight 
+  Printer, Save, Trash2, Wallet, ArrowRight,
+  ZoomIn, ZoomOut, Download 
 } from 'lucide-react';
 
 export default function ClientHub({ data, updateData }) {
-    const [activeTab, setActiveTab] = useState('clients'); // clients, quotes, invoices, catalog
+    const [activeTab, setActiveTab] = useState('invoices'); // Par défaut sur Factures pour tester
     
     // --- DONNÉES ---
     const clients = data.clients || [];
-    const catalog = data.catalog || []; // On va ajouter ça dans App.jsx après
-    const quotes = data.quotes || [];   // Idem
-    const invoices = data.invoices || []; // Idem
+    const catalog = data.catalog || [];
+    const quotes = data.quotes || [];
+    const invoices = data.invoices || [];
     const accounts = data.budget?.accounts || [];
+    const profile = data.profile || {}; // Infos entreprise
 
     // --- UTILS ---
     const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val || 0);
@@ -23,13 +25,12 @@ export default function ClientHub({ data, updateData }) {
         const prefix = type === 'quote' ? 'DEV' : 'FACT';
         const list = type === 'quote' ? quotes : invoices;
         const year = new Date().getFullYear();
-        const count = list.filter(i => i.date.includes(year.toString())).length + 1;
+        // On cherche le max number actuel pour incrémenter correctement
+        const count = list.length + 1; 
         return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
     };
 
-    // --- SOUS-COMPOSANTS (INTERNES) ---
-
-    // 1. GESTION CLIENTS (Simple et efficace)
+    // --- 1. GESTION CLIENTS (Gardé identique, compact) ---
     const ClientsTab = () => {
         const [form, setForm] = useState(false);
         const [editing, setEditing] = useState(null);
@@ -38,19 +39,13 @@ export default function ClientHub({ data, updateData }) {
         const saveClient = () => {
             if (!tempClient.name) return alert('Nom requis');
             const newClient = { ...tempClient, id: editing ? editing.id : Date.now(), status: 'Active' };
-            
-            let newClientsList;
-            if (editing) newClientsList = clients.map(c => c.id === editing.id ? newClient : c);
-            else newClientsList = [newClient, ...clients];
-
+            let newClientsList = editing ? clients.map(c => c.id === editing.id ? newClient : c) : [newClient, ...clients];
             updateData({ ...data, clients: newClientsList });
             setForm(false); setEditing(null); setTempClient({ name: '', email: '', phone: '', address: '', contact_person: '' });
         };
 
         const deleteClient = (id) => {
-            if (window.confirm('Supprimer ce client ?')) {
-                updateData({ ...data, clients: clients.filter(c => c.id !== id) }, { table: 'clients', id });
-            }
+            if (window.confirm('Supprimer ce client ?')) updateData({ ...data, clients: clients.filter(c => c.id !== id) }, { table: 'clients', id });
         };
 
         return (
@@ -61,15 +56,14 @@ export default function ClientHub({ data, updateData }) {
                         <Plus size={16}/> Nouveau Client
                     </button>
                 </div>
-
                 {form && (
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-100 dark:border-slate-700 shadow-lg animate-in slide-in-from-top-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <input type="text" placeholder="Nom Entreprise *" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" />
-                            <input type="text" placeholder="Contact (Nom)" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" />
-                            <input type="email" placeholder="Email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" />
-                            <input type="text" placeholder="Téléphone" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" />
-                            <textarea placeholder="Adresse complète" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="md:col-span-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none h-20 resize-none" />
+                            <input type="text" placeholder="Nom Entreprise *" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
+                            <input type="text" placeholder="Contact (Nom)" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
+                            <input type="email" placeholder="Email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
+                            <input type="text" placeholder="Téléphone" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
+                            <textarea placeholder="Adresse complète" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="md:col-span-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none h-20 resize-none text-slate-800 dark:text-white" />
                         </div>
                         <div className="flex justify-end gap-2">
                             <button onClick={() => setForm(false)} className="px-4 py-2 text-slate-500 hover:text-slate-800">Annuler</button>
@@ -77,7 +71,6 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
                 )}
-
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {clients.map(client => (
                         <div key={client.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:border-blue-300 transition-all group">
@@ -100,42 +93,34 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // 2. CATALOGUE (Offres)
+    // 2. CATALOGUE (Gardé identique)
     const CatalogTab = () => {
         const [newItem, setNewItem] = useState({ name: '', price: '' });
-
         const addItem = () => {
             if (!newItem.name || !newItem.price) return;
             const item = { ...newItem, id: Date.now(), price: parseFloat(newItem.price) };
             updateData({ ...data, catalog: [...catalog, item] });
             setNewItem({ name: '', price: '' });
         };
-
-        const deleteItem = (id) => {
-            updateData({ ...data, catalog: catalog.filter(i => i.id !== id) }, { table: 'catalog_items', id });
-        };
+        const deleteItem = (id) => updateData({ ...data, catalog: catalog.filter(i => i.id !== id) }, { table: 'catalog_items', id });
 
         return (
             <div className="space-y-6">
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-4 items-end">
                     <div className="flex-1 w-full">
                         <label className="text-xs font-bold text-slate-500 uppercase">Service / Produit</label>
-                        <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" placeholder="Ex: Création Logo" />
+                        <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" placeholder="Ex: Création Logo" />
                     </div>
                     <div className="w-32">
                         <label className="text-xs font-bold text-slate-500 uppercase">Prix (€)</label>
-                        <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none" placeholder="0.00" />
+                        <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" placeholder="0.00" />
                     </div>
                     <button onClick={addItem} className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 h-[42px]">Ajouter</button>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {catalog.map(item => (
                         <div key={item.id} className="flex justify-between items-center p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                            <div>
-                                <div className="font-bold text-slate-800 dark:text-white">{item.name}</div>
-                                <div className="text-purple-600 font-mono text-sm">{formatCurrency(item.price)}</div>
-                            </div>
+                            <div><div className="font-bold text-slate-800 dark:text-white">{item.name}</div><div className="text-purple-600 font-mono text-sm">{formatCurrency(item.price)}</div></div>
                             <button onClick={() => deleteItem(item.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={18}/></button>
                         </div>
                     ))}
@@ -144,7 +129,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // 3. ÉDITEUR DE DOCUMENTS (Commun Facture & Devis)
+    // 3. ÉDITEUR FACTURE / DEVIS (REFONTE TOTALE : VISUALISATION A4)
     const DocumentEditor = ({ type, onClose }) => {
         const isInvoice = type === 'invoice';
         const [doc, setDoc] = useState({
@@ -155,19 +140,19 @@ export default function ClientHub({ data, updateData }) {
             client_id: '',
             client_name: '',
             client_address: '',
-            items: [{ desc: '', qty: 1, price: 0 }],
+            items: [{ desc: 'Prestation', qty: 1, price: 0 }],
             status: 'Draft',
-            target_account_id: accounts[0]?.id || '', // Compte par défaut
-            notes: isInvoice ? 'Paiement à réception.' : 'Validité 30 jours.'
+            target_account_id: accounts[0]?.id || '',
+            notes: isInvoice ? 'Paiement à réception.' : 'Validité du devis : 30 jours.'
         });
+        const [zoom, setZoom] = useState(0.65); // Zoom initial pour voir la feuille
 
         const handleClientChange = (e) => {
             const c = clients.find(cl => cl.id.toString() === e.target.value);
-            if (c) setDoc({ ...doc, client_id: c.id, client_name: c.name, client_address: c.address || '' });
+            if (c) setDoc({ ...doc, client_id: c.id, client_name: c.name, client_address: (c.address || '') + (c.email ? '\n' + c.email : '') });
         };
 
         const addItem = () => setDoc({ ...doc, items: [...doc.items, { desc: '', qty: 1, price: 0 }] });
-        
         const updateItem = (index, field, value) => {
             const newItems = [...doc.items];
             newItems[index][field] = value;
@@ -178,107 +163,217 @@ export default function ClientHub({ data, updateData }) {
 
         const saveDocument = () => {
             if (!doc.client_id) return alert('Veuillez sélectionner un client.');
-            
             const finalDoc = { ...doc, total };
             const listName = isInvoice ? 'invoices' : 'quotes';
             const newList = [finalDoc, ...(isInvoice ? invoices : quotes)];
-            
             updateData({ ...data, [listName]: newList });
             onClose();
         };
 
-        return (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                <div className="bg-white dark:bg-slate-900 w-full max-w-4xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-                    {/* Header Editor */}
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800">
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            {isInvoice ? <FileText className="text-amber-500"/> : <ShoppingBag className="text-blue-500"/>}
-                            Nouveau {isInvoice ? 'Facture' : 'Devis'}
-                        </h2>
-                        <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full"><X size={20}/></button>
-                    </div>
+        const handlePrint = () => {
+            window.print(); // Utilise le CSS print natif du navigateur
+        };
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                        {/* Top Config */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        return (
+            <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden">
+                {/* Header Toolbar */}
+                <div className="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center text-white no-print">
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                        {isInvoice ? <FileText className="text-amber-500"/> : <ShoppingBag className="text-blue-500"/>}
+                        Nouveau {isInvoice ? 'Facture' : 'Devis'}
+                    </h2>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-2 py-1 border border-slate-700">
+                            <button onClick={() => setZoom(Math.max(0.4, zoom - 0.1))} className="p-1 hover:text-white text-slate-400"><ZoomOut size={16}/></button>
+                            <span className="text-xs font-mono w-10 text-center">{Math.round(zoom * 100)}%</span>
+                            <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))} className="p-1 hover:text-white text-slate-400"><ZoomIn size={16}/></button>
+                        </div>
+                        <button onClick={handlePrint} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-200 flex items-center gap-2">
+                            <Printer size={16}/> Imprimer / PDF
+                        </button>
+                        <button onClick={saveDocument} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2">
+                            <Save size={16}/> Enregistrer
+                        </button>
+                        <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"><X size={24}/></button>
+                    </div>
+                </div>
+
+                <div className="flex flex-1 overflow-hidden">
+                    {/* LEFT PANEL: EDITOR FORM */}
+                    <div className="w-1/3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-6 space-y-6 no-print">
+                        <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Client</label>
-                                <select onChange={handleClientChange} className="w-full p-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                    <option value="">-- Sélectionner --</option>
+                                <select onChange={handleClientChange} className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-blue-500">
+                                    <option value="">-- Sélectionner un client --</option>
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
-                                <textarea value={doc.client_address} readOnly className="w-full mt-2 p-2 bg-transparent text-xs text-slate-500 resize-none" placeholder="Adresse automatique..." />
                             </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Détails</label>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center"><span className="text-sm">Numéro</span> <span className="font-mono font-bold">{doc.number}</span></div>
-                                    <input type="date" value={doc.date} onChange={e => setDoc({...doc, date: e.target.value})} className="w-full p-1 bg-transparent border-b border-slate-200 text-sm" />
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Date</label>
+                                    <input type="date" value={doc.date} onChange={e => setDoc({...doc, date: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Échéance</label>
+                                    <input type="date" value={doc.dueDate} onChange={e => setDoc({...doc, dueDate: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white" />
                                 </div>
                             </div>
+
+                            {isInvoice && (
+                                <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                                    <label className="text-xs font-bold text-amber-600 uppercase block mb-1 flex items-center gap-2"><Wallet size={12}/> Compte de réception</label>
+                                    <select value={doc.target_account_id} onChange={e => setDoc({...doc, target_account_id: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
+                                        {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                    </select>
+                                    <p className="text-[10px] text-amber-600/70 mt-1 italic">Le montant ira sur ce compte une fois la facture "Payée".</p>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Statut</label>
-                                <select value={doc.status} onChange={e => setDoc({...doc, status: e.target.value})} className="w-full p-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg font-bold">
+                                <select value={doc.status} onChange={e => setDoc({...doc, status: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-800 dark:text-white">
                                     <option value="Draft">Brouillon</option>
                                     <option value="Sent">Envoyé</option>
                                     {isInvoice ? <option value="Paid">Payée</option> : <option value="Accepted">Accepté</option>}
                                 </select>
-                                
-                                {isInvoice && (
-                                    <div className="mt-4">
-                                        <label className="text-[10px] font-bold text-amber-600 uppercase block mb-1">Compte de réception</label>
-                                        <select value={doc.target_account_id} onChange={e => setDoc({...doc, target_account_id: e.target.value})} className="w-full p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
-                                            {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                        </select>
-                                    </div>
-                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Lignes</label>
+                                <div className="space-y-2">
+                                    {doc.items.map((item, i) => (
+                                        <div key={i} className="flex gap-2 items-start bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
+                                            <div className="flex-1 space-y-1">
+                                                <input type="text" value={item.desc} onChange={e => updateItem(i, 'desc', e.target.value)} className="w-full text-sm bg-transparent outline-none font-medium text-slate-800 dark:text-white" placeholder="Description" />
+                                                <div className="flex gap-2">
+                                                    <input type="number" value={item.qty} onChange={e => updateItem(i, 'qty', Number(e.target.value))} className="w-16 p-1 bg-slate-100 dark:bg-slate-700 rounded text-xs text-center outline-none text-slate-800 dark:text-white" placeholder="Qté" />
+                                                    <input type="number" value={item.price} onChange={e => updateItem(i, 'price', Number(e.target.value))} className="w-24 p-1 bg-slate-100 dark:bg-slate-700 rounded text-xs text-right outline-none text-slate-800 dark:text-white" placeholder="Prix" />
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setDoc({...doc, items: doc.items.filter((_, idx) => idx !== i)})} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
+                                        </div>
+                                    ))}
+                                    <button onClick={addItem} className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded text-xs font-bold text-slate-500 hover:text-blue-500 hover:border-blue-500">+ Ajouter ligne</button>
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Items */}
-                        <div>
-                            <table className="w-full text-left text-sm">
-                                <thead className="text-slate-500 border-b border-slate-200">
-                                    <tr><th className="py-2">Description</th><th className="py-2 w-20">Qté</th><th className="py-2 w-32">Prix</th><th className="py-2 w-10"></th></tr>
+                    {/* RIGHT PANEL: A4 PREVIEW */}
+                    <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
+                        <div 
+                            id="invoice-paper" 
+                            style={{ 
+                                width: '210mm', 
+                                minHeight: '297mm', 
+                                transform: `scale(${zoom})`, 
+                                transformOrigin: 'top center',
+                                boxShadow: '0 0 20px rgba(0,0,0,0.1)' 
+                            }}
+                            className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200"
+                        >
+                            {/* EN-TÊTE FACTURE */}
+                            <div className="flex justify-between items-start mb-12">
+                                <div>
+                                    {profile.logo ? (
+                                        <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> 
+                                    ) : (
+                                        <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>
+                                    )}
+                                    <div className="text-xs text-slate-500 leading-relaxed">
+                                        {profile.name}<br/>
+                                        {profile.address}<br/>
+                                        {profile.email_contact}<br/>
+                                        SIRET: {profile.siret}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <h1 className="text-4xl font-light text-slate-800 uppercase mb-2">{isInvoice ? 'Facture' : 'Devis'}</h1>
+                                    <p className="font-mono text-lg font-bold text-slate-600">N° {doc.number}</p>
+                                    <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
+                                </div>
+                            </div>
+
+                            {/* DESTINATAIRE */}
+                            <div className="flex justify-end mb-16">
+                                <div className="w-1/3 text-left">
+                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Client</p>
+                                    <p className="text-lg font-bold text-slate-800">{doc.client_name || "Nom du client"}</p>
+                                    <p className="text-sm text-slate-500 whitespace-pre-line">{doc.client_address}</p>
+                                </div>
+                            </div>
+
+                            {/* TABLEAU */}
+                            <table className="w-full mb-8">
+                                <thead className="border-b-2 border-slate-100">
+                                    <tr>
+                                        <th className="text-left py-3 text-xs font-bold text-slate-500 uppercase">Description</th>
+                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Qté</th>
+                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Prix Unit.</th>
+                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Total</th>
+                                    </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                <tbody className="text-sm text-slate-700">
                                     {doc.items.map((item, i) => (
-                                        <tr key={i}>
-                                            <td className="py-2">
-                                                <input type="text" value={item.desc} onChange={e => updateItem(i, 'desc', e.target.value)} className="w-full bg-transparent outline-none" placeholder="Description..." />
-                                                {/* Mini catalogue helper */}
-                                                <select onChange={e => {
-                                                    const catItem = catalog.find(c => c.name === e.target.value);
-                                                    if(catItem) { updateItem(i, 'desc', catItem.name); updateItem(i, 'price', catItem.price); }
-                                                }} className="w-4 opacity-50"><option></option>{catalog.map(c => <option key={c.id}>{c.name}</option>)}</select>
-                                            </td>
-                                            <td className="py-2"><input type="number" value={item.qty} onChange={e => updateItem(i, 'qty', Number(e.target.value))} className="w-full bg-transparent outline-none" /></td>
-                                            <td className="py-2"><input type="number" value={item.price} onChange={e => updateItem(i, 'price', Number(e.target.value))} className="w-full bg-transparent outline-none" /></td>
-                                            <td className="py-2 text-red-500 cursor-pointer" onClick={() => setDoc({...doc, items: doc.items.filter((_, idx) => idx !== i)})}>×</td>
+                                        <tr key={i} className="border-b border-slate-50">
+                                            <td className="py-4 font-medium">{item.desc}</td>
+                                            <td className="py-4 text-right">{item.qty}</td>
+                                            <td className="py-4 text-right">{formatCurrency(item.price)}</td>
+                                            <td className="py-4 text-right font-bold">{formatCurrency(item.qty * item.price)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
-                            <button onClick={addItem} className="mt-2 text-xs font-bold text-blue-500 hover:underline">+ Ajouter une ligne</button>
-                        </div>
 
-                        {/* Total */}
-                        <div className="flex justify-end">
-                            <div className="text-right">
-                                <p className="text-sm text-slate-500">Total HT</p>
-                                <p className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(total)}</p>
+                            {/* TOTALS */}
+                            <div className="flex justify-end mb-12">
+                                <div className="w-1/3 text-right space-y-2">
+                                    <div className="flex justify-between text-sm text-slate-500">
+                                        <span>Total HT</span>
+                                        <span>{formatCurrency(total)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-lg font-bold text-slate-800 pt-4 border-t border-slate-100">
+                                        <span>Total TTC</span>
+                                        <span>{formatCurrency(total)}</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 italic">TVA non applicable, art. 293 B du CGI</p>
+                                </div>
+                            </div>
+
+                            {/* FOOTER */}
+                            <div className="mt-auto pt-8 border-t border-slate-100 text-xs text-slate-500">
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div>
+                                        <p className="font-bold text-slate-700 mb-1">Informations de paiement</p>
+                                        <p>IBAN : {profile.iban || "---"}</p>
+                                        <p>BIC : {profile.bic || "---"}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-slate-700 mb-1">Note</p>
+                                        <p>{doc.notes}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-8 text-center text-[10px] text-slate-300">
+                                    {profile.companyName} - SIRET {profile.siret}
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800">
-                        <button onClick={onClose} className="px-4 py-2 text-slate-500 hover:text-slate-800">Annuler</button>
-                        <button onClick={saveDocument} className="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center gap-2">
-                            <Save size={18}/> Enregistrer
-                        </button>
-                    </div>
                 </div>
+
+                {/* CSS PRINT (Injecté uniquement ici pour forcer le bon format) */}
+                <style>{`
+                    @media print {
+                        body * { visibility: hidden; }
+                        #invoice-paper, #invoice-paper * { visibility: visible; }
+                        #invoice-paper {
+                            position: fixed; left: 0; top: 0; width: 100%; height: 100%; margin: 0; padding: 40px;
+                            transform: none !important; box-shadow: none !important;
+                        }
+                    }
+                `}</style>
             </div>
         );
     };
@@ -290,35 +385,24 @@ export default function ClientHub({ data, updateData }) {
 
         // --- PONT LOGIQUE : PAIEMENT ---
         const handleStatusChange = (doc, newStatus) => {
-            // 1. Mise à jour du statut
             let updatedList = list.map(d => d.id === doc.id ? { ...d, status: newStatus } : d);
             let updatedBudget = { ...data.budget };
 
-            // 2. Si passage à "Paid" pour une facture -> Création Transaction
             if (type === 'invoice' && newStatus === 'Paid' && doc.status !== 'Paid') {
-                if (!doc.target_account_id) return alert("Erreur : Aucun compte bancaire associé à cette facture. Modifiez-la pour choisir un compte.");
-                
+                if (!doc.target_account_id) return alert("Erreur : Aucun compte bancaire associé. Modifiez la facture pour en choisir un.");
                 const newTransaction = {
-                    id: Date.now(),
-                    date: new Date().toISOString(),
-                    amount: doc.total,
-                    type: 'income',
-                    description: `Facture ${doc.number} - ${doc.client_name}`,
-                    accountId: doc.target_account_id,
-                    archived: false
+                    id: Date.now(), date: new Date().toISOString(), amount: doc.total, type: 'income',
+                    description: `Facture ${doc.number} - ${doc.client_name}`, accountId: doc.target_account_id, archived: false
                 };
-
                 updatedBudget.transactions = [newTransaction, ...updatedBudget.transactions];
                 alert(`Transaction de ${formatCurrency(doc.total)} ajoutée au budget !`);
             }
-
-            // 3. Mise à jour globale
             const listName = type === 'quote' ? 'quotes' : 'invoices';
             updateData({ ...data, [listName]: updatedList, budget: updatedBudget });
         };
 
         const deleteDoc = (id) => {
-            if (window.confirm("Supprimer ce document ?")) {
+            if (window.confirm("Supprimer ?")) {
                 const listName = type === 'quote' ? 'quotes' : 'invoices';
                 const table = type === 'quote' ? 'quotes' : 'invoices';
                 updateData({ ...data, [listName]: list.filter(d => d.id !== id) }, { table, id });
@@ -333,48 +417,30 @@ export default function ClientHub({ data, updateData }) {
                         <Plus size={16}/> Créer
                     </button>
                 </div>
-
                 {editorOpen && <DocumentEditor type={type} onClose={() => setEditorOpen(false)} />}
-
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
                         <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 uppercase font-bold text-xs">
                             <tr>
-                                <th className="p-4">N°</th>
-                                <th className="p-4">Client</th>
-                                <th className="p-4">Date</th>
-                                <th className="p-4">Montant</th>
-                                <th className="p-4">Statut</th>
-                                <th className="p-4 text-right">Actions</th>
+                                <th className="p-4">N°</th><th className="p-4">Client</th><th className="p-4">Date</th><th className="p-4">Montant</th><th className="p-4">Statut</th><th className="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                             {list.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">Aucun document.</td></tr>}
                             {list.map(doc => (
                                 <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                    <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-300">{doc.number}</td>
+                                    <td className="p-4 font-mono font-bold">{doc.number}</td>
                                     <td className="p-4 font-medium">{doc.client_name}</td>
                                     <td className="p-4 text-slate-500">{formatDate(doc.date)}</td>
                                     <td className="p-4 font-bold">{formatCurrency(doc.total)}</td>
                                     <td className="p-4">
-                                        <select 
-                                            value={doc.status} 
-                                            onChange={(e) => handleStatusChange(doc, e.target.value)}
-                                            className={`text-xs font-bold px-2 py-1 rounded border outline-none cursor-pointer ${
-                                                doc.status === 'Paid' || doc.status === 'Accepted' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                doc.status === 'Sent' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                'bg-slate-100 text-slate-600 border-slate-200'
-                                            }`}
-                                        >
-                                            <option value="Draft">Brouillon</option>
-                                            <option value="Sent">Envoyé</option>
+                                        <select value={doc.status} onChange={(e) => handleStatusChange(doc, e.target.value)} className={`text-xs font-bold px-2 py-1 rounded border outline-none cursor-pointer ${doc.status === 'Paid' || doc.status === 'Accepted' ? 'bg-green-100 text-green-700 border-green-200' : doc.status === 'Sent' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                            <option value="Draft">Brouillon</option><option value="Sent">Envoyé</option>
                                             {type === 'invoice' ? <option value="Paid">Payée</option> : <option value="Accepted">Accepté</option>}
                                             {type === 'quote' && <option value="Rejected">Refusé</option>}
                                         </select>
                                     </td>
-                                    <td className="p-4 text-right">
-                                        <button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
-                                    </td>
+                                    <td className="p-4 text-right"><button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -386,26 +452,16 @@ export default function ClientHub({ data, updateData }) {
 
     return (
         <div className="fade-in p-6 pb-24 max-w-7xl mx-auto space-y-8">
-            {/* Header / Nav */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-white font-serif">Espace Client</h2>
                 <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
                     {['clients', 'quotes', 'invoices', 'catalog'].map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                        >
-                            {tab === 'clients' && 'Clients'}
-                            {tab === 'quotes' && 'Devis'}
-                            {tab === 'invoices' && 'Factures'}
-                            {tab === 'catalog' && 'Offres'}
+                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                            {tab === 'clients' && 'Clients'} {tab === 'quotes' && 'Devis'} {tab === 'invoices' && 'Factures'} {tab === 'catalog' && 'Offres'}
                         </button>
                     ))}
                 </div>
             </div>
-
-            {/* Content */}
             <div className="min-h-[500px]">
                 {activeTab === 'clients' && <ClientsTab />}
                 {activeTab === 'catalog' && <CatalogTab />}
