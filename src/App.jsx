@@ -22,81 +22,19 @@ export default function App() {
   const isLoaded = useRef(false);
   
   const getInitialTheme = () => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('localAppTheme') || 'light';
-    }
+    if (typeof window !== 'undefined') return localStorage.getItem('localAppTheme') || 'light';
     return 'light';
   };
 
   const [data, setData] = useState({
-    todos: [],
-    projects: [],
-    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
-    events: [],
-    notes: [],
-    mainNote: "",
-    settings: { theme: getInitialTheme() },
-    customLabels: {}
+    todos: [], projects: [], budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
+    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {}
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
-    if (!items || items.length === 0) return;
-    const mappedItems = items.map(mapFunction);
-    for (let i = 0; i < mappedItems.length; i += batchSize) {
-      const batch = mappedItems.slice(i, i + batchSize);
-      const { error } = await supabase.from(table).upsert(batch);
-      if (error) {
-        console.error(`Erreur sauvegarde lot ${table}:`, error);
-        throw error;
-      }
-    }
-  };
-
-  const toggleTheme = () => {
-    const currentTheme = data.settings?.theme || 'light';
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
-    setData(newData);
-    localStorage.setItem('localAppTheme', newTheme);
-    if (newTheme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-    updateData(newData); 
-  };
-
-  useEffect(() => {
-    const theme = data.settings?.theme || 'light';
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-    localStorage.setItem('localAppTheme', theme);
-  }, [data.settings?.theme]);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) initDataLoad(session.user.id);
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session && !isLoaded.current) initDataLoad(session.user.id);
-      else if (!session) setLoading(false);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const isDatePastOrToday = (dateStr) => {
-      if (!dateStr) return false;
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const checkDate = new Date(dateStr);
-      checkDate.setHours(0,0,0,0);
-      return checkDate <= today;
-  };
-
+  // Outil robuste pour les dates
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
@@ -108,17 +46,62 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
+  // Comparaison de date souple (Ignore l'heure)
+  const isDatePastOrToday = (dateStr) => {
+      if (!dateStr) return false;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      
+      const checkDate = parseLocalDate(dateStr); // Utilise notre parseur robuste
+      checkDate.setHours(0,0,0,0);
+      
+      return checkDate <= today;
+  };
+
+  const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
+    if (!items || items.length === 0) return;
+    const mappedItems = items.map(mapFunction);
+    for (let i = 0; i < mappedItems.length; i += batchSize) {
+      const batch = mappedItems.slice(i, i + batchSize);
+      const { error } = await supabase.from(table).upsert(batch);
+      if (error) console.error(`Erreur sauvegarde lot ${table}:`, error);
+    }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = data.settings?.theme === 'dark' ? 'light' : 'dark';
+    const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
+    setData(newData);
+    localStorage.setItem('localAppTheme', newTheme);
+    if (newTheme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
+    updateData(newData); 
+  };
+
+  useEffect(() => {
+    const theme = data.settings?.theme || 'light';
+    if (theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
+    localStorage.setItem('localAppTheme', theme);
+  }, [data.settings?.theme]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) initDataLoad(session.user.id); else setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session && !isLoaded.current) initDataLoad(session.user.id); else if (!session) setLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const initDataLoad = async (userId) => {
     if (isLoaded.current) return;
     isLoaded.current = true;
     setLoading(true);
 
     try {
-      const [
-        { data: profile }, { data: todos }, { data: notes }, { data: projects },
-        { data: accounts }, { data: transactions }, { data: recurring }, 
-        { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases }
-      ] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('profiles').select('*').single(),
         supabase.from('todos').select('*'),
         supabase.from('notes').select('*'),
@@ -132,106 +115,123 @@ export default function App() {
         supabase.from('safety_bases').select('*')
       ]);
 
-      // --- MOTEUR DE RATTRAPAGE ---
+      const [
+        { data: profile }, { data: todos }, { data: notes }, { data: projects },
+        { data: accounts }, { data: transactions }, { data: recurring }, 
+        { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases }
+      ] = results;
+
+      // --- MOTEUR DE RATTRAPAGE DÉBLOQUÉ ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
-      const validAccounts = accounts || [];
-      const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : null;
-
-      if (defaultAccountId) {
-          // 1. Scheduled
-          (scheduled || []).forEach(s => {
-              if (s.status === 'pending' && isDatePastOrToday(s.date)) {
-                  const baseId = Date.now() + Math.floor(Math.random() * 1000000);
-                  const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : defaultAccountId;
-                  const common = { id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, type: s.type, description: s.description, account_id: accId };
-
-                  if (s.type === 'transfer' && s.target_account_id) {
-                      const targetAccId = validAccounts.find(a => a.id === s.target_account_id) ? s.target_account_id : defaultAccountId;
-                      const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
-                      const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
-                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
-                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
-                  } else { newDBTransactions.push(common); }
-                  updatedDBScheduled.push({ ...s, status: 'executed' });
-              }
-          });
-
-          // 2. Recurring
-          const today = new Date();
-          today.setHours(0,0,0,0);
-          (recurring || []).forEach(r => {
-              let hasChanged = false;
-              let tempR = { ...r };
-              if (!tempR.next_due_date) {
-                  const d = new Date(); d.setDate(tempR.day_of_month);
-                  if (d < today) d.setMonth(d.getMonth() + 1);
-                  tempR.next_due_date = d.toISOString();
-                  hasChanged = true;
-              }
-              let loopSafety = 0;
-              while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
-                  const nextDueObj = parseLocalDate(tempR.next_due_date);
-                  const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
-                  const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : defaultAccountId;
-                  const common = { id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, type: tempR.type, description: tempR.description, account_id: accId };
-
-                  if (tempR.type === 'transfer' && tempR.target_account_id) {
-                      const targetAccId = validAccounts.find(a => a.id === tempR.target_account_id) ? tempR.target_account_id : defaultAccountId;
-                      const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
-                      const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
-                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${tempR.description}`, account_id: accId });
-                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${tempR.description}`, account_id: targetAccId });
-                  } else { newDBTransactions.push(common); }
-                  
-                  let nextMonth = nextDueObj.getMonth() + 1;
-                  let nextYear = nextDueObj.getFullYear();
-                  if (nextMonth > 11) { nextMonth = 0; nextYear++; }
-                  const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
-                  const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
-                  const newDate = new Date(nextYear, nextMonth, targetDay);
-                  if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
-                  tempR.next_due_date = newDate.toISOString();
-                  hasChanged = true;
-                  loopSafety++;
-              }
-              if (hasChanged) updatedDBRecurring.push(tempR);
-          });
-      }
-
-      // --- CORRECTION CRITIQUE : DÉCOUPLAGE UI / DB ---
-      // On met à jour l'état local AVANT de tenter la sauvegarde réseau
       
-      // 1. Préparation des listes finales
+      const validAccounts = accounts || [];
+      // On prend un ID par défaut même si la liste est vide (pour ne pas bloquer le script)
+      const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : (scheduled?.[0]?.account_id || 'offline-account');
+
+      // 1. Rattrapage PLANIFIÉS
+      (scheduled || []).forEach(s => {
+          // On force la vérification
+          if (s.status === 'pending' && isDatePastOrToday(s.date)) {
+              const baseId = Date.now() + Math.floor(Math.random() * 1000000);
+              // Si le compte n'est pas trouvé, on garde l'ID original
+              const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
+              
+              const common = { 
+                  id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, 
+                  type: s.type, description: s.description, account_id: accId 
+              };
+
+              if (s.type === 'transfer' && s.target_account_id) {
+                  const targetAccId = s.target_account_id;
+                  const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
+                  const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
+                  newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
+                  newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
+              } else { 
+                  newDBTransactions.push(common); 
+              }
+              updatedDBScheduled.push({ ...s, status: 'executed' });
+          }
+      });
+
+      // 2. Rattrapage RÉCURRENTS
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      (recurring || []).forEach(r => {
+          let hasChanged = false;
+          let tempR = { ...r };
+          if (!tempR.next_due_date) {
+              const d = new Date(); d.setDate(tempR.day_of_month);
+              if (d < today) d.setMonth(d.getMonth() + 1);
+              tempR.next_due_date = d.toISOString();
+              hasChanged = true;
+          }
+          let loopSafety = 0;
+          while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
+              const nextDueObj = parseLocalDate(tempR.next_due_date);
+              const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
+              const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
+              
+              const common = { 
+                  id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, 
+                  type: tempR.type, description: tempR.description, account_id: accId 
+              };
+
+              if (tempR.type === 'transfer' && tempR.target_account_id) {
+                  newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
+                  newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
+              } else { 
+                  newDBTransactions.push(common); 
+              }
+              
+              let nextMonth = nextDueObj.getMonth() + 1;
+              let nextYear = nextDueObj.getFullYear();
+              if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+              const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+              const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
+              const newDate = new Date(nextYear, nextMonth, targetDay);
+              
+              if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
+              tempR.next_due_date = newDate.toISOString();
+              hasChanged = true;
+              loopSafety++;
+          }
+          if (hasChanged) updatedDBRecurring.push(tempR);
+      });
+
+      // --- APPLICATION IMMÉDIATE DES CHANGEMENTS ---
       let finalTransactions = [...(transactions || []), ...newDBTransactions];
+      
+      // Utilisation de '==' pour ignorer les différences string/number sur les ID
       let finalScheduled = (scheduled || []).map(s => { 
-          const updated = updatedDBScheduled.find(u => u.id === s.id); 
+          const updated = updatedDBScheduled.find(u => u.id == s.id); 
           return updated || s; 
       });
       let finalRecurring = (recurring || []).map(r => { 
-          const updated = updatedDBRecurring.find(u => u.id === r.id); 
+          const updated = updatedDBRecurring.find(u => u.id == r.id); 
           return updated || r; 
       });
 
-      // 2. Tentative de sauvegarde (Non bloquante pour l'affichage)
+      // Sauvegarde asynchrone (ne bloque pas l'affichage)
       if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
+          const count = newDBTransactions.length;
+          setNotifMessage(`${count} paiement(s) rattrapé(s) !`);
           const syncAsync = async () => {
              try {
                  if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
                  if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
                  if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
-                 setNotifMessage("Paiements planifiés traités (Sync OK)");
              } catch (err) {
-                 console.error("Erreur Sync Rattrapage (Mais UI à jour):", err);
-                 setNotifMessage("Paiements traités (Sauvegarde différée)");
-                 setUnsavedChanges(true); // On marque pour réessayer plus tard
+                 console.error("Erreur Sync Arrière-plan:", err);
+                 setUnsavedChanges(true); // On réessaiera plus tard
              }
           };
-          syncAsync(); // On lance sans await bloquant
+          syncAsync();
       }
 
-      // 3. Affichage immédiat
+      // Mapping final pour l'affichage
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -240,24 +240,18 @@ export default function App() {
       const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
       const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
       
-      const localTheme = localStorage.getItem('localAppTheme');
-      const loadedTheme = localTheme || profile?.settings?.theme || 'light';
+      const loadedTheme = localStorage.getItem('localAppTheme') || profile?.settings?.theme || 'light';
       
       const newData = {
-        todos: todos || [],
-        notes: mappedNotes,
-        projects: mappedProjects,
-        events: events || [],
+        todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
         budget: {
           accounts: validAccounts,
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
-          recurring: mappedRecurring,
-          scheduled: mappedScheduled,
+          recurring: mappedRecurring, scheduled: mappedScheduled,
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
-        customLabels: profile?.custom_labels || {},
-        mainNote: ""
+        customLabels: profile?.custom_labels || {}, mainNote: ""
       };
 
       setData(newData);
@@ -301,10 +295,7 @@ export default function App() {
       setUnsavedChanges(false);
       setNotifMessage("Sauvegarde terminée !");
       setTimeout(() => setNotifMessage(null), 3000);
-    } catch (err) { 
-        console.error("Erreur sauvegarde critique", err);
-        setNotifMessage("Erreur sauvegarde (voir console)"); 
-    } finally { setIsSaving(false); }
+    } catch (err) { console.error("Erreur sauvegarde critique", err); setNotifMessage("Erreur sauvegarde (voir console)"); } finally { setIsSaving(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
@@ -326,14 +317,8 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
-        {(isSaving || unsavedChanges) && (
-            <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>
-        )}
-        {notifMessage && (
-            <div className={`px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in ${notifMessage.includes('Erreur') ? 'bg-red-900 border-red-700 text-red-100' : 'bg-slate-900 border-slate-700 text-slate-200'}`}>
-                {notifMessage}
-            </div>
-        )}
+        {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>}
+        {notifMessage && <div className={`px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in ${notifMessage.includes('Erreur') ? 'bg-red-900 border-red-700 text-red-100' : 'bg-slate-900 border-slate-700 text-slate-200'}`}>{notifMessage}</div>}
       </div>
       {isLocked && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
