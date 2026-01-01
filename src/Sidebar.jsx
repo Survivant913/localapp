@@ -8,20 +8,27 @@ import { supabase } from './supabaseClient';
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // --- CORRECTION : Déconnexion robuste pour Mobile & PC ---
+  // --- VERSION FORCE POUR MOBILE ---
   const handleLogout = async () => {
     try {
+      // 1. Déconnexion Supabase
       await supabase.auth.signOut();
       
-      // Si on est sur mobile, on ferme le menu visuellement tout de suite
+      // 2. Nettoyage manuel des résidus de session
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // 3. Fermeture visuelle immédiate du menu
       if (isMobileOpen && toggleMobile) {
         toggleMobile();
       }
-      
-      // On recharge pour revenir au login proprement
-      window.location.reload(); 
+
+      // 4. Redirection forcée vers l'origine (écrase le cache de navigation)
+      window.location.replace(window.location.origin);
     } catch (error) {
       console.error("Erreur déconnexion:", error);
+      // Sécurité : même en cas d'erreur API, on force le reload
+      window.location.href = "/";
     }
   };
 
@@ -37,15 +44,15 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
   return (
     <>
-      {/* Overlay Mobile */}
+      {/* Overlay Mobile - Z-INDEX 40 pour être sous la sidebar (50) */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
           onClick={toggleMobile}
         ></div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Z-INDEX 50 pour être au dessus de TOUT */}
       <div className={`
         fixed inset-y-0 left-0 z-50 bg-slate-950 text-white transform transition-all duration-300 ease-in-out border-r border-slate-800 flex flex-col
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
@@ -69,7 +76,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
             <Menu size={24} />
           </button>
 
-          {/* Bouton fermer sur mobile */}
           <button onClick={toggleMobile} className="md:hidden text-slate-400 hover:text-white p-2">
             <X size={24} />
           </button>
@@ -101,7 +107,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   </span>
                 )}
 
-                {/* Tooltip au survol si replié */}
                 {isCollapsed && (
                   <div className="absolute left-14 ml-2 bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap border border-slate-700 shadow-xl font-bold tracking-wide">
                     {item.label}
@@ -120,9 +125,10 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
             <button 
               onClick={handleLogout}
               className={`
-                flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors
+                flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer
                 ${isCollapsed ? 'w-10 h-10 p-0' : 'flex-1 px-4 py-3'}
               `}
+              style={{ WebkitTapHighlightColor: 'transparent' }} // Supprime le flash gris sur mobile
               title={isCollapsed ? "Déconnexion" : ""}
             >
               <LogOut size={18} />
