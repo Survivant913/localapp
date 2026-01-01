@@ -47,7 +47,7 @@ export default function CalendarView({ data }) {
                     colorClass: 'text-blue-600 dark:text-blue-400', 
                     bgClass: 'bg-blue-100 dark:bg-blue-900/30', 
                     borderClass: 'border-blue-200 dark:border-blue-800', 
-                    icon: ArrowRightLeft, // Double flèche
+                    icon: ArrowRightLeft, 
                     sign: '', 
                     label: 'Virement', 
                     isExpense: false, isIncome: false 
@@ -61,11 +61,9 @@ export default function CalendarView({ data }) {
 
         // VUE COMPTE SPÉCIFIQUE
         if (item.type === 'transfer') {
-            // Si le compte REÇOIT (Entrée)
             if (item.targetAccountId === calendarFilter) {
                 return { colorClass: 'text-green-700 dark:text-green-400', bgClass: 'bg-green-100 dark:bg-green-900/30', borderClass: 'border-green-200 dark:border-green-800', icon: TrendingUp, sign: '+', label: 'Reçu', isExpense: false, isIncome: true };
             }
-            // Si le compte ENVOIE (Sortie)
             if (item.accountId === calendarFilter) {
                 return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Envoyé', isExpense: true, isIncome: false };
             }
@@ -75,7 +73,7 @@ export default function CalendarView({ data }) {
         return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Dépense', isExpense: true, isIncome: false };
     };
 
-    // --- 2. CALCUL DU SOLDE ACTUEL ---
+    // --- 2. CALCUL DU SOLDE ACTUEL (POINT DE DÉPART) ---
     const currentBalance = useMemo(() => {
         return budget.transactions
             .filter(t => {
@@ -95,13 +93,72 @@ export default function CalendarView({ data }) {
             }, 0);
     }, [budget.transactions, calendarFilter]);
 
-    // --- 3. MOTEUR JOURNALIER ---
+    // --- 3. MOTEUR JOURNALIER INTELLIGENT ---
     const dailyData = useMemo(() => {
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const today = new Date();
         today.setHours(0,0,0,0);
+
+        // --- CORRECTION : CALCUL DU SOLDE DE DÉBUT DE MOIS ---
+        // On projette ce qu'il se passe entre "Aujourd'hui" et le "1er du mois affiché"
+        let startOfMonthProjection = currentBalance;
+        
+        const firstDayOfView = new Date(year, month, 1);
+        
+        // Si on regarde un mois futur, on doit simuler l'évolution entre aujourd'hui et ce futur
+        if (firstDayOfView > today) {
+            let simDate = new Date(today);
+            simDate.setDate(simDate.getDate() + 1); // Commencer simulation demain
+            
+            while (simDate < firstDayOfView) {
+                // Simuler Recurrents & Scheduled pour ce jour intermédiaire
+                const simDayOfMonth = simDate.getDate();
+                
+                // Scheduled
+                budget.scheduled.forEach(s => {
+                    if (s.status === 'pending' && isSameDay(parseLocalDate(s.date), simDate)) {
+                        if (calendarFilter === 'total' || s.accountId === calendarFilter || (s.type === 'transfer' && s.targetAccountId === calendarFilter)) {
+                            // Calcul impact
+                            let impact = 0;
+                            const amt = parseFloat(s.amount || 0);
+                            const disp = getContextDisplay(s);
+                            if (calendarFilter === 'total') {
+                                if (s.type === 'income') impact = amt;
+                                else if (s.type !== 'transfer') impact = -amt;
+                            } else {
+                                if (disp.isIncome) impact = amt;
+                                else if (disp.isExpense) impact = -amt;
+                            }
+                            startOfMonthProjection += impact;
+                        }
+                    }
+                });
+
+                // Recurring
+                budget.recurring.forEach(r => {
+                    if (r.dayOfMonth === simDayOfMonth && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
+                        if (calendarFilter === 'total' || r.accountId === calendarFilter || (r.type === 'transfer' && r.targetAccountId === calendarFilter)) {
+                             let impact = 0;
+                            const amt = parseFloat(r.amount || 0);
+                            const disp = getContextDisplay(r);
+                            if (calendarFilter === 'total') {
+                                if (r.type === 'income') impact = amt;
+                                else if (r.type !== 'transfer') impact = -amt;
+                            } else {
+                                if (disp.isIncome) impact = amt;
+                                else if (disp.isExpense) impact = -amt;
+                            }
+                            startOfMonthProjection += impact;
+                        }
+                    }
+                });
+                
+                simDate.setDate(simDate.getDate() + 1);
+            }
+        }
+        // --- FIN CORRECTION ---
 
         const daysMap = {};
 
@@ -114,20 +171,12 @@ export default function CalendarView({ data }) {
                 const amt = parseFloat(item.amount || 0);
                 const display = getContextDisplay(item);
                 
-                // Calcul de l'impact financier sur le total du jour
                 let impact = 0;
-                
                 if (calendarFilter === 'total') {
-                    // En vue globale, un transfert est neutre (0), sauf si c'est externe (income/expense)
-                    if (item.type === 'transfer') {
-                        impact = 0; 
-                    } else if (item.type === 'income') {
-                        impact = amt;
-                    } else {
-                        impact = -amt;
-                    }
+                    if (item.type === 'transfer') impact = 0; 
+                    else if (item.type === 'income') impact = amt;
+                    else impact = -amt;
                 } else {
-                    // En vue spécifique, on suit les règles strictes (Entrée/Sortie)
                     if (display.isIncome) impact = amt;
                     else if (display.isExpense) impact = -amt;
                 }
@@ -140,7 +189,6 @@ export default function CalendarView({ data }) {
             budget.transactions.forEach(t => {
                 const tDate = parseLocalDate(t.date);
                 if (isSameDay(tDate, date)) {
-                    // Vérif pertinence compte
                     if (calendarFilter === 'total' || t.accountId === calendarFilter || (t.type === 'transfer' && t.targetAccountId === calendarFilter)) {
                         addEvent(t, 'transaction', 'history');
                     }
@@ -158,6 +206,7 @@ export default function CalendarView({ data }) {
                 }
             });
 
+            // Pour les récurrents, on affiche seulement à partir d'aujourd'hui
             if (date >= today) {
                 budget.recurring.forEach(r => {
                     if (r.dayOfMonth === d && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
@@ -168,7 +217,6 @@ export default function CalendarView({ data }) {
                 });
             }
 
-            // Extras (non financiers)
             const extras = [];
             todos.forEach(t => { if (!t.completed && t.deadline && isSameDay(parseLocalDate(t.deadline), date)) extras.push({ type: 'todo', text: t.text }); });
             projects.forEach(p => { if (p.deadline && p.status !== 'done' && isSameDay(parseLocalDate(p.deadline), date)) extras.push({ type: 'project', text: p.title }); });
@@ -176,8 +224,10 @@ export default function CalendarView({ data }) {
             daysMap[d] = { date, events, dailyChange, extras, endBalance: 0 };
         }
 
-        // Projection du solde
-        let runningBalance = currentBalance;
+        // Projection finale avec le solde corrigé
+        let runningBalance = (firstDayOfView > today) ? startOfMonthProjection : currentBalance;
+
+        // Si on est sur le mois courant
         if (today.getMonth() === month && today.getFullYear() === year) {
             const todayDay = today.getDate();
             // Futur
@@ -197,8 +247,9 @@ export default function CalendarView({ data }) {
                     if (daysMap[d-1]) daysMap[d-1].endBalance = pastBalance;
                 }
             }
-        } else if (new Date(year, month, 1) > today) {
-            let projected = currentBalance; 
+        } else if (firstDayOfView > today) {
+            // Mois futur complet
+            let projected = startOfMonthProjection; 
             for (let d = 1; d <= daysInMonth; d++) {
                 if (daysMap[d]) {
                     projected += daysMap[d].dailyChange;
@@ -206,6 +257,7 @@ export default function CalendarView({ data }) {
                 }
             }
         } else {
+            // Mois passé (on n'affiche pas les soldes prévisionnels pour éviter la confusion avec l'historique réel non reconstitué)
             for (let d = 1; d <= daysInMonth; d++) if (daysMap[d]) daysMap[d].endBalance = null;
         }
 
@@ -245,13 +297,11 @@ export default function CalendarView({ data }) {
                 
                 <div className="flex items-center gap-3 bg-blue-50 dark:bg-slate-700/50 px-4 py-2 rounded-xl">
                     <Wallet size={20} className="text-blue-600 dark:text-blue-400"/>
-                    
-                    {/* CORRECTION DU SELECT : Styles explicites pour éviter le fond blanc sur texte blanc */}
                     <select 
                         value={calendarFilter} 
                         onChange={(e) => setCalendarFilter(e.target.value)} 
                         className="bg-transparent text-sm font-bold text-slate-700 dark:text-white outline-none cursor-pointer"
-                        style={{ colorScheme: 'dark' }} // Force le style natif sombre si supporté
+                        style={{ colorScheme: 'dark' }}
                     >
                         <option value="total" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Vue Globale</option>
                         {accounts.map(acc => (
@@ -265,7 +315,6 @@ export default function CalendarView({ data }) {
 
             {/* Grille Calendrier */}
             <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[700px]">
-                {/* Jours Semaine */}
                 <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                     {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map(day => (
                         <div key={day} className="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -274,7 +323,6 @@ export default function CalendarView({ data }) {
                     ))}
                 </div>
 
-                {/* Cases */}
                 <div className="grid grid-cols-7 auto-rows-fr flex-1 bg-gray-200 dark:bg-slate-700 gap-px border-b border-gray-200 dark:border-slate-700">
                     {Array.from({ length: offset }).map((_, i) => (
                         <div key={`blank-${i}`} className="bg-gray-50/50 dark:bg-slate-900/30"></div>
@@ -294,12 +342,10 @@ export default function CalendarView({ data }) {
                                     ${isToday ? 'bg-blue-50/40 dark:bg-slate-800 ring-inset ring-2 ring-blue-500' : 'hover:bg-gray-50 dark:hover:bg-slate-700'}
                                 `}
                             >
-                                {/* En-tête jour */}
                                 <div className="flex justify-between items-center">
                                     <span className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300'}`}>
                                         {d}
                                     </span>
-                                    {/* Bilan journalier (Caché si 0) */}
                                     {dayData.dailyChange !== 0 && (
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${dayData.dailyChange > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
                                             {dayData.dailyChange > 0 ? '+' : ''}{Math.round(dayData.dailyChange)}€
@@ -307,7 +353,6 @@ export default function CalendarView({ data }) {
                                     )}
                                 </div>
 
-                                {/* Contenu (Transactions) */}
                                 <div className="flex-1 flex flex-col gap-1 overflow-hidden min-h-[60px]">
                                     {dayData.events.slice(0, 4).map((e, idx) => {
                                         const d = e.display;
@@ -333,7 +378,6 @@ export default function CalendarView({ data }) {
                                     )}
                                 </div>
 
-                                {/* Solde fin de journée (Footer) */}
                                 {dayData.endBalance !== null && dayData.endBalance !== undefined && (
                                     <div className="mt-auto pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex justify-end">
                                         <span className={`text-xs font-extrabold ${dayData.endBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
