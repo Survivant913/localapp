@@ -5,29 +5,35 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels }) {
+export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // --- VERSION FORCE POUR MOBILE ---
+  // --- CORRECTIF : DÉCONNEXION INTELLIGENTE ---
   const handleLogout = async () => {
     try {
-      // 1. Déconnexion Supabase
+      // 1. On sauvegarde le thème actuel avant de tout effacer
+      const currentTheme = localStorage.getItem('localAppTheme');
+
+      // 2. Déconnexion Supabase
       await supabase.auth.signOut();
       
-      // 2. Nettoyage manuel des résidus de session
+      // 3. Nettoyage mémoire (pour sécurité et bugs mobile)
       localStorage.clear();
       sessionStorage.clear();
 
-      // 3. Fermeture visuelle immédiate du menu
+      // 4. On RESTAURE le thème immédiatement après le nettoyage
+      if (currentTheme) {
+        localStorage.setItem('localAppTheme', currentTheme);
+      }
+
+      // 5. Fermeture menu mobile et redirection
       if (isMobileOpen && toggleMobile) {
         toggleMobile();
       }
-
-      // 4. Redirection forcée vers l'origine (écrase le cache de navigation)
       window.location.replace(window.location.origin);
+      
     } catch (error) {
       console.error("Erreur déconnexion:", error);
-      // Sécurité : même en cas d'erreur API, on force le reload
       window.location.href = "/";
     }
   };
@@ -44,7 +50,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
   return (
     <>
-      {/* Overlay Mobile - Z-INDEX 40 pour être sous la sidebar (50) */}
+      {/* Overlay Mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -52,7 +58,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ></div>
       )}
 
-      {/* Sidebar - Z-INDEX 50 pour être au dessus de TOUT */}
+      {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 bg-slate-950 text-white transform transition-all duration-300 ease-in-out border-r border-slate-800 flex flex-col
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
@@ -128,8 +134,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer
                 ${isCollapsed ? 'w-10 h-10 p-0' : 'flex-1 px-4 py-3'}
               `}
-              style={{ WebkitTapHighlightColor: 'transparent' }} // Supprime le flash gris sur mobile
-              title={isCollapsed ? "Déconnexion" : ""}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+              title="Déconnexion"
             >
               <LogOut size={18} />
               {!isCollapsed && <span className="text-xs">Sortir</span>}
@@ -141,7 +147,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 rounded-xl text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors
                 ${isCollapsed ? 'w-10 h-10 flex items-center justify-center p-0' : 'p-3'}
               `}
-              title={isCollapsed ? "Mode Zen" : "Mode Zen (Focus)"}
+              title="Mode Zen"
             >
               <Coffee size={18} />
             </button>
