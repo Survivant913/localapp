@@ -8,9 +8,21 @@ import { supabase } from './supabaseClient';
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
+  // --- CORRECTION : Déconnexion robuste pour Mobile & PC ---
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
+    try {
+      await supabase.auth.signOut();
+      
+      // Si on est sur mobile, on ferme le menu visuellement tout de suite
+      if (isMobileOpen && toggleMobile) {
+        toggleMobile();
+      }
+      
+      // On recharge pour revenir au login proprement
+      window.location.reload(); 
+    } catch (error) {
+      console.error("Erreur déconnexion:", error);
+    }
   };
 
   const menuItems = [
@@ -28,7 +40,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
       {/* Overlay Mobile */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
           onClick={toggleMobile}
         ></div>
       )}
@@ -57,13 +69,13 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
             <Menu size={24} />
           </button>
 
-          <button onClick={toggleMobile} className="md:hidden text-slate-400 hover:text-white">
+          {/* Bouton fermer sur mobile */}
+          <button onClick={toggleMobile} className="md:hidden text-slate-400 hover:text-white p-2">
             <X size={24} />
           </button>
         </div>
 
         {/* Navigation */}
-        {/* CORRECTION ICI : Si replié (isCollapsed), on met 'overflow-visible' pour que l'infobulle sorte. Sinon 'overflow-y-auto' pour scroller. */}
         <nav className={`flex-1 px-3 space-y-2 custom-scrollbar ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
           {menuItems.map(item => {
             const Icon = item.icon;
@@ -84,18 +96,17 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 <Icon size={20} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 
                 {!isCollapsed && (
-                    <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
-                        {item.label}
-                    </span>
+                  <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
+                    {item.label}
+                  </span>
                 )}
 
-                {/* Tooltip au survol si replié (Z-INDEX 50 pour passer au dessus de tout) */}
+                {/* Tooltip au survol si replié */}
                 {isCollapsed && (
-                    <div className="absolute left-16 ml-2 bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap border border-slate-700 shadow-xl font-bold tracking-wide">
-                        {item.label}
-                        {/* Petite flèche décorative */}
-                        <div className="absolute top-1/2 -left-1 -mt-1 w-2 h-2 bg-slate-800 border-l border-b border-slate-700 transform rotate-45"></div>
-                    </div>
+                  <div className="absolute left-14 ml-2 bg-slate-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap border border-slate-700 shadow-xl font-bold tracking-wide">
+                    {item.label}
+                    <div className="absolute top-1/2 -left-1 -mt-1 w-2 h-2 bg-slate-800 border-l border-b border-slate-700 transform rotate-45"></div>
+                  </div>
                 )}
               </button>
             );
@@ -107,26 +118,26 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           <div className={`flex gap-2 mb-4 ${isCollapsed ? 'flex-col items-center' : ''}`}>
             
             <button 
-                onClick={handleLogout}
-                className={`
-                    flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors
-                    ${isCollapsed ? 'w-10 h-10 p-0' : 'flex-1 px-4 py-3'}
-                `}
-                title={isCollapsed ? "Déconnexion" : ""}
+              onClick={handleLogout}
+              className={`
+                flex items-center justify-center gap-2 rounded-xl text-sm font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors
+                ${isCollapsed ? 'w-10 h-10 p-0' : 'flex-1 px-4 py-3'}
+              `}
+              title={isCollapsed ? "Déconnexion" : ""}
             >
-                <LogOut size={18} />
-                {!isCollapsed && <span className="text-xs">Sortir</span>}
+              <LogOut size={18} />
+              {!isCollapsed && <span className="text-xs">Sortir</span>}
             </button>
             
             <button 
-                onClick={() => setView('zen')}
-                className={`
-                    rounded-xl text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors
-                    ${isCollapsed ? 'w-10 h-10 flex items-center justify-center p-0' : 'p-3'}
-                `}
-                title={isCollapsed ? "Mode Zen" : "Mode Zen (Focus)"}
+              onClick={() => setView('zen')}
+              className={`
+                rounded-xl text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors
+                ${isCollapsed ? 'w-10 h-10 flex items-center justify-center p-0' : 'p-3'}
+              `}
+              title={isCollapsed ? "Mode Zen" : "Mode Zen (Focus)"}
             >
-                <Coffee size={18} />
+              <Coffee size={18} />
             </button>
           </div>
 
