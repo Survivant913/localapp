@@ -9,7 +9,7 @@ import BudgetManager from './BudgetManager';
 import NotesManager from './NotesManager';
 import TodoList from './TodoList';
 import DataSettings from './DataSettings';
-import ClientHub from './ClientHub';
+import ClientHub from './ClientHub'; // LE NOUVEAU HUB
 import ZenMode from './ZenMode';
 import { Loader2, Lock } from 'lucide-react';
 
@@ -58,16 +58,18 @@ export default function App() {
       return checkDate <= today;
   };
 
-  // --- SAUVEGARDE ROBUSTE ---
+  // --- SAUVEGARDE ROBUSTE (Batch) ---
   const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
     if (!items || items.length === 0) return;
     const mappedItems = items.map(mapFunction);
+    
     for (let i = 0; i < mappedItems.length; i += batchSize) {
       const batch = mappedItems.slice(i, i + batchSize);
       const { error } = await supabase.from(table).upsert(batch);
+      
       if (error) {
-          console.error(`ERREUR SAUVEGARDE ${table}:`, error);
-          throw error; // On remonte l'erreur
+        console.error(`ERREUR CRITIQUE sur ${table}:`, error);
+        throw new Error(`Erreur sauvegarde ${table}: ${error.message}`);
       }
     }
   };
@@ -226,7 +228,7 @@ export default function App() {
           syncAsync();
       }
 
-      // Mapping final pour l'affichage
+      // Mapping final
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -240,7 +242,7 @@ export default function App() {
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
         budget: {
-          accounts: validAccounts, // Les comptes chargés depuis Supabase
+          accounts: validAccounts, // Comptes chargés
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
           recurring: mappedRecurring, scheduled: mappedScheduled,
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
@@ -272,6 +274,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [data, unsavedChanges]);
 
+  // --- SAUVEGARDE GLOBALE ---
   const saveDataToSupabase = async () => {
     if (!session) return;
     setIsSaving(true);
@@ -286,27 +289,24 @@ export default function App() {
           iban: data.profile?.iban, bic: data.profile?.bic, tva_number: data.profile?.tva_number
       });
 
-      // --- CORRECTION CRITIQUE : SAUVEGARDE COMPTES ---
-      // On s'assure que les comptes ont bien un ID et un nom avant d'être envoyés
-      const accountsToSave = data.budget.accounts.filter(a => a.id && a.name).map(a => ({ 
-          id: a.id, 
-          user_id: user.id, 
-          name: a.name 
-      }));
-      await upsertInBatches('accounts', accountsToSave, 50, a => a);
+      // --- COMPTES (FIX) ---
+      // On sauvegarde les comptes pour s'assurer qu'ils persistent
+      await upsertInBatches('accounts', data.budget.accounts, 50, a => ({ id: a.id, user_id: user.id, name: a.name }));
 
-      // Autres tables
+      // --- CLIENTS & DOCS ---
       await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
       await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-      
-      // Transactions (avec correction account_id)
+
+      // --- TRANSACTIONS ---
+      // Sécurité double mapping account_id
       await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ 
           id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, 
           date: t.date, account_id: t.accountId || t.account_id, archived: t.archived 
       }));
 
+      // Reste...
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
@@ -346,6 +346,8 @@ export default function App() {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
         {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>}
+        
+        {/* ERREUR ROUGE */}
         {notifMessage && notifMessage.includes('Erreur') && (
             <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100">
                 {notifMessage}
