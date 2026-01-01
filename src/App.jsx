@@ -9,6 +9,7 @@ import BudgetManager from './BudgetManager';
 import NotesManager from './NotesManager';
 import TodoList from './TodoList';
 import DataSettings from './DataSettings';
+import ClientManager from './ClientManager'; // --- AJOUT CRM : IMPORT ---
 import ZenMode from './ZenMode';
 import { Loader2, Lock } from 'lucide-react';
 
@@ -21,27 +22,26 @@ export default function App() {
   const [notifMessage, setNotifMessage] = useState(null);
   const isLoaded = useRef(false);
   
-  // Récupération sécurisée du thème au démarrage
   const getInitialTheme = () => {
     if (typeof window !== 'undefined') return localStorage.getItem('localAppTheme') || 'light';
     return 'light';
   };
 
   const [data, setData] = useState({
-    todos: [], projects: [], budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
-    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {}
+    todos: [], projects: [], 
+    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
+    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
+    clients: [], // --- AJOUT CRM : STATE ---
+    profile: {}  // --- AJOUT CRM : PROFIL ENTREPRISE ---
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- UTILITAIRES DE DATE ROBUSTES ---
-  
-  // Transforme n'importe quelle chaîne de date en objet Date fiable (minuit local)
+  // Outil robuste pour les dates
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
-        // Gestion spéciale pour le format YYYY-MM-DD standard
         if (typeof dateStr === 'string' && dateStr.includes('-')) {
             const parts = dateStr.split('T')[0].split('-');
             if (parts.length === 3) return new Date(parts[0], parts[1] - 1, parts[2]);
@@ -50,7 +50,7 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
-  // Vérifie si une date est passée ou est aujourd'hui (ignore l'heure exacte)
+  // Comparaison de date souple (Ignore l'heure)
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
@@ -62,7 +62,6 @@ export default function App() {
       return checkDate <= today;
   };
 
-  // --- SAUVEGARDE PAR LOTS (Performance & Fiabilité) ---
   const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
     if (!items || items.length === 0) return;
     const mappedItems = items.map(mapFunction);
@@ -73,7 +72,6 @@ export default function App() {
     }
   };
 
-  // --- GESTION DU THÈME ---
   const toggleTheme = () => {
     const newTheme = data.settings?.theme === 'dark' ? 'light' : 'dark';
     const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
@@ -89,7 +87,6 @@ export default function App() {
     localStorage.setItem('localAppTheme', theme);
   }, [data.settings?.theme]);
 
-  // --- GESTION DE SESSION ---
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -102,9 +99,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- CHARGEMENT INITIAL & RATTRAPAGE (CŒUR DU SYSTÈME) ---
   const initDataLoad = async (userId) => {
-    // Sécurité : On empêche le moteur de tourner deux fois
     if (isLoaded.current) return;
     isLoaded.current = true;
     setLoading(true);
@@ -121,27 +116,27 @@ export default function App() {
         supabase.from('scheduled').select('*'),
         supabase.from('events').select('*'),
         supabase.from('planner_items').select('*'),
-        supabase.from('safety_bases').select('*')
+        supabase.from('safety_bases').select('*'),
+        supabase.from('clients').select('*') // --- AJOUT CRM : CHARGEMENT ---
       ]);
 
       const [
         { data: profile }, { data: todos }, { data: notes }, { data: projects },
         { data: accounts }, { data: transactions }, { data: recurring }, 
-        { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases }
+        { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
+        { data: clients } // --- AJOUT CRM : VARIABLE ---
       ] = results;
 
-      // --- LOGIQUE DE RATTRAPAGE ---
+      // --- MOTEUR DE RATTRAPAGE DÉBLOQUÉ ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
       
       const validAccounts = accounts || [];
-      // Compte par défaut pour éviter les bugs si aucun compte n'est trouvé
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : (scheduled?.[0]?.account_id || 'offline-account');
 
-      // 1. Rattrapage des Paiements PLANIFIÉS (Date unique)
+      // 1. Rattrapage PLANIFIÉS
       (scheduled || []).forEach(s => {
-          // Si le paiement est "en attente" ET que la date est passée ou aujourd'hui
           if (s.status === 'pending' && isDatePastOrToday(s.date)) {
               const baseId = Date.now() + Math.floor(Math.random() * 1000000);
               const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
@@ -151,7 +146,6 @@ export default function App() {
                   type: s.type, description: s.description, account_id: accId 
               };
 
-              // Gestion spéciale des virements : Crée 2 transactions (Débit + Crédit)
               if (s.type === 'transfer' && s.target_account_id) {
                   const targetAccId = s.target_account_id;
                   const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
@@ -161,30 +155,23 @@ export default function App() {
               } else { 
                   newDBTransactions.push(common); 
               }
-              // On marque comme exécuté pour ne pas le refaire
               updatedDBScheduled.push({ ...s, status: 'executed' });
           }
       });
 
-      // 2. Rattrapage des Paiements RÉCURRENTS (Boucle temporelle)
+      // 2. Rattrapage RÉCURRENTS
       const today = new Date();
       today.setHours(0,0,0,0);
-      
       (recurring || []).forEach(r => {
           let hasChanged = false;
           let tempR = { ...r };
-          
-          // Initialisation si première fois
           if (!tempR.next_due_date) {
               const d = new Date(); d.setDate(tempR.day_of_month);
               if (d < today) d.setMonth(d.getMonth() + 1);
               tempR.next_due_date = d.toISOString();
               hasChanged = true;
           }
-          
-          let loopSafety = 0; // Sécurité anti-boucle infinie (max 12 mois de rattrapage d'un coup)
-          
-          // Tant que la prochaine date est dans le passé ou aujourd'hui
+          let loopSafety = 0;
           while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
               const nextDueObj = parseLocalDate(tempR.next_due_date);
               const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
@@ -202,19 +189,14 @@ export default function App() {
                   newDBTransactions.push(common); 
               }
               
-              // Calcul intelligent de la prochaine date (Gestion des fins de mois)
               let nextMonth = nextDueObj.getMonth() + 1;
               let nextYear = nextDueObj.getFullYear();
               if (nextMonth > 11) { nextMonth = 0; nextYear++; }
-              
               const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
-              // Si le paiement est le 31 et que le mois suivant n'a que 30 jours, on prend le 30.
               const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
               const newDate = new Date(nextYear, nextMonth, targetDay);
               
-              // Vérification date de fin d'abonnement
               if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
-              
               tempR.next_due_date = newDate.toISOString();
               hasChanged = true;
               loopSafety++;
@@ -222,9 +204,7 @@ export default function App() {
           if (hasChanged) updatedDBRecurring.push(tempR);
       });
 
-      // --- APPLICATION DES CHANGEMENTS ---
-      
-      // Fusion immédiate pour l'interface utilisateur (Réactivité maximale)
+      // --- APPLICATION IMMÉDIATE DES CHANGEMENTS ---
       let finalTransactions = [...(transactions || []), ...newDBTransactions];
       
       let finalScheduled = (scheduled || []).map(s => { 
@@ -236,25 +216,24 @@ export default function App() {
           return updated || r; 
       });
 
-      // Sauvegarde en base de données (Arrière-plan, silencieux)
+      // Sauvegarde asynchrone (ne bloque pas l'affichage)
       if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
           const count = newDBTransactions.length;
-          // Notification discrète (Log uniquement ou petit point de couleur géré par UI)
+          // Notification discrète (supprimée pour ne pas déranger)
           const syncAsync = async () => {
              try {
                  if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
                  if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
                  if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
              } catch (err) {
-                 console.error("Erreur Sync Arrière-plan (Rattrapage):", err);
-                 // Si ça échoue, ce n'est pas grave, le rattrapage se relancera au prochain démarrage
+                 console.error("Erreur Sync Arrière-plan:", err);
                  setUnsavedChanges(true); 
              }
           };
           syncAsync();
       }
 
-      // Préparation des données pour l'affichage
+      // Mapping final pour l'affichage
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -267,12 +246,14 @@ export default function App() {
       
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
+        clients: clients || [], // --- AJOUT CRM : DONNÉES ---
         budget: {
           accounts: validAccounts,
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
           recurring: mappedRecurring, scheduled: mappedScheduled,
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
+        profile: profile || {}, // --- AJOUT CRM : DONNÉES ---
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
         customLabels: profile?.custom_labels || {}, mainNote: ""
       };
@@ -283,7 +264,6 @@ export default function App() {
     } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
   };
 
-  // --- SAUVEGARDE STANDARD ---
   const updateData = async (newData, deleteRequest = null) => {
     setData(newData);
     setUnsavedChanges(true);
@@ -299,13 +279,41 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [data, unsavedChanges]);
 
-  // --- SAUVEGARDE VERS SUPABASE ---
   const saveDataToSupabase = async () => {
     if (!session) return;
     setIsSaving(true);
     try {
       const { user } = session;
-      await supabase.from('profiles').upsert({ id: user.id, settings: data.settings, custom_labels: data.customLabels });
+      
+      // --- AJOUT CRM : SAUVEGARDE PROFIL ENTREPRISE ---
+      await supabase.from('profiles').upsert({ 
+          id: user.id, 
+          settings: data.settings, 
+          custom_labels: data.customLabels,
+          // Mapping des champs entreprise
+          company_name: data.profile?.company_name,
+          siret: data.profile?.siret,
+          address: data.profile?.address,
+          email_contact: data.profile?.email_contact,
+          phone_contact: data.profile?.phone_contact,
+          iban: data.profile?.iban,
+          bic: data.profile?.bic,
+          tva_number: data.profile?.tva_number
+      });
+
+      // --- AJOUT CRM : SAUVEGARDE CLIENTS ---
+      await upsertInBatches('clients', data.clients, 50, c => ({
+          id: c.id,
+          user_id: user.id,
+          name: c.name,
+          contact_person: c.contact_person,
+          email: c.email,
+          phone: c.phone,
+          address: c.address,
+          status: c.status
+      }));
+
+      // Sauvegardes existantes (inchangées)
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
@@ -319,7 +327,7 @@ export default function App() {
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
       
       setUnsavedChanges(false);
-      // Mode silencieux : Pas de message de succès, juste le voyant
+      // Pas de notif de succès (mode discret)
     } catch (err) { 
         console.error("Erreur sauvegarde critique", err); 
         setNotifMessage("Erreur sauvegarde (voir console)"); 
@@ -337,6 +345,7 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
+      case 'clients': return <ClientManager data={data} updateData={updateData} />; // --- AJOUT CRM : ROUTE ---
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
@@ -344,13 +353,10 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-      
-      {/* NOTIFICATION DISCRÈTE */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
         {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>}
         {notifMessage && notifMessage.includes('Erreur') && <div className={`px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100`}>{notifMessage}</div>}
       </div>
-
       {isLocked && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
            <div className="mb-4 bg-blue-600 p-4 rounded-full"><Lock size={32} className="text-white"/></div>

@@ -2,13 +2,21 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient'; // Nécessaire pour le nettoyage
 import { 
   Settings, Moon, Sun, Type, Download, Upload, 
-  RefreshCw, CheckCircle2, AlertTriangle, User, Loader2
+  RefreshCw, CheckCircle2, AlertTriangle, User, Loader2,
+  Building2, Wallet // Nouvelles icônes pour la section entreprise
 } from 'lucide-react';
 
 export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
     // --- ETATS LOCAUX ---
     const [appName, setAppName] = useState(data.customLabels?.appName || 'LocalApp');
     const [userName, setUserName] = useState(data.customLabels?.userName || 'Utilisateur');
+    
+    // NOUVEAU : Champs Entreprise (Synchronisés avec le profil)
+    const [companyData, setCompanyData] = useState({
+        company_name: '', siret: '', address: '', email_contact: '', phone_contact: '',
+        iban: '', bic: '', tva_number: ''
+    });
+
     const [isSaved, setIsSaved] = useState(false);
     
     // Pour l'import de fichier
@@ -20,15 +28,29 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setAppName(data.customLabels.appName || 'LocalApp');
             setUserName(data.customLabels.userName || 'Utilisateur');
         }
-    }, [data.customLabels]);
+        // Chargement des données entreprise depuis le profil
+        if (data.profile) {
+            setCompanyData({
+                company_name: data.profile.company_name || '',
+                siret: data.profile.siret || '',
+                address: data.profile.address || '',
+                email_contact: data.profile.email_contact || '',
+                phone_contact: data.profile.phone_contact || '',
+                iban: data.profile.iban || '',
+                bic: data.profile.bic || '',
+                tva_number: data.profile.tva_number || ''
+            });
+        }
+    }, [data.customLabels, data.profile]);
 
     // --- ACTIONS ---
 
-    // 1. Sauvegarder les Textes (Titre, Nom)
+    // 1. Sauvegarder TOUT (Textes + Profil Entreprise)
     const handleSaveProfile = () => {
         const newSettings = {
             ...data,
-            customLabels: { ...data.customLabels, appName, userName }
+            customLabels: { ...data.customLabels, appName, userName },
+            profile: { ...data.profile, ...companyData } // On sauvegarde les infos entreprise
         };
         loadExternalData(newSettings); 
         
@@ -68,15 +90,14 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             try {
                 const parsedData = JSON.parse(e.target.result);
                 
-                // Vérification de structure
-                if (parsedData.budget && parsedData.projects) {
+                // Vérification de structure (On vérifie budget OU clients pour être souple)
+                if (parsedData.budget || parsedData.clients) {
                     if (window.confirm("ATTENTION : Cette action va EFFACER toutes les données actuelles pour les remplacer par celles du fichier. Continuer ?")) {
                         setImportStatus('loading');
                         
                         // 1. NETTOYAGE (Grand ménage via Supabase)
                         const { data: { user } } = await supabase.auth.getUser();
                         if (user) {
-                            // On supprime dans l'ordre pour éviter les conflits de clés étrangères si possible
                             await Promise.all([
                                 supabase.from('transactions').delete().eq('user_id', user.id),
                                 supabase.from('recurring').delete().eq('user_id', user.id),
@@ -86,14 +107,14 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 supabase.from('notes').delete().eq('user_id', user.id),
                                 supabase.from('todos').delete().eq('user_id', user.id),
                                 supabase.from('accounts').delete().eq('user_id', user.id),
-                                supabase.from('safety_bases').delete().eq('user_id', user.id)
+                                supabase.from('safety_bases').delete().eq('user_id', user.id),
+                                supabase.from('clients').delete().eq('user_id', user.id) // Ajouté pour le CRM
                             ]);
                         }
 
                         // 2. INJECTION DES NOUVELLES DONNÉES
-                        // On attend un peu que Supabase ait fini de nettoyer
                         setTimeout(() => {
-                            loadExternalData(parsedData); // Mise à jour de l'état local -> Déclenche la sauvegarde dans App.jsx
+                            loadExternalData(parsedData); 
                             setImportStatus('success');
                             setTimeout(() => setImportStatus(null), 3000);
                             alert("Restauration terminée avec succès !");
@@ -109,7 +130,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 alert("Erreur lors de la lecture du fichier.");
             }
         };
-        // Reset de l'input pour permettre de réimporter le même fichier si besoin
+        // Reset de l'input
         event.target.value = null;
     };
 
@@ -123,15 +144,66 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Paramètres</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm">Personnalisation & Données</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm">Mon Entreprise & Données</p>
                 </div>
             </div>
 
-            {/* 1. PERSONNALISATION */}
+            {/* 1. MON ENTREPRISE (NOUVELLE SECTION) */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                        <Type size={18} className="text-blue-500"/> Apparence & Textes
+                        <Building2 size={18} className="text-blue-500"/> Mon Entreprise
+                    </h3>
+                </div>
+                <div className="p-6 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Nom Commercial</label>
+                            <input type="text" value={companyData.company_name} onChange={e => setCompanyData({...companyData, company_name: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" placeholder="Ma Société" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">SIRET</label>
+                            <input type="text" value={companyData.siret} onChange={e => setCompanyData({...companyData, siret: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" placeholder="123 456 789 00012" />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Adresse de facturation</label>
+                            <input type="text" value={companyData.address} onChange={e => setCompanyData({...companyData, address: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" placeholder="10 Rue de la Paix, 75000 Paris" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Email Contact</label>
+                            <input type="email" value={companyData.email_contact} onChange={e => setCompanyData({...companyData, email_contact: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Téléphone</label>
+                            <input type="tel" value={companyData.phone_contact} onChange={e => setCompanyData({...companyData, phone_contact: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                        </div>
+                    </div>
+
+                    <hr className="border-slate-100 dark:border-slate-700"/>
+                    <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2"><Wallet size={16} className="text-green-500"/> Coordonnées Bancaires</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">IBAN</label>
+                            <input type="text" value={companyData.iban} onChange={e => setCompanyData({...companyData, iban: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white font-mono" placeholder="FR76 ..." />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">BIC</label>
+                            <input type="text" value={companyData.bic} onChange={e => setCompanyData({...companyData, bic: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white font-mono" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-500 uppercase">N° TVA Intracommunautaire</label>
+                            <input type="text" value={companyData.tva_number} onChange={e => setCompanyData({...companyData, tva_number: e.target.value})} className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white transition-colors" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 2. PERSONNALISATION APP */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                        <Type size={18} className="text-purple-500"/> Apparence & Textes
                     </h3>
                 </div>
                 
@@ -187,20 +259,21 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                             <p className="text-[10px] text-slate-400">Pour le message d'accueil "Bonjour, ..."</p>
                         </div>
                     </div>
-
-                    <div className="flex justify-end">
-                        <button 
-                            onClick={handleSaveProfile} 
-                            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold text-white transition-all ${isSaved ? 'bg-green-500' : 'bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-500'}`}
-                        >
-                            {isSaved ? <CheckCircle2 size={16}/> : <RefreshCw size={16}/>}
-                            {isSaved ? 'Enregistré !' : 'Mettre à jour'}
-                        </button>
-                    </div>
                 </div>
             </div>
 
-            {/* 2. GESTION DES DONNÉES (IMPORT/EXPORT) */}
+            {/* BOUTON SAUVEGARDER FLOTTANT ou FIXE */}
+            <div className="flex justify-end sticky bottom-6 z-20">
+                <button 
+                    onClick={handleSaveProfile} 
+                    className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold text-white transition-all shadow-xl ${isSaved ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                    {isSaved ? <CheckCircle2 size={18}/> : <RefreshCw size={18}/>}
+                    {isSaved ? 'Enregistré !' : 'Enregistrer les modifications'}
+                </button>
+            </div>
+
+            {/* 3. GESTION DES DONNÉES (IMPORT/EXPORT) */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">

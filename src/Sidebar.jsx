@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
-  StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu 
+  StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
+  Users // --- AJOUT CRM : IMPORT ICÔNE ---
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -43,6 +44,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'calendar', label: 'Planning', icon: Calendar },
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
+    { id: 'clients', label: 'Clients', icon: Users }, // --- AJOUT CRM : BOUTON MENU ---
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
