@@ -9,7 +9,7 @@ import BudgetManager from './BudgetManager';
 import NotesManager from './NotesManager';
 import TodoList from './TodoList';
 import DataSettings from './DataSettings';
-import ClientManager from './ClientManager'; // --- AJOUT CRM : IMPORT ---
+import ClientHub from './ClientHub'; // --- REMPLACEMENT : C'est le nouveau Hub ---
 import ZenMode from './ZenMode';
 import { Loader2, Lock } from 'lucide-react';
 
@@ -31,8 +31,12 @@ export default function App() {
     todos: [], projects: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
-    clients: [], // --- AJOUT CRM : STATE ---
-    profile: {}  // --- AJOUT CRM : PROFIL ENTREPRISE ---
+    // --- NOUVELLES DONNÉES ERP ---
+    clients: [], 
+    quotes: [], 
+    invoices: [], 
+    catalog: [], 
+    profile: {}
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -50,15 +54,13 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
-  // Comparaison de date souple (Ignore l'heure)
+  // Comparaison de date souple
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
       today.setHours(0,0,0,0);
-      
       const checkDate = parseLocalDate(dateStr); 
       checkDate.setHours(0,0,0,0);
-      
       return checkDate <= today;
   };
 
@@ -105,6 +107,7 @@ export default function App() {
     setLoading(true);
 
     try {
+      // --- CHARGEMENT DE TOUTES LES TABLES (Y COMPRIS LES NOUVELLES) ---
       const results = await Promise.all([
         supabase.from('profiles').select('*').single(),
         supabase.from('todos').select('*'),
@@ -117,17 +120,20 @@ export default function App() {
         supabase.from('events').select('*'),
         supabase.from('planner_items').select('*'),
         supabase.from('safety_bases').select('*'),
-        supabase.from('clients').select('*') // --- AJOUT CRM : CHARGEMENT ---
+        supabase.from('clients').select('*'),       // Clients
+        supabase.from('quotes').select('*'),        // Devis
+        supabase.from('invoices').select('*'),      // Factures
+        supabase.from('catalog_items').select('*')  // Catalogue
       ]);
 
       const [
         { data: profile }, { data: todos }, { data: notes }, { data: projects },
         { data: accounts }, { data: transactions }, { data: recurring }, 
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
-        { data: clients } // --- AJOUT CRM : VARIABLE ---
+        { data: clients }, { data: quotes }, { data: invoices }, { data: catalog }
       ] = results;
 
-      // --- MOTEUR DE RATTRAPAGE DÉBLOQUÉ ---
+      // --- MOTEUR DE RATTRAPAGE PAIEMENTS (EXISTANT) ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
@@ -204,36 +210,25 @@ export default function App() {
           if (hasChanged) updatedDBRecurring.push(tempR);
       });
 
-      // --- APPLICATION IMMÉDIATE DES CHANGEMENTS ---
+      // --- APPLICATION DES CHANGEMENTS ---
       let finalTransactions = [...(transactions || []), ...newDBTransactions];
-      
-      let finalScheduled = (scheduled || []).map(s => { 
-          const updated = updatedDBScheduled.find(u => u.id == s.id); 
-          return updated || s; 
-      });
-      let finalRecurring = (recurring || []).map(r => { 
-          const updated = updatedDBRecurring.find(u => u.id == r.id); 
-          return updated || r; 
-      });
+      let finalScheduled = (scheduled || []).map(s => { const updated = updatedDBScheduled.find(u => u.id == s.id); return updated || s; });
+      let finalRecurring = (recurring || []).map(r => { const updated = updatedDBRecurring.find(u => u.id == r.id); return updated || r; });
 
-      // Sauvegarde asynchrone (ne bloque pas l'affichage)
       if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
-          const count = newDBTransactions.length;
-          // Notification discrète (supprimée pour ne pas déranger)
           const syncAsync = async () => {
              try {
                  if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
                  if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
                  if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
              } catch (err) {
-                 console.error("Erreur Sync Arrière-plan:", err);
+                 console.error("Erreur Sync Rattrapage:", err);
                  setUnsavedChanges(true); 
              }
           };
           syncAsync();
       }
 
-      // Mapping final pour l'affichage
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -246,14 +241,18 @@ export default function App() {
       
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
-        clients: clients || [], // --- AJOUT CRM : DONNÉES ---
         budget: {
           accounts: validAccounts,
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
           recurring: mappedRecurring, scheduled: mappedScheduled,
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
-        profile: profile || {}, // --- AJOUT CRM : DONNÉES ---
+        // --- NOUVELLES DONNÉES INJECTÉES ICI ---
+        clients: clients || [],
+        quotes: quotes || [],
+        invoices: invoices || [],
+        catalog: catalog || [],
+        profile: profile || {},
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
         customLabels: profile?.custom_labels || {}, mainNote: ""
       };
@@ -285,12 +284,11 @@ export default function App() {
     try {
       const { user } = session;
       
-      // --- AJOUT CRM : SAUVEGARDE PROFIL ENTREPRISE ---
+      // Profil & Entreprise
       await supabase.from('profiles').upsert({ 
           id: user.id, 
           settings: data.settings, 
           custom_labels: data.customLabels,
-          // Mapping des champs entreprise
           company_name: data.profile?.company_name,
           siret: data.profile?.siret,
           address: data.profile?.address,
@@ -301,19 +299,13 @@ export default function App() {
           tva_number: data.profile?.tva_number
       });
 
-      // --- AJOUT CRM : SAUVEGARDE CLIENTS ---
-      await upsertInBatches('clients', data.clients, 50, c => ({
-          id: c.id,
-          user_id: user.id,
-          name: c.name,
-          contact_person: c.contact_person,
-          email: c.email,
-          phone: c.phone,
-          address: c.address,
-          status: c.status
-      }));
+      // --- NOUVELLES TABLES ERP ---
+      await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
+      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
+      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
+      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
 
-      // Sauvegardes existantes (inchangées)
+      // Tables existantes
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
@@ -327,7 +319,6 @@ export default function App() {
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
       
       setUnsavedChanges(false);
-      // Pas de notif de succès (mode discret)
     } catch (err) { 
         console.error("Erreur sauvegarde critique", err); 
         setNotifMessage("Erreur sauvegarde (voir console)"); 
@@ -345,7 +336,8 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
-      case 'clients': return <ClientManager data={data} updateData={updateData} />; // --- AJOUT CRM : ROUTE ---
+      // --- REMPLACEMENT ICI : ClientManager -> ClientHub ---
+      case 'clients': return <ClientHub data={data} updateData={updateData} />; 
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
