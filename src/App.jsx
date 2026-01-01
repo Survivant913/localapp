@@ -10,7 +10,7 @@ import NotesManager from './NotesManager';
 import TodoList from './TodoList';
 import DataSettings from './DataSettings';
 import ZenMode from './ZenMode';
-import { Loader2, Lock } from 'lucide-react'; // On enlève les icones Save/WifiOff inutiles maintenant
+import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -21,6 +21,14 @@ export default function App() {
   const [notifMessage, setNotifMessage] = useState(null);
   const isLoaded = useRef(false);
   
+  // Initialisation immédiate du thème depuis le LocalStorage pour éviter le flash blanc
+  const getInitialTheme = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('localAppTheme') || 'light';
+    }
+    return 'light';
+  };
+
   const [data, setData] = useState({
     todos: [],
     projects: [],
@@ -28,14 +36,32 @@ export default function App() {
     events: [],
     notes: [],
     mainNote: "",
-    settings: { theme: localStorage.getItem('localAppTheme') || 'light' },
+    settings: { theme: getInitialTheme() },
     customLabels: {}
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. GESTION DU THÈME
+  // --- NOUVELLE FONCTION DE BASCULE DU THÈME ---
+  const toggleTheme = () => {
+    const currentTheme = data.settings?.theme || 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // 1. Mise à jour locale immédiate
+    const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
+    setData(newData);
+    
+    // 2. Mise à jour du stockage navigateur
+    localStorage.setItem('localAppTheme', newTheme);
+    if (newTheme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+
+    // 3. Sauvegarde en base de données (pour la synchro future)
+    updateData(newData); 
+  };
+
+  // 1. GESTION DU THÈME (Effet de bord)
   useEffect(() => {
     const theme = data.settings?.theme || 'light';
     if (theme === 'dark') {
@@ -202,7 +228,10 @@ export default function App() {
       const plannerBases = {}; (safetyBases || []).forEach(b => plannerBases[b.account_id] = b.amount);
       const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
       const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
-      const loadedTheme = localStorage.getItem('localAppTheme') || profile?.settings?.theme || 'light';
+      
+      // PRIORITÉ AU LOCAL STORAGE POUR LE THÈME
+      const localTheme = localStorage.getItem('localAppTheme');
+      const loadedTheme = localTheme || profile?.settings?.theme || 'light';
       
       const newData = {
         todos: todos || [],
@@ -275,7 +304,8 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
-      case 'settings': return <DataSettings data={data} loadExternalData={updateData} />;
+      // On passe toggleTheme et darkMode aux settings aussi
+      case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
   };
@@ -283,14 +313,11 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       
-      {/* NOUVELLE NOTIFICATION DISCRÈTE (En bas à droite) */}
+      {/* NOTIFICATION DISCRÈTE */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
-        {/* Le petit point (Status) */}
         {(isSaving || unsavedChanges) && (
             <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>
         )}
-        
-        {/* Le message (Uniquement pour le Rattrapage ou infos importantes) */}
         {notifMessage && (
             <div className="bg-slate-900 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in">
                 {notifMessage}
@@ -308,7 +335,17 @@ export default function App() {
 
       {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
 
-      <Sidebar currentView={currentView} setView={setView} isMobileOpen={isMobileMenuOpen} toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} labels={data.customLabels} />
+      {/* MODIFICATION IMPORTANTE : On passe explicitement toggleTheme à la Sidebar */}
+      <Sidebar 
+        currentView={currentView} 
+        setView={setView} 
+        isMobileOpen={isMobileMenuOpen} 
+        toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+        labels={data.customLabels} 
+        darkMode={data.settings?.theme === 'dark'}
+        toggleTheme={toggleTheme}
+      />
+
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
           <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'LocalApp'}</h1>
