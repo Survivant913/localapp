@@ -42,7 +42,6 @@ export default function App() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- FONCTION INTELLIGENTE D'ENVOI PAR PAQUETS ---
   const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
     if (!items || items.length === 0) return;
     const mappedItems = items.map(mapFunction);
@@ -89,15 +88,12 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fonction utilitaire pour comparer les dates sans l'heure (YYYY-MM-DD)
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
       today.setHours(0,0,0,0);
-      
       const checkDate = new Date(dateStr);
       checkDate.setHours(0,0,0,0);
-      
       return checkDate <= today;
   };
 
@@ -136,112 +132,66 @@ export default function App() {
         supabase.from('safety_bases').select('*')
       ]);
 
-      // --- MOTEUR DE RATTRAPAGE AMÉLIORÉ ---
-      // On utilise isDatePastOrToday pour ignorer les heures/minutes et comparer juste le jour
-      
+      // --- MOTEUR DE RATTRAPAGE ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
-      
       const validAccounts = accounts || [];
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : null;
 
       if (defaultAccountId) {
-          // 1. Rattrapage PLANIFIÉS (Scheduled)
+          // 1. Scheduled
           (scheduled || []).forEach(s => {
-              // Si c'est "pending" et que la date est passée ou aujourd'hui
               if (s.status === 'pending' && isDatePastOrToday(s.date)) {
                   const baseId = Date.now() + Math.floor(Math.random() * 1000000);
                   const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : defaultAccountId;
-                  
-                  const common = { 
-                      id: baseId, 
-                      user_id: userId, 
-                      amount: s.amount, 
-                      date: s.date, // On garde la date prévue
-                      archived: false, 
-                      type: s.type, 
-                      description: s.description, 
-                      account_id: accId 
-                  };
+                  const common = { id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, type: s.type, description: s.description, account_id: accId };
 
                   if (s.type === 'transfer' && s.target_account_id) {
                       const targetAccId = validAccounts.find(a => a.id === s.target_account_id) ? s.target_account_id : defaultAccountId;
                       const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
                       const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
-                      
                       newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
                       newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
-                  } else { 
-                      newDBTransactions.push(common); 
-                  }
-                  
-                  // On marque comme exécuté
+                  } else { newDBTransactions.push(common); }
                   updatedDBScheduled.push({ ...s, status: 'executed' });
               }
           });
 
-          // 2. Rattrapage RÉCURRENTS
+          // 2. Recurring
           const today = new Date();
           today.setHours(0,0,0,0);
-
           (recurring || []).forEach(r => {
               let hasChanged = false;
               let tempR = { ...r };
-              
-              // Initialisation date si manquante
               if (!tempR.next_due_date) {
-                  const d = new Date(); 
-                  d.setDate(tempR.day_of_month);
-                  // Si le jour est déjà passé ce mois-ci, c'est pour le mois prochain
+                  const d = new Date(); d.setDate(tempR.day_of_month);
                   if (d < today) d.setMonth(d.getMonth() + 1);
                   tempR.next_due_date = d.toISOString();
                   hasChanged = true;
               }
-
               let loopSafety = 0;
-              // On boucle tant que la prochaine date est passée ou aujourd'hui
               while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
                   const nextDueObj = parseLocalDate(tempR.next_due_date);
                   const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
                   const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : defaultAccountId;
-                  
-                  const common = { 
-                      id: baseId, 
-                      user_id: userId, 
-                      amount: tempR.amount, 
-                      date: tempR.next_due_date, 
-                      archived: false, 
-                      type: tempR.type, 
-                      description: tempR.description, 
-                      account_id: accId 
-                  };
+                  const common = { id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, type: tempR.type, description: tempR.description, account_id: accId };
 
                   if (tempR.type === 'transfer' && tempR.target_account_id) {
                       const targetAccId = validAccounts.find(a => a.id === tempR.target_account_id) ? tempR.target_account_id : defaultAccountId;
                       const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
                       const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
-                      
                       newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${tempR.description}`, account_id: accId });
                       newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${tempR.description}`, account_id: targetAccId });
-                  } else { 
-                      newDBTransactions.push(common); 
-                  }
+                  } else { newDBTransactions.push(common); }
                   
-                  // Calcul prochaine échéance
                   let nextMonth = nextDueObj.getMonth() + 1;
                   let nextYear = nextDueObj.getFullYear();
                   if (nextMonth > 11) { nextMonth = 0; nextYear++; }
-                  
-                  // Gestion fin de mois (ex: le 31)
                   const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
                   const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
-                  
                   const newDate = new Date(nextYear, nextMonth, targetDay);
-                  
-                  // Vérif date de fin
                   if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
-                  
                   tempR.next_due_date = newDate.toISOString();
                   hasChanged = true;
                   loopSafety++;
@@ -250,29 +200,38 @@ export default function App() {
           });
       }
 
-      // Fusion des données
-      let finalTransactions = transactions || [];
-      let finalScheduled = scheduled || [];
-      let finalRecurring = recurring || [];
+      // --- CORRECTION CRITIQUE : DÉCOUPLAGE UI / DB ---
+      // On met à jour l'état local AVANT de tenter la sauvegarde réseau
+      
+      // 1. Préparation des listes finales
+      let finalTransactions = [...(transactions || []), ...newDBTransactions];
+      let finalScheduled = (scheduled || []).map(s => { 
+          const updated = updatedDBScheduled.find(u => u.id === s.id); 
+          return updated || s; 
+      });
+      let finalRecurring = (recurring || []).map(r => { 
+          const updated = updatedDBRecurring.find(u => u.id === r.id); 
+          return updated || r; 
+      });
 
-      // Sauvegarde des mises à jour en base
+      // 2. Tentative de sauvegarde (Non bloquante pour l'affichage)
       if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
-          try {
-               if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
-               if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
-               if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
-              
-              // Mise à jour des listes locales pour affichage immédiat
-              finalTransactions = [...finalTransactions, ...newDBTransactions];
-              finalScheduled = finalScheduled.map(s => { const updated = updatedDBScheduled.find(u => u.id === s.id); return updated || s; });
-              finalRecurring = finalRecurring.map(r => { const updated = updatedDBRecurring.find(u => u.id === r.id); return updated || r; });
-              
-              setNotifMessage("Paiements planifiés traités.");
-              setTimeout(() => setNotifMessage(null), 4000);
-          } catch (err) { console.error("ERREUR RATTRAPAGE:", err); }
+          const syncAsync = async () => {
+             try {
+                 if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
+                 if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
+                 if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
+                 setNotifMessage("Paiements planifiés traités (Sync OK)");
+             } catch (err) {
+                 console.error("Erreur Sync Rattrapage (Mais UI à jour):", err);
+                 setNotifMessage("Paiements traités (Sauvegarde différée)");
+                 setUnsavedChanges(true); // On marque pour réessayer plus tard
+             }
+          };
+          syncAsync(); // On lance sans await bloquant
       }
 
-      // Mapping final des données
+      // 3. Affichage immédiat
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -328,41 +287,24 @@ export default function App() {
     try {
       const { user } = session;
       await supabase.from('profiles').upsert({ id: user.id, settings: data.settings, custom_labels: data.customLabels });
-
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
       await upsertInBatches('accounts', data.budget.accounts, 50, a => ({ id: a.id, user_id: user.id, name: a.name }));
-      
-      await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ 
-          id: t.id, 
-          user_id: user.id, 
-          amount: t.amount, 
-          type: t.type, 
-          description: t.description, 
-          date: t.date, 
-          account_id: t.accountId, 
-          archived: t.archived 
-      }));
-
+      await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, date: t.date, account_id: t.accountId, archived: t.archived }));
       await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
-
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
-      
       setUnsavedChanges(false);
       setNotifMessage("Sauvegarde terminée !");
       setTimeout(() => setNotifMessage(null), 3000);
-
     } catch (err) { 
         console.error("Erreur sauvegarde critique", err);
         setNotifMessage("Erreur sauvegarde (voir console)"); 
-    } finally { 
-        setIsSaving(false);
-    }
+    } finally { setIsSaving(false); }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
@@ -383,7 +325,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
-      
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
         {(isSaving || unsavedChanges) && (
             <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>
@@ -394,7 +335,6 @@ export default function App() {
             </div>
         )}
       </div>
-
       {isLocked && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
            <div className="mb-4 bg-blue-600 p-4 rounded-full"><Lock size={32} className="text-white"/></div>
@@ -402,19 +342,8 @@ export default function App() {
            <input type="password" maxLength="4" className="text-center text-2xl tracking-widest p-2 rounded bg-slate-800 text-white border border-slate-700 w-40 outline-none focus:border-blue-500" onChange={(e) => { if(e.target.value === data.settings.pin) setIsLocked(false); }} autoFocus />
         </div>
       )}
-
       {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
-
-      <Sidebar 
-        currentView={currentView} 
-        setView={setView} 
-        isMobileOpen={isMobileMenuOpen} 
-        toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-        labels={data.customLabels} 
-        darkMode={data.settings?.theme === 'dark'}
-        toggleTheme={toggleTheme}
-      />
-
+      <Sidebar currentView={currentView} setView={setView} isMobileOpen={isMobileMenuOpen} toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} labels={data.customLabels} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
           <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'LocalApp'}</h1>
