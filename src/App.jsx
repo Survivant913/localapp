@@ -52,7 +52,7 @@ export default function App() {
       const today = new Date();
       today.setHours(0,0,0,0);
       
-      const checkDate = parseLocalDate(dateStr); // Utilise notre parseur robuste
+      const checkDate = parseLocalDate(dateStr); 
       checkDate.setHours(0,0,0,0);
       
       return checkDate <= today;
@@ -127,15 +127,12 @@ export default function App() {
       let updatedDBRecurring = [];
       
       const validAccounts = accounts || [];
-      // On prend un ID par défaut même si la liste est vide (pour ne pas bloquer le script)
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : (scheduled?.[0]?.account_id || 'offline-account');
 
       // 1. Rattrapage PLANIFIÉS
       (scheduled || []).forEach(s => {
-          // On force la vérification
           if (s.status === 'pending' && isDatePastOrToday(s.date)) {
               const baseId = Date.now() + Math.floor(Math.random() * 1000000);
-              // Si le compte n'est pas trouvé, on garde l'ID original
               const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
               
               const common = { 
@@ -201,10 +198,8 @@ export default function App() {
           if (hasChanged) updatedDBRecurring.push(tempR);
       });
 
-      // --- APPLICATION IMMÉDIATE DES CHANGEMENTS ---
+      // --- APPLICATION IMMÉDIATE ---
       let finalTransactions = [...(transactions || []), ...newDBTransactions];
-      
-      // Utilisation de '==' pour ignorer les différences string/number sur les ID
       let finalScheduled = (scheduled || []).map(s => { 
           const updated = updatedDBScheduled.find(u => u.id == s.id); 
           return updated || s; 
@@ -214,10 +209,9 @@ export default function App() {
           return updated || r; 
       });
 
-      // Sauvegarde asynchrone (ne bloque pas l'affichage)
+      // Sauvegarde asynchrone (SILENCIEUSE)
       if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
-          const count = newDBTransactions.length;
-          setNotifMessage(`${count} paiement(s) rattrapé(s) !`);
+          // On n'affiche plus de message ici pour la discrétion
           const syncAsync = async () => {
              try {
                  if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
@@ -225,13 +219,12 @@ export default function App() {
                  if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
              } catch (err) {
                  console.error("Erreur Sync Arrière-plan:", err);
-                 setUnsavedChanges(true); // On réessaiera plus tard
+                 setUnsavedChanges(true);
              }
           };
           syncAsync();
       }
 
-      // Mapping final pour l'affichage
       const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
       const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
       const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
@@ -275,6 +268,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [data, unsavedChanges]);
 
+  // --- SAUVEGARDE SILENCIEUSE ---
   const saveDataToSupabase = async () => {
     if (!session) return;
     setIsSaving(true);
@@ -292,10 +286,17 @@ export default function App() {
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
+      
       setUnsavedChanges(false);
-      setNotifMessage("Sauvegarde terminée !");
-      setTimeout(() => setNotifMessage(null), 3000);
-    } catch (err) { console.error("Erreur sauvegarde critique", err); setNotifMessage("Erreur sauvegarde (voir console)"); } finally { setIsSaving(false); }
+      // Suppression du message de succès pour la discrétion
+      // setNotifMessage("Sauvegarde terminée !"); <--- SUPPRIMÉ
+      
+    } catch (err) { 
+        console.error("Erreur sauvegarde critique", err); 
+        setNotifMessage("Erreur sauvegarde (voir console)"); // On garde l'erreur
+    } finally { 
+        setIsSaving(false); 
+    }
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
@@ -316,10 +317,19 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+      
+      {/* NOTIFICATION DISCRÈTE (Uniquement le point coloré) */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
         {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`} title={isSaving ? "Sauvegarde..." : "Modifié"}></div>}
-        {notifMessage && <div className={`px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in ${notifMessage.includes('Erreur') ? 'bg-red-900 border-red-700 text-red-100' : 'bg-slate-900 border-slate-700 text-slate-200'}`}>{notifMessage}</div>}
+        
+        {/* On affiche le message SEULEMENT si c'est une erreur */}
+        {notifMessage && notifMessage.includes('Erreur') && (
+            <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100">
+                {notifMessage}
+            </div>
+        )}
       </div>
+
       {isLocked && (
         <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
            <div className="mb-4 bg-blue-600 p-4 rounded-full"><Lock size={32} className="text-white"/></div>
