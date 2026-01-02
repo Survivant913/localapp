@@ -68,7 +68,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 1. GESTION CLIENTS (STYLE PROTOTYPE) ---
+    // --- 1. GESTION CLIENTS ---
     const ClientsTab = () => {
         const [form, setForm] = useState(false);
         const [editing, setEditing] = useState(null);
@@ -91,7 +91,6 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="space-y-6">
-                {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="relative w-full md:w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -108,7 +107,6 @@ export default function ClientHub({ data, updateData }) {
                     </button>
                 </div>
 
-                {/* Formulaire Modal */}
                 {form && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                         <div className="bg-white dark:bg-slate-900 w-full max-w-2xl p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
@@ -151,18 +149,13 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 )}
 
-                {/* LISTE CLIENTS STYLE PROTOTYPE */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredClients.map(client => (
                         <div key={client.id} className="bg-white dark:bg-[#1E1E1E] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 hover:border-amber-500/50 transition-all group relative shadow-sm">
-                            
-                            {/* Actions (Hidden by default, visible on hover) */}
                             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => { setEditing(client); setTempClient(client); setForm(true); }} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-amber-500 rounded-lg"><Pencil size={14}/></button>
                                 <button onClick={() => deleteClient(client.id)} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 rounded-lg"><Trash2 size={14}/></button>
                             </div>
-
-                            {/* Header: Avatar + Nom */}
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-white font-serif font-bold text-xl">
                                     {getInitials(client.name)}
@@ -172,11 +165,7 @@ export default function ClientHub({ data, updateData }) {
                                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{client.contact_person || 'Pas de contact'}</p>
                                 </div>
                             </div>
-
-                            {/* Séparateur */}
                             <hr className="border-slate-100 dark:border-slate-800 mb-6" />
-
-                            {/* Détails */}
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
                                     <Mail size={16} className="text-slate-400 dark:text-slate-600"/>
@@ -186,8 +175,6 @@ export default function ClientHub({ data, updateData }) {
                                     <Phone size={16} className="text-slate-400 dark:text-slate-600"/>
                                     <span>{client.phone || '---'}</span>
                                 </div>
-                                
-                                {/* Adresse en bas, style discret */}
                                 <div className="pt-2 flex items-start gap-3 text-xs text-slate-400 dark:text-slate-500 italic">
                                     <MapPin size={14} className="shrink-0 mt-0.5"/>
                                     <span>{client.address || 'Aucune adresse renseignée'}</span>
@@ -195,8 +182,6 @@ export default function ClientHub({ data, updateData }) {
                             </div>
                         </div>
                     ))}
-                    
-                    {/* Carte Ajouter (Vide) */}
                     {filteredClients.length === 0 && !searchTerm && (
                         <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group min-h-[240px]">
                             <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/20 group-hover:text-amber-600 flex items-center justify-center transition-colors">
@@ -210,7 +195,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 2. CATALOGUE (TABLEAU PRO) ---
+    // --- 2. CATALOGUE ---
     const CatalogTab = () => {
         const [newItem, setNewItem] = useState({ name: '', price: '' });
         
@@ -224,35 +209,18 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="space-y-6">
-                {/* Barre d'ajout Rapide */}
                 <div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-2 items-center">
                     <div className="p-3 bg-slate-100 dark:bg-slate-700 text-slate-500 rounded-lg ml-2 hidden md:block">
                         <Package size={20}/>
                     </div>
-                    <input 
-                        type="text" 
-                        value={newItem.name} 
-                        onChange={e => setNewItem({...newItem, name: e.target.value})} 
-                        className="flex-1 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 text-sm" 
-                        placeholder="Nom du service ou produit..." 
-                    />
+                    <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="flex-1 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 text-sm" placeholder="Nom du service ou produit..." />
                     <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
                     <div className="flex items-center gap-2 w-full md:w-auto px-2">
                         <span className="text-slate-400 font-bold text-sm">€</span>
-                        <input 
-                            type="number" 
-                            value={newItem.price} 
-                            onChange={e => setNewItem({...newItem, price: e.target.value})} 
-                            className="w-24 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 font-mono text-sm" 
-                            placeholder="0.00" 
-                        />
+                        <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-24 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 font-mono text-sm" placeholder="0.00" />
                     </div>
-                    <button onClick={addItem} className="w-full md:w-auto px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg font-bold hover:opacity-90 transition-opacity">
-                        Ajouter
-                    </button>
+                    <button onClick={addItem} className="w-full md:w-auto px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg font-bold hover:opacity-90 transition-opacity">Ajouter</button>
                 </div>
-
-                {/* Tableau */}
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
@@ -265,21 +233,15 @@ export default function ClientHub({ data, updateData }) {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
                             {catalog.length === 0 && (
                                 <tr>
-                                    <td colSpan="3" className="p-12 text-center text-slate-400">
-                                        Votre catalogue est vide.
-                                    </td>
+                                    <td colSpan="3" className="p-12 text-center text-slate-400">Votre catalogue est vide.</td>
                                 </tr>
                             )}
                             {catalog.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                     <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-300">
-                                        {formatCurrency(item.price)}
-                                    </td>
+                                    <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-300">{formatCurrency(item.price)}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <button onClick={() => deleteItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                                            <Trash2 size={16}/>
-                                        </button>
+                                        <button onClick={() => deleteItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                     </td>
                                 </tr>
                             ))}
@@ -290,23 +252,12 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 3. ÉDITEUR FACTURE / DEVIS (INCHANGÉ) ---
+    // --- 3. ÉDITEUR ---
     const DocumentEditor = ({ type, onClose, initialDoc }) => {
         const isInvoice = type === 'invoice';
-        
         const [doc, setDoc] = useState(initialDoc || {
-            id: Date.now(),
-            number: generateNumber(type),
-            date: new Date().toISOString().split('T')[0],
-            dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-            client_id: '',
-            client_name: '',
-            client_address: '',
-            items: [{ desc: 'Prestation', qty: 1, price: 0 }],
-            status: 'Draft',
-            target_account_id: accounts[0]?.id || '',
-            notes: isInvoice ? 'Paiement à réception.' : 'Validité du devis : 30 jours.',
-            taxRate: 20
+            id: Date.now(), number: generateNumber(type), date: new Date().toISOString().split('T')[0], dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+            client_id: '', client_name: '', client_address: '', items: [{ desc: 'Prestation', qty: 1, price: 0 }], status: 'Draft', target_account_id: accounts[0]?.id || '', notes: isInvoice ? 'Paiement à réception.' : 'Validité du devis : 30 jours.', taxRate: 20
         });
         const [zoom, setZoom] = useState(0.65);
 
@@ -314,11 +265,7 @@ export default function ClientHub({ data, updateData }) {
             const mention = 'TVA non applicable, art. 293 B du CGI.';
             setDoc(prev => {
                 const isAE = prev.taxRate === 0 && prev.notes.includes(mention);
-                if (isAE) {
-                    return { ...prev, taxRate: 20, notes: prev.notes.replace(mention, '').replace(/\n\n$/, '').trim() };
-                } else {
-                    return { ...prev, taxRate: 0, notes: prev.notes.includes(mention) ? prev.notes : (prev.notes ? prev.notes + '\n\n' + mention : mention) };
-                }
+                return isAE ? { ...prev, taxRate: 20, notes: prev.notes.replace(mention, '').replace(/\n\n$/, '').trim() } : { ...prev, taxRate: 0, notes: prev.notes.includes(mention) ? prev.notes : (prev.notes ? prev.notes + '\n\n' + mention : mention) };
             });
         };
 
@@ -328,29 +275,18 @@ export default function ClientHub({ data, updateData }) {
         };
 
         const addItem = () => setDoc({ ...doc, items: [...doc.items, { desc: '', qty: 1, price: 0 }] });
-        
-        const updateItem = (index, field, value) => {
-            const newItems = [...doc.items];
-            newItems[index][field] = value;
-            setDoc({ ...doc, items: newItems });
-        };
-
+        const updateItem = (index, field, value) => { const newItems = [...doc.items]; newItems[index][field] = value; setDoc({ ...doc, items: newItems }); };
         const subTotal = doc.items.reduce((acc, i) => acc + (i.qty * i.price), 0);
         const taxAmount = subTotal * (doc.taxRate / 100);
         const total = subTotal + taxAmount;
 
         const saveDocument = () => {
             if (!doc.client_id) return alert('Veuillez sélectionner un client.');
-            
             const finalDoc = { ...doc, subTotal, total };
             const listName = isInvoice ? 'invoices' : 'quotes';
             const list = isInvoice ? invoices : quotes;
-
             const isEditing = !!initialDoc;
-            const newList = isEditing 
-                ? list.map(d => d.id === finalDoc.id ? finalDoc : d) 
-                : [finalDoc, ...list];
-            
+            const newList = isEditing ? list.map(d => d.id === finalDoc.id ? finalDoc : d) : [finalDoc, ...list];
             updateData({ ...data, [listName]: newList });
             onClose();
         };
@@ -370,12 +306,8 @@ export default function ClientHub({ data, updateData }) {
                             <span className="text-xs font-mono w-10 text-center">{Math.round(zoom * 100)}%</span>
                             <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))} className="p-1 hover:text-white text-slate-400"><ZoomIn size={16}/></button>
                         </div>
-                        <button onClick={handlePrint} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-200 flex items-center gap-2">
-                            <Printer size={16}/> Imprimer
-                        </button>
-                        <button onClick={saveDocument} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2">
-                            <Save size={16}/> Enregistrer
-                        </button>
+                        <button onClick={handlePrint} className="bg-white text-black px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-200 flex items-center gap-2"><Printer size={16}/> Imprimer</button>
+                        <button onClick={saveDocument} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2"><Save size={16}/> Enregistrer</button>
                         <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"><X size={24}/></button>
                     </div>
                 </div>
@@ -390,7 +322,6 @@ export default function ClientHub({ data, updateData }) {
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Date</label>
@@ -401,37 +332,19 @@ export default function ClientHub({ data, updateData }) {
                                     <input type="date" value={doc.dueDate} onChange={e => setDoc({...doc, dueDate: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white" />
                                 </div>
                             </div>
-
                             {isInvoice && (
                                 <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-lg border border-amber-100 dark:border-amber-800/30">
                                     <label className="text-xs font-bold text-amber-600 uppercase block mb-1 flex items-center gap-2"><Wallet size={12}/> Compte de réception</label>
-                                    <select 
-                                        value={doc.target_account_id} 
-                                        onChange={e => setDoc({...doc, target_account_id: e.target.value})} 
-                                        className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-slate-800 dark:text-white outline-none"
-                                    >
+                                    <select value={doc.target_account_id} onChange={e => setDoc({...doc, target_account_id: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
                                         <option value="">-- Choisir un compte --</option>
-                                        {accounts.length > 0 ? (
-                                            accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)
-                                        ) : (
-                                            <option disabled>Aucun compte créé dans Budget</option>
-                                        )}
+                                        {accounts.length > 0 ? accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>) : <option disabled>Aucun compte créé dans Budget</option>}
                                     </select>
                                 </div>
                             )}
-
                             <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Options fiscales</label>
-                                <button 
-                                    onClick={toggleAutoEntrepreneur}
-                                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all border ${
-                                        doc.taxRate === 0 && doc.notes.includes('293 B')
-                                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                        : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300'
-                                    }`}
-                                >
-                                    <Sparkles size={14}/>
-                                    {doc.taxRate === 0 && doc.notes.includes('293 B') ? 'Mode AE Activé (TVA 0%)' : 'Activer Mode AE (TVA 0%)'}
+                                <button onClick={toggleAutoEntrepreneur} className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all border ${doc.taxRate === 0 && doc.notes.includes('293 B') ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300'}`}>
+                                    <Sparkles size={14}/> {doc.taxRate === 0 && doc.notes.includes('293 B') ? 'Mode AE Activé (TVA 0%)' : 'Activer Mode AE (TVA 0%)'}
                                 </button>
                                 {doc.taxRate !== 0 && (
                                     <div className="mt-3">
@@ -440,7 +353,6 @@ export default function ClientHub({ data, updateData }) {
                                     </div>
                                 )}
                             </div>
-
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Lignes</label>
                                 <div className="space-y-2">
@@ -448,10 +360,7 @@ export default function ClientHub({ data, updateData }) {
                                         <div key={i} className="flex gap-2 items-start bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                                             <div className="flex-1 space-y-1">
                                                 <input type="text" value={item.desc} onChange={e => updateItem(i, 'desc', e.target.value)} className="w-full text-sm bg-transparent outline-none font-medium text-slate-800 dark:text-white" placeholder="Description" />
-                                                <select onChange={e => {
-                                                    const catItem = catalog.find(c => c.name === e.target.value);
-                                                    if(catItem) { updateItem(i, 'desc', catItem.name); updateItem(i, 'price', catItem.price); }
-                                                }} className="w-full text-xs p-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-500 cursor-pointer">
+                                                <select onChange={e => { const catItem = catalog.find(c => c.name === e.target.value); if(catItem) { updateItem(i, 'desc', catItem.name); updateItem(i, 'price', catItem.price); } }} className="w-full text-xs p-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-500 cursor-pointer">
                                                     <option value="">Insérer un produit...</option>
                                                     {catalog.map(c => <option key={c.id} value={c.name}>{c.name} - {c.price}€</option>)}
                                                 </select>
@@ -470,25 +379,11 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
-                        <div 
-                            id="invoice-paper" 
-                            style={{ 
-                                width: '210mm', 
-                                minHeight: '297mm', 
-                                transform: `scale(${zoom})`, 
-                                transformOrigin: 'top center',
-                                boxShadow: '0 0 40px rgba(0,0,0,0.1)' 
-                            }}
-                            className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200"
-                        >
+                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             {/* EN-TÊTE FACTURE */}
                             <div className="flex justify-between items-start mb-12">
                                 <div>
-                                    {profile.logo ? (
-                                        <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> 
-                                    ) : (
-                                        <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>
-                                    )}
+                                    {profile.logo ? <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> : <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>}
                                     <div className="text-xs text-slate-500 leading-relaxed">
                                         {profile.name}<br/>
                                         {profile.address}<br/>
@@ -502,7 +397,6 @@ export default function ClientHub({ data, updateData }) {
                                     <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
                                 </div>
                             </div>
-
                             {/* DESTINATAIRE */}
                             <div className="flex justify-end mb-16">
                                 <div className="w-1/3 text-left">
@@ -511,7 +405,6 @@ export default function ClientHub({ data, updateData }) {
                                     <p className="text-sm text-slate-500 whitespace-pre-line">{doc.client_address}</p>
                                 </div>
                             </div>
-
                             {/* TABLEAU */}
                             <table className="w-full mb-8">
                                 <thead className="border-b-2 border-slate-100">
@@ -533,7 +426,6 @@ export default function ClientHub({ data, updateData }) {
                                     ))}
                                 </tbody>
                             </table>
-
                             {/* TOTALS */}
                             <div className="flex justify-end mb-12">
                                 <div className="w-1/3 text-right space-y-2">
@@ -549,12 +441,9 @@ export default function ClientHub({ data, updateData }) {
                                         <span>Total TTC</span>
                                         <span>{formatCurrency(total)}</span>
                                     </div>
-                                    {doc.taxRate === 0 && (
-                                        <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>
-                                    )}
+                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>}
                                 </div>
                             </div>
-
                             {/* FOOTER */}
                             <div className="mt-auto pt-8 border-t border-slate-100 text-xs text-slate-500">
                                 <div className="grid grid-cols-2 gap-8">
@@ -568,47 +457,49 @@ export default function ClientHub({ data, updateData }) {
                                         <p className="whitespace-pre-wrap">{doc.notes}</p>
                                     </div>
                                 </div>
-                                <div className="mt-8 text-center text-[10px] text-slate-300">
-                                    {profile.companyName} - SIRET {profile.siret}
-                                </div>
+                                <div className="mt-8 text-center text-[10px] text-slate-300">{profile.companyName} - SIRET {profile.siret}</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* --- CSS POUR L'IMPRESSION (LE CORRECTIF EST ICI) --- */}
+                {/* --- CSS POUR L'IMPRESSION (CORRECTIF PAGE BLANCHE) --- */}
                 <style>{`
                     @media print {
-                        /* Cache TOUT sauf la facture */
+                        /* Cache TOUT le site par défaut */
                         body > * { display: none !important; }
-                        body * { visibility: hidden; }
                         
-                        html, body {
-                            overflow: visible !important;
-                            height: auto !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-
-                        #invoice-paper, #invoice-paper * {
-                            visibility: visible !important;
-                        }
-
+                        /* Affiche uniquement la feuille de facture */
                         #invoice-paper {
-                            position: fixed !important;
+                            display: block !important;
+                            visibility: visible !important;
+                            position: absolute !important;
                             left: 0 !important;
                             top: 0 !important;
                             width: 210mm !important;
-                            min-height: 297mm !important;
+                            height: 297mm !important;
                             margin: 0 !important;
-                            padding: 0 !important; /* Laisse le padding interne faire le job */
-                            transform: none !important;
-                            background: white !important;
+                            padding: 0 !important;
+                            transform: scale(1) !important; /* Annule le zoom écran */
+                            background-color: white !important;
                             color: black !important;
-                            z-index: 99999 !important;
                             box-shadow: none !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
+                            z-index: 99999 !important;
+                        }
+                        
+                        /* Assure que le contenu dans la facture est visible */
+                        #invoice-paper * {
+                            visibility: visible !important;
+                            color: black !important;
+                        }
+
+                        /* Enlève le fond gris du modal */
+                        .fixed.inset-0 {
+                            position: static !important;
+                            background: white !important;
+                            width: auto !important;
+                            height: auto !important;
+                            overflow: visible !important;
                         }
 
                         @page {
@@ -621,36 +512,22 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 4. LISTE DES DOCUMENTS (TABLEAU DE BORD) ---
+    // --- 4. LISTE DES DOCUMENTS ---
     const DocumentList = ({ type }) => {
         const list = type === 'quote' ? quotes : invoices;
         const [docToEdit, setDocToEdit] = useState(null);
         const [isCreating, setIsCreating] = useState(false);
         const [filterStatus, setFilterStatus] = useState('all');
 
-        const openEditor = (doc = null) => {
-            setDocToEdit(doc);
-            setIsCreating(true);
-        };
-
-        const closeEditor = () => {
-            setDocToEdit(null);
-            setIsCreating(false);
-        };
+        const openEditor = (doc = null) => { setDocToEdit(doc); setIsCreating(true); };
+        const closeEditor = () => { setDocToEdit(null); setIsCreating(false); };
 
         const convertToInvoice = (quote) => {
             if(!window.confirm("Créer une facture à partir de ce devis ?")) return;
             const year = new Date().getFullYear();
             const count = invoices.length + 1;
             const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
-            const newInvoice = {
-                ...quote,
-                id: Date.now(),
-                number: newInvoiceNumber,
-                status: 'Draft',
-                date: new Date().toISOString(),
-                type: 'invoice' 
-            };
+            const newInvoice = { ...quote, id: Date.now(), number: newInvoiceNumber, status: 'Draft', date: new Date().toISOString(), type: 'invoice' };
             updateData({ ...data, invoices: [newInvoice, ...invoices] });
             alert(`Facture brouillon ${newInvoiceNumber} créée !`);
         };
@@ -658,18 +535,9 @@ export default function ClientHub({ data, updateData }) {
         const handleStatusChange = (doc, newStatus) => {
             let updatedList = list.map(d => d.id === doc.id ? { ...d, status: newStatus } : d);
             let updatedBudget = { ...data.budget };
-
             if (type === 'invoice' && newStatus === 'Paid' && doc.status !== 'Paid') {
                 if (!doc.target_account_id) return alert("Erreur : Aucun compte bancaire associé.");
-                const newTransaction = {
-                    id: Date.now(),
-                    date: new Date().toISOString(),
-                    amount: doc.total, 
-                    type: 'income',
-                    description: `Facture ${doc.number} - ${doc.client_name}`,
-                    accountId: doc.target_account_id,
-                    archived: false
-                };
+                const newTransaction = { id: Date.now(), date: new Date().toISOString(), amount: doc.total, type: 'income', description: `Facture ${doc.number} - ${doc.client_name}`, accountId: doc.target_account_id, archived: false };
                 updatedBudget.transactions = [newTransaction, ...updatedBudget.transactions];
                 alert(`✅ Transaction de ${formatCurrency(doc.total)} ajoutée au compte !`);
             }
@@ -706,7 +574,6 @@ export default function ClientHub({ data, updateData }) {
         return (
             <div className="space-y-6">
                 <FinancialSummary />
-
                 <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="flex items-center gap-4">
                         <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize flex items-center gap-2">
@@ -716,19 +583,13 @@ export default function ClientHub({ data, updateData }) {
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
                             {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
-                                    {s === 'all' ? 'Tout' : s}
-                                </button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
                             ))}
                         </div>
                     </div>
-                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20">
-                        <Plus size={16}/> Créer
-                    </button>
+                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20"><Plus size={16}/> Créer</button>
                 </div>
-
                 {isCreating && <DocumentEditor type={type} initialDoc={docToEdit} onClose={closeEditor} />}
-
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                     <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
                         <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase font-bold text-xs">
@@ -752,12 +613,7 @@ export default function ClientHub({ data, updateData }) {
                                     <td className="p-4 text-center">
                                         <div className="relative group/status inline-block">
                                             {getStatusBadge(doc.status)}
-                                            {/* FIX DROPDOWN DARK MODE */}
-                                            <select 
-                                                value={doc.status} 
-                                                onChange={(e) => handleStatusChange(doc, e.target.value)}
-                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                            >
+                                            <select value={doc.status} onChange={(e) => handleStatusChange(doc, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer">
                                                 <option value="Draft" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Brouillon</option>
                                                 <option value="Sent" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Envoyé</option>
                                                 {type === 'invoice' ? <option value="Paid" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Payée</option> : <option value="Accepted" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Accepté</option>}
@@ -766,14 +622,8 @@ export default function ClientHub({ data, updateData }) {
                                         </div>
                                     </td>
                                     <td className="p-4 text-right flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => openEditor(doc)} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors">
-                                            <Pencil size={16}/>
-                                        </button>
-                                        {type === 'quote' && (
-                                            <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                                                <ArrowRightLeft size={16}/>
-                                            </button>
-                                        )}
+                                        <button onClick={() => openEditor(doc)} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"><Pencil size={16}/></button>
+                                        {type === 'quote' && <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><ArrowRightLeft size={16}/></button>}
                                         <button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                     </td>
                                 </tr>
@@ -791,11 +641,7 @@ export default function ClientHub({ data, updateData }) {
                 <h2 className="text-3xl font-bold text-slate-800 dark:text-white font-serif tracking-tight">Espace Client</h2>
                 <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     {['clients', 'quotes', 'invoices', 'catalog'].map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                        >
+                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
                             {tab === 'clients' && 'Clients'}
                             {tab === 'quotes' && 'Devis'}
                             {tab === 'invoices' && 'Factures'}
