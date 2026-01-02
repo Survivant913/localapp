@@ -71,8 +71,6 @@ export default function App() {
       
       if (error) {
         console.error(`ERREUR CRITIQUE sur ${table}:`, error);
-        // On ne lance pas d'erreur bloquante ici pour permettre aux autres tables de se sauvegarder
-        // mais on le signale dans la console
       }
     }
   };
@@ -274,27 +272,35 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [data, unsavedChanges]);
 
+  // --- SAUVEGARDE GLOBALE (MISE À JOUR) ---
   const saveDataToSupabase = async () => {
     if (!session) return;
     setIsSaving(true);
     try {
       const { user } = session;
       
-      // Profil
+      // Profil (AVEC LOGO MAINTENANT ✅)
       await supabase.from('profiles').upsert({ 
-          id: user.id, settings: data.settings, custom_labels: data.customLabels,
-          company_name: data.profile?.company_name, siret: data.profile?.siret, address: data.profile?.address,
-          email_contact: data.profile?.email_contact, phone_contact: data.profile?.phone_contact,
-          iban: data.profile?.iban, bic: data.profile?.bic, tva_number: data.profile?.tva_number
+          id: user.id, 
+          settings: data.settings, 
+          custom_labels: data.customLabels,
+          company_name: data.profile?.company_name, 
+          siret: data.profile?.siret, 
+          address: data.profile?.address,
+          email_contact: data.profile?.email_contact, 
+          phone_contact: data.profile?.phone_contact,
+          iban: data.profile?.iban, 
+          bic: data.profile?.bic, 
+          tva_number: data.profile?.tva_number,
+          logo: data.profile?.logo // <--- La ligne magique
       });
 
-      // --- COMPTES (Securisé et Filtré) ---
-      // On s'assure qu'on envoie des comptes valides avec user_id
+      // --- COMPTES ---
       const accountsToSave = data.budget.accounts
-          .filter(a => a && a.name && a.id) // Filtre de sécurité
+          .filter(a => a && a.name && a.id)
           .map(a => ({ 
               id: a.id, 
-              user_id: user.id, // INDISPENSABLE
+              user_id: user.id, 
               name: a.name 
           }));
       await upsertInBatches('accounts', accountsToSave, 50, a => a);
@@ -307,7 +313,7 @@ export default function App() {
           date: t.date, account_id: t.accountId || t.account_id, archived: t.archived 
       }));
 
-      // Autres tables (ERP, etc)
+      // Autres tables
       await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
