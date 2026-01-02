@@ -4,7 +4,8 @@ import {
   ChevronRight, CheckCircle2, AlertCircle, X, 
   Printer, Save, Trash2, Wallet, ArrowRight,
   ZoomIn, ZoomOut, Download, Sparkles,
-  ArrowRightLeft, TrendingUp, Clock, Pencil
+  ArrowRightLeft, TrendingUp, Clock, Pencil,
+  MoreHorizontal, Filter, Package
 } from 'lucide-react';
 
 export default function ClientHub({ data, updateData }) {
@@ -30,7 +31,9 @@ export default function ClientHub({ data, updateData }) {
         return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
     };
 
-    // --- 0. COMPOSANT : RÉSUMÉ FINANCIER (Simplifié) ---
+    const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '??';
+
+    // --- 0. COMPOSANT : RÉSUMÉ FINANCIER ---
     const FinancialSummary = () => {
         const pendingPayment = invoices
             .filter(i => i.status === 'Sent')
@@ -41,30 +44,44 @@ export default function ClientHub({ data, updateData }) {
             .reduce((sum, q) => sum + (q.total || 0), 0);
 
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 animate-in slide-in-from-top-4">
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-orange-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-orange-100 text-orange-600"><Clock size={24}/></div>
-                    <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase">Paiements en attente</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(pendingPayment)}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4">
+                <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity text-orange-500">
+                        <Clock size={80}/>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg"><Clock size={20}/></div>
+                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">En attente de paiement</span>
+                        </div>
+                        <p className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{formatCurrency(pendingPayment)}</p>
+                        <p className="text-xs text-slate-400 mt-1">Factures envoyées, non payées</p>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-blue-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-blue-100 text-blue-600"><FileText size={24}/></div>
-                    <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase">Devis à facturer</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
+
+                <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity text-blue-500">
+                        <FileText size={80}/>
+                    </div>
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><FileText size={20}/></div>
+                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Pipeline Commercial</span>
+                        </div>
+                        <p className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{formatCurrency(acceptedQuotes)}</p>
+                        <p className="text-xs text-slate-400 mt-1">Devis acceptés, à facturer</p>
                     </div>
                 </div>
             </div>
         );
     };
 
-    // --- 1. GESTION CLIENTS ---
+    // --- 1. GESTION CLIENTS (REDESIGN) ---
     const ClientsTab = () => {
         const [form, setForm] = useState(false);
         const [editing, setEditing] = useState(null);
         const [tempClient, setTempClient] = useState({ name: '', email: '', phone: '', address: '', contact_person: '' });
+        const [searchTerm, setSearchTerm] = useState('');
 
         const saveClient = () => {
             if (!tempClient.name) return alert('Nom requis');
@@ -78,54 +95,119 @@ export default function ClientHub({ data, updateData }) {
             if (window.confirm('Supprimer ce client ?')) updateData({ ...data, clients: clients.filter(c => c.id !== id) }, { table: 'clients', id });
         };
 
+        const filteredClients = clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
         return (
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Carnet d'adresses</h3>
-                    <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-blue-700 transition-colors">
-                        <Plus size={16}/> Nouveau Client
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input 
+                            type="text" 
+                            placeholder="Rechercher un client..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500 text-sm text-slate-800 dark:text-white"
+                        />
+                    </div>
+                    <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                        <Plus size={18}/> Nouveau Client
                     </button>
                 </div>
+
+                {/* Formulaire (Modal Inline) */}
                 {form && (
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-100 dark:border-slate-700 shadow-lg animate-in slide-in-from-top-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <input type="text" placeholder="Nom Entreprise *" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
-                            <input type="text" placeholder="Contact (Nom)" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
-                            <input type="email" placeholder="Email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
-                            <input type="text" placeholder="Téléphone" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" />
-                            <textarea placeholder="Adresse complète" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="md:col-span-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none h-20 resize-none text-slate-800 dark:text-white" />
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-100 dark:border-slate-700 shadow-xl animate-in slide-in-from-top-2 relative">
+                        <button onClick={() => setForm(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                        <h4 className="font-bold text-lg mb-6 text-slate-800 dark:text-white">{editing ? 'Modifier le client' : 'Ajouter un client'}</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Entreprise / Nom</label>
+                                    <input type="text" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Contact Principal</label>
+                                    <input type="text" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                                        <input type="email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Téléphone</label>
+                                        <input type="text" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Adresse</label>
+                                    <input type="text" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => setForm(false)} className="px-4 py-2 text-slate-500 hover:text-slate-800">Annuler</button>
-                            <button onClick={saveClient} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Enregistrer</button>
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setForm(false)} className="px-6 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">Annuler</button>
+                            <button onClick={saveClient} className="px-6 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20">Enregistrer</button>
                         </div>
                     </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {clients.map(client => (
-                        <div key={client.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:border-blue-300 transition-all group">
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="font-bold text-lg text-slate-800 dark:text-white truncate pr-2">{client.name}</div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditing(client); setTempClient(client); setForm(true); }} className="p-1.5 text-slate-400 hover:text-blue-500 bg-slate-100 dark:bg-slate-700 rounded"><Users size={14}/></button>
-                                    <button onClick={() => deleteClient(client.id)} className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-100 dark:bg-slate-700 rounded"><Trash2 size={14}/></button>
+
+                {/* Liste Clients (Cartes Pro) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredClients.map(client => (
+                        <div key={client.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all group relative">
+                            
+                            {/* Header Carte */}
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                                        {getInitials(client.name)}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 dark:text-white text-lg leading-tight">{client.name}</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{client.contact_person || 'Pas de contact'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => { setEditing(client); setTempClient(client); setForm(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Pencil size={16}/></button>
+                                    <button onClick={() => deleteClient(client.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                 </div>
                             </div>
-                            <div className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
-                                {client.contact_person && <p>👤 {client.contact_person}</p>}
-                                {client.email && <p>✉️ {client.email}</p>}
-                                {client.phone && <p>📞 {client.phone}</p>}
+
+                            {/* Info Body */}
+                            <div className="space-y-2.5">
+                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg">
+                                    <span className="text-slate-400">✉️</span> <span className="truncate">{client.email || '---'}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg">
+                                    <span className="text-slate-400">📞</span> <span>{client.phone || '---'}</span>
+                                </div>
                             </div>
                         </div>
                     ))}
+                    
+                    {/* Carte "Ajouter" vide pour inciter */}
+                    {filteredClients.length === 0 && !searchTerm && (
+                        <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-slate-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-all group h-full min-h-[200px]">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-100 group-hover:text-blue-600 flex items-center justify-center transition-colors">
+                                <Plus size={24}/>
+                            </div>
+                            <span className="font-medium">Ajouter un premier client</span>
+                        </button>
+                    )}
                 </div>
             </div>
         );
     };
 
-    // --- 2. CATALOGUE ---
+    // --- 2. CATALOGUE (REDESIGN TABLEAU) ---
     const CatalogTab = () => {
         const [newItem, setNewItem] = useState({ name: '', price: '' });
+        
         const addItem = () => {
             if (!newItem.name || !newItem.price) return;
             const item = { ...newItem, id: Date.now(), price: parseFloat(newItem.price) };
@@ -136,34 +218,77 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="space-y-6">
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-1 w-full">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Service / Produit</label>
-                        <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" placeholder="Ex: Création Logo" />
+                {/* Barre d'ajout Rapide (Top Bar) */}
+                <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-2 items-center">
+                    <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg ml-2 hidden md:block">
+                        <Package size={20}/>
                     </div>
-                    <div className="w-32">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Prix (€)</label>
-                        <input type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-800 dark:text-white" placeholder="0.00" />
+                    <input 
+                        type="text" 
+                        value={newItem.name} 
+                        onChange={e => setNewItem({...newItem, name: e.target.value})} 
+                        className="flex-1 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400" 
+                        placeholder="Nom du service ou produit..." 
+                    />
+                    <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
+                    <div className="flex items-center gap-2 w-full md:w-auto px-2">
+                        <span className="text-slate-400 font-bold">€</span>
+                        <input 
+                            type="number" 
+                            value={newItem.price} 
+                            onChange={e => setNewItem({...newItem, price: e.target.value})} 
+                            className="w-24 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 font-mono" 
+                            placeholder="0.00" 
+                        />
                     </div>
-                    <button onClick={addItem} className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 h-[42px]">Ajouter</button>
+                    <button onClick={addItem} className="w-full md:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/20">
+                        Ajouter
+                    </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {catalog.map(item => (
-                        <div key={item.id} className="flex justify-between items-center p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                            <div><div className="font-bold text-slate-800 dark:text-white">{item.name}</div><div className="text-purple-600 font-mono text-sm">{formatCurrency(item.price)}</div></div>
-                            <button onClick={() => deleteItem(item.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={18}/></button>
-                        </div>
-                    ))}
+
+                {/* Tableau des produits */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+                            <tr>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Désignation</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Prix Unitaire</th>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-20">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {catalog.length === 0 && (
+                                <tr>
+                                    <td colSpan="3" className="p-12 text-center text-slate-400">
+                                        <ShoppingBag size={48} className="mx-auto mb-4 opacity-20"/>
+                                        <p>Votre catalogue est vide.</p>
+                                    </td>
+                                </tr>
+                            )}
+                            {catalog.map(item => (
+                                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                    <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/50">
+                                        {formatCurrency(item.price)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button onClick={() => deleteItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors">
+                                            <Trash2 size={16}/>
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         );
     };
 
-    // --- 3. ÉDITEUR FACTURE / DEVIS (AVEC EDIT) ---
+    // --- 3. ÉDITEUR FACTURE / DEVIS (Inchangé mais propre) ---
     const DocumentEditor = ({ type, onClose, initialDoc }) => {
         const isInvoice = type === 'invoice';
         
-        // Initialisation : soit on charge le doc existant, soit on crée un nouveau
         const [doc, setDoc] = useState(initialDoc || {
             id: Date.now(),
             number: generateNumber(type),
@@ -205,7 +330,6 @@ export default function ClientHub({ data, updateData }) {
             setDoc({ ...doc, items: newItems });
         };
 
-        // --- CALCULS AUTOMATIQUES ---
         const subTotal = doc.items.reduce((acc, i) => acc + (i.qty * i.price), 0);
         const taxAmount = subTotal * (doc.taxRate / 100);
         const total = subTotal + taxAmount;
@@ -217,7 +341,6 @@ export default function ClientHub({ data, updateData }) {
             const listName = isInvoice ? 'invoices' : 'quotes';
             const list = isInvoice ? invoices : quotes;
 
-            // Si c'est une édition, on met à jour. Sinon on ajoute.
             const isEditing = !!initialDoc;
             const newList = isEditing 
                 ? list.map(d => d.id === finalDoc.id ? finalDoc : d) 
@@ -230,9 +353,8 @@ export default function ClientHub({ data, updateData }) {
         const handlePrint = () => window.print();
 
         return (
-            <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden">
-                {/* Toolbar */}
-                <div className="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center text-white no-print">
+            <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden backdrop-blur-sm">
+                <div className="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center text-white no-print shadow-xl">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {isInvoice ? <FileText className="text-amber-500"/> : <ShoppingBag className="text-blue-500"/>}
                         {initialDoc ? 'Modifier' : 'Nouveau'} {isInvoice ? 'Facture' : 'Devis'}
@@ -254,12 +376,11 @@ export default function ClientHub({ data, updateData }) {
                 </div>
 
                 <div className="flex flex-1 overflow-hidden">
-                    {/* GAUCHE: ÉDITEUR */}
                     <div className="w-1/3 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 overflow-y-auto p-6 space-y-6 no-print">
                         <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Client</label>
-                                <select value={doc.client_id} onChange={handleClientChange} className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
+                                <select value={doc.client_id} onChange={handleClientChange} className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-blue-500">
                                     <option value="">-- Sélectionner un client --</option>
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
@@ -291,28 +412,26 @@ export default function ClientHub({ data, updateData }) {
                                             <option disabled>Aucun compte créé dans Budget</option>
                                         )}
                                     </select>
-                                    <p className="text-[10px] text-amber-600/70 mt-1 italic">Le montant ira sur ce compte une fois la facture "Payée".</p>
                                 </div>
                             )}
 
-                            {/* BOUTON MODE AE */}
-                            <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Options fiscales</label>
                                 <button 
                                     onClick={toggleAutoEntrepreneur}
                                     className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all border ${
                                         doc.taxRate === 0 && doc.notes.includes('293 B')
                                         ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                        : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                        : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300'
                                     }`}
                                 >
                                     <Sparkles size={14}/>
                                     {doc.taxRate === 0 && doc.notes.includes('293 B') ? 'Mode AE Activé (TVA 0%)' : 'Activer Mode AE (TVA 0%)'}
                                 </button>
                                 {doc.taxRate !== 0 && (
-                                    <div className="mt-2">
+                                    <div className="mt-3">
                                         <label className="text-[10px] text-slate-400">Taux TVA (%)</label>
-                                        <input type="number" value={doc.taxRate} onChange={e => setDoc({...doc, taxRate: Number(e.target.value)})} className="w-full mt-1 p-1 bg-white dark:bg-slate-800 border rounded text-sm text-center"/>
+                                        <input type="number" value={doc.taxRate} onChange={e => setDoc({...doc, taxRate: Number(e.target.value)})} className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-900 border dark:border-slate-600 rounded text-sm text-center dark:text-white"/>
                                     </div>
                                 )}
                             </div>
@@ -327,7 +446,7 @@ export default function ClientHub({ data, updateData }) {
                                                 <select onChange={e => {
                                                     const catItem = catalog.find(c => c.name === e.target.value);
                                                     if(catItem) { updateItem(i, 'desc', catItem.name); updateItem(i, 'price', catItem.price); }
-                                                }} className="w-full text-xs p-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-500">
+                                                }} className="w-full text-xs p-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-500 cursor-pointer">
                                                     <option value="">Insérer un produit...</option>
                                                     {catalog.map(c => <option key={c.id} value={c.name}>{c.name} - {c.price}€</option>)}
                                                 </select>
@@ -339,13 +458,12 @@ export default function ClientHub({ data, updateData }) {
                                             <button onClick={() => setDoc({...doc, items: doc.items.filter((_, idx) => idx !== i)})} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
                                         </div>
                                     ))}
-                                    <button onClick={addItem} className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded text-xs font-bold text-slate-500 hover:text-blue-500 hover:border-blue-500">+ Ajouter ligne</button>
+                                    <button onClick={addItem} className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded text-xs font-bold text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-colors">+ Ajouter ligne</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* DROITE: APERÇU A4 */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div 
                             id="invoice-paper" 
@@ -354,7 +472,7 @@ export default function ClientHub({ data, updateData }) {
                                 minHeight: '297mm', 
                                 transform: `scale(${zoom})`, 
                                 transformOrigin: 'top center',
-                                boxShadow: '0 0 20px rgba(0,0,0,0.1)' 
+                                boxShadow: '0 0 40px rgba(0,0,0,0.1)' 
                             }}
                             className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200"
                         >
@@ -374,7 +492,7 @@ export default function ClientHub({ data, updateData }) {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <h1 className="text-4xl font-light text-slate-800 uppercase mb-2">{isInvoice ? 'Facture' : 'Devis'}</h1>
+                                    <h1 className="text-4xl font-light text-slate-800 uppercase mb-2 tracking-wide">{isInvoice ? 'Facture' : 'Devis'}</h1>
                                     <p className="font-mono text-lg font-bold text-slate-600">N° {doc.number}</p>
                                     <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
                                 </div>
@@ -453,7 +571,6 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* CSS PRINT */}
                 <style>{`
                     @media print {
                         body * { visibility: hidden; }
@@ -471,10 +588,9 @@ export default function ClientHub({ data, updateData }) {
     // --- 4. LISTE DES DOCUMENTS (TABLEAU DE BORD) ---
     const DocumentList = ({ type }) => {
         const list = type === 'quote' ? quotes : invoices;
-        
-        // État pour savoir si on édite un doc précis ou si on en crée un nouveau
         const [docToEdit, setDocToEdit] = useState(null);
         const [isCreating, setIsCreating] = useState(false);
+        const [filterStatus, setFilterStatus] = useState('all');
 
         const openEditor = (doc = null) => {
             setDocToEdit(doc);
@@ -486,14 +602,11 @@ export default function ClientHub({ data, updateData }) {
             setIsCreating(false);
         };
 
-        // --- CONVERTIR DEVIS -> FACTURE ---
         const convertToInvoice = (quote) => {
             if(!window.confirm("Créer une facture à partir de ce devis ?")) return;
-            
             const year = new Date().getFullYear();
             const count = invoices.length + 1;
             const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
-            
             const newInvoice = {
                 ...quote,
                 id: Date.now(),
@@ -502,7 +615,6 @@ export default function ClientHub({ data, updateData }) {
                 date: new Date().toISOString(),
                 type: 'invoice' 
             };
-
             updateData({ ...data, invoices: [newInvoice, ...invoices] });
             alert(`Facture brouillon ${newInvoiceNumber} créée !`);
         };
@@ -512,8 +624,7 @@ export default function ClientHub({ data, updateData }) {
             let updatedBudget = { ...data.budget };
 
             if (type === 'invoice' && newStatus === 'Paid' && doc.status !== 'Paid') {
-                if (!doc.target_account_id) return alert("Erreur : Aucun compte bancaire associé. Modifiez la facture pour en choisir un.");
-                
+                if (!doc.target_account_id) return alert("Erreur : Aucun compte bancaire associé.");
                 const newTransaction = {
                     id: Date.now(),
                     date: new Date().toISOString(),
@@ -523,11 +634,9 @@ export default function ClientHub({ data, updateData }) {
                     accountId: doc.target_account_id,
                     archived: false
                 };
-
                 updatedBudget.transactions = [newTransaction, ...updatedBudget.transactions];
                 alert(`✅ Transaction de ${formatCurrency(doc.total)} ajoutée au compte !`);
             }
-
             const listName = type === 'quote' ? 'quotes' : 'invoices';
             updateData({ ...data, [listName]: updatedList, budget: updatedBudget });
         };
@@ -540,68 +649,95 @@ export default function ClientHub({ data, updateData }) {
             }
         };
 
+        const getStatusBadge = (status) => {
+            const styles = {
+                Draft: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
+                Sent: 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/50',
+                Paid: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50',
+                Accepted: 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/50',
+                Rejected: 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50',
+            };
+            const labels = { Draft: 'Brouillon', Sent: 'Envoyé', Paid: 'Payée', Accepted: 'Accepté', Rejected: 'Refusé' };
+            return (
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${styles[status] || styles.Draft}`}>
+                    {labels[status] || status}
+                </span>
+            );
+        };
+
+        const filteredList = list.filter(d => filterStatus === 'all' || d.status === filterStatus);
+
         return (
             <div className="space-y-6">
                 <FinancialSummary />
 
-                <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize">{type === 'quote' ? 'Devis' : 'Factures'}</h3>
-                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors">
+                <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize flex items-center gap-2">
+                            {type === 'quote' ? <FileText className="text-blue-500"/> : <Wallet className="text-emerald-500"/>}
+                            {type === 'quote' ? 'Mes Devis' : 'Mes Factures'}
+                        </h3>
+                        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
+                        <div className="flex gap-2">
+                            {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                                    {s === 'all' ? 'Tout' : s}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20">
                         <Plus size={16}/> Créer
                     </button>
                 </div>
 
                 {isCreating && <DocumentEditor type={type} initialDoc={docToEdit} onClose={closeEditor} />}
 
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                     <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
-                        <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 uppercase font-bold text-xs">
+                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase font-bold text-xs">
                             <tr>
-                                <th className="p-4">N°</th>
+                                <th className="p-4">Numéro</th>
                                 <th className="p-4">Client</th>
                                 <th className="p-4">Date</th>
-                                <th className="p-4">Montant TTC</th>
-                                <th className="p-4">Statut</th>
+                                <th className="p-4 text-right">Montant TTC</th>
+                                <th className="p-4 text-center">Statut</th>
                                 <th className="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {list.length === 0 && <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">Aucun document.</td></tr>}
-                            {list.map(doc => (
-                                <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                    <td className="p-4 font-mono font-bold">{doc.number}</td>
-                                    <td className="p-4 font-medium">{doc.client_name}</td>
+                            {filteredList.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-slate-400 italic">Aucun document trouvé.</td></tr>}
+                            {filteredList.map(doc => (
+                                <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                    <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-200">{doc.number}</td>
+                                    <td className="p-4 font-medium text-slate-900 dark:text-white">{doc.client_name}</td>
                                     <td className="p-4 text-slate-500">{formatDate(doc.date)}</td>
-                                    <td className="p-4 font-bold">{formatCurrency(doc.total)}</td>
-                                    <td className="p-4">
-                                        <select 
-                                            value={doc.status} 
-                                            onChange={(e) => handleStatusChange(doc, e.target.value)}
-                                            className={`text-xs font-bold px-2 py-1 rounded border outline-none cursor-pointer ${
-                                                doc.status === 'Paid' || doc.status === 'Accepted' ? 'bg-green-100 text-green-700 border-green-200' :
-                                                doc.status === 'Sent' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                'bg-slate-100 text-slate-600 border-slate-200'
-                                            }`}
-                                        >
-                                            <option value="Draft">Brouillon</option>
-                                            <option value="Sent">Envoyé</option>
-                                            {type === 'invoice' ? <option value="Paid">Payée</option> : <option value="Accepted">Accepté</option>}
-                                            {type === 'quote' && <option value="Rejected">Refusé</option>}
-                                        </select>
+                                    <td className="p-4 text-right font-bold text-slate-900 dark:text-white">{formatCurrency(doc.total)}</td>
+                                    <td className="p-4 text-center">
+                                        <div className="relative group/status inline-block">
+                                            {getStatusBadge(doc.status)}
+                                            <select 
+                                                value={doc.status} 
+                                                onChange={(e) => handleStatusChange(doc, e.target.value)}
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                            >
+                                                <option value="Draft">Brouillon</option>
+                                                <option value="Sent">Envoyé</option>
+                                                {type === 'invoice' ? <option value="Paid">Payée</option> : <option value="Accepted">Accepté</option>}
+                                                {type === 'quote' && <option value="Rejected">Refusé</option>}
+                                            </select>
+                                        </div>
                                     </td>
-                                    <td className="p-4 text-right flex justify-end gap-2">
-                                        {/* BOUTON EDITER / IMPRIMER */}
-                                        <button onClick={() => openEditor(doc)} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded">
+                                    <td className="p-4 text-right flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => openEditor(doc)} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors">
                                             <Pencil size={16}/>
                                         </button>
-
-                                        {/* BOUTON CONVERTIR (Seulement pour les devis) */}
                                         {type === 'quote' && (
-                                            <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded">
+                                            <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
                                                 <ArrowRightLeft size={16}/>
                                             </button>
                                         )}
-                                        <button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                        <button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                     </td>
                                 </tr>
                             ))}
@@ -615,13 +751,13 @@ export default function ClientHub({ data, updateData }) {
     return (
         <div className="fade-in p-6 pb-24 max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 className="text-3xl font-bold text-slate-800 dark:text-white font-serif">Espace Client</h2>
-                <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
+                <h2 className="text-3xl font-bold text-slate-800 dark:text-white font-serif tracking-tight">Espace Client</h2>
+                <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     {['clients', 'quotes', 'invoices', 'catalog'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                         >
                             {tab === 'clients' && 'Clients'}
                             {tab === 'quotes' && 'Devis'}
