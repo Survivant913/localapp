@@ -291,19 +291,17 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        // --- NOUVELLE FONCTION IMPRESSION "EXTRACTION" ---
+        // --- IMPRESSION PROPRE (DESIGN PROTOTYPE) ---
         const handlePrint = () => {
             const content = document.getElementById('invoice-paper');
             if (!content) return;
 
-            // On ouvre une nouvelle fenêtre vierge
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
                 alert("Veuillez autoriser les pop-ups pour imprimer.");
                 return;
             }
 
-            // On reconstruit le document proprement
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
@@ -312,8 +310,8 @@ export default function ClientHub({ data, updateData }) {
                     <script src="https://cdn.tailwindcss.com"></script>
                     <style>
                         @page { size: A4; margin: 0; }
-                        body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 40px; background: white; }
+                        body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
+                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 40px; background: white; box-sizing: border-box; }
                     </style>
                 </head>
                 <body>
@@ -321,7 +319,6 @@ export default function ClientHub({ data, updateData }) {
                         ${content.innerHTML}
                     </div>
                     <script>
-                        // On attend que le contenu soit chargé avant d'imprimer
                         window.onload = function() {
                             setTimeout(function() {
                                 window.print();
@@ -420,6 +417,7 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
 
+                    {/* APERÇU A4 ET ZONE IMPRIMABLE */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             {/* EN-TÊTE FACTURE */}
@@ -439,67 +437,73 @@ export default function ClientHub({ data, updateData }) {
                                     <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
                                 </div>
                             </div>
-                            {/* DESTINATAIRE */}
+                            
+                            {/* DESTINATAIRE (Style PRO Prototype) */}
                             <div className="flex justify-end mb-16">
-                                <div className="w-1/3 text-left">
-                                    <p className="text-xs font-bold text-slate-400 uppercase mb-1">Client</p>
-                                    <p className="text-lg font-bold text-slate-800">{doc.client_name || "Nom du client"}</p>
-                                    <p className="text-sm text-slate-500 whitespace-pre-line">{doc.client_address}</p>
+                                <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
+                                    <p className="text-lg font-bold text-slate-900 leading-tight mb-1">{doc.client_name || "Nom du client"}</p>
+                                    <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{doc.client_address}</p>
                                 </div>
                             </div>
-                            {/* TABLEAU */}
-                            <table className="w-full mb-8">
-                                <thead className="border-b-2 border-slate-100">
+
+                            {/* TABLEAU (Style PRO Prototype) */}
+                            <table className="w-full mb-12">
+                                <thead>
                                     <tr>
-                                        <th className="text-left py-3 text-xs font-bold text-slate-500 uppercase">Description</th>
-                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Qté</th>
-                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Prix Unit.</th>
-                                        <th className="text-right py-3 text-xs font-bold text-slate-500 uppercase">Total</th>
+                                        <th className="text-left py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Description</th>
+                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Qté</th>
+                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Prix Unit.</th>
+                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm text-slate-700">
                                     {doc.items.map((item, i) => (
-                                        <tr key={i} className="border-b border-slate-50">
+                                        <tr key={i} className="border-b border-slate-50 last:border-b-0">
                                             <td className="py-4 font-medium">{item.desc}</td>
                                             <td className="py-4 text-right">{item.qty}</td>
                                             <td className="py-4 text-right">{formatCurrency(item.price)}</td>
-                                            <td className="py-4 text-right font-bold">{formatCurrency(item.qty * item.price)}</td>
+                                            <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.qty * item.price)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+
                             {/* TOTALS */}
-                            <div className="flex justify-end mb-12">
-                                <div className="w-1/3 text-right space-y-2">
-                                    <div className="flex justify-between text-sm text-slate-500">
+                            <div className="flex justify-end mb-16">
+                                <div className="w-1/3 text-right space-y-3">
+                                    <div className="flex justify-between text-xs text-slate-500">
                                         <span>Total HT</span>
                                         <span>{formatCurrency(subTotal)}</span>
                                     </div>
-                                    <div className="flex justify-between text-sm text-slate-500">
+                                    <div className="flex justify-between text-xs text-slate-500">
                                         <span>TVA ({doc.taxRate}%)</span>
                                         <span>{formatCurrency(taxAmount)}</span>
                                     </div>
-                                    <div className="flex justify-between text-lg font-bold text-slate-800 pt-4 border-t border-slate-100">
+                                    <div className="flex justify-between text-xl font-bold text-slate-900 pt-4 border-t border-slate-900">
                                         <span>Total TTC</span>
                                         <span>{formatCurrency(total)}</span>
                                     </div>
-                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>}
+                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic mt-1">TVA non applicable</p>}
                                 </div>
                             </div>
+
                             {/* FOOTER */}
-                            <div className="mt-auto pt-8 border-t border-slate-100 text-xs text-slate-500">
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div>
-                                        <p className="font-bold text-slate-700 mb-1">Informations de paiement</p>
-                                        <p>IBAN : {profile.iban || "---"}</p>
-                                        <p>BIC : {profile.bic || "---"}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-slate-700 mb-1">Note</p>
-                                        <p className="whitespace-pre-wrap">{doc.notes}</p>
+                            <div className="mt-auto border-t border-slate-100 pt-8 grid grid-cols-2 gap-12">
+                                <div>
+                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
+                                    <div className="text-xs text-slate-500 space-y-1">
+                                        <p>IBAN : <span className="font-mono text-slate-700">{profile.iban || "---"}</span></p>
+                                        <p>BIC : <span className="font-mono text-slate-700">{profile.bic || "---"}</span></p>
                                     </div>
                                 </div>
-                                <div className="mt-8 text-center text-[10px] text-slate-300">{profile.companyName} - SIRET {profile.siret}</div>
+                                <div>
+                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
+                                    <p className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">{doc.notes}</p>
+                                </div>
+                            </div>
+                            <div className="mt-8 text-center text-[10px] text-slate-300 font-medium tracking-wide uppercase">
+                                {profile.companyName} - SIRET {profile.siret}
                             </div>
                         </div>
                     </div>
