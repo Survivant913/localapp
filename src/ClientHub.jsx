@@ -576,31 +576,39 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* FIX IMPRESSION CSS */}
+                {/* --- CSS POUR L'IMPRESSION (LE CORRECTIF EST ICI) --- */}
                 <style>{`
                     @media print {
+                        /* Cache TOUT sauf la facture */
+                        body > * { display: none !important; }
                         body * { visibility: hidden; }
-                        #invoice-paper, #invoice-paper * { visibility: visible; }
                         
-                        body, #invoice-paper {
-                            background-color: white !important;
-                            color: black !important;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
+                        html, body {
+                            overflow: visible !important;
+                            height: auto !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+
+                        #invoice-paper, #invoice-paper * {
+                            visibility: visible !important;
                         }
 
                         #invoice-paper {
-                            position: absolute !important;
+                            position: fixed !important;
                             left: 0 !important;
                             top: 0 !important;
-                            margin: 0 !important;
-                            padding: 40px !important;
                             width: 210mm !important;
                             min-height: 297mm !important;
+                            margin: 0 !important;
+                            padding: 0 !important; /* Laisse le padding interne faire le job */
                             transform: none !important;
+                            background: white !important;
+                            color: black !important;
+                            z-index: 99999 !important;
                             box-shadow: none !important;
-                            overflow: visible !important;
-                            z-index: 9999 !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
                         }
 
                         @page {
