@@ -294,7 +294,7 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        // --- IMPRESSION PROPRIÉTÉ DÉFINITIVE ---
+        // --- IMPRESSION PROPRIÉTÉ DÉFINITIVE (AVEC FOOTER CORRIGÉ) ---
         const handlePrint = () => {
             const content = document.getElementById('invoice-paper');
             if (!content) return;
@@ -309,43 +309,17 @@ export default function ClientHub({ data, updateData }) {
                     <title>Impression ${doc.number}</title>
                     <script src="https://cdn.tailwindcss.com"></script>
                     <style>
-                        @page { size: A4; margin: 10mm; }
-                        body { margin: 0; padding: 0; background: white; font-family: sans-serif; }
-                        .print-table { width: 100%; border-collapse: collapse; }
-                        .print-content { width: 100%; }
-                        tr { page-break-inside: avoid; }
+                        @page { size: A4; margin: 0; }
+                        body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
+                        .print-container { width: 210mm; height: 297mm; margin: 0 auto; position: relative; background: white; box-sizing: border-box; }
                     </style>
                 </head>
                 <body>
-                    <table class="print-table">
-                        <tbody>
-                            <tr>
-                                <td>
-                                    <div class="print-content">
-                                        ${content.innerHTML}
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
+                    <div class="print-container">
+                        ${content.innerHTML}
+                    </div>
                     <script>
                         window.onload = function() {
-                            // On cherche le bloc qui contient les notes et paiements
-                            // Il a souvent la classe mt-auto ou est le dernier div
-                            const divs = document.querySelectorAll('div');
-                            const footer = Array.from(divs).reverse().find(d => d.innerText.includes('IBAN') || d.innerText.includes('Note'));
-                            
-                            if (footer) {
-                                footer.style.position = 'fixed';
-                                footer.style.bottom = '15mm';
-                                footer.style.left = '40px';
-                                footer.style.right = '40px';
-                                footer.style.borderTop = '1px solid #e2e8f0';
-                                footer.style.paddingTop = '15px';
-                                footer.classList.remove('mt-auto');
-                            }
-
                             setTimeout(function() {
                                 window.print();
                                 window.close();
@@ -435,16 +409,16 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
-                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
-                            {/* EN-TÊTE PREMIUM */}
+                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)', position: 'relative' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
+                            
+                            {/* --- EN-TÊTE --- */}
                             <div className="flex justify-between items-start mb-12">
                                 <div>
                                     {profile.logo ? <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> : <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>}
                                     <div className="text-xs text-slate-500 leading-relaxed">
                                         {profile.name}<br/>
                                         {profile.address}<br/>
-                                        {profile.email_contact}<br/>
-                                        SIRET: {profile.siret}
+                                        {profile.email_contact}
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -454,7 +428,7 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
                             
-                            {/* DESTINATAIRE PREMIUM */}
+                            {/* --- DESTINATAIRE --- */}
                             <div className="flex justify-end mb-16">
                                 <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
@@ -463,7 +437,7 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* TABLEAU PREMIUM */}
+                            {/* --- TABLEAU --- */}
                             <table className="w-full mb-12">
                                 <thead>
                                     <tr>
@@ -485,8 +459,8 @@ export default function ClientHub({ data, updateData }) {
                                 </tbody>
                             </table>
 
-                            {/* TOTALS PREMIUM */}
-                            <div className="flex justify-end mb-16">
+                            {/* --- RÉCAPITULATIF FINANCIER --- */}
+                            <div className="flex justify-end mb-24">
                                 <div className="w-1/3 text-right space-y-3">
                                     <div className="flex justify-between text-xs text-slate-500">
                                         <span>Total HT</span><span>{formatCurrency(subTotal)}</span>
@@ -497,22 +471,36 @@ export default function ClientHub({ data, updateData }) {
                                     <div className="flex justify-between text-xl font-bold text-slate-900 pt-4 border-t border-slate-900">
                                         <span>Total TTC</span><span>{formatCurrency(total)}</span>
                                     </div>
+                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>}
                                 </div>
                             </div>
 
-                            {/* FOOTER PREMIUM */}
-                            <div className="mt-auto border-t border-slate-100 pt-8 grid grid-cols-2 gap-12 text-xs text-slate-500">
-                                <div>
-                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
-                                    <p>IBAN : <span className="font-mono text-slate-700">{profile.iban || "---"}</span></p>
-                                    <p>BIC : <span className="font-mono text-slate-700">{profile.bic || "---"}</span></p>
+                            {/* --- PIED DE PAGE FIXÉ EN BAS --- */}
+                            <div className="mt-auto">
+                                <div className="grid grid-cols-2 gap-12 items-end pb-8">
+                                    {/* Infos Bancaires (Bas Gauche) */}
+                                    <div className="text-left">
+                                        <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
+                                        <div className="text-[11px] text-slate-500 space-y-1 leading-relaxed">
+                                            <p>IBAN : <span className="font-mono text-slate-700 font-bold">{profile.iban || "---"}</span></p>
+                                            <p>BIC : <span className="font-mono text-slate-700 font-bold">{profile.bic || "---"}</span></p>
+                                        </div>
+                                    </div>
+                                    {/* Note (Bas Droite) */}
+                                    <div className="text-right">
+                                        <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
+                                        <p className="text-[11px] text-slate-500 whitespace-pre-wrap leading-relaxed italic">{doc.notes}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
-                                    <p className="whitespace-pre-wrap leading-relaxed">{doc.notes}</p>
+                                
+                                {/* SIRET (Tout en bas au milieu) */}
+                                <div className="border-t border-slate-100 pt-4 text-center">
+                                    <p className="text-[10px] text-slate-300 font-medium tracking-[0.2em] uppercase">
+                                        {profile.companyName} — SIRET {profile.siret}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="mt-8 text-center text-[10px] text-slate-300 font-medium tracking-widest uppercase">{profile.companyName} - SIRET {profile.siret}</div>
+
                         </div>
                     </div>
                 </div>
@@ -591,7 +579,7 @@ export default function ClientHub({ data, updateData }) {
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
                             {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
                             ))}
                         </div>
                     </div>
