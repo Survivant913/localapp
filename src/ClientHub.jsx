@@ -463,55 +463,46 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* --- STYLE CSS CRITIQUE POUR L'IMPRESSION --- */}
+                {/* --- CSS POUR L'IMPRESSION (VERSION DÉFINITIVE SANS DISPLAY NONE) --- */}
                 <style>{`
                     @media print {
-                        /* 1. CACHER TOUT LE RESTE */
-                        body * {
-                            visibility: hidden;
-                        }
+                        /* 1. Reset général */
+                        @page { size: A4; margin: 0; }
+                        body { margin: 0; padding: 0; }
 
-                        /* 2. RENDRE LA FACTURE VISIBLE */
-                        #invoice-paper, #invoice-paper * {
-                            visibility: visible !important;
-                        }
-
-                        /* 3. SORTIR LA FACTURE DU FLUX ET LA COLLER SUR LA FEUILLE */
+                        /* 2. Cacher tout ce qui est autour */
+                        body > *:not(.fixed) { display: none !important; }
+                        
+                        /* 3. Forcer l'affichage de la facture */
                         #invoice-paper {
-                            position: absolute !important;
-                            left: 0 !important;
+                            display: block !important;
+                            visibility: visible !important;
+                            position: fixed !important;
                             top: 0 !important;
+                            left: 0 !important;
+                            width: 210mm !important;
+                            height: 297mm !important;
                             margin: 0 !important;
-                            padding: 0 !important;
-                            width: 100% !important;
-                            /* Annuler le zoom de l'écran pour l'impression */
-                            transform: none !important;
-                            background: white !important;
+                            padding: 40px !important;
+                            transform: scale(1) !important;
+                            background-color: white !important;
                             color: black !important;
-                            box-shadow: none !important;
-                            z-index: 99999 !important;
+                            z-index: 2147483647 !important; /* Z-index maximum */
+                            overflow: visible !important;
                         }
 
-                        /* 4. FORCER LA TAILLE DE LA PAGE */
-                        @page {
-                            size: auto;
-                            margin: 0mm;
+                        #invoice-paper * {
+                            visibility: visible !important;
+                            color: black !important;
                         }
-                        
-                        /* Fix spécifique pour le body/html qui pourraient bloquer la hauteur */
-                        html, body {
-                            height: auto !important;
-                            overflow: visible !important;
-                            background: white !important;
-                        }
-                        
-                        /* Annuler le fixed inset-0 du modal qui peut cacher le contenu */
+
+                        /* 4. S'assurer que le modal ne bloque pas */
                         .fixed.inset-0 {
                             position: static !important;
-                            width: auto !important;
-                            height: auto !important;
-                            overflow: visible !important;
                             background: white !important;
+                            width: 100% !important;
+                            height: 100% !important;
+                            overflow: visible !important;
                         }
                     }
                 `}</style>
