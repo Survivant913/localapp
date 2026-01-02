@@ -291,7 +291,49 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        const handlePrint = () => window.print();
+        // --- NOUVELLE FONCTION IMPRESSION "EXTRACTION" ---
+        const handlePrint = () => {
+            const content = document.getElementById('invoice-paper');
+            if (!content) return;
+
+            // On ouvre une nouvelle fenêtre vierge
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Veuillez autoriser les pop-ups pour imprimer.");
+                return;
+            }
+
+            // On reconstruit le document proprement
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Impression ${doc.number}</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <style>
+                        @page { size: A4; margin: 0; }
+                        body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 40px; background: white; }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-container">
+                        ${content.innerHTML}
+                    </div>
+                    <script>
+                        // On attend que le contenu soit chargé avant d'imprimer
+                        window.onload = function() {
+                            setTimeout(function() {
+                                window.print();
+                                window.close();
+                            }, 500);
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        };
 
         return (
             <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden backdrop-blur-sm">
@@ -462,50 +504,6 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
                 </div>
-
-                {/* --- CSS POUR L'IMPRESSION (VERSION DÉFINITIVE SANS DISPLAY NONE) --- */}
-                <style>{`
-                    @media print {
-                        /* 1. Reset général */
-                        @page { size: A4; margin: 0; }
-                        body { margin: 0; padding: 0; }
-
-                        /* 2. Cacher tout ce qui est autour */
-                        body > *:not(.fixed) { display: none !important; }
-                        
-                        /* 3. Forcer l'affichage de la facture */
-                        #invoice-paper {
-                            display: block !important;
-                            visibility: visible !important;
-                            position: fixed !important;
-                            top: 0 !important;
-                            left: 0 !important;
-                            width: 210mm !important;
-                            height: 297mm !important;
-                            margin: 0 !important;
-                            padding: 40px !important;
-                            transform: scale(1) !important;
-                            background-color: white !important;
-                            color: black !important;
-                            z-index: 2147483647 !important; /* Z-index maximum */
-                            overflow: visible !important;
-                        }
-
-                        #invoice-paper * {
-                            visibility: visible !important;
-                            color: black !important;
-                        }
-
-                        /* 4. S'assurer que le modal ne bloque pas */
-                        .fixed.inset-0 {
-                            position: static !important;
-                            background: white !important;
-                            width: 100% !important;
-                            height: 100% !important;
-                            overflow: visible !important;
-                        }
-                    }
-                `}</style>
             </div>
         );
     };
