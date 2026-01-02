@@ -378,7 +378,6 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
 
-                    {/* APERÇU A4 ET ZONE IMPRIMABLE */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             {/* EN-TÊTE FACTURE */}
@@ -464,7 +463,7 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* --- CSS D'IMPRESSION (CORRIGÉ POUR PAGE BLANCHE) --- */}
+                {/* --- STYLE CSS CRITIQUE POUR L'IMPRESSION --- */}
                 <style>{`
                     @media print {
                         /* 1. CACHER TOUT LE RESTE */
@@ -490,12 +489,29 @@ export default function ClientHub({ data, updateData }) {
                             background: white !important;
                             color: black !important;
                             box-shadow: none !important;
+                            z-index: 99999 !important;
                         }
 
                         /* 4. FORCER LA TAILLE DE LA PAGE */
                         @page {
                             size: auto;
                             margin: 0mm;
+                        }
+                        
+                        /* Fix spécifique pour le body/html qui pourraient bloquer la hauteur */
+                        html, body {
+                            height: auto !important;
+                            overflow: visible !important;
+                            background: white !important;
+                        }
+                        
+                        /* Annuler le fixed inset-0 du modal qui peut cacher le contenu */
+                        .fixed.inset-0 {
+                            position: static !important;
+                            width: auto !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                            background: white !important;
                         }
                     }
                 `}</style>
