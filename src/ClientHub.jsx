@@ -252,7 +252,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 3. ÉDITEUR ---
+    // --- 3. ÉDITEUR FACTURE / DEVIS ---
     const DocumentEditor = ({ type, onClose, initialDoc }) => {
         const isInvoice = type === 'invoice';
         const [doc, setDoc] = useState(initialDoc || {
@@ -378,6 +378,7 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
 
+                    {/* APERÇU A4 ET ZONE IMPRIMABLE */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             {/* EN-TÊTE FACTURE */}
@@ -463,48 +464,38 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* --- CSS POUR L'IMPRESSION (CORRECTIF PAGE BLANCHE) --- */}
+                {/* --- CSS D'IMPRESSION (CORRIGÉ POUR PAGE BLANCHE) --- */}
                 <style>{`
                     @media print {
-                        /* Cache TOUT le site par défaut */
-                        body > * { display: none !important; }
-                        
-                        /* Affiche uniquement la feuille de facture */
-                        #invoice-paper {
-                            display: block !important;
+                        /* 1. CACHER TOUT LE RESTE */
+                        body * {
+                            visibility: hidden;
+                        }
+
+                        /* 2. RENDRE LA FACTURE VISIBLE */
+                        #invoice-paper, #invoice-paper * {
                             visibility: visible !important;
+                        }
+
+                        /* 3. SORTIR LA FACTURE DU FLUX ET LA COLLER SUR LA FEUILLE */
+                        #invoice-paper {
                             position: absolute !important;
                             left: 0 !important;
                             top: 0 !important;
-                            width: 210mm !important;
-                            height: 297mm !important;
                             margin: 0 !important;
                             padding: 0 !important;
-                            transform: scale(1) !important; /* Annule le zoom écran */
-                            background-color: white !important;
+                            width: 100% !important;
+                            /* Annuler le zoom de l'écran pour l'impression */
+                            transform: none !important;
+                            background: white !important;
                             color: black !important;
                             box-shadow: none !important;
-                            z-index: 99999 !important;
-                        }
-                        
-                        /* Assure que le contenu dans la facture est visible */
-                        #invoice-paper * {
-                            visibility: visible !important;
-                            color: black !important;
                         }
 
-                        /* Enlève le fond gris du modal */
-                        .fixed.inset-0 {
-                            position: static !important;
-                            background: white !important;
-                            width: auto !important;
-                            height: auto !important;
-                            overflow: visible !important;
-                        }
-
+                        /* 4. FORCER LA TAILLE DE LA PAGE */
                         @page {
-                            size: A4 portrait;
-                            margin: 0;
+                            size: auto;
+                            margin: 0mm;
                         }
                     }
                 `}</style>
