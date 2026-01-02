@@ -576,13 +576,36 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
+                {/* FIX IMPRESSION CSS */}
                 <style>{`
                     @media print {
                         body * { visibility: hidden; }
                         #invoice-paper, #invoice-paper * { visibility: visible; }
+                        
+                        body, #invoice-paper {
+                            background-color: white !important;
+                            color: black !important;
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                        }
+
                         #invoice-paper {
-                            position: fixed; left: 0; top: 0; width: 100%; height: 100%; margin: 0; padding: 40px;
-                            transform: none !important; box-shadow: none !important;
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            margin: 0 !important;
+                            padding: 40px !important;
+                            width: 210mm !important;
+                            min-height: 297mm !important;
+                            transform: none !important;
+                            box-shadow: none !important;
+                            overflow: visible !important;
+                            z-index: 9999 !important;
+                        }
+
+                        @page {
+                            size: A4 portrait;
+                            margin: 0;
                         }
                     }
                 `}</style>
@@ -721,15 +744,16 @@ export default function ClientHub({ data, updateData }) {
                                     <td className="p-4 text-center">
                                         <div className="relative group/status inline-block">
                                             {getStatusBadge(doc.status)}
+                                            {/* FIX DROPDOWN DARK MODE */}
                                             <select 
                                                 value={doc.status} 
                                                 onChange={(e) => handleStatusChange(doc, e.target.value)}
                                                 className="absolute inset-0 opacity-0 cursor-pointer"
                                             >
-                                                <option value="Draft">Brouillon</option>
-                                                <option value="Sent">Envoyé</option>
-                                                {type === 'invoice' ? <option value="Paid">Payée</option> : <option value="Accepted">Accepté</option>}
-                                                {type === 'quote' && <option value="Rejected">Refusé</option>}
+                                                <option value="Draft" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Brouillon</option>
+                                                <option value="Sent" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Envoyé</option>
+                                                {type === 'invoice' ? <option value="Paid" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Payée</option> : <option value="Accepted" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Accepté</option>}
+                                                {type === 'quote' && <option value="Rejected" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Refusé</option>}
                                             </select>
                                         </div>
                                     </td>
