@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Users, FileText, ShoppingBag, Plus, Search, 
   ChevronRight, CheckCircle2, AlertCircle, X, 
   Printer, Save, Trash2, Wallet, ArrowRight,
-  ZoomIn, ZoomOut, Download, Sparkles 
+  ZoomIn, ZoomOut, Download, Sparkles,
+  ArrowRightLeft, TrendingUp, Clock, Check
 } from 'lucide-react';
 
 export default function ClientHub({ data, updateData }) {
@@ -27,6 +28,48 @@ export default function ClientHub({ data, updateData }) {
         const year = new Date().getFullYear();
         const count = list.length + 1; 
         return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
+    };
+
+    // --- 0. COMPOSANT : RÉSUMÉ FINANCIER (Haut de page) ---
+    const FinancialSummary = () => {
+        // Calculs
+        const pendingPayment = invoices
+            .filter(i => i.status === 'Sent')
+            .reduce((sum, i) => sum + (i.total || 0), 0);
+        
+        const acceptedQuotes = quotes
+            .filter(q => q.status === 'Accepted')
+            .reduce((sum, q) => sum + (q.total || 0), 0);
+
+        const paidInvoices = invoices
+            .filter(i => i.status === 'Paid')
+            .reduce((sum, i) => sum + (i.total || 0), 0);
+
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in slide-in-from-top-4">
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-orange-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-orange-100 text-orange-600"><Clock size={24}/></div>
+                    <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase">Paiements en attente</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(pendingPayment)}</p>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-blue-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-blue-100 text-blue-600"><FileText size={24}/></div>
+                    <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase">Devis à facturer</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-emerald-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-emerald-100 text-emerald-600"><CheckCircle2 size={24}/></div>
+                    <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase">Encaissé (Total)</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(paidInvoices)}</p>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     // --- 1. GESTION CLIENTS ---
@@ -128,11 +171,10 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 3. ÉDITEUR FACTURE / DEVIS (CORRIGÉ & COMPLET) ---
+    // --- 3. ÉDITEUR FACTURE / DEVIS (AMÉLIORÉ) ---
     const DocumentEditor = ({ type, onClose }) => {
         const isInvoice = type === 'invoice';
         
-        // Initialisation avec TVA 20% par défaut
         const [doc, setDoc] = useState({
             id: Date.now(),
             number: generateNumber(type),
@@ -145,20 +187,17 @@ export default function ClientHub({ data, updateData }) {
             status: 'Draft',
             target_account_id: accounts[0]?.id || '',
             notes: isInvoice ? 'Paiement à réception.' : 'Validité du devis : 30 jours.',
-            taxRate: 20 // TVA par défaut
+            taxRate: 20
         });
         const [zoom, setZoom] = useState(0.65);
 
-        // --- FEATURE PROTO : MODE AUTO-ENTREPRENEUR ---
         const toggleAutoEntrepreneur = () => {
             const mention = 'TVA non applicable, art. 293 B du CGI.';
             setDoc(prev => {
                 const isAE = prev.taxRate === 0 && prev.notes.includes(mention);
                 if (isAE) {
-                    // Désactiver
                     return { ...prev, taxRate: 20, notes: prev.notes.replace(mention, '').replace(/\n\n$/, '').trim() };
                 } else {
-                    // Activer
                     return { ...prev, taxRate: 0, notes: prev.notes.includes(mention) ? prev.notes : (prev.notes ? prev.notes + '\n\n' + mention : mention) };
                 }
             });
@@ -185,7 +224,7 @@ export default function ClientHub({ data, updateData }) {
         const saveDocument = () => {
             if (!doc.client_id) return alert('Veuillez sélectionner un client.');
             
-            const finalDoc = { ...doc, subTotal, total }; // On sauvegarde aussi les totaux calculés
+            const finalDoc = { ...doc, subTotal, total };
             const listName = isInvoice ? 'invoices' : 'quotes';
             const newList = [finalDoc, ...(isInvoice ? invoices : quotes)];
             
@@ -293,8 +332,11 @@ export default function ClientHub({ data, updateData }) {
                                                 <select onChange={e => {
                                                     const catItem = catalog.find(c => c.name === e.target.value);
                                                     if(catItem) { updateItem(i, 'desc', catItem.name); updateItem(i, 'price', catItem.price); }
-                                                }} className="w-4 opacity-50"><option></option>{catalog.map(c => <option key={c.id}>{c.name}</option>)}</select>
-                                                <div className="flex gap-2">
+                                                }} className="w-full text-xs p-1 bg-slate-100 dark:bg-slate-700 rounded border-none outline-none text-slate-500">
+                                                    <option value="">Insérer un produit...</option>
+                                                    {catalog.map(c => <option key={c.id} value={c.name}>{c.name} - {c.price}€</option>)}
+                                                </select>
+                                                <div className="flex gap-2 pt-1">
                                                     <input type="number" value={item.qty} onChange={e => updateItem(i, 'qty', Number(e.target.value))} className="w-16 p-1 bg-slate-100 dark:bg-slate-700 rounded text-xs text-center outline-none text-slate-800 dark:text-white" placeholder="Qté" />
                                                     <input type="number" value={item.price} onChange={e => updateItem(i, 'price', Number(e.target.value))} className="w-24 p-1 bg-slate-100 dark:bg-slate-700 rounded text-xs text-right outline-none text-slate-800 dark:text-white" placeholder="Prix" />
                                                 </div>
@@ -308,7 +350,7 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
 
-                    {/* DROITE: APERÇU A4 TEMPS RÉEL */}
+                    {/* DROITE: APERÇU A4 */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div 
                             id="invoice-paper" 
@@ -416,7 +458,7 @@ export default function ClientHub({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* CSS PRINT (Force le bon format lors de l'impression) */}
+                {/* CSS PRINT */}
                 <style>{`
                     @media print {
                         body * { visibility: hidden; }
@@ -436,7 +478,28 @@ export default function ClientHub({ data, updateData }) {
         const list = type === 'quote' ? quotes : invoices;
         const [editorOpen, setEditorOpen] = useState(false);
 
-        // --- PONT LOGIQUE : PAIEMENT AUTOMATIQUE ---
+        // --- CONVERTIR DEVIS -> FACTURE (NOUVEAU) ---
+        const convertToInvoice = (quote) => {
+            if(!window.confirm("Créer une facture à partir de ce devis ?")) return;
+            
+            // On calcule le prochain numéro de facture
+            const year = new Date().getFullYear();
+            const count = invoices.length + 1;
+            const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
+            
+            const newInvoice = {
+                ...quote,
+                id: Date.now(), // Nouvel ID
+                number: newInvoiceNumber,
+                status: 'Draft',
+                date: new Date().toISOString(),
+                type: 'invoice' // On change le type, le reste (items, client) est conservé
+            };
+
+            updateData({ ...data, invoices: [newInvoice, ...invoices] });
+            alert(`Facture brouillon ${newInvoiceNumber} créée !`);
+        };
+
         const handleStatusChange = (doc, newStatus) => {
             let updatedList = list.map(d => d.id === doc.id ? { ...d, status: newStatus } : d);
             let updatedBudget = { ...data.budget };
@@ -447,7 +510,7 @@ export default function ClientHub({ data, updateData }) {
                 const newTransaction = {
                     id: Date.now(),
                     date: new Date().toISOString(),
-                    amount: doc.total, // Montant TTC
+                    amount: doc.total, 
                     type: 'income',
                     description: `Facture ${doc.number} - ${doc.client_name}`,
                     accountId: doc.target_account_id,
@@ -472,6 +535,8 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="space-y-6">
+                <FinancialSummary />
+
                 <div className="flex justify-between items-center">
                     <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize">{type === 'quote' ? 'Devis' : 'Factures'}</h3>
                     <button onClick={() => setEditorOpen(true)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors">
@@ -517,7 +582,13 @@ export default function ClientHub({ data, updateData }) {
                                             {type === 'quote' && <option value="Rejected">Refusé</option>}
                                         </select>
                                     </td>
-                                    <td className="p-4 text-right">
+                                    <td className="p-4 text-right flex justify-end gap-2">
+                                        {/* BOUTON CONVERTIR (Seulement pour les devis) */}
+                                        {type === 'quote' && (
+                                            <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded">
+                                                <ArrowRightLeft size={16}/>
+                                            </button>
+                                        )}
                                         <button onClick={() => deleteDoc(doc.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={16}/></button>
                                     </td>
                                 </tr>
