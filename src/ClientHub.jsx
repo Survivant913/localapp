@@ -5,11 +5,11 @@ import {
   Printer, Save, Trash2, Wallet, ArrowRight,
   ZoomIn, ZoomOut, Download, Sparkles,
   ArrowRightLeft, TrendingUp, Clock, Pencil,
-  MoreHorizontal, Filter, Package
+  MapPin, Mail, Phone, Package
 } from 'lucide-react';
 
 export default function ClientHub({ data, updateData }) {
-    const [activeTab, setActiveTab] = useState('invoices'); 
+    const [activeTab, setActiveTab] = useState('clients'); 
     
     // --- DONNÉES ---
     const clients = data.clients || [];
@@ -45,38 +45,30 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4">
-                <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity text-orange-500">
-                        <Clock size={80}/>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between group hover:border-orange-200 dark:hover:border-orange-900/50 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">En attente de paiement</p>
+                        <p className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(pendingPayment)}</p>
                     </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg"><Clock size={20}/></div>
-                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">En attente de paiement</span>
-                        </div>
-                        <p className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{formatCurrency(pendingPayment)}</p>
-                        <p className="text-xs text-slate-400 mt-1">Factures envoyées, non payées</p>
+                    <div className="p-4 bg-orange-50 dark:bg-orange-900/20 text-orange-500 rounded-full">
+                        <Clock size={24}/>
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity text-blue-500">
-                        <FileText size={80}/>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between group hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Devis à facturer</p>
+                        <p className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
                     </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><FileText size={20}/></div>
-                            <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Pipeline Commercial</span>
-                        </div>
-                        <p className="text-3xl font-bold text-slate-800 dark:text-white mt-2">{formatCurrency(acceptedQuotes)}</p>
-                        <p className="text-xs text-slate-400 mt-1">Devis acceptés, à facturer</p>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-full">
+                        <FileText size={24}/>
                     </div>
                 </div>
             </div>
         );
     };
 
-    // --- 1. GESTION CLIENTS (REDESIGN) ---
+    // --- 1. GESTION CLIENTS (STYLE PROTOTYPE) ---
     const ClientsTab = () => {
         const [form, setForm] = useState(false);
         const [editing, setEditing] = useState(null);
@@ -100,7 +92,7 @@ export default function ClientHub({ data, updateData }) {
         return (
             <div className="space-y-6">
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="relative w-full md:w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input 
@@ -108,92 +100,106 @@ export default function ClientHub({ data, updateData }) {
                             placeholder="Rechercher un client..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500 text-sm text-slate-800 dark:text-white"
+                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 text-sm text-slate-800 dark:text-white shadow-sm"
                         />
                     </div>
-                    <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="w-full md:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                    <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="bg-amber-600 text-white px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20">
                         <Plus size={18}/> Nouveau Client
                     </button>
                 </div>
 
-                {/* Formulaire (Modal Inline) */}
+                {/* Formulaire Modal */}
                 {form && (
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-blue-100 dark:border-slate-700 shadow-xl animate-in slide-in-from-top-2 relative">
-                        <button onClick={() => setForm(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={20}/></button>
-                        <h4 className="font-bold text-lg mb-6 text-slate-800 dark:text-white">{editing ? 'Modifier le client' : 'Ajouter un client'}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Entreprise / Nom</label>
-                                    <input type="text" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Contact Principal</label>
-                                    <input type="text" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
-                                </div>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-slate-900 w-full max-w-2xl p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-bold text-xl text-slate-800 dark:text-white font-serif">{editing ? 'Modifier le client' : 'Nouveau Client'}</h4>
+                                <button onClick={() => setForm(false)} className="text-slate-400 hover:text-white"><X size={24}/></button>
                             </div>
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                                        <input type="email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Entreprise / Nom</label>
+                                        <input type="text" value={tempClient.name} onChange={e => setTempClient({...tempClient, name: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-amber-500 dark:text-white" placeholder="ex: Startup Nation" />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase">Téléphone</label>
-                                        <input type="text" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Principal</label>
+                                        <input type="text" value={tempClient.contact_person} onChange={e => setTempClient({...tempClient, contact_person: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-amber-500 dark:text-white" placeholder="ex: CEO" />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Adresse</label>
-                                    <input type="text" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 dark:text-white" />
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                                        <input type="email" value={tempClient.email} onChange={e => setTempClient({...tempClient, email: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-amber-500 dark:text-white" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Téléphone</label>
+                                        <input type="text" value={tempClient.phone} onChange={e => setTempClient({...tempClient, phone: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-amber-500 dark:text-white" />
+                                    </div>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Adresse Complète</label>
+                                    <input type="text" value={tempClient.address} onChange={e => setTempClient({...tempClient, address: e.target.value})} className="w-full mt-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-amber-500 dark:text-white" placeholder="10 Rue de la Tech, Paris" />
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                            <button onClick={() => setForm(false)} className="px-6 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">Annuler</button>
-                            <button onClick={saveClient} className="px-6 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20">Enregistrer</button>
+                            <div className="flex justify-end gap-3">
+                                <button onClick={() => setForm(false)} className="px-6 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Annuler</button>
+                                <button onClick={saveClient} className="px-8 py-3 rounded-xl text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-600/20">Enregistrer</button>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Liste Clients (Cartes Pro) */}
+                {/* LISTE CLIENTS STYLE PROTOTYPE */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredClients.map(client => (
-                        <div key={client.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all group relative">
+                        <div key={client.id} className="bg-white dark:bg-[#1E1E1E] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 hover:border-amber-500/50 transition-all group relative shadow-sm">
                             
-                            {/* Header Carte */}
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
-                                        {getInitials(client.name)}
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-800 dark:text-white text-lg leading-tight">{client.name}</h4>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{client.contact_person || 'Pas de contact'}</p>
-                                    </div>
+                            {/* Actions (Hidden by default, visible on hover) */}
+                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => { setEditing(client); setTempClient(client); setForm(true); }} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-amber-500 rounded-lg"><Pencil size={14}/></button>
+                                <button onClick={() => deleteClient(client.id)} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 rounded-lg"><Trash2 size={14}/></button>
+                            </div>
+
+                            {/* Header: Avatar + Nom */}
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-white font-serif font-bold text-xl">
+                                    {getInitials(client.name)}
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditing(client); setTempClient(client); setForm(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Pencil size={16}/></button>
-                                    <button onClick={() => deleteClient(client.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                <div>
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-lg">{client.name}</h4>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{client.contact_person || 'Pas de contact'}</p>
                                 </div>
                             </div>
 
-                            {/* Info Body */}
-                            <div className="space-y-2.5">
-                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg">
-                                    <span className="text-slate-400">✉️</span> <span className="truncate">{client.email || '---'}</span>
+                            {/* Séparateur */}
+                            <hr className="border-slate-100 dark:border-slate-800 mb-6" />
+
+                            {/* Détails */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                                    <Mail size={16} className="text-slate-400 dark:text-slate-600"/>
+                                    <span>{client.email || '---'}</span>
                                 </div>
-                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg">
-                                    <span className="text-slate-400">📞</span> <span>{client.phone || '---'}</span>
+                                <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-400">
+                                    <Phone size={16} className="text-slate-400 dark:text-slate-600"/>
+                                    <span>{client.phone || '---'}</span>
+                                </div>
+                                
+                                {/* Adresse en bas, style discret */}
+                                <div className="pt-2 flex items-start gap-3 text-xs text-slate-400 dark:text-slate-500 italic">
+                                    <MapPin size={14} className="shrink-0 mt-0.5"/>
+                                    <span>{client.address || 'Aucune adresse renseignée'}</span>
                                 </div>
                             </div>
                         </div>
                     ))}
                     
-                    {/* Carte "Ajouter" vide pour inciter */}
+                    {/* Carte Ajouter (Vide) */}
                     {filteredClients.length === 0 && !searchTerm && (
-                        <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-slate-400 hover:text-blue-500 hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-slate-800 transition-all group h-full min-h-[200px]">
-                            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-100 group-hover:text-blue-600 flex items-center justify-center transition-colors">
+                        <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group min-h-[240px]">
+                            <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/20 group-hover:text-amber-600 flex items-center justify-center transition-colors">
                                 <Plus size={24}/>
                             </div>
                             <span className="font-medium">Ajouter un premier client</span>
@@ -204,7 +210,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 2. CATALOGUE (REDESIGN TABLEAU) ---
+    // --- 2. CATALOGUE (TABLEAU PRO) ---
     const CatalogTab = () => {
         const [newItem, setNewItem] = useState({ name: '', price: '' });
         
@@ -218,35 +224,35 @@ export default function ClientHub({ data, updateData }) {
 
         return (
             <div className="space-y-6">
-                {/* Barre d'ajout Rapide (Top Bar) */}
-                <div className="bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-2 items-center">
-                    <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg ml-2 hidden md:block">
+                {/* Barre d'ajout Rapide */}
+                <div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-2 items-center">
+                    <div className="p-3 bg-slate-100 dark:bg-slate-700 text-slate-500 rounded-lg ml-2 hidden md:block">
                         <Package size={20}/>
                     </div>
                     <input 
                         type="text" 
                         value={newItem.name} 
                         onChange={e => setNewItem({...newItem, name: e.target.value})} 
-                        className="flex-1 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400" 
+                        className="flex-1 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 text-sm" 
                         placeholder="Nom du service ou produit..." 
                     />
                     <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 hidden md:block"></div>
                     <div className="flex items-center gap-2 w-full md:w-auto px-2">
-                        <span className="text-slate-400 font-bold">€</span>
+                        <span className="text-slate-400 font-bold text-sm">€</span>
                         <input 
                             type="number" 
                             value={newItem.price} 
                             onChange={e => setNewItem({...newItem, price: e.target.value})} 
-                            className="w-24 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 font-mono" 
+                            className="w-24 p-3 bg-transparent outline-none text-slate-800 dark:text-white placeholder:text-slate-400 font-mono text-sm" 
                             placeholder="0.00" 
                         />
                     </div>
-                    <button onClick={addItem} className="w-full md:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/20">
+                    <button onClick={addItem} className="w-full md:w-auto px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg font-bold hover:opacity-90 transition-opacity">
                         Ajouter
                     </button>
                 </div>
 
-                {/* Tableau des produits */}
+                {/* Tableau */}
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                     <table className="w-full text-left">
                         <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
@@ -256,19 +262,18 @@ export default function ClientHub({ data, updateData }) {
                                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-20">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
                             {catalog.length === 0 && (
                                 <tr>
                                     <td colSpan="3" className="p-12 text-center text-slate-400">
-                                        <ShoppingBag size={48} className="mx-auto mb-4 opacity-20"/>
-                                        <p>Votre catalogue est vide.</p>
+                                        Votre catalogue est vide.
                                     </td>
                                 </tr>
                             )}
                             {catalog.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                     <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-300 bg-slate-50/50 dark:bg-slate-800/50">
+                                    <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-300">
                                         {formatCurrency(item.price)}
                                     </td>
                                     <td className="px-6 py-4 text-right">
@@ -285,7 +290,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 3. ÉDITEUR FACTURE / DEVIS (Inchangé mais propre) ---
+    // --- 3. ÉDITEUR FACTURE / DEVIS (INCHANGÉ) ---
     const DocumentEditor = ({ type, onClose, initialDoc }) => {
         const isInvoice = type === 'invoice';
         
