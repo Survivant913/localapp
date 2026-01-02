@@ -4,7 +4,7 @@ import {
   ChevronRight, CheckCircle2, AlertCircle, X, 
   Printer, Save, Trash2, Wallet, ArrowRight,
   ZoomIn, ZoomOut, Download, Sparkles,
-  ArrowRightLeft, TrendingUp, Clock, Check
+  ArrowRightLeft, TrendingUp, Clock, Pencil
 } from 'lucide-react';
 
 export default function ClientHub({ data, updateData }) {
@@ -30,9 +30,8 @@ export default function ClientHub({ data, updateData }) {
         return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
     };
 
-    // --- 0. COMPOSANT : RÉSUMÉ FINANCIER (Haut de page) ---
+    // --- 0. COMPOSANT : RÉSUMÉ FINANCIER (Simplifié) ---
     const FinancialSummary = () => {
-        // Calculs
         const pendingPayment = invoices
             .filter(i => i.status === 'Sent')
             .reduce((sum, i) => sum + (i.total || 0), 0);
@@ -41,12 +40,8 @@ export default function ClientHub({ data, updateData }) {
             .filter(q => q.status === 'Accepted')
             .reduce((sum, q) => sum + (q.total || 0), 0);
 
-        const paidInvoices = invoices
-            .filter(i => i.status === 'Paid')
-            .reduce((sum, i) => sum + (i.total || 0), 0);
-
         return (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 animate-in slide-in-from-top-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 animate-in slide-in-from-top-4">
                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-orange-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
                     <div className="p-3 rounded-full bg-orange-100 text-orange-600"><Clock size={24}/></div>
                     <div>
@@ -59,13 +54,6 @@ export default function ClientHub({ data, updateData }) {
                     <div>
                         <p className="text-xs font-bold text-slate-500 uppercase">Devis à facturer</p>
                         <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-emerald-100 dark:border-slate-700 shadow-sm flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-emerald-100 text-emerald-600"><CheckCircle2 size={24}/></div>
-                    <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase">Encaissé (Total)</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{formatCurrency(paidInvoices)}</p>
                     </div>
                 </div>
             </div>
@@ -171,11 +159,12 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 3. ÉDITEUR FACTURE / DEVIS (AMÉLIORÉ) ---
-    const DocumentEditor = ({ type, onClose }) => {
+    // --- 3. ÉDITEUR FACTURE / DEVIS (AVEC EDIT) ---
+    const DocumentEditor = ({ type, onClose, initialDoc }) => {
         const isInvoice = type === 'invoice';
         
-        const [doc, setDoc] = useState({
+        // Initialisation : soit on charge le doc existant, soit on crée un nouveau
+        const [doc, setDoc] = useState(initialDoc || {
             id: Date.now(),
             number: generateNumber(type),
             date: new Date().toISOString().split('T')[0],
@@ -226,7 +215,13 @@ export default function ClientHub({ data, updateData }) {
             
             const finalDoc = { ...doc, subTotal, total };
             const listName = isInvoice ? 'invoices' : 'quotes';
-            const newList = [finalDoc, ...(isInvoice ? invoices : quotes)];
+            const list = isInvoice ? invoices : quotes;
+
+            // Si c'est une édition, on met à jour. Sinon on ajoute.
+            const isEditing = !!initialDoc;
+            const newList = isEditing 
+                ? list.map(d => d.id === finalDoc.id ? finalDoc : d) 
+                : [finalDoc, ...list];
             
             updateData({ ...data, [listName]: newList });
             onClose();
@@ -240,7 +235,7 @@ export default function ClientHub({ data, updateData }) {
                 <div className="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center text-white no-print">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         {isInvoice ? <FileText className="text-amber-500"/> : <ShoppingBag className="text-blue-500"/>}
-                        Nouveau {isInvoice ? 'Facture' : 'Devis'}
+                        {initialDoc ? 'Modifier' : 'Nouveau'} {isInvoice ? 'Facture' : 'Devis'}
                     </h2>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-2 py-1 border border-slate-700">
@@ -264,7 +259,7 @@ export default function ClientHub({ data, updateData }) {
                         <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Client</label>
-                                <select onChange={handleClientChange} className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
+                                <select value={doc.client_id} onChange={handleClientChange} className="w-full p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
                                     <option value="">-- Sélectionner un client --</option>
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
@@ -476,24 +471,36 @@ export default function ClientHub({ data, updateData }) {
     // --- 4. LISTE DES DOCUMENTS (TABLEAU DE BORD) ---
     const DocumentList = ({ type }) => {
         const list = type === 'quote' ? quotes : invoices;
-        const [editorOpen, setEditorOpen] = useState(false);
+        
+        // État pour savoir si on édite un doc précis ou si on en crée un nouveau
+        const [docToEdit, setDocToEdit] = useState(null);
+        const [isCreating, setIsCreating] = useState(false);
 
-        // --- CONVERTIR DEVIS -> FACTURE (NOUVEAU) ---
+        const openEditor = (doc = null) => {
+            setDocToEdit(doc);
+            setIsCreating(true);
+        };
+
+        const closeEditor = () => {
+            setDocToEdit(null);
+            setIsCreating(false);
+        };
+
+        // --- CONVERTIR DEVIS -> FACTURE ---
         const convertToInvoice = (quote) => {
             if(!window.confirm("Créer une facture à partir de ce devis ?")) return;
             
-            // On calcule le prochain numéro de facture
             const year = new Date().getFullYear();
             const count = invoices.length + 1;
             const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
             
             const newInvoice = {
                 ...quote,
-                id: Date.now(), // Nouvel ID
+                id: Date.now(),
                 number: newInvoiceNumber,
                 status: 'Draft',
                 date: new Date().toISOString(),
-                type: 'invoice' // On change le type, le reste (items, client) est conservé
+                type: 'invoice' 
             };
 
             updateData({ ...data, invoices: [newInvoice, ...invoices] });
@@ -539,12 +546,12 @@ export default function ClientHub({ data, updateData }) {
 
                 <div className="flex justify-between items-center">
                     <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize">{type === 'quote' ? 'Devis' : 'Factures'}</h3>
-                    <button onClick={() => setEditorOpen(true)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors">
+                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors">
                         <Plus size={16}/> Créer
                     </button>
                 </div>
 
-                {editorOpen && <DocumentEditor type={type} onClose={() => setEditorOpen(false)} />}
+                {isCreating && <DocumentEditor type={type} initialDoc={docToEdit} onClose={closeEditor} />}
 
                 <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
@@ -583,6 +590,11 @@ export default function ClientHub({ data, updateData }) {
                                         </select>
                                     </td>
                                     <td className="p-4 text-right flex justify-end gap-2">
+                                        {/* BOUTON EDITER / IMPRIMER */}
+                                        <button onClick={() => openEditor(doc)} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded">
+                                            <Pencil size={16}/>
+                                        </button>
+
                                         {/* BOUTON CONVERTIR (Seulement pour les devis) */}
                                         {type === 'quote' && (
                                             <button onClick={() => convertToInvoice(doc)} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded">
