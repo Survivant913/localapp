@@ -23,12 +23,30 @@ export default function ClientHub({ data, updateData }) {
     const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val || 0);
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
     
+    // --- NOUVELLE FONCTION DE NUMÉROTATION SÉCURISÉE ---
     const generateNumber = (type) => {
         const prefix = type === 'quote' ? 'DEV' : 'FACT';
         const list = type === 'quote' ? quotes : invoices;
         const year = new Date().getFullYear();
-        const count = list.length + 1; 
-        return `${prefix}-${year}-${count.toString().padStart(3, '0')}`;
+        
+        let nextNumber = 1;
+        let isUnique = false;
+        let finalString = "";
+
+        // Boucle "tant que" pour trouver un numéro libre
+        while (!isUnique) {
+            const candidate = `${prefix}-${year}-${nextNumber.toString().padStart(3, '0')}`;
+            // On vérifie si ce numéro existe déjà dans la liste
+            const exists = list.some(doc => doc.number === candidate);
+            
+            if (!exists) {
+                finalString = candidate;
+                isUnique = true; // On a trouvé un numéro libre !
+            } else {
+                nextNumber++; // Sinon on teste le suivant
+            }
+        }
+        return finalString;
     };
 
     const getInitials = (name) => name ? name.substring(0, 2).toUpperCase() : '??';
@@ -291,43 +309,18 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        // --- IMPRESSION PROPRE (DESIGN PROTOTYPE) ---
         const handlePrint = () => {
             const content = document.getElementById('invoice-paper');
             if (!content) return;
-
             const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert("Veuillez autoriser les pop-ups pour imprimer.");
-                return;
-            }
-
+            if (!printWindow) return alert("Veuillez autoriser les pop-ups.");
             printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Impression ${doc.number}</title>
-                    <script src="https://cdn.tailwindcss.com"></script>
-                    <style>
-                        @page { size: A4; margin: 0; }
-                        body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
-                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 40px; background: white; box-sizing: border-box; }
-                    </style>
-                </head>
-                <body>
-                    <div class="print-container">
-                        ${content.innerHTML}
-                    </div>
-                    <script>
-                        window.onload = function() {
-                            setTimeout(function() {
-                                window.print();
-                                window.close();
-                            }, 500);
-                        }
-                    </script>
-                </body>
-                </html>
+                <!DOCTYPE html><html><head><title>Impression ${doc.number}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
+                .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 40px; background: white; box-sizing: border-box; }</style></head>
+                <body><div class="print-container">${content.innerHTML}</div>
+                <script>window.onload = function() { setTimeout(function() { window.print(); window.close(); }, 500); }</script></body></html>
             `);
             printWindow.document.close();
         };
@@ -417,7 +410,6 @@ export default function ClientHub({ data, updateData }) {
                         </div>
                     </div>
 
-                    {/* APERÇU A4 ET ZONE IMPRIMABLE */}
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             {/* EN-TÊTE FACTURE */}
@@ -438,7 +430,6 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
                             
-                            {/* DESTINATAIRE (Style PRO Prototype) */}
                             <div className="flex justify-end mb-16">
                                 <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
@@ -447,7 +438,6 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* TABLEAU (Style PRO Prototype) */}
                             <table className="w-full mb-12">
                                 <thead>
                                     <tr>
@@ -469,42 +459,32 @@ export default function ClientHub({ data, updateData }) {
                                 </tbody>
                             </table>
 
-                            {/* TOTALS */}
                             <div className="flex justify-end mb-16">
                                 <div className="w-1/3 text-right space-y-3">
                                     <div className="flex justify-between text-xs text-slate-500">
-                                        <span>Total HT</span>
-                                        <span>{formatCurrency(subTotal)}</span>
+                                        <span>Total HT</span><span>{formatCurrency(subTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-xs text-slate-500">
-                                        <span>TVA ({doc.taxRate}%)</span>
-                                        <span>{formatCurrency(taxAmount)}</span>
+                                        <span>TVA ({doc.taxRate}%)</span><span>{formatCurrency(taxAmount)}</span>
                                     </div>
                                     <div className="flex justify-between text-xl font-bold text-slate-900 pt-4 border-t border-slate-900">
-                                        <span>Total TTC</span>
-                                        <span>{formatCurrency(total)}</span>
+                                        <span>Total TTC</span><span>{formatCurrency(total)}</span>
                                     </div>
-                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic mt-1">TVA non applicable</p>}
                                 </div>
                             </div>
 
-                            {/* FOOTER */}
-                            <div className="mt-auto border-t border-slate-100 pt-8 grid grid-cols-2 gap-12">
+                            <div className="mt-auto border-t border-slate-100 pt-8 grid grid-cols-2 gap-12 text-xs text-slate-500">
                                 <div>
-                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
-                                    <div className="text-xs text-slate-500 space-y-1">
-                                        <p>IBAN : <span className="font-mono text-slate-700">{profile.iban || "---"}</span></p>
-                                        <p>BIC : <span className="font-mono text-slate-700">{profile.bic || "---"}</span></p>
-                                    </div>
+                                    <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Paiement</p>
+                                    <p>IBAN : <span className="font-mono text-slate-700">{profile.iban || "---"}</span></p>
+                                    <p>BIC : <span className="font-mono text-slate-700">{profile.bic || "---"}</span></p>
                                 </div>
                                 <div>
                                     <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
-                                    <p className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed">{doc.notes}</p>
+                                    <p className="whitespace-pre-wrap leading-relaxed">{doc.notes}</p>
                                 </div>
                             </div>
-                            <div className="mt-8 text-center text-[10px] text-slate-300 font-medium tracking-wide uppercase">
-                                {profile.companyName} - SIRET {profile.siret}
-                            </div>
+                            <div className="mt-8 text-center text-[10px] text-slate-300 font-medium uppercase tracking-widest">{profile.companyName} - SIRET {profile.siret}</div>
                         </div>
                     </div>
                 </div>
@@ -512,7 +492,7 @@ export default function ClientHub({ data, updateData }) {
         );
     };
 
-    // --- 4. LISTE DES DOCUMENTS ---
+    // --- 4. LISTE DES DOCUMENTS (TABLEAU DE BORD) ---
     const DocumentList = ({ type }) => {
         const list = type === 'quote' ? quotes : invoices;
         const [docToEdit, setDocToEdit] = useState(null);
