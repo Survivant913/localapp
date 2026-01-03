@@ -307,7 +307,7 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        // --- IMPRESSION PROPRIÉTÉ DÉFINITIVE (AVEC FOOTER CORRIGÉ) ---
+        // --- IMPRESSION PARFAITE ---
         const handlePrint = () => {
             const content = document.getElementById('invoice-paper');
             if (!content) return;
@@ -324,16 +324,28 @@ export default function ClientHub({ data, updateData }) {
                     <style>
                         @page { size: A4; margin: 0; }
                         body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
-                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; position: relative; background: white; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; }
-                        .content-flex { flex: 1; }
-                        
-                        /* Le pied de page fixe pour l'impression */
+                        /* Conteneur principal A4 */
+                        .print-container { 
+                            width: 210mm; 
+                            height: 297mm; /* Hauteur fixe A4 */
+                            margin: 0 auto; 
+                            background: white; 
+                            padding: 40px; 
+                            box-sizing: border-box; 
+                            display: flex; 
+                            flex-direction: column; 
+                            justify-content: space-between; /* Pousse le footer en bas */
+                        }
+                        /* Contenu (Haut) */
+                        .print-content {
+                            flex-grow: 1;
+                        }
+                        /* Footer (Bas) */
                         .invoice-footer {
-                            margin-top: auto; /* Pousse en bas grâce au flex */
+                            width: 100%;
                             border-top: 1px solid #e2e8f0;
                             padding-top: 20px;
                             background: white;
-                            width: 100%;
                         }
                     </style>
                 </head>
@@ -354,6 +366,8 @@ export default function ClientHub({ data, updateData }) {
             `);
             printWindow.document.close();
         };
+
+        const companyDisplayName = profile.companyName || profile.name || "Votre Entreprise";
 
         return (
             <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden backdrop-blur-sm">
@@ -441,26 +455,29 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
-                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
+                        {/* IMPORTANT : display flex column + justify-between permet de pousser le footer
+                            MAIS dans l'aperçu à l'écran, on utilise h-full ou min-h-full pour simuler la page
+                        */}
+                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             
-                            {/* --- CONTENU PRINCIPAL (Flex 1 pour pousser le footer) --- */}
-                            <div className="flex-1">
+                            {/* --- HAUT DE PAGE (En-tête, Destinataire, Tableau, Totaux) --- */}
+                            <div className="print-content">
                                 {/* --- EN-TÊTE --- */}
                                 <div className="flex justify-between items-start mb-12">
                                     <div>
-                                        {profile.logo ? (
-                                            <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/>
-                                        ) : (
-                                            <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>
+                                        {profile.logo && (
+                                            <img src={profile.logo} className="h-16 w-auto object-contain mb-3" alt="Logo"/>
                                         )}
+                                        
+                                        {/* CORRECTION : Affiche TOUJOURS le nom. Gros si pas logo, petit gras si logo */}
+                                        <div className={`${profile.logo ? 'text-xl font-bold' : 'text-3xl font-bold uppercase tracking-tight'} text-slate-900 mb-2`}>
+                                            {companyDisplayName}
+                                        </div>
 
                                         <div className="text-xs text-slate-500 leading-relaxed">
-                                            {/* NOM EN PETIT ET GRAS SI LOGO PRÉSENT */}
-                                            {profile.logo && <span className="font-bold text-slate-800 text-sm block mb-1">{profile.companyName}</span>}
-                                            
-                                            {profile.name}<br/>
-                                            {profile.address}<br/>
-                                            {profile.email_contact}
+                                            {profile.address && <div>{profile.address}</div>}
+                                            {profile.email_contact && <div>{profile.email_contact}</div>}
+                                            {profile.phone && <div>{profile.phone}</div>}
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -470,7 +487,7 @@ export default function ClientHub({ data, updateData }) {
                                     </div>
                                 </div>
                                 
-                                {/* --- DESTINATAIRE (Style PRO) --- */}
+                                {/* --- DESTINATAIRE --- */}
                                 <div className="flex justify-end mb-16">
                                     <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
@@ -479,7 +496,7 @@ export default function ClientHub({ data, updateData }) {
                                     </div>
                                 </div>
 
-                                {/* --- TABLEAU (Style PRO) --- */}
+                                {/* --- TABLEAU --- */}
                                 <table className="w-full mb-12">
                                     <thead>
                                         <tr>
@@ -518,10 +535,9 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* --- PIED DE PAGE FIXE (Poussé en bas par flex-1) --- */}
-                            <div className="invoice-footer mt-auto pt-8 border-t border-slate-100">
+                            {/* --- PIED DE PAGE FIXÉ EN BAS --- */}
+                            <div className="invoice-footer border-t border-slate-100 pt-8">
                                 <div className="grid grid-cols-2 gap-12 items-end">
-                                    {/* Banque (Gauche) */}
                                     <div className="text-left">
                                         <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
                                         <div className="text-[11px] text-slate-500 space-y-1">
@@ -529,15 +545,13 @@ export default function ClientHub({ data, updateData }) {
                                             <p>BIC : <span className="font-mono text-slate-700 font-bold">{profile.bic || "---"}</span></p>
                                         </div>
                                     </div>
-                                    {/* Note (Droite) */}
                                     <div className="text-right">
                                         <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
                                         <p className="text-[11px] text-slate-500 whitespace-pre-wrap leading-relaxed italic">{doc.notes}</p>
                                     </div>
                                 </div>
-                                {/* SIRET (Centre Bas) */}
                                 <div className="mt-8 text-center text-[10px] text-slate-300 font-medium tracking-widest uppercase">
-                                    {profile.companyName} - SIRET {profile.siret}
+                                    {companyDisplayName} - SIRET {profile.siret}
                                 </div>
                             </div>
 
