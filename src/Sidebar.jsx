@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users, Box // --- ADDED BOX ICON FOR WORKSPACE ---
+  Users, Box 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // --- SMART LOGOUT FIX ---
   const handleLogout = async () => {
     try {
       const currentTheme = localStorage.getItem('localAppTheme');
@@ -31,7 +30,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { id: 'workspace', label: 'Workspace (Incubateur)', icon: Box }, // --- NEW WORKSPACE ITEM ---
+    { id: 'workspace', label: 'Workspace', icon: Box }, // --- JUSTE "WORKSPACE" ---
     { id: 'calendar', label: 'Planning', icon: Calendar },
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
@@ -85,7 +84,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           {menuItems.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
-            const isWorkspace = item.id === 'workspace'; // Identify Workspace item
 
             return (
               <button
@@ -95,12 +93,12 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   w-full flex items-center gap-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative
                   ${isCollapsed ? 'justify-center px-0' : 'px-4'}
                   ${isActive 
-                    ? (isWorkspace ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20')
-                    : (isWorkspace ? 'text-indigo-300 hover:bg-indigo-900/30 hover:text-white border border-indigo-900/30' : 'text-slate-400 hover:bg-slate-900 hover:text-white')
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                    : 'text-slate-400 hover:bg-slate-900 hover:text-white'
                   }
                 `}
               >
-                <Icon size={20} className={`shrink-0 ${isActive ? 'text-white' : (isWorkspace ? 'text-indigo-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-300')}`} />
+                <Icon size={20} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 
                 {!isCollapsed && (
                   <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
