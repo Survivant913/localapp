@@ -2,20 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Target, Users, DollarSign, 
-  Share2, BarChart3, List, // J'ai remplacé Network/Kanban par Share2/List (plus sûr)
+  Menu, PieChart, Activity, // Icones standards et sûres
   ArrowLeft, Trash2, Eye, EyeOff, Settings,
-  Activity, Sun, Zap, AlertTriangle, Check, X, Box
+  Check, X
 } from 'lucide-react';
 
-// --- ICONS MAPPING ---
+// --- ICONS MAPPING SÉCURISÉ ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'competition', label: 'Concurrence', icon: Target },
     { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'mindmap', label: 'Mindmap', icon: Share2 },
-    { id: 'data', label: 'Graphiques', icon: BarChart3 },
-    { id: 'kanban', label: 'Organisation', icon: List },
+    { id: 'mindmap', label: 'Mindmap', icon: Activity }, // Remplacé par Activity
+    { id: 'data', label: 'Graphiques', icon: PieChart }, // Remplacé par PieChart
+    { id: 'kanban', label: 'Organisation', icon: Menu }, // Remplacé par Menu
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -39,13 +39,15 @@ const PostItItem = ({ item, updateItem, deleteItem, colors }) => {
         }
     }, [item.text]);
 
-    const currentColor = colors.find(c => c.id === (item.color || 'yellow')) || colors[0];
+    // Protection contre item null ou color manquant
+    const safeColor = (item && item.color) ? item.color : 'yellow';
+    const currentColor = colors.find(c => c.id === safeColor) || colors[0];
 
     return (
         <div className={`p-3 rounded-lg border text-sm shadow-sm relative group/item transition-all hover:shadow-md ${currentColor.bg} ${currentColor.border}`}>
             <textarea 
                 ref={textareaRef}
-                value={item.text} 
+                value={item.text || ''} 
                 onChange={e => updateItem(item.id, 'text', e.target.value)}
                 className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-100 text-sm font-medium leading-relaxed overflow-hidden"
                 placeholder="..."
@@ -95,20 +97,20 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
 // 1. MODULE CARNET
 // ==========================================
 const EditorModule = ({ venture }) => {
-    if (!venture) return null;
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
+        if (!venture) return;
         const fetchPages = async () => {
             const { data } = await supabase.from('venture_pages').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
             if (data) { setPages(data); if (data.length > 0) setActivePageId(data[0].id); }
             setLoading(false);
         };
         fetchPages();
-    }, [venture.id]);
+    }, [venture]);
 
     const createPage = async () => {
         const { data } = await supabase.from('venture_pages').insert([{ venture_id: venture.id, title: 'Nouvelle Page', content: '' }]).select();
@@ -176,22 +178,21 @@ const EditorModule = ({ venture }) => {
 // 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
-    if (!venture) return null;
     const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Activity, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
         { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
-        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: Share2, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'cost', label: 'Structure de Coûts', icon: Trash2, col: 'md:col-span-5 md:row-span-1', color: 'red' },
-        { id: 'revenue', label: 'Flux de Revenus', icon: BarChart3, col: 'md:col-span-5 md:row-span-1', color: 'green' },
+        { id: 'revenue', label: 'Flux de Revenus', icon: PieChart, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
 
     const SECTIONS_SWOT = [
@@ -202,6 +203,7 @@ const StrategyModule = ({ venture }) => {
     ];
 
     useEffect(() => {
+        if (!venture) return;
         const loadStrategy = async () => {
             const { data: rows } = await supabase.from('venture_strategies').select('*').eq('venture_id', venture.id);
             const formatted = {};
@@ -210,7 +212,7 @@ const StrategyModule = ({ venture }) => {
             setLoading(false);
         };
         loadStrategy();
-    }, [venture.id]);
+    }, [venture]);
 
     const handleUpdate = (sectionId, newItems) => {
         setData(prev => ({ ...prev, [sectionId]: newItems }));
@@ -242,7 +244,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (FIXÉ : COULEURS & PERSISTANCE)
+// 3. MODULE CONCURRENCE (FIXÉ & SÉCURISÉ)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     if (!venture) return null;
@@ -255,7 +257,7 @@ const CompetitionModule = ({ venture }) => {
     const MAX_SCORE = 5;
     const saveTimeoutRef = useRef({});
     
-    // MAP pour convertir Tailwind -> Hex pour le SVG
+    // TRADUCTEUR COULEURS
     const TAILWIND_TO_HEX = {
         'bg-indigo-500': '#6366f1',
         'bg-red-500': '#ef4444',
@@ -268,56 +270,42 @@ const CompetitionModule = ({ venture }) => {
         'bg-pink-500': '#ec4899'
     };
     const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
-    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8';
+    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Fallback gris
 
     const DEFAULT_DIMS = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
 
     useEffect(() => {
         const loadData = async () => {
-            // 1. Charger les dimensions
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
             const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) ? vData.dimensions : DEFAULT_DIMS;
             setDimensions(loadedDims);
 
-            // 2. Charger les concurrents
             const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
             
             if (cData && cData.length > 0) {
                 setCompetitors(cData);
             } else {
-                // Initialiser "Mon Projet" UNIQUEMENT si la liste est vide
                 const initialStats = {};
                 loadedDims.forEach(d => initialStats[d] = 3);
-                
-                const myProject = {
-                    venture_id: venture.id,
-                    name: 'Mon Projet',
-                    is_me: true,
-                    stats: initialStats,
-                    color: 'bg-indigo-500',
-                    visible: true
-                };
-                // Ici on écrit, car c'est une création initiale nécessaire
+                const myProject = { venture_id: venture.id, name: 'Mon Projet', is_me: true, stats: initialStats, color: 'bg-indigo-500', visible: true };
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
                 if (inserted) setCompetitors(inserted);
             }
             setLoading(false);
         };
         loadData();
-    }, [venture.id]);
+    }, [venture]);
 
-    // GESTION DES DIMENSIONS
     const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
-            setDimensions(newDims); // Update UI
+            setDimensions(newDims);
             
-            // Update DB IMMEDIATEMENT
+            // Sauvegarde immédiate
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
-            // Update Competitors UI & DB
             const updatedCompetitors = competitors.map(c => {
-                const newStats = { ...c.stats, [newDimText]: 3 };
+                const newStats = { ...(c.stats || {}), [newDimText]: 3 };
                 return { ...c, stats: newStats };
             });
             setCompetitors(updatedCompetitors);
@@ -333,11 +321,9 @@ const CompetitionModule = ({ venture }) => {
         if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
         const newDims = dimensions.filter(d => d !== dim);
         setDimensions(newDims);
-        // Sauvegarde DB immédiate
         await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
     };
 
-    // GESTION DES CONCURRENTS
     const addCompetitor = async () => {
         const initialStats = {};
         dimensions.forEach(d => initialStats[d] = 3);
@@ -370,17 +356,19 @@ const CompetitionModule = ({ venture }) => {
         }, 800);
     };
 
-    // RADAR SVG
+    // RADAR SVG SÉCURISÉ
     const radarSize = 300;
     const centerX = radarSize / 2;
     const centerY = radarSize / 2;
     const radius = 100;
     const getCoordinates = (value, index, total) => {
+        const val = isNaN(value) ? 0 : value; // Safety
         const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
-        const r = (value / MAX_SCORE) * radius;
+        const r = (val / MAX_SCORE) * radius;
         return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
     };
     const getPath = (stats) => {
+        if (!dimensions.length) return "";
         const points = dimensions.map((dim, i) => {
             const val = stats ? (stats[dim] || 0) : 0;
             const coords = getCoordinates(val, i, dimensions.length);
@@ -448,14 +436,14 @@ export default function Workspace() {
 
     if (!activeVenture) {
         return (
-            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2></div><div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowRight size={16}/></div></div>))}</div>)}</div>
+            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2></div><div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowLeft size={16} className="rotate-180"/></div></div>))}</div>)}</div>
         );
     }
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><Share2 size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><PieChart size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
         </div>
     );
 }
