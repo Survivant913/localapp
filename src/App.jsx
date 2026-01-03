@@ -11,7 +11,7 @@ import TodoList from './TodoList';
 import DataSettings from './DataSettings';
 import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
-import Workspace from './Workspace'; // <--- NEW IMPORT
+import Workspace from './Workspace'; 
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -33,7 +33,7 @@ export default function App() {
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
-    ventures: [] // <--- NEW STATE FOR WORKSPACE
+    ventures: [] 
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -69,7 +69,6 @@ export default function App() {
     for (let i = 0; i < mappedItems.length; i += batchSize) {
       const batch = mappedItems.slice(i, i + batchSize);
       const { error } = await supabase.from(table).upsert(batch);
-      
       if (error) {
         console.error(`CRITICAL ERROR on ${table}:`, error);
       }
@@ -125,7 +124,7 @@ export default function App() {
         supabase.from('quotes').select('*'),
         supabase.from('invoices').select('*'),
         supabase.from('catalog_items').select('*'),
-        supabase.from('ventures').select('*') // <--- NEW FETCH
+        supabase.from('ventures').select('*') 
       ]);
 
       const [
@@ -133,7 +132,7 @@ export default function App() {
         { data: accounts }, { data: transactions }, { data: recurring }, 
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
-        { data: ventures } // <--- NEW DATA
+        { data: ventures } 
       ] = results;
 
       // --- CATCH-UP ENGINE ---
@@ -249,7 +248,7 @@ export default function App() {
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
         clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
-        ventures: ventures || [], // <--- LOAD VENTURES
+        ventures: ventures || [], 
         profile: profile || {},
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
         customLabels: profile?.custom_labels || {}, mainNote: ""
@@ -330,9 +329,6 @@ export default function App() {
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
       
-      // Note: Ventures are saved inside Workspace.jsx individually, so we don't necessarily need a bulk save here unless you edit them outside.
-      // But for safety, we can add basic update for Ventures title/status if needed later.
-      
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
@@ -357,15 +353,13 @@ export default function App() {
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
-      case 'workspace': return <Workspace data={data} updateData={updateData} />; // <--- NEW ROUTE
+      // Note: 'workspace' is handled separately to keep it alive
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
   };
 
-  // --- THE FIX START ---
   const isWorkspace = currentView === 'workspace';
-  // --- THE FIX END ---
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
@@ -392,14 +386,21 @@ export default function App() {
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
         </header>
         
-        {/* --- MODIFIED MAIN CONTAINER --- */}
         <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
-          <div className={`w-full ${isWorkspace ? 'h-full' : 'max-w-7xl mx-auto'}`}> 
-            {renderContent()} 
+          
+          {/* CORRECTIF RADICAL : LE WORKSPACE RESTE MONTÉ MAIS CACHÉ */}
+          <div className="w-full h-full" style={{ display: currentView === 'workspace' ? 'block' : 'none' }}>
+             <Workspace data={data} updateData={updateData} />
           </div>
-        </main>
-        {/* --- END MODIFICATION --- */}
 
+          {/* LES AUTRES VUES NE SONT AFFICHÉES QUE SI CE N'EST PAS LE WORKSPACE */}
+          {currentView !== 'workspace' && (
+             <div className="max-w-7xl mx-auto w-full"> 
+                {renderContent()} 
+             </div>
+          )}
+
+        </main>
       </div>
     </div>
   );
