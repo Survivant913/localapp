@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Target, Users, DollarSign, 
-  Menu, PieChart, Activity, // Icones standards et sûres
+  Share2, PieChart, Activity, List,
   ArrowLeft, Trash2, Eye, EyeOff, Settings,
-  Check, X
+  Sun, Zap, AlertTriangle, Check, X, Box
 } from 'lucide-react';
 
 // --- ICONS MAPPING SÉCURISÉ ---
@@ -13,9 +13,9 @@ const MODULES = [
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'competition', label: 'Concurrence', icon: Target },
     { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'mindmap', label: 'Mindmap', icon: Activity }, // Remplacé par Activity
-    { id: 'data', label: 'Graphiques', icon: PieChart }, // Remplacé par PieChart
-    { id: 'kanban', label: 'Organisation', icon: Menu }, // Remplacé par Menu
+    { id: 'mindmap', label: 'Mindmap', icon: Activity },
+    { id: 'data', label: 'Graphiques', icon: PieChart },
+    { id: 'kanban', label: 'Organisation', icon: List },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -39,7 +39,6 @@ const PostItItem = ({ item, updateItem, deleteItem, colors }) => {
         }
     }, [item.text]);
 
-    // Protection contre item null ou color manquant
     const safeColor = (item && item.color) ? item.color : 'yellow';
     const currentColor = colors.find(c => c.id === safeColor) || colors[0];
 
@@ -76,10 +75,13 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
     const updateItem = (id, field, value) => { onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i)); };
     const deleteItem = (id) => { onChange(items.filter(i => i.id !== id)); };
 
+    // Protection contre icône manquante
+    const SafeIcon = Icon || FileText;
+
     return (
         <div className={`flex flex-col bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative group hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors ${className}`}>
             <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase tracking-wide shrink-0 mb-3">
-                {Icon && <Icon size={14} className="text-indigo-500"/>} {title}
+                <SafeIcon size={14} className="text-indigo-500"/> {title}
             </h3>
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[100px]">
                 {items.map(item => (
@@ -175,7 +177,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE
+// 2. MODULE STRATÉGIE (SÉCURISÉ)
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -183,14 +185,15 @@ const StrategyModule = ({ venture }) => {
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
+    // ICÔNES STABLES UNIQUEMENT
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Activity, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
         { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
-        { id: 'resources', label: 'Ressources Clés', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Share2, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'cost', label: 'Structure de Coûts', icon: Trash2, col: 'md:col-span-5 md:row-span-1', color: 'red' },
         { id: 'revenue', label: 'Flux de Revenus', icon: PieChart, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
@@ -244,7 +247,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (FIXÉ & SÉCURISÉ)
+// 3. MODULE CONCURRENCE (SÉCURISÉ & PERSISTANT)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     if (!venture) return null;
@@ -270,16 +273,25 @@ const CompetitionModule = ({ venture }) => {
         'bg-pink-500': '#ec4899'
     };
     const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
-    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Fallback gris
+    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8';
 
     const DEFAULT_DIMS = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
 
     useEffect(() => {
         const loadData = async () => {
-            const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) ? vData.dimensions : DEFAULT_DIMS;
+            // 1. Charger les dimensions
+            let { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
+            
+            // --- FIX RADICAL PERSISTANCE ---
+            // Si la DB est vide ou nulle, on l'initialise PHYSIQUEMENT et on attend la réponse
+            let loadedDims = vData?.dimensions;
+            if (!loadedDims || loadedDims.length === 0) {
+                loadedDims = DEFAULT_DIMS;
+                await supabase.from('ventures').update({ dimensions: loadedDims }).eq('id', venture.id);
+            }
             setDimensions(loadedDims);
 
+            // 2. Charger les concurrents
             const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
             
             if (cData && cData.length > 0) {
@@ -287,7 +299,16 @@ const CompetitionModule = ({ venture }) => {
             } else {
                 const initialStats = {};
                 loadedDims.forEach(d => initialStats[d] = 3);
-                const myProject = { venture_id: venture.id, name: 'Mon Projet', is_me: true, stats: initialStats, color: 'bg-indigo-500', visible: true };
+                
+                const myProject = {
+                    venture_id: venture.id,
+                    name: 'Mon Projet',
+                    is_me: true,
+                    stats: initialStats,
+                    color: 'bg-indigo-500',
+                    visible: true
+                };
+                // Initialisation physique du 1er concurrent
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
                 if (inserted) setCompetitors(inserted);
             }
@@ -299,9 +320,9 @@ const CompetitionModule = ({ venture }) => {
     const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
-            setDimensions(newDims);
+            setDimensions(newDims); // Optimistic UI
             
-            // Sauvegarde immédiate
+            // Sauvegarde DB
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
             const updatedCompetitors = competitors.map(c => {
@@ -362,7 +383,7 @@ const CompetitionModule = ({ venture }) => {
     const centerY = radarSize / 2;
     const radius = 100;
     const getCoordinates = (value, index, total) => {
-        const val = isNaN(value) ? 0 : value; // Safety
+        const val = isNaN(value) ? 0 : value;
         const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
         const r = (val / MAX_SCORE) * radius;
         return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
