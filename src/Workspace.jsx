@@ -13,10 +13,10 @@ const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
-    { id: 'finance', label: 'Finance', icon: DollarSign },
+    { id: 'finance', label: 'Finance', icon: DollarSign }, // Le module est ici, pas besoin de l'ajouter ailleurs
 ];
 
-// --- COULEURS ---
+// --- COULEURS MINDMAP ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -36,12 +36,10 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (AUTO-EXPAND : S'AGRANDIT AVEC LE TEXTE)
+// COMPOSANT POST-IT
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
-
-    // Auto-resize : Le post-it grandit quand on écrit
     useLayoutEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'; 
@@ -60,18 +58,13 @@ const PostIt = ({ item, update, remove, color }) => {
                 placeholder="..."
                 style={{ minHeight: '28px' }}
             />
-            <button 
-                onClick={() => remove(item.id)} 
-                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"
-            >
-                <Trash2 size={10}/>
-            </button>
+            <button onClick={() => remove(item.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"><Trash2 size={10}/></button>
         </div>
     );
 };
 
 // ==========================================
-// 1. MODULE CARNET (TON CODE ORIGINAL)
+// 1. MODULE CARNET
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -127,7 +120,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (TON CODE ORIGINAL)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -202,7 +195,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (TON CODE ORIGINAL)
+// 3. MODULE MINDMAP
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -297,29 +290,43 @@ const FinanceModule = ({ venture }) => {
 
     if (loading || !data) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
-    // CALCULS & GRAPHIQUE (SVG FIXE)
+    // --- CALCULS CORRIGÉS ---
     const s = data[activeScenario];
     const breakevenQty = s.price > s.var ? Math.ceil(s.fixed / (s.price - s.var)) : 0;
     const breakevenRev = breakevenQty * s.price;
     const projectedRevenue = s.target * s.price;
     const projectedCost = s.fixed + (s.target * s.var);
     const profit = projectedRevenue - projectedCost;
-    const runway = s.fixed > 0 ? (data.capital / s.fixed).toFixed(1) : "∞";
+    
+    // --- RUNWAY CORRIGÉ (SURVIE SI PERTE) ---
+    const monthlyNetFlow = projectedRevenue - projectedCost; // Résultat net mensuel
+    let runway;
+    if (monthlyNetFlow >= 0) {
+        runway = "∞"; // Rentable = infini
+    } else {
+        // Combien de mois on tient avec le capital si on perd 'monthlyNetFlow' par mois
+        runway = (data.capital / Math.abs(monthlyNetFlow)).toFixed(1);
+    }
 
-    // Dimensions Fixes pour SVG (pas de déformation)
+    // --- GRAPHIQUE (SVG FIXE & PADDE) ---
     const WIDTH = 1000;
     const HEIGHT = 400;
+    const PADDING = 40; // Marge interne pour ne pas couper les lignes
     
     // Echelles
     const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
     const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
     
-    const xToPx = (val) => (val / graphMaxX) * WIDTH;
-    const yToPx = (val) => HEIGHT - (val / graphMaxY) * HEIGHT;
+    // Conversion Valeur -> Pixel (avec Padding)
+    const effectiveWidth = WIDTH - (PADDING * 2);
+    const effectiveHeight = HEIGHT - (PADDING * 2);
 
-    const ptStart = { x: 0, y: yToPx(s.fixed) };
-    const ptEndCost = { x: WIDTH, y: yToPx(s.fixed + (s.var * graphMaxX)) };
-    const ptEndRev = { x: WIDTH, y: yToPx(s.price * graphMaxX) };
+    const xToPx = (val) => PADDING + (val / graphMaxX) * effectiveWidth;
+    const yToPx = (val) => (HEIGHT - PADDING) - (val / graphMaxY) * effectiveHeight;
+
+    const ptStart = { x: PADDING, y: yToPx(s.fixed) };
+    const ptEndCost = { x: WIDTH - PADDING, y: yToPx(s.fixed + (s.var * graphMaxX)) };
+    const ptEndRev = { x: WIDTH - PADDING, y: yToPx(s.price * graphMaxX) };
     const ptBreakeven = { x: xToPx(breakevenQty), y: yToPx(breakevenRev) };
 
     return (
@@ -378,20 +385,20 @@ const FinanceModule = ({ venture }) => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
-                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none">
                             {/* Zone Profit */}
-                            <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH},${ptEndRev.y} ${WIDTH},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
+                            <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
                             
                             {/* Axes */}
-                            <line x1="0" y1={HEIGHT} x2={WIDTH} y2={HEIGHT} stroke="#e2e8f0" strokeWidth="2" />
-                            <line x1="0" y1="0" x2="0" y2={HEIGHT} stroke="#e2e8f0" strokeWidth="2" />
+                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="2" />
+                            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="2" />
 
                             {/* Lignes */}
-                            <line x1="0" y1={HEIGHT} x2={WIDTH} y2={ptEndRev.y} stroke="#10b981" strokeWidth="3" />
-                            <text x={WIDTH-10} y={ptEndRev.y - 10} textAnchor="end" className="text-lg fill-emerald-500 font-bold">Revenus</text>
+                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={ptEndRev.y} stroke="#10b981" strokeWidth="3" />
+                            <text x={WIDTH-PADDING} y={ptEndRev.y - 10} textAnchor="end" className="text-lg fill-emerald-500 font-bold">Revenus</text>
 
-                            <line x1="0" y1={ptStart.y} x2={WIDTH} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="3" strokeDasharray="8,8" />
-                            <text x={WIDTH-10} y={ptEndCost.y - 10} textAnchor="end" className="text-lg fill-red-500 font-bold">Coûts</text>
+                            <line x1={PADDING} y1={ptStart.y} x2={WIDTH-PADDING} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="3" strokeDasharray="8,8" />
+                            <text x={WIDTH-PADDING} y={ptEndCost.y - 10} textAnchor="end" className="text-lg fill-red-500 font-bold">Coûts</text>
 
                             {/* Point Mort */}
                             <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="6" fill="#1e293b" />
@@ -405,7 +412,7 @@ const FinanceModule = ({ venture }) => {
 };
 
 // ==========================================
-// WORKSPACE MAIN (AJOUT DU MODULE DANS LA NAV)
+// WORKSPACE MAIN
 // ==========================================
 export default function Workspace() {
     const [ventures, setVentures] = useState([]);
@@ -441,10 +448,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">
-                {MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}
-                <button onClick={() => setActiveModuleId('finance')} className={`p-3 rounded-xl transition-all ${activeModuleId === 'finance' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title="Finance"><DollarSign size={20}/></button>
-            </nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
