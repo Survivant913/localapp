@@ -262,7 +262,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (CORRIGÉ : COULEURS & SAVE)
+// 3. MODULE CONCURRENCE (CORRIGÉ : COULEURS & SAVE FIX)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
@@ -274,18 +274,36 @@ const CompetitionModule = ({ venture }) => {
     const MAX_SCORE = 5;
     const saveTimeoutRef = useRef({});
     
-    // NOUVEAU : Palette de couleurs pour éviter le rouge systématique
-    const COMPETITOR_COLORS = [
-        'bg-red-500', 'bg-orange-500', 'bg-amber-500', 
-        'bg-emerald-500', 'bg-cyan-500', 'bg-blue-500', 
-        'bg-violet-500', 'bg-pink-500'
-    ];
+    // MAP pour convertir Tailwind -> Hex pour le SVG
+    const TAILWIND_TO_HEX = {
+        'bg-indigo-500': '#6366f1',
+        'bg-red-500': '#ef4444',
+        'bg-orange-500': '#f97316',
+        'bg-amber-500': '#f59e0b',
+        'bg-emerald-500': '#10b981',
+        'bg-cyan-500': '#06b6d4',
+        'bg-blue-500': '#3b82f6',
+        'bg-violet-500': '#8b5cf6',
+        'bg-pink-500': '#ec4899'
+    };
+
+    const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
+
+    const getHexColor = (tailwindClass) => {
+        return TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Gris par défaut
+    };
 
     useEffect(() => {
         const loadData = async () => {
-            // 1. Charger les dimensions du projet
+            // 1. Charger les dimensions (Critères)
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            const currentDims = vData?.dimensions || ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
+            let currentDims = vData?.dimensions;
+
+            // FIX RADICAL : Si pas de dimensions en BDD, on FORCE l'écriture par défaut
+            if (!currentDims || currentDims.length === 0) {
+                currentDims = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
+                await supabase.from('ventures').update({ dimensions: currentDims }).eq('id', venture.id);
+            }
             setDimensions(currentDims);
 
             // 2. Charger les concurrents
@@ -314,29 +332,28 @@ const CompetitionModule = ({ venture }) => {
         loadData();
     }, [venture.id]);
 
-    // GESTION DES DIMENSIONS (CRITÈRES)
-    const updateDimensionsInDB = async (newDims) => {
-        setDimensions(newDims);
-        await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
-    };
-
+    // GESTION DES DIMENSIONS
     const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
             setDimensions(newDims);
             
-            // 1. Sauvegarder la nouvelle liste de dimensions
+            // 1. Sauvegarder la nouvelle liste
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
-            // 2. Ajouter la stat par défaut (3) à TOUS les concurrents existants
-            const updatedCompetitors = competitors.map(c => ({
-                ...c, stats: { ...c.stats, [newDimText]: 3 }
-            }));
+            // 2. Mettre à jour TOUS les concurrents existants avec une note par défaut
+            const updatedCompetitors = competitors.map(c => {
+                // On s'assure que stats existe, sinon on le crée
+                const currentStats = c.stats || {};
+                const newStats = { ...currentStats, [newDimText]: 3 };
+                return { ...c, stats: newStats };
+            });
+            
             setCompetitors(updatedCompetitors);
 
-            // 3. Sauvegarder chaque concurrent mis à jour dans la DB
+            // 3. Persister chaque concurrent en base
             for (const comp of updatedCompetitors) {
-                await supabase.from('venture_competitors').upsert(comp);
+                await supabase.from('venture_competitors').update({ stats: comp.stats }).eq('id', comp.id);
             }
             
             setNewDimText("");
@@ -346,7 +363,8 @@ const CompetitionModule = ({ venture }) => {
     const removeDimension = async (dim) => {
         if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
         const newDims = dimensions.filter(d => d !== dim);
-        updateDimensionsInDB(newDims);
+        setDimensions(newDims);
+        await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
     };
 
     // GESTION DES CONCURRENTS
@@ -354,15 +372,16 @@ const CompetitionModule = ({ venture }) => {
         const initialStats = {};
         dimensions.forEach(d => initialStats[d] = 3);
         
-        // NOUVEAU : Choix de couleur rotatif
-        const nextColor = COMPETITOR_COLORS[competitors.length % COMPETITOR_COLORS.length];
+        // Couleur suivante dans la liste (sauf la première qui est pour "Moi")
+        const colorIndex = (competitors.length) % (COMPETITOR_COLORS.length - 1) + 1;
+        const nextColor = COMPETITOR_COLORS[colorIndex];
 
         const newComp = {
             venture_id: venture.id,
             name: 'Nouveau',
             is_me: false,
             stats: initialStats,
-            color: nextColor, // <--- Couleur dynamique
+            color: nextColor,
             visible: true
         };
         const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
@@ -376,7 +395,6 @@ const CompetitionModule = ({ venture }) => {
     };
 
     const handleUpdateCompetitor = (id, field, value, statKey = null) => {
-        // Update Local
         const updatedList = competitors.map(c => {
             if (c.id === id) {
                 if (statKey) return { ...c, stats: { ...c.stats, [statKey]: parseFloat(value) } };
@@ -386,7 +404,6 @@ const CompetitionModule = ({ venture }) => {
         });
         setCompetitors(updatedList);
 
-        // Update DB (Debounce)
         if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
         saveTimeoutRef.current[id] = setTimeout(async () => {
             const compToSave = updatedList.find(c => c.id === id);
@@ -394,7 +411,7 @@ const CompetitionModule = ({ venture }) => {
         }, 800);
     };
 
-    // --- LOGIQUE RADAR SVG ---
+    // --- RADAR LOGIC ---
     const radarSize = 300;
     const centerX = radarSize / 2;
     const centerY = radarSize / 2;
@@ -408,7 +425,7 @@ const CompetitionModule = ({ venture }) => {
 
     const getPath = (stats) => {
         const points = dimensions.map((dim, i) => {
-            const val = stats[dim] || 0;
+            const val = stats ? (stats[dim] || 0) : 0;
             const coords = getCoordinates(val, i, dimensions.length);
             return `${coords.x},${coords.y}`;
         });
@@ -419,7 +436,6 @@ const CompetitionModule = ({ venture }) => {
 
     return (
         <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* PARTIE GAUCHE : RADAR */}
             <div className="flex-1 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-800 p-6 relative">
                 <h3 className="absolute top-6 left-6 font-bold text-lg text-slate-700 dark:text-white flex items-center gap-2">
                     <Target className="text-indigo-500"/> Radar de Positionnement
@@ -427,14 +443,12 @@ const CompetitionModule = ({ venture }) => {
                 
                 <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
                     <svg width="100%" height="100%" viewBox={`0 0 ${radarSize} ${radarSize}`} className="overflow-visible">
-                        {/* Grille de fond */}
                         {[1, 2, 3, 4, 5].map(level => (
                             <polygon key={level} points={dimensions.map((_, i) => {
                                 const c = getCoordinates(level, i, dimensions.length);
                                 return `${c.x},${c.y}`;
                             }).join(' ')} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.5" className="dark:stroke-slate-700" />
                         ))}
-                        {/* Axes */}
                         {dimensions.map((dim, i) => {
                             const end = getCoordinates(MAX_SCORE, i, dimensions.length);
                             return (
@@ -446,21 +460,18 @@ const CompetitionModule = ({ venture }) => {
                                 </g>
                             );
                         })}
-                        {/* Données */}
                         {competitors.map(comp => (
                             (comp.visible) && (
                                 <g key={comp.id} className="transition-all duration-500 ease-out">
                                     <polygon 
                                         points={getPath(comp.stats)} 
-                                        fill={comp.is_me ? "rgba(99, 102, 241, 0.2)" : "rgba(100, 116, 139, 0.1)"} 
-                                        stroke={comp.is_me ? "#6366f1" : (comp.color?.replace('bg-', '') === 'red-500' ? '#ef4444' : '#cbd5e1')} // Fallback couleur simple pour SVG
-                                        strokeWidth={comp.is_me ? 2.5 : 1.5} 
-                                        style={{ stroke: comp.is_me ? '#6366f1' : 'inherit' }}
+                                        fill={getHexColor(comp.color) + "33"} // +33 pour opacité
+                                        stroke={getHexColor(comp.color)} 
+                                        strokeWidth={comp.is_me ? 3 : 2} 
                                     />
-                                    {/* Pour le SVG, on ne peut pas utiliser les classes tailwind bg-*, on garde une logique simple ici ou on mappe les couleurs Hex */}
                                     {dimensions.map((dim, i) => {
-                                        const c = getCoordinates(comp.stats[dim], i, dimensions.length);
-                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={comp.is_me ? "#6366f1" : "#94a3b8"} />;
+                                        const c = getCoordinates(comp.stats?.[dim] || 0, i, dimensions.length);
+                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={getHexColor(comp.color)} />;
                                     })}
                                 </g>
                             )
@@ -469,7 +480,6 @@ const CompetitionModule = ({ venture }) => {
                 </div>
             </div>
 
-            {/* PARTIE DROITE : LISTE & ÉDITION */}
             <div className="w-96 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shrink-0">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
                     <div className="flex items-center gap-2">
@@ -504,7 +514,7 @@ const CompetitionModule = ({ venture }) => {
                         <div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${comp.is_me ? 'bg-indigo-500' : comp.color}`}></div>
+                                    <div className={`w-3 h-3 rounded-full ${comp.color}`}></div>
                                     <input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" />
                                 </div>
                                 <div className="flex gap-1">
@@ -516,8 +526,8 @@ const CompetitionModule = ({ venture }) => {
                                 {dimensions.map(dim => (
                                     <div key={dim} className="flex items-center gap-3">
                                         <span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate" title={dim}>{dim}</span>
-                                        <input type="range" min="1" max="5" step="0.5" value={comp.stats[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-                                        <span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats[dim]}</span>
+                                        <input type="range" min="1" max="5" step="0.5" value={comp.stats?.[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                                        <span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats?.[dim]}</span>
                                     </div>
                                 ))}
                             </div>
