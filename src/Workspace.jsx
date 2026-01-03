@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
-  Sun, Zap, AlertTriangle, Check, X, Box, Move, ZoomIn, ZoomOut, Maximize
+  Sun, Zap, AlertTriangle, Check, X, Box, Move, 
+  ZoomIn, ZoomOut, Maximize, Palette, GitCommit
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -11,6 +12,16 @@ const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
+];
+
+// --- PALETTE DE COULEURS ---
+const NODE_COLORS = [
+    { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600' },
+    { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-400 dark:border-blue-700' },
+    { id: 'green', bg: 'bg-emerald-50 dark:bg-emerald-900/30', border: 'border-emerald-400 dark:border-emerald-700' },
+    { id: 'yellow', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-amber-400 dark:border-amber-700' },
+    { id: 'red', bg: 'bg-rose-50 dark:bg-rose-900/30', border: 'border-rose-400 dark:border-rose-700' },
+    { id: 'purple', bg: 'bg-violet-50 dark:bg-violet-900/30', border: 'border-violet-400 dark:border-violet-700' },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -23,7 +34,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (EXTERNE POUR EVITER LE BUG DE FOCUS)
+// COMPOSANT POST-IT (STRATÉGIE)
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => (
     <div className={`p-2 rounded border mb-2 text-xs group relative ${color === 'blue' ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : color === 'red' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : color === 'green' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'}`}>
@@ -100,7 +111,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (SANS BUG DE FOCUS)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -181,15 +192,15 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (AMÉLIORÉ : ZOOM, PAN, SVG FLUIDE)
+// 3. MODULE MINDMAP (AMÉLIORÉ : MULTI-SOURCES + TEXTE + COULEURS)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
-    const [pan, setPan] = useState({ x: 0, y: 0 }); // Navigation (Pan)
-    const [scale, setScale] = useState(1); // Zoom
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [scale, setScale] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
-    const [draggingNode, setDraggingNode] = useState(null); // { id, offsetX, offsetY }
+    const [draggingNode, setDraggingNode] = useState(null);
     const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
     
     const containerRef = useRef(null);
@@ -201,10 +212,9 @@ const MindmapModule = ({ venture }) => {
             const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
             if (data && data.content && data.content.length > 0) {
                 setNodes(data.content);
-                // Centrer la vue (simple)
-                setPan({ x: 0, y: 0 });
             } else {
-                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root' }];
+                // Racine par défaut
+                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue' }];
                 setNodes(root);
                 await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' });
             }
@@ -229,18 +239,32 @@ const MindmapModule = ({ venture }) => {
 
         const newNode = {
             id: Date.now().toString(),
-            x: parent.x + 220, // Un peu plus loin
+            x: parent.x + 220,
             y: parent.y + (Math.random() * 100 - 50),
             label: 'Nouvelle idée',
             parentId: selectedId,
-            type: 'child'
+            type: 'child',
+            color: parent.color || 'white' // Hérite de la couleur
         };
         setNodes([...nodes, newNode]);
         setSelectedId(newNode.id);
     };
 
+    const addRoot = () => {
+        const newRoot = {
+            id: Date.now().toString(),
+            x: -pan.x + 100, // Apparait dans la vue actuelle
+            y: -pan.y + 100,
+            label: 'Nouvelle Source',
+            type: 'root',
+            color: 'blue'
+        };
+        setNodes([...nodes, newRoot]);
+        setSelectedId(newRoot.id);
+    };
+
     const deleteNode = () => {
-        if (!selectedId || selectedId === 'root') return;
+        if (!selectedId) return;
         const toDelete = new Set([selectedId]);
         let changed = true;
         while(changed) {
@@ -256,84 +280,63 @@ const MindmapModule = ({ venture }) => {
         setSelectedId(null);
     };
 
-    // --- GESTION SOURIS (PAN & DRAG) ---
+    const updateColor = (colorId) => {
+        if(!selectedId) return;
+        setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n));
+    };
+
+    // --- GESTION SOURIS ---
     const handleMouseDown = (e, nodeId = null) => {
         if (nodeId) {
-            // Start Dragging Node
-            e.stopPropagation(); // Ne pas déclencher le Pan
+            e.stopPropagation();
             const node = nodes.find(n => n.id === nodeId);
             setSelectedId(nodeId);
             setDraggingNode({ id: nodeId, startX: e.clientX, startY: e.clientY });
         } else {
-            // Start Panning Canvas
             setIsPanning(true);
             setLastMousePos({ x: e.clientX, y: e.clientY });
-            setSelectedId(null); // Deselect on click empty space
+            setSelectedId(null);
         }
     };
 
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (draggingNode) {
-                // Deplacer le noeud (en tenant compte du zoom !)
                 const dx = (e.clientX - draggingNode.startX) / scale;
                 const dy = (e.clientY - draggingNode.startY) / scale;
-                
-                setNodes(prev => prev.map(n => 
-                    n.id === draggingNode.id 
-                    ? { ...n, x: n.x + dx, y: n.y + dy } 
-                    : n
-                ));
-                // Update start position for next frame
+                setNodes(prev => prev.map(n => n.id === draggingNode.id ? { ...n, x: n.x + dx, y: n.y + dy } : n));
                 setDraggingNode(prev => ({ ...prev, startX: e.clientX, startY: e.clientY }));
             } else if (isPanning) {
-                // Deplacer le canvas
                 const dx = e.clientX - lastMousePos.x;
                 const dy = e.clientY - lastMousePos.y;
                 setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
                 setLastMousePos({ x: e.clientX, y: e.clientY });
             }
         };
-
-        const handleMouseUp = () => {
-            setDraggingNode(null);
-            setIsPanning(false);
-        };
-
+        const handleMouseUp = () => { setDraggingNode(null); setIsPanning(false); };
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
+        return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
     }, [draggingNode, isPanning, lastMousePos, scale]);
 
     const updateLabel = (id, newLabel) => {
         setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
     };
 
-    // Rendu des lignes courbes (Bézier)
     const renderLines = () => {
         return nodes.map(node => {
             if (!node.parentId) return null;
             const parent = nodes.find(n => n.id === node.parentId);
             if (!parent) return null;
-
-            // Dimensions approx d'une carte (180x60)
-            const w = 180; const h = 60;
-            const startX = parent.x + w; // Sortie à droite du parent
-            const startY = parent.y + h/2; // Milieu vertical
-            const endX = node.x; // Entrée à gauche de l'enfant
-            const endY = node.y + h/2; // Milieu vertical
-
-            // Courbe
+            
+            // Calculs pour les lignes courbes
+            const w = 180; const h = 80; // Taille approx des cartes
+            const startX = parent.x + w; 
+            const startY = parent.y + h/2;
+            const endX = node.x; 
+            const endY = node.y + h/2;
             const dist = Math.abs(endX - startX) / 2;
-            const cp1x = startX + dist;
-            const cp1y = startY;
-            const cp2x = endX - dist;
-            const cp2y = endY;
-
-            const pathData = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+            const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`;
 
             return (
                 <path 
@@ -347,10 +350,26 @@ const MindmapModule = ({ venture }) => {
     return (
         <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
             {/* Toolbar */}
-            <div className="absolute top-4 left-4 z-20 flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
-                <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors" title="Ajouter Enfant"><Plus size={20}/></button>
-                <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${(!selectedId || selectedId === 'root') ? 'opacity-30 cursor-not-allowed' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
+                <div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
+                    <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors" title="Ajouter Enfant"><GitCommit size={20}/></button>
+                    <button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors" title="Ajouter Source"><Plus size={20}/></button>
+                    <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                    <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
+                </div>
+                
+                {/* Palette de couleurs (si sélectionné) */}
+                {selectedId && (
+                    <div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">
+                        {NODE_COLORS.map(c => (
+                            <button 
+                                key={c.id} 
+                                onClick={() => updateColor(c.id)}
+                                className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Zoom Controls */}
@@ -360,51 +379,32 @@ const MindmapModule = ({ venture }) => {
                 <button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button>
             </div>
 
-            {/* Canvas infini */}
-            <div 
-                ref={containerRef}
-                className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`}
-                onMouseDown={(e) => handleMouseDown(e)}
-            >
-                <div 
-                    style={{ 
-                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                        transformOrigin: '0 0',
-                        width: '100%', height: '100%',
-                        position: 'absolute'
-                    }}
-                >
-                    <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">
-                        {renderLines()}
-                    </svg>
-
-                    {nodes.map(node => (
-                        <div 
-                            key={node.id}
-                            style={{ 
-                                transform: `translate(${node.x}px, ${node.y}px)`,
-                                width: '180px',
-                                cursor: draggingNode?.id === node.id ? 'grabbing' : 'grab'
-                            }}
-                            className={`absolute top-0 left-0 p-4 rounded-2xl shadow-sm transition-shadow duration-200 flex flex-col items-center justify-center backdrop-blur-sm z-10
-                                ${selectedId === node.id 
-                                    ? 'ring-2 ring-indigo-500 shadow-xl bg-white dark:bg-slate-800 z-50' 
-                                    : 'border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 hover:border-indigo-300'}
-                                ${node.type === 'root' ? 'bg-indigo-50/90 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800' : ''}
-                            `}
-                            onMouseDown={(e) => handleMouseDown(e, node.id)}
-                        >
-                            <input 
-                                value={node.label} 
-                                onChange={(e) => updateLabel(node.id, e.target.value)} 
-                                className={`w-full bg-transparent text-center outline-none break-words font-medium ${node.type === 'root' ? 'text-indigo-700 dark:text-indigo-300 text-sm font-bold uppercase tracking-wide' : 'text-slate-700 dark:text-slate-200 text-sm'}`} 
-                                placeholder="Idée..." 
-                            />
-                            {node.type !== 'root' && (
-                                <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-indigo-400 rounded-full"></div>
-                            )}
-                        </div>
-                    ))}
+            {/* Canvas */}
+            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
+                <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
+                    <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
+                    {nodes.map(node => {
+                        const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0];
+                        return (
+                            <div 
+                                key={node.id}
+                                style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto', minHeight: '80px', cursor: draggingNode?.id === node.id ? 'grabbing' : 'grab' }}
+                                className={`absolute top-0 left-0 p-3 rounded-2xl shadow-sm transition-shadow duration-200 flex flex-col justify-center z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
+                                onMouseDown={(e) => handleMouseDown(e, node.id)}
+                            >
+                                <textarea
+                                    value={node.label} 
+                                    onChange={(e) => updateLabel(node.id, e.target.value)}
+                                    // STOP PROPAGATION HERE TO ALLOW TYPING WITHOUT DRAGGING
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`}
+                                    placeholder="Idée..."
+                                    rows={Math.max(2, (node.label?.split('\n').length || 1))}
+                                />
+                                {node.type !== 'root' && <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-indigo-400 border-2 border-white dark:border-slate-800 rounded-full"></div>}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </div>
