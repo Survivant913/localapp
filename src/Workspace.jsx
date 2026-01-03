@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Target, Users, DollarSign, 
-  Network, BarChart3, Kanban,
+  Share2, BarChart3, List, // J'ai remplacé Network/Kanban par Share2/List (plus sûr)
   ArrowLeft, Trash2, Eye, EyeOff, Settings,
-  Activity, Sun, Zap, AlertTriangle, Check, X
+  Activity, Sun, Zap, AlertTriangle, Check, X, Box
 } from 'lucide-react';
 
 // --- ICONS MAPPING ---
@@ -13,9 +13,9 @@ const MODULES = [
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'competition', label: 'Concurrence', icon: Target },
     { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'mindmap', label: 'Mindmap', icon: Network },
+    { id: 'mindmap', label: 'Mindmap', icon: Share2 },
     { id: 'data', label: 'Graphiques', icon: BarChart3 },
-    { id: 'kanban', label: 'Organisation', icon: Kanban },
+    { id: 'kanban', label: 'Organisation', icon: List },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -95,6 +95,7 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
 // 1. MODULE CARNET
 // ==========================================
 const EditorModule = ({ venture }) => {
+    if (!venture) return null;
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -175,19 +176,20 @@ const EditorModule = ({ venture }) => {
 // 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
+    if (!venture) return null;
     const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Network, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
         { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
         { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: ArrowRight, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'channels', label: 'Canaux', icon: Share2, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'cost', label: 'Structure de Coûts', icon: Trash2, col: 'md:col-span-5 md:row-span-1', color: 'red' },
         { id: 'revenue', label: 'Flux de Revenus', icon: BarChart3, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
@@ -240,9 +242,10 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (CORRIGÉ : PERSISTANCE)
+// 3. MODULE CONCURRENCE (FIXÉ : COULEURS & PERSISTANCE)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
+    if (!venture) return null;
     const [competitors, setCompetitors] = useState([]);
     const [dimensions, setDimensions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -273,13 +276,7 @@ const CompetitionModule = ({ venture }) => {
         const loadData = async () => {
             // 1. Charger les dimensions
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            
-            // LOGIQUE DE CHARGEMENT SIMPLE : Si DB vide -> Défaut (Visualisation seulement)
-            // On n'écrit PAS dans la DB ici pour éviter les conflits/boucles
-            const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) 
-                ? vData.dimensions 
-                : DEFAULT_DIMS;
-            
+            const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) ? vData.dimensions : DEFAULT_DIMS;
             setDimensions(loadedDims);
 
             // 2. Charger les concurrents
@@ -458,7 +455,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><Users size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><Share2 size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
         </div>
     );
 }
