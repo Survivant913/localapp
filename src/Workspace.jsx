@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  Plus, FileText, Users, ArrowLeft, Trash2, 
+  Plus, Minus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal
@@ -192,7 +192,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (CASCADE + GRIP VISIBLE + MULTILIGNE)
+// 3. MODULE MINDMAP (CASCADE + COLLAPSE + GRIP)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -200,7 +200,7 @@ const MindmapModule = ({ venture }) => {
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [scale, setScale] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
-    const [draggingNode, setDraggingNode] = useState(null); // { id, lastX, lastY }
+    const [draggingNode, setDraggingNode] = useState(null); 
     const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
     
     const containerRef = useRef(null);
@@ -212,12 +212,11 @@ const MindmapModule = ({ venture }) => {
             const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
             if (data && data.content && data.content.length > 0) {
                 setNodes(data.content);
-                // Centrer la vue
-                const centerX = window.innerWidth / 2 - 400; // Approx
+                const centerX = window.innerWidth / 2 - 400; 
                 const centerY = window.innerHeight / 2 - 300;
                 setPan({ x: centerX, y: centerY });
             } else {
-                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue' }];
+                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue', collapsed: false }];
                 setNodes(root);
                 await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' });
             }
@@ -234,7 +233,7 @@ const MindmapModule = ({ venture }) => {
         }, 1000);
     }, [nodes, venture.id]);
 
-    // --- FONCTION RÉCURSIVE POUR TROUVER TOUS LES DESCENDANTS ---
+    // --- UTILS RECURSIFS ---
     const getDescendants = (nodeId, allNodes) => {
         let descendants = [];
         const children = allNodes.filter(n => n.parentId === nodeId);
@@ -245,37 +244,52 @@ const MindmapModule = ({ venture }) => {
         return descendants;
     };
 
+    const isVisible = (nodeId) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return false;
+        if (!node.parentId) return true; // Root always visible
+        const parent = nodes.find(n => n.id === node.parentId);
+        if (!parent) return false; // Should not happen
+        if (parent.collapsed) return false; // Parent says hide
+        return isVisible(parent.id); // Recursively check up
+    };
+
     // --- ACTIONS ---
     const addNode = () => {
         if (!selectedId) { alert("Sélectionnez une carte parente d'abord !"); return; }
         const parent = nodes.find(n => n.id === selectedId);
         if (!parent) return;
 
+        // Si le parent était replié, on le déplie pour voir le nouvel enfant
+        if (parent.collapsed) {
+            setNodes(prev => prev.map(n => n.id === parent.id ? { ...n, collapsed: false } : n));
+        }
+
         const newNode = {
             id: Date.now().toString(),
-            x: parent.x + 220,
+            x: parent.x + 240,
             y: parent.y,
             label: 'Nouvelle idée',
             parentId: selectedId,
             type: 'child',
-            color: parent.color || 'white'
+            color: parent.color || 'white',
+            collapsed: false
         };
-        setNodes([...nodes, newNode]);
+        setNodes(prev => [...prev, newNode]);
         setSelectedId(newNode.id);
     };
 
     const addRoot = () => {
-        // Calcule le centre visible actuel pour placer la nouvelle source
         const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale;
         const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale;
-
         const newRoot = {
             id: Date.now().toString(),
-            x: viewportCenterX - 90, // Centré moins moitié largeur carte
+            x: viewportCenterX - 90,
             y: viewportCenterY - 40,
             label: 'Nouvelle Source',
             type: 'root',
-            color: 'blue'
+            color: 'blue',
+            collapsed: false
         };
         setNodes([...nodes, newRoot]);
         setSelectedId(newRoot.id);
@@ -288,21 +302,22 @@ const MindmapModule = ({ venture }) => {
         setSelectedId(null);
     };
 
+    const toggleCollapse = (e, nodeId) => {
+        e.stopPropagation();
+        setNodes(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n));
+    };
+
     const updateColor = (colorId) => {
         if(!selectedId) return;
         setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n));
     };
 
-    // --- GESTION SOURIS (PAN & DRAG EN CASCADE) ---
+    // --- MOUSE HANDLING ---
     const handleMouseDown = (e, nodeId = null) => {
         if (nodeId) {
             e.stopPropagation();
             setSelectedId(nodeId);
-            setDraggingNode({ 
-                id: nodeId, 
-                lastX: e.clientX, 
-                lastY: e.clientY 
-            });
+            setDraggingNode({ id: nodeId, lastX: e.clientX, lastY: e.clientY });
         } else {
             setIsPanning(true);
             setLastMousePos({ x: e.clientX, y: e.clientY });
@@ -313,20 +328,12 @@ const MindmapModule = ({ venture }) => {
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (draggingNode) {
-                // Calcul du Delta (Déplacement depuis la dernière frame)
                 const deltaX = (e.clientX - draggingNode.lastX) / scale;
                 const deltaY = (e.clientY - draggingNode.lastY) / scale;
                 
-                // Trouver tous les noeuds à déplacer (le parent + ses descendants)
+                // Déplacement en cascade
                 const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, nodes)]);
-
-                setNodes(prev => prev.map(n => 
-                    nodesToMove.has(n.id)
-                    ? { ...n, x: n.x + deltaX, y: n.y + deltaY } 
-                    : n
-                ));
-
-                // Mettre à jour la position de référence pour la prochaine frame
+                setNodes(prev => prev.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n));
                 setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY }));
 
             } else if (isPanning) {
@@ -336,19 +343,11 @@ const MindmapModule = ({ venture }) => {
                 setLastMousePos({ x: e.clientX, y: e.clientY });
             }
         };
-
-        const handleMouseUp = () => {
-            setDraggingNode(null);
-            setIsPanning(false);
-        };
-
+        const handleMouseUp = () => { setDraggingNode(null); setIsPanning(false); };
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [draggingNode, isPanning, lastMousePos, scale, nodes]); // nodes added to dependency to allow recursion read
+        return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
+    }, [draggingNode, isPanning, lastMousePos, scale, nodes]);
 
     const updateLabel = (id, newLabel) => {
         setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
@@ -356,13 +355,16 @@ const MindmapModule = ({ venture }) => {
 
     const renderLines = () => {
         return nodes.map(node => {
+            // Visibility Check
+            if (!isVisible(node.id)) return null;
             if (!node.parentId) return null;
-            const parent = nodes.find(n => n.id === node.parentId);
-            if (!parent) return null;
             
-            const w = 180; const h = 100; // Estimation de la taille de la carte
+            const parent = nodes.find(n => n.id === node.parentId);
+            if (!parent) return null; // Parent hidden or deleted
+            
+            const w = 180; const h = 100; 
             const startX = parent.x + w; 
-            const startY = parent.y + 40; // Hauteur de la poignée approx
+            const startY = parent.y + 40; 
             const endX = node.x; 
             const endY = node.y + 40;
             const dist = Math.abs(endX - startX) / 2;
@@ -387,7 +389,6 @@ const MindmapModule = ({ venture }) => {
                     <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
                 </div>
-                
                 {selectedId && (
                     <div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">
                         {NODE_COLORS.map(c => (
@@ -401,7 +402,7 @@ const MindmapModule = ({ venture }) => {
                 )}
             </div>
 
-            {/* Zoom */}
+            {/* Zoom Controls */}
             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
                 <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button>
                 <button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button>
@@ -412,8 +413,14 @@ const MindmapModule = ({ venture }) => {
             <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
                 <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
                     <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
+                    
                     {nodes.map(node => {
+                        // VISIBILITY CHECK
+                        if (!isVisible(node.id)) return null;
+
                         const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0];
+                        const hasChildren = nodes.some(n => n.parentId === node.id);
+
                         return (
                             <div 
                                 key={node.id}
@@ -421,24 +428,34 @@ const MindmapModule = ({ venture }) => {
                                 className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
                                 onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
                             >
-                                {/* ZONE DE GRIP VISIBLE (HEADER) */}
+                                {/* HEADER (GRIP) */}
                                 <div 
                                     className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`}
                                     onMouseDown={(e) => handleMouseDown(e, node.id)}
                                 >
-                                    <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500"/>
+                                    <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/>
                                 </div>
 
-                                {/* ZONE DE TEXTE (MULTILIGNE) */}
-                                <div className="p-2">
+                                {/* CONTENT */}
+                                <div className="p-2 relative">
                                     <textarea
                                         value={node.label} 
                                         onChange={(e) => updateLabel(node.id, e.target.value)}
-                                        onMouseDown={(e) => e.stopPropagation()} // Permet de sélectionner le texte sans drag
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`}
                                         placeholder="Idée..."
                                         rows={Math.max(2, (node.label?.split('\n').length || 1))}
                                     />
+                                    {/* COLLAPSE BUTTON */}
+                                    {hasChildren && (
+                                        <button 
+                                            onClick={(e) => toggleCollapse(e, node.id)}
+                                            className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50"
+                                            title={node.collapsed ? "Afficher" : "Masquer"}
+                                        >
+                                            {node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
