@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FolderOpen, ArrowRight, Trash2, ArrowLeft,
   FileText, Target, Users, DollarSign, 
   Network, BarChart3, Kanban,
-  Loader2, Save, Box, Activity, Sun, Zap, AlertTriangle, Check, X, MousePointer2
+  Loader2, Save, Box, Activity, Sun, Zap, AlertTriangle, Check, X
 } from 'lucide-react';
 
 // --- ICONS MAPPING ---
@@ -18,6 +18,7 @@ const MODULES = [
     { id: 'kanban', label: 'Organisation', icon: Kanban },
 ];
 
+// --- HOOK GENÉRIQUE SAVE AUTO ---
 function useAutoSave(value, delay = 1000, callback) {
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -28,7 +29,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANTS UI PARTAGÉS (Post-its)
+// COMPOSANTS UI PARTAGÉS
 // ==========================================
 const PostItItem = ({ item, updateItem, deleteItem, colors }) => {
     const textareaRef = useRef(null);
@@ -101,7 +102,7 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
 };
 
 // ==========================================
-// 1. MODULE CARNET (EDITOR)
+// 1. MODULE CARNET
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -112,10 +113,7 @@ const EditorModule = ({ venture }) => {
     useEffect(() => {
         const fetchPages = async () => {
             const { data } = await supabase.from('venture_pages').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
-            if (data) {
-                setPages(data);
-                if (data.length > 0) setActivePageId(data[0].id);
-            }
+            if (data) { setPages(data); if (data.length > 0) setActivePageId(data[0].id); }
             setLoading(false);
         };
         fetchPages();
@@ -145,7 +143,7 @@ const EditorModule = ({ venture }) => {
         if (!pageToSave) return;
         setSaving(true);
         try { await supabase.from('venture_pages').update({ title: pageToSave.title, content: pageToSave.content }).eq('id', pageToSave.id); } 
-        catch (error) { console.error(error); } finally { setSaving(false); }
+        finally { setSaving(false); }
     });
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
@@ -184,12 +182,13 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (CANVAS & SWOT)
+// 2. MODULE STRATÉGIE (CORRIGÉ & ROBUSTE)
 // ==========================================
 const StrategyModule = ({ venture }) => {
-    const [view, setView] = useState('canvas'); // canvas | swot
+    const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
+    const saveTimeoutRef = useRef({}); // Pour debouncer chaque section
 
     const SECTIONS_CANVAS = [
         { id: 'partners', label: 'Partenaires Clés', icon: Network, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
@@ -221,62 +220,46 @@ const StrategyModule = ({ venture }) => {
         loadStrategy();
     }, [venture.id]);
 
-    const handleUpdate = async (sectionId, newItems) => {
-        // Optimistic UI
+    const handleUpdate = (sectionId, newItems) => {
+        // 1. Mise à jour immédiate locale (Optimistic UI)
         setData(prev => ({ ...prev, [sectionId]: newItems }));
         
-        // Save DB
-        const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
-        await supabase.from('venture_strategies').upsert({
-            venture_id: venture.id,
-            type,
-            section_id: sectionId,
-            content: newItems
-        }, { onConflict: 'venture_id, section_id' });
+        // 2. Debounce pour la sauvegarde BDD (évite de spammer)
+        if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
+        
+        saveTimeoutRef.current[sectionId] = setTimeout(async () => {
+            const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
+            await supabase.from('venture_strategies').upsert({
+                venture_id: venture.id,
+                type,
+                section_id: sectionId,
+                content: newItems
+            }, { onConflict: 'venture_id, section_id' }); // <--- La clé magique qui nécessite la commande SQL
+        }, 1000);
     };
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement de la stratégie...</div>;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* Header Module */}
             <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0">
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                     <button onClick={() => setView('canvas')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'canvas' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>Canvas</button>
                     <button onClick={() => setView('swot')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'swot' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>SWOT</button>
                 </div>
             </div>
-
-            {/* Content Scrollable */}
             <div className="flex-1 overflow-y-auto p-6">
                 {view === 'canvas' && (
                     <div className="grid grid-cols-1 md:grid-cols-10 gap-4 h-full min-h-[800px]">
                         {SECTIONS_CANVAS.map(section => (
-                            <PostItSection 
-                                key={section.id} 
-                                title={section.label} 
-                                icon={section.icon} 
-                                items={data[section.id] || []} 
-                                onChange={(val) => handleUpdate(section.id, val)}
-                                colorDefault={section.color}
-                                className={`${section.col} min-h-[200px]`}
-                            />
+                            <PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className={`${section.col} min-h-[200px]`}/>
                         ))}
                     </div>
                 )}
-
                 {view === 'swot' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[600px]">
                         {SECTIONS_SWOT.map(section => (
-                            <PostItSection 
-                                key={section.id} 
-                                title={section.label} 
-                                icon={section.icon} 
-                                items={data[section.id] || []} 
-                                onChange={(val) => handleUpdate(section.id, val)}
-                                colorDefault={section.color}
-                                className="min-h-[300px]"
-                            />
+                            <PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className="min-h-[300px]"/>
                         ))}
                     </div>
                 )}
@@ -320,7 +303,6 @@ export default function Workspace() {
         setVentures(ventures.filter(v => v.id !== id));
     };
 
-    // VUE 1 : LISTE PROJETS
     if (!activeVenture) {
         return (
             <div className="fade-in p-6 max-w-6xl mx-auto space-y-8">
@@ -346,32 +328,23 @@ export default function Workspace() {
         );
     }
 
-    // VUE 2 : INTERIEUR (PLEIN ÉCRAN)
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4">
                 <button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button>
                 <h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2>
             </header>
-            
             <div className="flex-1 flex overflow-hidden">
                 <nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">
                     {MODULES.map(module => (
-                        <button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}>
-                            <module.icon size={20}/>
-                        </button>
+                        <button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>
                     ))}
                 </nav>
-
                 <main className="flex-1 overflow-hidden relative bg-white dark:bg-black">
                     {activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}
                     {activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}
-                    
                     {!['editor', 'business'].includes(activeModuleId) && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                            <Users size={48} className="mb-4 opacity-20"/>
-                            <p>Module {activeModuleId} en construction</p>
-                        </div>
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400"><Users size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>
                     )}
                 </main>
             </div>
