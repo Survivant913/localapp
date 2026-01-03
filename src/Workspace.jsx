@@ -3,15 +3,14 @@ import { supabase } from './supabaseClient';
 import { 
   Plus, FolderOpen, ArrowRight, Trash2, ArrowLeft,
   FileText, Target, Users, DollarSign, 
-  Network, BarChart3, Kanban, Presentation,
-  MoreVertical, Loader2, Save
+  Network, BarChart3, Kanban,
+  Loader2, Save
 } from 'lucide-react';
 
-// --- ICONS MAPPING ---
+// --- ICONS MAPPING (Présentation supprimée) ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
-    { id: 'pitch', label: 'Présentation', icon: Presentation },
-    { id: 'business', label: 'Stratégie', icon: Users }, // Changé pour Users/Briefcase
+    { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'competition', label: 'Concurrence', icon: Target },
     { id: 'finance', label: 'Finance', icon: DollarSign },
     { id: 'mindmap', label: 'Mindmap', icon: Network },
@@ -19,7 +18,7 @@ const MODULES = [
     { id: 'kanban', label: 'Organisation', icon: Kanban },
 ];
 
-// --- HOOK DE SAUVEGARDE AUTOMATIQUE (DEBOUNCE) ---
+// --- HOOK DE SAUVEGARDE AUTOMATIQUE ---
 function useAutoSave(value, delay = 1000, callback) {
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -30,7 +29,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// 1. MODULE CARNET (EDITOR)
+// 1. MODULE CARNET (EDITOR) - VERSION PLEIN ÉCRAN
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -38,7 +37,6 @@ const EditorModule = ({ venture }) => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Chargement initial
     useEffect(() => {
         const fetchPages = async () => {
             const { data } = await supabase
@@ -56,7 +54,6 @@ const EditorModule = ({ venture }) => {
         fetchPages();
     }, [venture.id]);
 
-    // Création page
     const createPage = async () => {
         const { data, error } = await supabase
             .from('venture_pages')
@@ -69,7 +66,6 @@ const EditorModule = ({ venture }) => {
         }
     };
 
-    // Suppression page
     const deletePage = async (id, e) => {
         e.stopPropagation();
         if (!window.confirm("Supprimer cette page ?")) return;
@@ -79,15 +75,12 @@ const EditorModule = ({ venture }) => {
         if (activePageId === id) setActivePageId(newPages[0]?.id || null);
     };
 
-    // Mise à jour locale immédiate (pour la fluidité)
     const updateLocalPage = (id, field, value) => {
         setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
-    // Active Page Object
     const activePage = pages.find(p => p.id === activePageId);
 
-    // Sauvegarde automatique du CONTENU et TITRE
     useAutoSave(activePage, 1500, async (pageToSave) => {
         if (!pageToSave) return;
         setSaving(true);
@@ -103,10 +96,11 @@ const EditorModule = ({ venture }) => {
         }
     });
 
-    if (loading) return <div className="p-10 text-center text-slate-400">Chargement du carnet...</div>;
+    if (loading) return <div className="p-10 text-center text-slate-400">Chargement...</div>;
 
+    // --- MODIFICATION ICI : SUPPRESSION DES BORDURES ET MARGES ---
     return (
-        <div className="flex h-full bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="flex h-full bg-white dark:bg-slate-900">
             {/* Sidebar des pages */}
             <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
@@ -129,9 +123,6 @@ const EditorModule = ({ venture }) => {
                             </button>
                         </div>
                     ))}
-                    {pages.length === 0 && (
-                        <div className="text-center py-8 text-xs text-slate-400 italic">Aucune page</div>
-                    )}
                 </div>
             </div>
 
@@ -175,33 +166,25 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// COMPOSANT PRINCIPAL : WORKSPACE
+// WORKSPACE MAIN
 // ==========================================
 export default function Workspace() {
     const [ventures, setVentures] = useState([]);
     const [activeVenture, setActiveVenture] = useState(null);
     const [loading, setLoading] = useState(true);
     const [newVentureTitle, setNewVentureTitle] = useState("");
-    const [activeModuleId, setActiveModuleId] = useState('editor'); // Module par défaut : Carnet
+    const [activeModuleId, setActiveModuleId] = useState('editor');
 
-    // --- 1. CHARGEMENT DES PROJETS (VENTURES) ---
     useEffect(() => {
         fetchVentures();
     }, []);
 
     const fetchVentures = async () => {
         try {
-            const { data, error } = await supabase
-                .from('ventures')
-                .select('*')
-                .order('last_modified', { ascending: false });
+            const { data, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false });
             if (error) throw error;
             setVentures(data || []);
-        } catch (error) {
-            console.error("Erreur chargement:", error);
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
     };
 
     const createVenture = async () => {
@@ -211,12 +194,12 @@ export default function Workspace() {
             if (error) throw error;
             setVentures([data[0], ...ventures]);
             setNewVentureTitle("");
-        } catch (error) { alert("Erreur création projet"); }
+        } catch (error) { alert("Erreur création"); }
     };
 
     const deleteVenture = async (id, e) => {
         e.stopPropagation();
-        if (!window.confirm("Supprimer définitivement ce projet et toutes ses données ?")) return;
+        if (!window.confirm("Supprimer ce projet ?")) return;
         try {
             const { error } = await supabase.from('ventures').delete().eq('id', id);
             if (error) throw error;
@@ -225,7 +208,7 @@ export default function Workspace() {
         } catch (error) { console.error("Erreur suppression", error); }
     };
 
-    // --- VUE 1 : LISTE DES PROJETS ---
+    // --- VUE LISTE ---
     if (!activeVenture) {
         return (
             <div className="fade-in p-6 max-w-6xl mx-auto space-y-8">
@@ -235,53 +218,20 @@ export default function Workspace() {
                         <p className="text-slate-500">Incubateur d'idées & Gestion de projets avancée</p>
                     </div>
                 </div>
-
-                {/* BARRE DE CRÉATION */}
                 <div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2">
                     <div className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg text-slate-500"><FolderOpen size={20}/></div>
-                    <input 
-                        type="text" 
-                        value={newVentureTitle}
-                        onChange={(e) => setNewVentureTitle(e.target.value)}
-                        placeholder="Nom de votre nouvelle idée..." 
-                        className="flex-1 bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-400 font-medium"
-                        onKeyDown={(e) => e.key === 'Enter' && createVenture()}
-                    />
-                    <button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center gap-2">
-                        <Plus size={18}/> Créer
-                    </button>
+                    <input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nom de votre nouvelle idée..." className="flex-1 bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-400 font-medium" onKeyDown={(e) => e.key === 'Enter' && createVenture()} />
+                    <button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity flex items-center gap-2"><Plus size={18}/> Créer</button>
                 </div>
-
-                {/* GRILLE DES PROJETS */}
-                {loading ? (
-                    <div className="text-center py-20"><Loader2 className="animate-spin w-8 h-8 text-slate-400 mx-auto"/></div>
-                ) : (
+                {loading ? <div className="text-center py-20"><Loader2 className="animate-spin w-8 h-8 text-slate-400 mx-auto"/></div> : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {ventures.length === 0 && (
-                            <div className="col-span-full text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                                Commencez par créer votre premier projet ci-dessus.
-                            </div>
-                        )}
                         {ventures.map(v => (
-                            <div 
-                                key={v.id} 
-                                onClick={() => setActiveVenture(v)}
-                                className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 cursor-pointer transition-all shadow-sm hover:shadow-lg relative overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                    <button onClick={(e) => deleteVenture(v.id, e)} className="p-2 bg-white dark:bg-slate-700 text-red-500 rounded-lg shadow hover:bg-red-50"><Trash2 size={16}/></button>
-                                </div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg shadow-indigo-500/20">
-                                        <FolderOpen size={24}/>
-                                    </div>
-                                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-500 rounded uppercase">{v.status || 'Idea'}</span>
-                                </div>
+                            <div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 cursor-pointer transition-all shadow-sm hover:shadow-lg relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10"><button onClick={(e) => deleteVenture(v.id, e)} className="p-2 bg-white dark:bg-slate-700 text-red-500 rounded-lg shadow hover:bg-red-50"><Trash2 size={16}/></button></div>
+                                <div className="flex justify-between items-start mb-4"><div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg shadow-indigo-500/20"><FolderOpen size={24}/></div><span className="px-2 py-1 bg-slate-100 dark:bg-slate-900 text-xs font-bold text-slate-500 rounded uppercase">{v.status || 'Idea'}</span></div>
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 truncate">{v.title}</h3>
                                 <p className="text-xs text-slate-400">Modifié le {new Date(v.last_modified).toLocaleDateString()}</p>
-                                <div className="mt-6 flex items-center text-indigo-600 dark:text-indigo-400 font-bold text-sm group-hover:translate-x-1 transition-transform">
-                                    Ouvrir l'espace <ArrowRight size={16} className="ml-2"/>
-                                </div>
+                                <div className="mt-6 flex items-center text-indigo-600 dark:text-indigo-400 font-bold text-sm group-hover:translate-x-1 transition-transform">Ouvrir l'espace <ArrowRight size={16} className="ml-2"/></div>
                             </div>
                         ))}
                     </div>
@@ -290,15 +240,12 @@ export default function Workspace() {
         );
     }
 
-    // --- VUE 2 : INTERIEUR DU PROJET (LAYOUT + MODULES) ---
+    // --- VUE INTERIEURE (MODIFIÉE POUR PLEIN ÉCRAN) ---
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
-            {/* HEADER MINIMALISTE */}
             <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setActiveVenture(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Retour aux projets">
-                        <ArrowLeft size={20}/>
-                    </button>
+                    <button onClick={() => setActiveVenture(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Retour aux projets"><ArrowLeft size={20}/></button>
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white truncate max-w-[200px] md:max-w-md">{activeVenture.title}</h2>
                 </div>
@@ -306,43 +253,27 @@ export default function Workspace() {
             </header>
             
             <div className="flex-1 flex overflow-hidden">
-                {/* MENU LATÉRAL "FURTIF" 
-                    Une fine bande d'icônes à gauche. S'étend au survol pour afficher les labels (tooltip style).
-                */}
                 <nav className="w-16 hover:w-56 bg-slate-900 text-slate-400 flex flex-col items-center py-4 gap-2 transition-all duration-300 ease-in-out z-30 shrink-0 overflow-hidden group">
                     {MODULES.map(module => {
                         const isActive = activeModuleId === module.id;
                         const Icon = module.icon;
                         return (
-                            <button
-                                key={module.id}
-                                onClick={() => setActiveModuleId(module.id)}
-                                className={`
-                                    w-full flex items-center px-4 py-3 gap-4 transition-colors relative
-                                    ${isActive ? 'text-white bg-indigo-600' : 'hover:text-white hover:bg-slate-800'}
-                                `}
-                                title={module.label}
-                            >
+                            <button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`w-full flex items-center px-4 py-3 gap-4 transition-colors relative ${isActive ? 'text-white bg-indigo-600' : 'hover:text-white hover:bg-slate-800'}`} title={module.label}>
                                 <Icon size={24} className="shrink-0"/>
-                                <span className="text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-75">
-                                    {module.label}
-                                </span>
+                                <span className="text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 delay-75">{module.label}</span>
                                 {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-white"></div>}
                             </button>
                         );
                     })}
                 </nav>
 
-                {/* ZONE DE CONTENU PRINCIPALE */}
-                <main className="flex-1 overflow-hidden p-2 md:p-4 bg-slate-100 dark:bg-black relative">
+                {/* ZONE PRINCIPALE SANS PADDING NI MARGES POUR LE PLEIN ÉCRAN */}
+                <main className="flex-1 overflow-hidden flex flex-col bg-slate-100 dark:bg-black relative">
                     {activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}
                     
-                    {/* Placeholder pour les futurs modules */}
                     {activeModuleId !== 'editor' && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/50">
-                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
-                                <Users size={32} className="opacity-50"/>
-                            </div>
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 dark:border-slate-800 m-8 rounded-2xl bg-white/50 dark:bg-slate-900/50">
+                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4"><Users size={32} className="opacity-50"/></div>
                             <h3 className="text-xl font-bold text-slate-600 dark:text-slate-300">Module {activeModuleId}</h3>
                             <p className="text-sm">En cours de développement...</p>
                         </div>
