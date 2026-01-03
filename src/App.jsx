@@ -11,6 +11,7 @@ import TodoList from './TodoList';
 import DataSettings from './DataSettings';
 import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
+import Workspace from './Workspace'; // <--- NEW IMPORT
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -31,7 +32,8 @@ export default function App() {
     todos: [], projects: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
-    clients: [], quotes: [], invoices: [], catalog: [], profile: {}
+    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
+    ventures: [] // <--- NEW STATE FOR WORKSPACE
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -58,10 +60,9 @@ export default function App() {
       return checkDate <= today;
   };
 
-  // --- SAUVEGARDE ROBUSTE (Batch) ---
+  // --- ROBUST BATCH SAVING ---
   const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
     if (!items || items.length === 0) return;
-    // On filtre les éléments invalides (sans ID) pour éviter de casser la base
     const validItems = items.filter(i => i && i.id);
     const mappedItems = validItems.map(mapFunction);
     
@@ -70,7 +71,7 @@ export default function App() {
       const { error } = await supabase.from(table).upsert(batch);
       
       if (error) {
-        console.error(`ERREUR CRITIQUE sur ${table}:`, error);
+        console.error(`CRITICAL ERROR on ${table}:`, error);
       }
     }
   };
@@ -123,17 +124,19 @@ export default function App() {
         supabase.from('clients').select('*'),
         supabase.from('quotes').select('*'),
         supabase.from('invoices').select('*'),
-        supabase.from('catalog_items').select('*')
+        supabase.from('catalog_items').select('*'),
+        supabase.from('ventures').select('*') // <--- NEW FETCH
       ]);
 
       const [
         { data: profile }, { data: todos }, { data: notes }, { data: projects },
         { data: accounts }, { data: transactions }, { data: recurring }, 
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
-        { data: clients }, { data: quotes }, { data: invoices }, { data: catalog }
+        { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
+        { data: ventures } // <--- NEW DATA
       ] = results;
 
-      // --- MOTEUR DE RATTRAPAGE ---
+      // --- CATCH-UP ENGINE ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
@@ -141,7 +144,7 @@ export default function App() {
       const validAccounts = accounts || [];
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : 'offline-account';
 
-      // 1. Rattrapage PLANIFIÉS
+      // 1. Scheduled Catch-up
       (scheduled || []).forEach(s => {
           if (s.status === 'pending' && isDatePastOrToday(s.date)) {
               const baseId = Date.now() + Math.floor(Math.random() * 1000000);
@@ -165,7 +168,7 @@ export default function App() {
           }
       });
 
-      // 2. Rattrapage RÉCURRENTS
+      // 2. Recurring Catch-up
       (recurring || []).forEach(r => {
           let hasChanged = false;
           let tempR = { ...r };
@@ -246,6 +249,7 @@ export default function App() {
           planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
         },
         clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
+        ventures: ventures || [], // <--- LOAD VENTURES
         profile: profile || {},
         settings: { ...(profile?.settings || {}), theme: loadedTheme },
         customLabels: profile?.custom_labels || {}, mainNote: ""
@@ -272,14 +276,14 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [data, unsavedChanges]);
 
-  // --- SAUVEGARDE GLOBALE (MISE À JOUR) ---
+  // --- GLOBAL SAVE (UPDATE) ---
   const saveDataToSupabase = async () => {
     if (!session) return;
     setIsSaving(true);
     try {
       const { user } = session;
       
-      // Profil (AVEC LOGO MAINTENANT ✅)
+      // Profil
       await supabase.from('profiles').upsert({ 
           id: user.id, 
           settings: data.settings, 
@@ -292,10 +296,10 @@ export default function App() {
           iban: data.profile?.iban, 
           bic: data.profile?.bic, 
           tva_number: data.profile?.tva_number,
-          logo: data.profile?.logo // <--- La ligne magique
+          logo: data.profile?.logo
       });
 
-      // --- COMPTES ---
+      // --- ACCOUNTS ---
       const accountsToSave = data.budget.accounts
           .filter(a => a && a.name && a.id)
           .map(a => ({ 
@@ -313,7 +317,7 @@ export default function App() {
           date: t.date, account_id: t.accountId || t.account_id, archived: t.archived 
       }));
 
-      // Autres tables
+      // Other tables
       await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
@@ -325,6 +329,10 @@ export default function App() {
       await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
+      
+      // Note: Ventures are saved inside Workspace.jsx individually, so we don't necessarily need a bulk save here unless you edit them outside.
+      // But for safety, we can add basic update for Ventures title/status if needed later.
+      
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
@@ -349,6 +357,7 @@ export default function App() {
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
+      case 'workspace': return <Workspace data={data} updateData={updateData} />; // <--- NEW ROUTE
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }

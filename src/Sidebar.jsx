@@ -2,37 +2,27 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users // --- AJOUT CRM : IMPORT ICÔNE ---
+  Users, Box // --- ADDED BOX ICON FOR WORKSPACE ---
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // --- CORRECTIF : DÉCONNEXION INTELLIGENTE ---
+  // --- SMART LOGOUT FIX ---
   const handleLogout = async () => {
     try {
-      // 1. On sauvegarde le thème actuel avant de tout effacer
       const currentTheme = localStorage.getItem('localAppTheme');
-
-      // 2. Déconnexion Supabase
       await supabase.auth.signOut();
-      
-      // 3. Nettoyage mémoire (pour sécurité et bugs mobile)
       localStorage.clear();
       sessionStorage.clear();
-
-      // 4. On RESTAURE le thème immédiatement après le nettoyage
       if (currentTheme) {
         localStorage.setItem('localAppTheme', currentTheme);
       }
-
-      // 5. Fermeture menu mobile et redirection
       if (isMobileOpen && toggleMobile) {
         toggleMobile();
       }
       window.location.replace(window.location.origin);
-      
     } catch (error) {
       console.error("Erreur déconnexion:", error);
       window.location.href = "/";
@@ -41,10 +31,11 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
+    { id: 'workspace', label: 'Workspace (Incubateur)', icon: Box }, // --- NEW WORKSPACE ITEM ---
     { id: 'calendar', label: 'Planning', icon: Calendar },
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
-    { id: 'clients', label: 'Clients', icon: Users }, // --- AJOUT CRM : BOUTON MENU ---
+    { id: 'clients', label: 'Clients', icon: Users },
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
@@ -94,6 +85,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           {menuItems.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
+            const isWorkspace = item.id === 'workspace'; // Identify Workspace item
+
             return (
               <button
                 key={item.id}
@@ -102,12 +95,12 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   w-full flex items-center gap-3 py-3 rounded-xl text-sm font-medium transition-all duration-200 group relative
                   ${isCollapsed ? 'justify-center px-0' : 'px-4'}
                   ${isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+                    ? (isWorkspace ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20')
+                    : (isWorkspace ? 'text-indigo-300 hover:bg-indigo-900/30 hover:text-white border border-indigo-900/30' : 'text-slate-400 hover:bg-slate-900 hover:text-white')
                   }
                 `}
               >
-                <Icon size={20} className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                <Icon size={20} className={`shrink-0 ${isActive ? 'text-white' : (isWorkspace ? 'text-indigo-400 group-hover:text-white' : 'text-slate-500 group-hover:text-slate-300')}`} />
                 
                 {!isCollapsed && (
                   <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
