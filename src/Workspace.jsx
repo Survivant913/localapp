@@ -1,22 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-// IMPORTATION UNIQUEMENT D'ICÔNES GARANTIES SANS BUG
 import { 
-  Plus, FileText, Target, Users, DollarSign, 
-  Activity, BarChart2, Menu,
-  ArrowLeft, Trash2, Eye, EyeOff, Settings,
-  Check, X
+  Plus, FileText, Users, ArrowLeft, Trash2, 
+  Activity, Target, DollarSign, BarChart2, Share2, Menu, // Icônes utilisées dans les tuiles Stratégie
+  Sun, Zap, AlertTriangle, Check, X, Box
 } from 'lucide-react';
 
-// --- ICONS MAPPING ---
+// --- SEULEMENT 2 MODULES ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
-    { id: 'competition', label: 'Concurrence', icon: Target },
-    { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'mindmap', label: 'Mindmap', icon: Activity },
-    { id: 'data', label: 'Graphiques', icon: BarChart2 },
-    { id: 'kanban', label: 'Organisation', icon: Menu },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -29,7 +22,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANTS UI PARTAGÉS
+// COMPOSANTS UI PARTAGÉS (Post-its)
 // ==========================================
 const PostItItem = ({ item, updateItem, deleteItem, colors }) => {
     const textareaRef = useRef(null);
@@ -176,7 +169,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (ICÔNES CORRIGÉES)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -184,15 +177,15 @@ const StrategyModule = ({ venture }) => {
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
-    // ICÔNES STANDARD UNIQUEMENT POUR EVITER LES CRASH
+    // ICÔNES STANDARD (On utilise celles importées en haut)
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Users, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'valueProps', label: 'Propositions de Valeur', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'red' },
+        { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
-        { id: 'resources', label: 'Ressources Clés', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'green' },
         { id: 'cost', label: 'Structure de Coûts', icon: DollarSign, col: 'md:col-span-5 md:row-span-1', color: 'red' },
         { id: 'revenue', label: 'Flux de Revenus', icon: BarChart2, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
@@ -246,215 +239,6 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (FIX 400 & PERSISTANCE)
-// ==========================================
-const CompetitionModule = ({ venture }) => {
-    if (!venture || !venture.id) return <div className="p-10 text-center">Chargement des données...</div>;
-    
-    const [competitors, setCompetitors] = useState([]);
-    const [dimensions, setDimensions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [isEditingDims, setIsEditingDims] = useState(false);
-    const [newDimText, setNewDimText] = useState("");
-    
-    const MAX_SCORE = 5;
-    const saveTimeoutRef = useRef({});
-    
-    const TAILWIND_TO_HEX = {
-        'bg-indigo-500': '#6366f1', 'bg-red-500': '#ef4444', 'bg-orange-500': '#f97316',
-        'bg-amber-500': '#f59e0b', 'bg-emerald-500': '#10b981', 'bg-cyan-500': '#06b6d4',
-        'bg-blue-500': '#3b82f6', 'bg-violet-500': '#8b5cf6', 'bg-pink-500': '#ec4899'
-    };
-    const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
-    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8';
-
-    const DEFAULT_DIMS = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
-
-    useEffect(() => {
-        let mounted = true;
-        const loadData = async () => {
-            try {
-                // LOAD DIMENSIONS
-                const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-                
-                // Si vide, on utilise le défaut pour l'affichage mais ON N'ECRIT PAS DANS LA DB
-                // Cela évite la boucle de réinitialisation en cas de conflit
-                const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) ? vData.dimensions : DEFAULT_DIMS;
-                if (mounted) setDimensions(loadedDims);
-
-                // LOAD COMPETITORS
-                const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
-                
-                if (cData && cData.length > 0) {
-                    if (mounted) setCompetitors(cData);
-                } else {
-                    // Initialiser "Mon Projet" seulement si vraiment vide
-                    const initialStats = {};
-                    loadedDims.forEach(d => initialStats[d] = 3);
-                    const myProject = {
-                        venture_id: parseInt(venture.id), // FIX 400: Force Integer
-                        name: 'Mon Projet',
-                        is_me: true,
-                        stats: initialStats,
-                        color: 'bg-indigo-500',
-                        visible: true
-                    };
-                    const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
-                    if (mounted && inserted) setCompetitors(inserted);
-                }
-            } catch (error) {
-                console.error("Erreur chargement:", error);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-        loadData();
-        return () => { mounted = false; };
-    }, [venture]);
-
-    const addDimension = async () => {
-        if (newDimText && !dimensions.includes(newDimText)) {
-            const newDims = [...dimensions, newDimText];
-            setDimensions(newDims);
-            
-            // SAVE DIMENSIONS
-            await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
-
-            // UPDATE LOCAL + DB COMPETITORS
-            const updatedCompetitors = competitors.map(c => {
-                const newStats = { ...(c.stats || {}), [newDimText]: 3 };
-                return { ...c, stats: newStats };
-            });
-            setCompetitors(updatedCompetitors);
-
-            for (const comp of updatedCompetitors) {
-                // FIX 400: Clean payload
-                const payload = { 
-                    id: comp.id, 
-                    venture_id: parseInt(venture.id), 
-                    stats: comp.stats,
-                    name: comp.name,
-                    color: comp.color,
-                    is_me: comp.is_me,
-                    visible: comp.visible
-                };
-                await supabase.from('venture_competitors').upsert(payload);
-            }
-            setNewDimText("");
-        }
-    };
-
-    const removeDimension = async (dim) => {
-        if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
-        const newDims = dimensions.filter(d => d !== dim);
-        setDimensions(newDims);
-        await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
-    };
-
-    const addCompetitor = async () => {
-        const initialStats = {};
-        dimensions.forEach(d => initialStats[d] = 3);
-        const colorIndex = (competitors.length) % (COMPETITOR_COLORS.length - 1) + 1;
-        const nextColor = COMPETITOR_COLORS[colorIndex];
-        
-        const newComp = { 
-            venture_id: parseInt(venture.id), // FIX 400
-            name: 'Nouveau', 
-            is_me: false, 
-            stats: initialStats, 
-            color: nextColor, 
-            visible: true 
-        };
-        const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
-        if (data) setCompetitors([...competitors, data[0]]);
-    };
-
-    const deleteCompetitor = async (id) => {
-        if (!window.confirm("Supprimer ?")) return;
-        await supabase.from('venture_competitors').delete().eq('id', id);
-        setCompetitors(competitors.filter(c => c.id !== id));
-    };
-
-    const handleUpdateCompetitor = (id, field, value, statKey = null) => {
-        const updatedList = competitors.map(c => {
-            if (c.id === id) {
-                if (statKey) return { ...c, stats: { ...c.stats, [statKey]: parseFloat(value) } };
-                return { ...c, [field]: value };
-            }
-            return c;
-        });
-        setCompetitors(updatedList);
-        if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
-        saveTimeoutRef.current[id] = setTimeout(async () => {
-            const compToSave = updatedList.find(c => c.id === id);
-            if(compToSave) {
-                // FIX 400: Clean Payload for Upsert
-                const payload = { 
-                    id: compToSave.id, 
-                    venture_id: parseInt(venture.id), 
-                    stats: compToSave.stats,
-                    name: compToSave.name,
-                    color: compToSave.color,
-                    is_me: compToSave.is_me,
-                    visible: compToSave.visible,
-                    strengths: compToSave.strengths 
-                };
-                await supabase.from('venture_competitors').upsert(payload);
-            }
-        }, 800);
-    };
-
-    // RADAR SVG SÉCURISÉ
-    const radarSize = 300;
-    const centerX = radarSize / 2;
-    const centerY = radarSize / 2;
-    const radius = 100;
-    const getCoordinates = (value, index, total) => {
-        const val = isNaN(value) ? 0 : value;
-        const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
-        const r = (val / MAX_SCORE) * radius;
-        return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
-    };
-    const getPath = (stats) => {
-        if (!dimensions.length) return "";
-        const points = dimensions.map((dim, i) => {
-            const val = stats ? (stats[dim] || 0) : 0;
-            const coords = getCoordinates(val, i, dimensions.length);
-            return `${coords.x},${coords.y}`;
-        });
-        return points.join(' ');
-    };
-
-    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
-
-    return (
-        <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            <div className="flex-1 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-800 p-6 relative">
-                <h3 className="absolute top-6 left-6 font-bold text-lg text-slate-700 dark:text-white flex items-center gap-2"><Target className="text-indigo-500"/> Radar de Positionnement</h3>
-                <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
-                    <svg width="100%" height="100%" viewBox={`0 0 ${radarSize} ${radarSize}`} className="overflow-visible">
-                        {[1, 2, 3, 4, 5].map(level => (<polygon key={level} points={dimensions.map((_, i) => { const c = getCoordinates(level, i, dimensions.length); return `${c.x},${c.y}`; }).join(' ')} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.5" className="dark:stroke-slate-700" />))}
-                        {dimensions.map((dim, i) => {
-                            const end = getCoordinates(MAX_SCORE, i, dimensions.length);
-                            return (<g key={dim}><line x1={centerX} y1={centerY} x2={end.x} y2={end.y} stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/><text x={end.x * 1.15 - centerX * 0.15} y={end.y * 1.15 - centerY * 0.15} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 dark:fill-slate-400 uppercase tracking-wide">{dim}</text></g>);
-                        })}
-                        {competitors.map(comp => ((comp.visible) && (<g key={comp.id} className="transition-all duration-500 ease-out">
-                            <polygon points={getPath(comp.stats)} fill={getHexColor(comp.color) + "33"} stroke={getHexColor(comp.color)} strokeWidth={comp.is_me ? 3 : 2} />
-                            {dimensions.map((dim, i) => { const c = getCoordinates(comp.stats?.[dim] || 0, i, dimensions.length); return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={getHexColor(comp.color)} />; })}
-                        </g>)))}
-                    </svg>
-                </div>
-            </div>
-            <div className="w-96 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900"><div className="flex items-center gap-2"><button onClick={() => setIsEditingDims(!isEditingDims)} className={`p-1.5 rounded transition-colors ${isEditingDims ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Modifier les critères"><Settings size={16}/></button><span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span></div><button onClick={addCompetitor} className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:text-indigo-600 transition-colors"><Plus size={16}/></button></div>
-                {isEditingDims && (<div className="p-4 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800"><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Gérer les critères du radar</h4><div className="flex flex-wrap gap-2 mb-3">{dimensions.map(dim => (<span key={dim} className="px-2 py-1 bg-white dark:bg-slate-700 rounded text-xs border border-slate-200 dark:border-slate-600 flex items-center gap-1">{dim}<button onClick={() => removeDimension(dim)} className="hover:text-red-500"><X size={10}/></button></span>))}</div><div className="flex gap-2"><input value={newDimText} onChange={e => setNewDimText(e.target.value)} className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white" placeholder="Nouveau critère..." /><button onClick={addDimension} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded font-bold">OK</button></div></div>)}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">{competitors.map(comp => (<div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}><div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><div className={`w-3 h-3 rounded-full ${comp.color}`}></div><input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" /></div><div className="flex gap-1"><button onClick={() => handleUpdateCompetitor(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">{comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>{!comp.is_me && <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}</div></div><div className="space-y-3">{dimensions.map(dim => (<div key={dim} className="flex items-center gap-3"><span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate" title={dim}>{dim}</span><input type="range" min="1" max="5" step="0.5" value={comp.stats?.[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" /><span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats?.[dim]}</span></div>))}</div><div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800"><textarea value={comp.strengths || ''} onChange={e => handleUpdateCompetitor(comp.id, 'strengths', e.target.value)} placeholder="Forces / Atouts..." className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12" /></div></div>))}</div>
-            </div>
-        </div>
-    );
-};
-
-// ==========================================
 // WORKSPACE MAIN
 // ==========================================
 export default function Workspace() {
@@ -491,7 +275,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><PieChart size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
