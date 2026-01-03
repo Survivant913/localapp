@@ -19,6 +19,10 @@ export default function ClientHub({ data, updateData }) {
     const accounts = data.budget?.accounts || [];
     const profile = data.profile || {}; 
 
+    // --- CORRECTION NOM ENTREPRISE ---
+    // On cherche d'abord 'company_name' (format DataSettings), sinon le nom utilisateur, sinon le défaut.
+    const companyDisplayName = profile.company_name || profile.companyName || profile.name || "Votre Entreprise";
+
     // --- UTILS ---
     const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val || 0);
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
@@ -307,7 +311,6 @@ export default function ClientHub({ data, updateData }) {
             onClose();
         };
 
-        // --- IMPRESSION PARFAITE ---
         const handlePrint = () => {
             const content = document.getElementById('invoice-paper');
             if (!content) return;
@@ -324,23 +327,23 @@ export default function ClientHub({ data, updateData }) {
                     <style>
                         @page { size: A4; margin: 0; }
                         body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
-                        /* Conteneur principal A4 */
+                        /* Conteneur principal A4 avec Flexbox */
                         .print-container { 
                             width: 210mm; 
-                            height: 297mm; /* Hauteur fixe A4 */
+                            height: 297mm; 
                             margin: 0 auto; 
                             background: white; 
                             padding: 40px; 
                             box-sizing: border-box; 
                             display: flex; 
                             flex-direction: column; 
-                            justify-content: space-between; /* Pousse le footer en bas */
+                            justify-content: space-between; 
                         }
-                        /* Contenu (Haut) */
+                        /* Contenu principal qui pousse le reste */
                         .print-content {
                             flex-grow: 1;
                         }
-                        /* Footer (Bas) */
+                        /* Footer collé en bas */
                         .invoice-footer {
                             width: 100%;
                             border-top: 1px solid #e2e8f0;
@@ -366,8 +369,6 @@ export default function ClientHub({ data, updateData }) {
             `);
             printWindow.document.close();
         };
-
-        const companyDisplayName = profile.companyName || profile.name || "Votre Entreprise";
 
         return (
             <div className="fixed inset-0 bg-black/80 z-[100] flex flex-col overflow-hidden backdrop-blur-sm">
@@ -455,12 +456,12 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
-                        {/* IMPORTANT : display flex column + justify-between permet de pousser le footer
-                            MAIS dans l'aperçu à l'écran, on utilise h-full ou min-h-full pour simuler la page
+                        {/* CONTENEUR APERÇU ÉCRAN 
+                            Utilise aussi Flexbox pour simuler l'aspect papier (hauteur et espacement)
                         */}
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             
-                            {/* --- HAUT DE PAGE (En-tête, Destinataire, Tableau, Totaux) --- */}
+                            {/* --- CONTENU DU HAUT (Prend toute la place disponible) --- */}
                             <div className="print-content">
                                 {/* --- EN-TÊTE --- */}
                                 <div className="flex justify-between items-start mb-12">
@@ -469,7 +470,7 @@ export default function ClientHub({ data, updateData }) {
                                             <img src={profile.logo} className="h-16 w-auto object-contain mb-3" alt="Logo"/>
                                         )}
                                         
-                                        {/* CORRECTION : Affiche TOUJOURS le nom. Gros si pas logo, petit gras si logo */}
+                                        {/* LOGIQUE CORRIGÉE : Nom en gros si pas de logo, petit si logo */}
                                         <div className={`${profile.logo ? 'text-xl font-bold' : 'text-3xl font-bold uppercase tracking-tight'} text-slate-900 mb-2`}>
                                             {companyDisplayName}
                                         </div>
@@ -535,7 +536,7 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* --- PIED DE PAGE FIXÉ EN BAS --- */}
+                            {/* --- PIED DE PAGE FIXE --- */}
                             <div className="invoice-footer border-t border-slate-100 pt-8">
                                 <div className="grid grid-cols-2 gap-12 items-end">
                                     <div className="text-left">
