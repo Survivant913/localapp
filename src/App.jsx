@@ -290,7 +290,7 @@ export default function App() {
           custom_labels: data.customLabels,
           company_name: data.profile?.company_name, 
           siret: data.profile?.siret, 
-          address: data.profile?.address,
+          address: data.profile?.address, 
           email_contact: data.profile?.email_contact, 
           phone_contact: data.profile?.phone_contact,
           iban: data.profile?.iban, 
@@ -363,6 +363,10 @@ export default function App() {
     }
   };
 
+  // --- THE FIX START ---
+  const isWorkspace = currentView === 'workspace';
+  // --- THE FIX END ---
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
@@ -387,9 +391,15 @@ export default function App() {
           <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'LocalApp'}</h1>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
         </header>
-        <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="max-w-7xl mx-auto w-full"> {renderContent()} </div>
+        
+        {/* --- MODIFIED MAIN CONTAINER --- */}
+        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
+          <div className={`w-full ${isWorkspace ? 'h-full' : 'max-w-7xl mx-auto'}`}> 
+            {renderContent()} 
+          </div>
         </main>
+        {/* --- END MODIFICATION --- */}
+
       </div>
     </div>
   );
