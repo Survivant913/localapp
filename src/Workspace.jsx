@@ -304,9 +304,8 @@ const FinanceModule = ({ venture }) => {
     // --- GRAPHIQUE SVG NET & PRÉCIS ---
     const WIDTH = 1000;
     const HEIGHT = 400;
-    const PADDING = 40; 
+    const PADDING = 60; // Plus de marge pour ne pas coller aux bords
     
-    // Calcul des échelles en incluant l'objectif (Target)
     const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
     const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
     
@@ -316,13 +315,10 @@ const FinanceModule = ({ venture }) => {
     const xToPx = (val) => PADDING + (val / graphMaxX) * effectiveW;
     const yToPx = (val) => (HEIGHT - PADDING) - (val / graphMaxY) * effectiveH;
 
-    // Coordonnées Lignes
     const ptStart = { x: PADDING, y: yToPx(s.fixed) };
     const ptEndCost = { x: WIDTH - PADDING, y: yToPx(s.fixed + (s.var * graphMaxX)) };
     const ptEndRev = { x: WIDTH - PADDING, y: yToPx(s.price * graphMaxX) };
     const ptBreakeven = { x: xToPx(breakevenQty), y: yToPx(breakevenRev) };
-    
-    // Coordonnées Objectif
     const ptTarget = { x: xToPx(s.target), y: yToPx(projectedRevenue) };
 
     return (
@@ -381,7 +377,7 @@ const FinanceModule = ({ venture }) => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
-                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" shapeRendering="geometricPrecision">
+                        <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
                             {/* Zone Profit */}
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
                             
