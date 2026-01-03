@@ -315,6 +315,8 @@ export default function ClientHub({ data, updateData }) {
             const printWindow = window.open('', '_blank');
             if (!printWindow) return alert("Veuillez autoriser les pop-ups pour imprimer.");
 
+            // Création du contenu HTML pour l'impression avec une structure Flexbox
+            // Cela force le pied de page à être poussé tout en bas de la page A4.
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
@@ -324,15 +326,24 @@ export default function ClientHub({ data, updateData }) {
                     <style>
                         @page { size: A4; margin: 0; }
                         body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
-                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; position: relative; background: white; padding: 40px; box-sizing: border-box; }
-                        
-                        /* Le pied de page fixe pour l'impression */
+                        /* Conteneur principal en flex column pour pousser le footer */
+                        .print-container {
+                            width: 210mm;
+                            min-height: 297mm; /* Hauteur A4 */
+                            margin: 0 auto;
+                            background: white;
+                            padding: 40px;
+                            box-sizing: border-box;
+                            display: flex; /* Ajout Flexbox */
+                            flex-direction: column; /* Direction verticale */
+                        }
+                        /* Le contenu principal prend tout l'espace */
+                        .print-container > div:first-child {
+                            flex: 1;
+                        }
+                        /* Le pied de page est poussé en bas */
                         .invoice-footer {
-                            position: fixed;
-                            bottom: 15mm;
-                            left: 40px;
-                            right: 40px;
-                            width: calc(100% - 80px);
+                            margin-top: auto; /* Pousse en bas */
                             border-top: 1px solid #e2e8f0;
                             padding-top: 20px;
                             background: white;
@@ -443,73 +454,77 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
+                        {/* Ajout de la classe flex flex-col pour l'aperçu également */}
                         <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             
-                            {/* --- EN-TÊTE --- */}
-                            <div className="flex justify-between items-start mb-12">
-                                <div>
-                                    {profile.logo ? <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> : <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>}
-                                    <div className="text-xs text-slate-500 leading-relaxed">
-                                        {profile.name}<br/>
-                                        {profile.address}<br/>
-                                        {profile.email_contact}
+                            {/* --- CONTENU PRINCIPAL (Prend tout l'espace) --- */}
+                            <div className="flex-1">
+                                {/* --- EN-TÊTE --- */}
+                                <div className="flex justify-between items-start mb-12">
+                                    <div>
+                                        {profile.logo ? <img src={profile.logo} className="h-16 w-auto object-contain mb-4" alt="Logo"/> : <div className="text-2xl font-bold text-slate-800 mb-2">{profile.companyName || "Votre Entreprise"}</div>}
+                                        <div className="text-xs text-slate-500 leading-relaxed">
+                                            {profile.name}<br/>
+                                            {profile.address}<br/>
+                                            {profile.email_contact}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <h1 className="text-4xl font-light text-slate-800 uppercase mb-2 tracking-wide">{isInvoice ? 'Facture' : 'Devis'}</h1>
+                                        <p className="font-mono text-lg font-bold text-slate-600">N° {doc.number}</p>
+                                        <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <h1 className="text-4xl font-light text-slate-800 uppercase mb-2 tracking-wide">{isInvoice ? 'Facture' : 'Devis'}</h1>
-                                    <p className="font-mono text-lg font-bold text-slate-600">N° {doc.number}</p>
-                                    <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
+                                
+                                {/* --- DESTINATAIRE (Style PRO) --- */}
+                                <div className="flex justify-end mb-16">
+                                    <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
+                                        <p className="text-lg font-bold text-slate-900 leading-tight mb-1">{doc.client_name || "Nom du client"}</p>
+                                        <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{doc.client_address}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            {/* --- DESTINATAIRE (Style PRO) --- */}
-                            <div className="flex justify-end mb-16">
-                                <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
-                                    <p className="text-lg font-bold text-slate-900 leading-tight mb-1">{doc.client_name || "Nom du client"}</p>
-                                    <p className="text-sm text-slate-600 whitespace-pre-line leading-relaxed">{doc.client_address}</p>
-                                </div>
-                            </div>
 
-                            {/* --- TABLEAU (Style PRO) --- */}
-                            <table className="w-full mb-12">
-                                <thead>
-                                    <tr>
-                                        <th className="text-left py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Description</th>
-                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Qté</th>
-                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Prix Unit.</th>
-                                        <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm text-slate-700">
-                                    {doc.items.map((item, i) => (
-                                        <tr key={i} className="border-b border-slate-50 last:border-b-0">
-                                            <td className="py-4 font-medium">{item.desc}</td>
-                                            <td className="py-4 text-right">{item.qty}</td>
-                                            <td className="py-4 text-right">{formatCurrency(item.price)}</td>
-                                            <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.qty * item.price)}</td>
+                                {/* --- TABLEAU (Style PRO) --- */}
+                                <table className="w-full mb-12">
+                                    <thead>
+                                        <tr>
+                                            <th className="text-left py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Description</th>
+                                            <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Qté</th>
+                                            <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Prix Unit.</th>
+                                            <th className="text-right py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-200">Total</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="text-sm text-slate-700">
+                                        {doc.items.map((item, i) => (
+                                            <tr key={i} className="border-b border-slate-50 last:border-b-0">
+                                                <td className="py-4 font-medium">{item.desc}</td>
+                                                <td className="py-4 text-right">{item.qty}</td>
+                                                <td className="py-4 text-right">{formatCurrency(item.price)}</td>
+                                                <td className="py-4 text-right font-bold text-slate-900">{formatCurrency(item.qty * item.price)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
 
-                            {/* --- TOTAUX --- */}
-                            <div className="flex justify-end mb-24">
-                                <div className="w-1/3 text-right space-y-3">
-                                    <div className="flex justify-between text-xs text-slate-500">
-                                        <span>Total HT</span><span>{formatCurrency(subTotal)}</span>
+                                {/* --- TOTAUX --- */}
+                                <div className="flex justify-end mb-12">
+                                    <div className="w-1/3 text-right space-y-3">
+                                        <div className="flex justify-between text-xs text-slate-500">
+                                            <span>Total HT</span><span>{formatCurrency(subTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500">
+                                            <span>TVA ({doc.taxRate}%)</span><span>{formatCurrency(taxAmount)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xl font-bold text-slate-900 pt-4 border-t border-slate-900">
+                                            <span>Total TTC</span><span>{formatCurrency(total)}</span>
+                                        </div>
+                                        {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>}
                                     </div>
-                                    <div className="flex justify-between text-xs text-slate-500">
-                                        <span>TVA ({doc.taxRate}%)</span><span>{formatCurrency(taxAmount)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xl font-bold text-slate-900 pt-4 border-t border-slate-900">
-                                        <span>Total TTC</span><span>{formatCurrency(total)}</span>
-                                    </div>
-                                    {doc.taxRate === 0 && <p className="text-[10px] text-slate-400 italic">TVA non applicable</p>}
                                 </div>
                             </div>
 
-                            {/* --- PIED DE PAGE FIXE (Classe unique pour l'impression) --- */}
+                            {/* --- PIED DE PAGE FIXE (Poussé en bas par flex-1) --- */}
                             <div className="invoice-footer mt-auto pt-8 border-t border-slate-100">
                                 <div className="grid grid-cols-2 gap-12 items-end">
                                     {/* Banque (Gauche) */}
@@ -610,7 +625,7 @@ export default function ClientHub({ data, updateData }) {
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
                             {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
                             ))}
                         </div>
                     </div>
