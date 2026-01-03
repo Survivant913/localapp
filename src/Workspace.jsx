@@ -5,7 +5,7 @@ import {
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
-  Wallet, Clock
+  Wallet, Clock, Trophy, Swords // Icônes ajoutées
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -14,9 +14,10 @@ const MODULES = [
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
     { id: 'finance', label: 'Finance', icon: DollarSign },
+    { id: 'competitors', label: 'Concurrence', icon: Swords }, // NOUVEAU MODULE
 ];
 
-// --- COULEURS MINDMAP ---
+// --- COULEURS ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -248,7 +249,7 @@ const MindmapModule = ({ venture }) => {
 };
 
 // ==========================================
-// 4. MODULE FINANCE (OPTIMISÉ: NETTETÉ + CIBLE)
+// 4. MODULE FINANCE
 // ==========================================
 const FinanceModule = ({ venture }) => {
     const [activeScenario, setActiveScenario] = useState('realistic');
@@ -304,7 +305,7 @@ const FinanceModule = ({ venture }) => {
     // --- GRAPHIQUE SVG NET & PRÉCIS ---
     const WIDTH = 1000;
     const HEIGHT = 400;
-    const PADDING = 60; // Plus de marge pour ne pas coller aux bords
+    const PADDING = 60; 
     
     const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
     const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
@@ -346,7 +347,6 @@ const FinanceModule = ({ venture }) => {
 
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                    {/* INPUTS */}
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><Menu size={16}/> Paramètres ({activeScenario})</h3>
                         <div className="space-y-4">
@@ -357,7 +357,6 @@ const FinanceModule = ({ venture }) => {
                         </div>
                     </div>
 
-                    {/* KPI 1 */}
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center text-center">
                         <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Seuil de Rentabilité</h3>
                         <div className="text-5xl font-black text-slate-800 dark:text-white mb-1">{breakevenQty}</div>
@@ -365,7 +364,6 @@ const FinanceModule = ({ venture }) => {
                         <div className="mt-4 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold text-slate-500">soit {breakevenRev} € de CA</div>
                     </div>
 
-                    {/* KPI 2 */}
                     <div className={`p-5 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}`}>
                         <h3 className={`text-xs font-bold uppercase mb-2 ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>Résultat Projeté</h3>
                         <div className={`text-5xl font-black mb-1 ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{profit > 0 ? '+' : ''}{profit} €</div>
@@ -373,37 +371,151 @@ const FinanceModule = ({ venture }) => {
                     </div>
                 </div>
 
-                {/* GRAPH */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
                         <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
-                            {/* Zone Profit */}
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
-                            
-                            {/* Axes */}
                             <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
                             <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
-
-                            {/* Ligne Objectif Verticale (Pointillés Bleus) */}
                             <line x1={ptTarget.x} y1={HEIGHT-PADDING} x2={ptTarget.x} y2={ptTarget.y} stroke="#6366f1" strokeWidth="1" strokeDasharray="4,4" />
-
-                            {/* Lignes Courbes */}
                             <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={ptEndRev.y} stroke="#10b981" strokeWidth="2" />
                             <text x={WIDTH-PADDING} y={ptEndRev.y - 10} textAnchor="end" className="text-xs fill-emerald-500 font-bold">Revenus</text>
-
                             <line x1={PADDING} y1={ptStart.y} x2={WIDTH-PADDING} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" />
                             <text x={WIDTH-PADDING} y={ptEndCost.y - 10} textAnchor="end" className="text-xs fill-red-500 font-bold">Coûts</text>
-
-                            {/* Point Mort */}
                             <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="4" fill="#1e293b" />
                             <text x={ptBreakeven.x} y={ptBreakeven.y + 20} textAnchor="middle" className="text-[10px] fill-slate-500 font-bold">PM ({breakevenQty})</text>
-
-                            {/* Point Objectif (Bleu) */}
                             <circle cx={ptTarget.x} cy={ptTarget.y} r="5" fill="#6366f1" />
                             <text x={ptTarget.x} y={ptTarget.y - 15} textAnchor="middle" className="text-xs fill-indigo-500 font-bold">Objectif ({s.target})</text>
                         </svg>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 5. MODULE CONCURRENCE (RADAR CHART) - NOUVEAU
+// ==========================================
+const CompetitorModule = ({ venture }) => {
+    const [competitors, setCompetitors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const saveTimeoutRef = useRef({});
+
+    useEffect(() => {
+        const load = async () => {
+            const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('is_primary', { ascending: false });
+            if (data && data.length > 0) { setCompetitors(data); } 
+            else {
+                const me = { venture_id: venture.id, name: 'Mon Projet', is_primary: true, color: 'blue', scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
+                const comp = { venture_id: venture.id, name: 'Concurrent A', is_primary: false, color: 'red', scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
+                const { data: created } = await supabase.from('venture_competitors').insert([me, comp]).select();
+                if (created) setCompetitors(created);
+            }
+            setLoading(false);
+        };
+        load();
+    }, [venture]);
+
+    const handleUpdate = (id, field, value) => {
+        const newComps = competitors.map(c => c.id === id ? { ...c, [field]: value } : c);
+        setCompetitors(newComps);
+        if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
+        saveTimeoutRef.current[id] = setTimeout(async () => {
+            await supabase.from('venture_competitors').update({ [field]: value }).eq('id', id);
+        }, 1000);
+    };
+
+    const handleScore = (id, criterion, val) => {
+        const comp = competitors.find(c => c.id === id);
+        const newScores = { ...comp.scores, [criterion]: parseInt(val) };
+        handleUpdate(id, 'scores', newScores);
+    };
+
+    const addCompetitor = async () => {
+        const base = competitors[0] || { scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
+        const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: 'gray', scores: base.scores }]).select();
+        if (data) setCompetitors([...competitors, data[0]]);
+    };
+
+    const deleteCompetitor = async (id) => {
+        if (!window.confirm("Supprimer ?")) return;
+        await supabase.from('venture_competitors').delete().eq('id', id);
+        setCompetitors(competitors.filter(c => c.id !== id));
+    };
+
+    // --- RADAR MATH ---
+    const criteria = competitors.length > 0 ? Object.keys(competitors[0].scores) : [];
+    const radius = 100; const center = 150;
+    const angleSlice = (Math.PI * 2) / criteria.length;
+
+    const getCoords = (val, i) => {
+        const angle = i * angleSlice - Math.PI / 2;
+        return { x: center + Math.cos(angle) * radius * (val / 5), y: center + Math.sin(angle) * radius * (val / 5) };
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 shrink-0">
+                <h3 className="font-bold text-slate-700 dark:text-white flex items-center gap-2"><Trophy size={18} className="text-indigo-500"/> Radar de Positionnement</h3>
+                <button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* RADAR CHART */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center min-h-[400px]">
+                    <svg width="350" height="300" viewBox="0 0 300 300" className="overflow-visible">
+                        {/* Grille */}
+                        {[1, 2, 3, 4, 5].map(level => (
+                            <polygon key={level} points={criteria.map((_, i) => `${getCoords(level, i).x},${getCoords(level, i).y}`).join(' ')} fill="none" stroke="#e2e8f0" strokeWidth="1" />
+                        ))}
+                        {/* Axes */}
+                        {criteria.map((c, i) => {
+                            const p = getCoords(5, i);
+                            return (
+                                <g key={i}>
+                                    <line x1={center} y1={center} x2={p.x} y2={p.y} stroke="#e2e8f0" strokeWidth="1"/>
+                                    <text x={p.x} y={p.y} dx={p.x > center ? 10 : -10} dy={p.y > center ? 15 : -5} textAnchor={p.x > center ? 'start' : 'end'} className="text-[10px] font-bold fill-slate-500 uppercase">{c}</text>
+                                </g>
+                            );
+                        })}
+                        {/* Data */}
+                        {competitors.map(c => {
+                            const points = criteria.map((k, i) => { const p = getCoords(c.scores[k] || 0, i); return `${p.x},${p.y}`; }).join(' ');
+                            const color = c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : '#94a3b8';
+                            return <polygon key={c.id} points={points} fill={color} fillOpacity={c.is_primary ? 0.2 : 0} stroke={color} strokeWidth={c.is_primary ? 3 : 2} />;
+                        })}
+                    </svg>
+                </div>
+
+                {/* CARDS */}
+                <div className="space-y-4">
+                    {competitors.map(c => (
+                        <div key={c.id} className={`p-4 rounded-xl border ${c.is_primary ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-800' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800'}`}>
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${c.color === 'blue' ? 'bg-blue-500' : c.color === 'red' ? 'bg-red-500' : 'bg-slate-400'}`}></div>
+                                    <input type="text" value={c.name} onChange={e => handleUpdate(c.id, 'name', e.target.value)} className="font-bold bg-transparent outline-none text-slate-800 dark:text-white text-sm"/>
+                                </div>
+                                {!c.is_primary && <button onClick={() => deleteCompetitor(c.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                {Object.keys(c.scores).map(k => (
+                                    <div key={k}>
+                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1"><span>{k}</span><span>{c.scores[k]}/5</span></div>
+                                        <input type="range" min="0" max="5" step="1" value={c.scores[k]} onChange={e => handleScore(c.id, k, e.target.value)} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <textarea value={c.strengths || ''} onChange={e => handleUpdate(c.id, 'strengths', e.target.value)} placeholder="Forces..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
+                                <textarea value={c.weaknesses || ''} onChange={e => handleUpdate(c.id, 'weaknesses', e.target.value)} placeholder="Faiblesses..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
@@ -447,7 +559,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
