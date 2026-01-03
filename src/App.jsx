@@ -39,15 +39,15 @@ export default function App() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- UTILS ---
+  // --- UTILS (CORRECTION CRITIQUE DATE LOCALE) ---
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
-        if (typeof dateStr === 'string' && dateStr.includes('-')) {
-            const parts = dateStr.split('T')[0].split('-');
-            if (parts.length === 3) return new Date(parts[0], parts[1] - 1, parts[2]);
-        }
-        return new Date(dateStr);
+        // CORRECTION : On laisse le navigateur convertir l'UTC en Local
+        // Cela évite que le 4 Janvier 23h00 UTC soit interprété comme le 4 Janvier
+        // Il sera bien vu comme le 5 Janvier 00h00 Local
+        const d = new Date(dateStr);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     } catch(e) { return new Date(); }
   };
 
@@ -323,7 +323,6 @@ export default function App() {
     }
   };
 
-  // CORRECTIF POUR LE LAYOUT PLEIN ECRAN
   const isWorkspace = currentView === 'workspace';
 
   return (
@@ -355,7 +354,6 @@ export default function App() {
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
         </header>
         
-        {/* CORRECTIF LAYOUT : Suppression padding si Workspace */}
         <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
           <div className={`w-full ${isWorkspace ? 'h-full' : 'max-w-7xl mx-auto'}`}> 
             {renderContent()} 
