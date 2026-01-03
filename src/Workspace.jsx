@@ -5,18 +5,18 @@ import {
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
-  Wallet, Clock // Ajout des icônes Finance
+  Wallet, Clock
 } from 'lucide-react';
 
-// --- MODULES (FINANCE AJOUTÉ) ---
+// --- MODULES ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
-    { id: 'finance', label: 'Finance', icon: DollarSign }, // Nouveau module
+    { id: 'finance', label: 'Finance', icon: DollarSign },
 ];
 
-// --- COULEURS MINDMAP ---
+// --- COULEURS ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -36,10 +36,12 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (STRATÉGIE)
+// COMPOSANT POST-IT (AUTO-EXPAND : S'AGRANDIT AVEC LE TEXTE)
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
+
+    // Auto-resize : Le post-it grandit quand on écrit
     useLayoutEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'; 
@@ -58,13 +60,18 @@ const PostIt = ({ item, update, remove, color }) => {
                 placeholder="..."
                 style={{ minHeight: '28px' }}
             />
-            <button onClick={() => remove(item.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"><Trash2 size={10}/></button>
+            <button 
+                onClick={() => remove(item.id)} 
+                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"
+            >
+                <Trash2 size={10}/>
+            </button>
         </div>
     );
 };
 
 // ==========================================
-// 1. MODULE CARNET
+// 1. MODULE CARNET (TON CODE ORIGINAL)
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -120,7 +127,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE
+// 2. MODULE STRATÉGIE (TON CODE ORIGINAL)
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -195,7 +202,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP
+// 3. MODULE MINDMAP (TON CODE ORIGINAL)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -248,7 +255,7 @@ const MindmapModule = ({ venture }) => {
 };
 
 // ==========================================
-// 4. MODULE FINANCE (SIMULATION RENTABILITÉ - NOUVEAU)
+// 4. MODULE FINANCE (CORRIGÉ & STABLE)
 // ==========================================
 const FinanceModule = ({ venture }) => {
     const [activeScenario, setActiveScenario] = useState('realistic');
@@ -290,6 +297,7 @@ const FinanceModule = ({ venture }) => {
 
     if (loading || !data) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
+    // CALCULS & GRAPHIQUE (SVG FIXE)
     const s = data[activeScenario];
     const breakevenQty = s.price > s.var ? Math.ceil(s.fixed / (s.price - s.var)) : 0;
     const breakevenRev = breakevenQty * s.price;
@@ -298,15 +306,21 @@ const FinanceModule = ({ venture }) => {
     const profit = projectedRevenue - projectedCost;
     const runway = s.fixed > 0 ? (data.capital / s.fixed).toFixed(1) : "∞";
 
+    // Dimensions Fixes pour SVG (pas de déformation)
+    const WIDTH = 1000;
+    const HEIGHT = 400;
+    
+    // Echelles
     const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
     const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
-    const xToPct = (val) => (val / graphMaxX) * 100;
-    const yToPct = (val) => 100 - (val / graphMaxY) * 100;
+    
+    const xToPx = (val) => (val / graphMaxX) * WIDTH;
+    const yToPx = (val) => HEIGHT - (val / graphMaxY) * HEIGHT;
 
-    const ptStart = { x: 0, y: yToPct(s.fixed) };
-    const ptEndCost = { x: 100, y: yToPct(s.fixed + (s.var * graphMaxX)) };
-    const ptEndRev = { x: 100, y: yToPct(s.price * graphMaxX) };
-    const ptBreakeven = { x: xToPct(breakevenQty), y: yToPct(breakevenRev) };
+    const ptStart = { x: 0, y: yToPx(s.fixed) };
+    const ptEndCost = { x: WIDTH, y: yToPx(s.fixed + (s.var * graphMaxX)) };
+    const ptEndRev = { x: WIDTH, y: yToPx(s.price * graphMaxX) };
+    const ptBreakeven = { x: xToPx(breakevenQty), y: yToPx(breakevenRev) };
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -333,6 +347,7 @@ const FinanceModule = ({ venture }) => {
 
             <div className="flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    {/* INPUTS */}
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><Menu size={16}/> Paramètres ({activeScenario})</h3>
                         <div className="space-y-4">
@@ -343,6 +358,7 @@ const FinanceModule = ({ venture }) => {
                         </div>
                     </div>
 
+                    {/* KPI 1 */}
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center text-center">
                         <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Seuil de Rentabilité</h3>
                         <div className="text-5xl font-black text-slate-800 dark:text-white mb-1">{breakevenQty}</div>
@@ -350,6 +366,7 @@ const FinanceModule = ({ venture }) => {
                         <div className="mt-4 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold text-slate-500">soit {breakevenRev} € de CA</div>
                     </div>
 
+                    {/* KPI 2 */}
                     <div className={`p-5 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}`}>
                         <h3 className={`text-xs font-bold uppercase mb-2 ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>Résultat Projeté</h3>
                         <div className={`text-5xl font-black mb-1 ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{profit > 0 ? '+' : ''}{profit} €</div>
@@ -357,19 +374,30 @@ const FinanceModule = ({ venture }) => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-80 relative">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 absolute top-6 left-6">Analyse du Point Mort</h3>
-                    <svg className="w-full h-full pt-8" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <polygon points={`${ptBreakeven.x},${ptBreakeven.y} 100,${ptEndRev.y} 100,${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
-                        <line x1="0" y1="100" x2="100" y2="100" stroke="#e2e8f0" strokeWidth="1" />
-                        <line x1="0" y1="0" x2="0" y2="100" stroke="#e2e8f0" strokeWidth="1" />
-                        <line x1="0" y1="100" x2="100" y2={ptEndRev.y} stroke="#10b981" strokeWidth="2" />
-                        <text x="98" y={ptEndRev.y - 2} textAnchor="end" className="text-[3px] fill-emerald-500 font-bold">Revenus</text>
-                        <line x1="0" y1={ptStart.y} x2="100" y2={ptEndCost.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="4" />
-                        <text x="98" y={ptEndCost.y - 2} textAnchor="end" className="text-[3px] fill-red-500 font-bold">Coûts</text>
-                        <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="1.5" fill="#1e293b" />
-                        <text x={ptBreakeven.x} y={ptBreakeven.y + 6} textAnchor="middle" className="text-[3px] fill-slate-500 font-bold">PM ({breakevenQty})</text>
-                    </svg>
+                {/* GRAPH */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
+                    <div className="flex-1 w-full h-full relative">
+                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+                            {/* Zone Profit */}
+                            <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH},${ptEndRev.y} ${WIDTH},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
+                            
+                            {/* Axes */}
+                            <line x1="0" y1={HEIGHT} x2={WIDTH} y2={HEIGHT} stroke="#e2e8f0" strokeWidth="2" />
+                            <line x1="0" y1="0" x2="0" y2={HEIGHT} stroke="#e2e8f0" strokeWidth="2" />
+
+                            {/* Lignes */}
+                            <line x1="0" y1={HEIGHT} x2={WIDTH} y2={ptEndRev.y} stroke="#10b981" strokeWidth="3" />
+                            <text x={WIDTH-10} y={ptEndRev.y - 10} textAnchor="end" className="text-lg fill-emerald-500 font-bold">Revenus</text>
+
+                            <line x1="0" y1={ptStart.y} x2={WIDTH} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="3" strokeDasharray="8,8" />
+                            <text x={WIDTH-10} y={ptEndCost.y - 10} textAnchor="end" className="text-lg fill-red-500 font-bold">Coûts</text>
+
+                            {/* Point Mort */}
+                            <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="6" fill="#1e293b" />
+                            <text x={ptBreakeven.x} y={ptBreakeven.y + 25} textAnchor="middle" className="text-sm fill-slate-500 font-bold">PM ({breakevenQty})</text>
+                        </svg>
+                    </div>
                 </div>
             </div>
         </div>
@@ -377,7 +405,7 @@ const FinanceModule = ({ venture }) => {
 };
 
 // ==========================================
-// WORKSPACE MAIN
+// WORKSPACE MAIN (AJOUT DU MODULE DANS LA NAV)
 // ==========================================
 export default function Workspace() {
     const [ventures, setVentures] = useState([]);
@@ -413,7 +441,10 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">
+                {MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}
+                <button onClick={() => setActiveModuleId('finance')} className={`p-3 rounded-xl transition-all ${activeModuleId === 'finance' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title="Finance"><DollarSign size={20}/></button>
+            </nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
