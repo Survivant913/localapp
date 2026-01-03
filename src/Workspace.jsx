@@ -262,30 +262,40 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (RADAR)
+// 3. MODULE CONCURRENCE (AVEC CRITÈRES DYNAMIQUES)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
+    const [dimensions, setDimensions] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [editingDim, setEditingDim] = useState(false);
+    const [isEditingDims, setIsEditingDims] = useState(false);
+    const [newDimText, setNewDimText] = useState("");
     
-    // Dimensions fixes pour simplifier l'enregistrement JSONB pour l'instant
-    const dimensions = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
     const MAX_SCORE = 5;
+    const saveTimeoutRef = useRef({});
 
     useEffect(() => {
-        const loadCompetitors = async () => {
-            const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id);
-            if (data && data.length > 0) {
-                setCompetitors(data);
+        const loadData = async () => {
+            // 1. Charger les dimensions du projet (ou défaut)
+            const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
+            const currentDims = vData?.dimensions || ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
+            setDimensions(currentDims);
+
+            // 2. Charger les concurrents
+            const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
+            
+            if (cData && cData.length > 0) {
+                setCompetitors(cData);
             } else {
-                // Créer "Mon Projet" par défaut s'il n'existe pas
+                // Initialiser "Mon Projet" si vide
+                const initialStats = {};
+                currentDims.forEach(d => initialStats[d] = 3);
+                
                 const myProject = {
                     venture_id: venture.id,
                     name: 'Mon Projet',
                     is_me: true,
-                    stats: { 'Prix': 3, 'Qualité': 3, 'Innovation': 3, 'Service': 3, 'Design': 3 },
-                    color: 'bg-indigo-500',
+                    stats: initialStats,
                     visible: true
                 };
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
@@ -293,44 +303,75 @@ const CompetitionModule = ({ venture }) => {
             }
             setLoading(false);
         };
-        loadCompetitors();
+        loadData();
     }, [venture.id]);
 
+    // GESTION DES DIMENSIONS (CRITÈRES)
+    const updateDimensionsInDB = async (newDims) => {
+        setDimensions(newDims);
+        await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
+    };
+
+    const addDimension = () => {
+        if (newDimText && !dimensions.includes(newDimText)) {
+            const newDims = [...dimensions, newDimText];
+            updateDimensionsInDB(newDims);
+            
+            // Ajouter la stat par défaut (3) aux concurrents existants
+            const updatedCompetitors = competitors.map(c => ({
+                ...c, stats: { ...c.stats, [newDimText]: 3 }
+            }));
+            setCompetitors(updatedCompetitors);
+            // Sauvegarder les concurrents mis à jour
+            updatedCompetitors.forEach(c => handleUpdateCompetitor(c.id, null, 3, newDimText));
+            setNewDimText("");
+        }
+    };
+
+    const removeDimension = (dim) => {
+        if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
+        const newDims = dimensions.filter(d => d !== dim);
+        updateDimensionsInDB(newDims);
+    };
+
+    // GESTION DES CONCURRENTS
     const addCompetitor = async () => {
+        const initialStats = {};
+        dimensions.forEach(d => initialStats[d] = 3);
         const newComp = {
             venture_id: venture.id,
             name: 'Nouveau',
             is_me: false,
-            stats: { 'Prix': 3, 'Qualité': 3, 'Innovation': 3, 'Service': 3, 'Design': 3 },
-            color: 'bg-red-500',
+            stats: initialStats,
             visible: true
         };
         const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
         if (data) setCompetitors([...competitors, data[0]]);
     };
 
-    const handleUpdate = async (id, field, value, statKey = null) => {
-        // Mise à jour locale (Optimistic)
+    const deleteCompetitor = async (id) => {
+        if (!window.confirm("Supprimer ?")) return;
+        await supabase.from('venture_competitors').delete().eq('id', id);
+        setCompetitors(competitors.filter(c => c.id !== id));
+    };
+
+    const handleUpdateCompetitor = (id, field, value, statKey = null) => {
+        // Update Local
         const updatedList = competitors.map(c => {
             if (c.id === id) {
-                if (statKey) {
-                    return { ...c, stats: { ...c.stats, [statKey]: parseFloat(value) } };
-                }
+                if (statKey) return { ...c, stats: { ...c.stats, [statKey]: parseFloat(value) } };
                 return { ...c, [field]: value };
             }
             return c;
         });
         setCompetitors(updatedList);
 
-        // Mise à jour DB (Debounce simple ou direct pour les sliders)
-        const compToUpdate = updatedList.find(c => c.id === id);
-        await supabase.from('venture_competitors').upsert(compToUpdate);
-    };
-
-    const deleteCompetitor = async (id) => {
-        if (!window.confirm("Supprimer ?")) return;
-        await supabase.from('venture_competitors').delete().eq('id', id);
-        setCompetitors(competitors.filter(c => c.id !== id));
+        // Update DB (Debounce)
+        if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
+        saveTimeoutRef.current[id] = setTimeout(async () => {
+            const compToSave = updatedList.find(c => c.id === id);
+            if(compToSave) await supabase.from('venture_competitors').upsert(compToSave);
+        }, 800);
     };
 
     // --- LOGIQUE RADAR SVG ---
@@ -408,58 +449,58 @@ const CompetitionModule = ({ venture }) => {
 
             {/* PARTIE DROITE : LISTE & ÉDITION */}
             <div className="w-96 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsEditingDims(!isEditingDims)} className={`p-1.5 rounded transition-colors ${isEditingDims ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Modifier les critères">
+                            <Settings size={16}/>
+                        </button>
+                        <span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span>
+                    </div>
                     <button onClick={addCompetitor} className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:text-indigo-600 transition-colors"><Plus size={16}/></button>
                 </div>
+
+                {isEditingDims && (
+                    <div className="p-4 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Gérer les critères du radar</h4>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {dimensions.map(dim => (
+                                <span key={dim} className="px-2 py-1 bg-white dark:bg-slate-700 rounded text-xs border border-slate-200 dark:border-slate-600 flex items-center gap-1">
+                                    {dim}
+                                    <button onClick={() => removeDimension(dim)} className="hover:text-red-500"><X size={10}/></button>
+                                </span>
+                            ))}
+                        </div>
+                        <div className="flex gap-2">
+                            <input value={newDimText} onChange={e => setNewDimText(e.target.value)} className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white" placeholder="Nouveau critère..." />
+                            <button onClick={addDimension} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded font-bold">OK</button>
+                        </div>
+                    </div>
+                )}
                 
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {competitors.map(comp => (
                         <div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
-                            {/* En-tête Carte */}
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-2">
                                     <div className={`w-3 h-3 rounded-full ${comp.is_me ? 'bg-indigo-500' : 'bg-red-500'}`}></div>
-                                    <input 
-                                        value={comp.name} 
-                                        onChange={e => handleUpdate(comp.id, 'name', e.target.value)} 
-                                        className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white"
-                                    />
+                                    <input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" />
                                 </div>
                                 <div className="flex gap-1">
-                                    <button onClick={() => handleUpdate(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">
-                                        {comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}
-                                    </button>
-                                    {!comp.is_me && (
-                                        <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
-                                    )}
+                                    <button onClick={() => handleUpdateCompetitor(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">{comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>
+                                    {!comp.is_me && <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}
                                 </div>
                             </div>
-
-                            {/* Sliders */}
                             <div className="space-y-3">
                                 {dimensions.map(dim => (
                                     <div key={dim} className="flex items-center gap-3">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate">{dim}</span>
-                                        <input 
-                                            type="range" min="1" max="5" step="0.5" 
-                                            value={comp.stats[dim] || 1} 
-                                            onChange={e => handleUpdate(comp.id, null, e.target.value, dim)}
-                                            className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                                        />
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate" title={dim}>{dim}</span>
+                                        <input type="range" min="1" max="5" step="0.5" value={comp.stats[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
                                         <span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats[dim]}</span>
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Notes rapides */}
                             <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <textarea 
-                                    value={comp.strengths || ''}
-                                    onChange={e => handleUpdate(comp.id, 'strengths', e.target.value)}
-                                    placeholder="Forces / Atouts..."
-                                    className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12"
-                                />
+                                <textarea value={comp.strengths || ''} onChange={e => handleUpdateCompetitor(comp.id, 'strengths', e.target.value)} placeholder="Forces / Atouts..." className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12" />
                             </div>
                         </div>
                     ))}
