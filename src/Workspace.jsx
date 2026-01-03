@@ -4,7 +4,7 @@ import {
   Plus, FileText, Target, Users, DollarSign, 
   Network, BarChart3, Kanban,
   ArrowLeft, Trash2, Eye, EyeOff, Settings,
-  Activity, Sun, Zap, AlertTriangle, Check, X, Box, ArrowRight
+  Activity, Sun, Zap, AlertTriangle, Check, X
 } from 'lucide-react';
 
 // --- ICONS MAPPING ---
@@ -240,7 +240,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (FIXÉ : COULEURS & SAVE)
+// 3. MODULE CONCURRENCE (CORRIGÉ : PERSISTANCE)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
@@ -252,7 +252,7 @@ const CompetitionModule = ({ venture }) => {
     const MAX_SCORE = 5;
     const saveTimeoutRef = useRef({});
     
-    // --- LE CORRECTIF COULEUR EST ICI ---
+    // MAP pour convertir Tailwind -> Hex pour le SVG
     const TAILWIND_TO_HEX = {
         'bg-indigo-500': '#6366f1',
         'bg-red-500': '#ef4444',
@@ -265,15 +265,22 @@ const CompetitionModule = ({ venture }) => {
         'bg-pink-500': '#ec4899'
     };
     const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
-    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Fallback gris
+    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8';
+
+    const DEFAULT_DIMS = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
 
     useEffect(() => {
         const loadData = async () => {
             // 1. Charger les dimensions
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            // Utiliser une valeur par défaut locale si vide, MAIS ne pas écraser la DB tout de suite pour éviter les conflits de rechargement
-            let currentDims = vData?.dimensions || ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
-            setDimensions(currentDims);
+            
+            // LOGIQUE DE CHARGEMENT SIMPLE : Si DB vide -> Défaut (Visualisation seulement)
+            // On n'écrit PAS dans la DB ici pour éviter les conflits/boucles
+            const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) 
+                ? vData.dimensions 
+                : DEFAULT_DIMS;
+            
+            setDimensions(loadedDims);
 
             // 2. Charger les concurrents
             const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
@@ -281,10 +288,19 @@ const CompetitionModule = ({ venture }) => {
             if (cData && cData.length > 0) {
                 setCompetitors(cData);
             } else {
-                // Initialiser "Mon Projet" si vide
+                // Initialiser "Mon Projet" UNIQUEMENT si la liste est vide
                 const initialStats = {};
-                currentDims.forEach(d => initialStats[d] = 3);
-                const myProject = { venture_id: venture.id, name: 'Mon Projet', is_me: true, stats: initialStats, color: 'bg-indigo-500', visible: true };
+                loadedDims.forEach(d => initialStats[d] = 3);
+                
+                const myProject = {
+                    venture_id: venture.id,
+                    name: 'Mon Projet',
+                    is_me: true,
+                    stats: initialStats,
+                    color: 'bg-indigo-500',
+                    visible: true
+                };
+                // Ici on écrit, car c'est une création initiale nécessaire
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
                 if (inserted) setCompetitors(inserted);
             }
@@ -299,7 +315,7 @@ const CompetitionModule = ({ venture }) => {
             const newDims = [...dimensions, newDimText];
             setDimensions(newDims); // Update UI
             
-            // Update DB
+            // Update DB IMMEDIATEMENT
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
             // Update Competitors UI & DB
@@ -320,6 +336,7 @@ const CompetitionModule = ({ venture }) => {
         if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
         const newDims = dimensions.filter(d => d !== dim);
         setDimensions(newDims);
+        // Sauvegarde DB immédiate
         await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
     };
 
@@ -389,7 +406,6 @@ const CompetitionModule = ({ venture }) => {
                             return (<g key={dim}><line x1={centerX} y1={centerY} x2={end.x} y2={end.y} stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/><text x={end.x * 1.15 - centerX * 0.15} y={end.y * 1.15 - centerY * 0.15} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 dark:fill-slate-400 uppercase tracking-wide">{dim}</text></g>);
                         })}
                         {competitors.map(comp => ((comp.visible) && (<g key={comp.id} className="transition-all duration-500 ease-out">
-                            {/* FIX COULEUR ICI : UTILISATION DE getHexColor */}
                             <polygon points={getPath(comp.stats)} fill={getHexColor(comp.color) + "33"} stroke={getHexColor(comp.color)} strokeWidth={comp.is_me ? 3 : 2} />
                             {dimensions.map((dim, i) => { const c = getCoordinates(comp.stats?.[dim] || 0, i, dimensions.length); return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={getHexColor(comp.color)} />; })}
                         </g>)))}
