@@ -4,7 +4,7 @@ import {
   Plus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
-  ZoomIn, ZoomOut, Maximize, Palette, GitCommit
+  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -14,14 +14,14 @@ const MODULES = [
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
 ];
 
-// --- PALETTE DE COULEURS ---
+// --- COULEURS ---
 const NODE_COLORS = [
-    { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600' },
-    { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-400 dark:border-blue-700' },
-    { id: 'green', bg: 'bg-emerald-50 dark:bg-emerald-900/30', border: 'border-emerald-400 dark:border-emerald-700' },
-    { id: 'yellow', bg: 'bg-amber-50 dark:bg-amber-900/30', border: 'border-amber-400 dark:border-amber-700' },
-    { id: 'red', bg: 'bg-rose-50 dark:bg-rose-900/30', border: 'border-rose-400 dark:border-rose-700' },
-    { id: 'purple', bg: 'bg-violet-50 dark:bg-violet-900/30', border: 'border-violet-400 dark:border-violet-700' },
+    { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
+    { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
+    { id: 'green', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-400 dark:border-emerald-700', header: 'bg-emerald-100 dark:bg-emerald-800' },
+    { id: 'yellow', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-400 dark:border-amber-700', header: 'bg-amber-100 dark:bg-amber-800' },
+    { id: 'red', bg: 'bg-rose-50 dark:bg-rose-900/20', border: 'border-rose-400 dark:border-rose-700', header: 'bg-rose-100 dark:bg-rose-800' },
+    { id: 'purple', bg: 'bg-violet-50 dark:bg-violet-900/20', border: 'border-violet-400 dark:border-violet-700', header: 'bg-violet-100 dark:bg-violet-800' },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -192,7 +192,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (AMÉLIORÉ : MULTI-SOURCES + TEXTE + COULEURS)
+// 3. MODULE MINDMAP (CASCADE + GRIP VISIBLE + MULTILIGNE)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -200,7 +200,7 @@ const MindmapModule = ({ venture }) => {
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [scale, setScale] = useState(1);
     const [isPanning, setIsPanning] = useState(false);
-    const [draggingNode, setDraggingNode] = useState(null);
+    const [draggingNode, setDraggingNode] = useState(null); // { id, lastX, lastY }
     const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
     
     const containerRef = useRef(null);
@@ -212,8 +212,11 @@ const MindmapModule = ({ venture }) => {
             const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
             if (data && data.content && data.content.length > 0) {
                 setNodes(data.content);
+                // Centrer la vue
+                const centerX = window.innerWidth / 2 - 400; // Approx
+                const centerY = window.innerHeight / 2 - 300;
+                setPan({ x: centerX, y: centerY });
             } else {
-                // Racine par défaut
                 const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue' }];
                 setNodes(root);
                 await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' });
@@ -231,6 +234,17 @@ const MindmapModule = ({ venture }) => {
         }, 1000);
     }, [nodes, venture.id]);
 
+    // --- FONCTION RÉCURSIVE POUR TROUVER TOUS LES DESCENDANTS ---
+    const getDescendants = (nodeId, allNodes) => {
+        let descendants = [];
+        const children = allNodes.filter(n => n.parentId === nodeId);
+        children.forEach(child => {
+            descendants.push(child.id);
+            descendants = [...descendants, ...getDescendants(child.id, allNodes)];
+        });
+        return descendants;
+    };
+
     // --- ACTIONS ---
     const addNode = () => {
         if (!selectedId) { alert("Sélectionnez une carte parente d'abord !"); return; }
@@ -240,21 +254,25 @@ const MindmapModule = ({ venture }) => {
         const newNode = {
             id: Date.now().toString(),
             x: parent.x + 220,
-            y: parent.y + (Math.random() * 100 - 50),
+            y: parent.y,
             label: 'Nouvelle idée',
             parentId: selectedId,
             type: 'child',
-            color: parent.color || 'white' // Hérite de la couleur
+            color: parent.color || 'white'
         };
         setNodes([...nodes, newNode]);
         setSelectedId(newNode.id);
     };
 
     const addRoot = () => {
+        // Calcule le centre visible actuel pour placer la nouvelle source
+        const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale;
+        const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale;
+
         const newRoot = {
             id: Date.now().toString(),
-            x: -pan.x + 100, // Apparait dans la vue actuelle
-            y: -pan.y + 100,
+            x: viewportCenterX - 90, // Centré moins moitié largeur carte
+            y: viewportCenterY - 40,
             label: 'Nouvelle Source',
             type: 'root',
             color: 'blue'
@@ -265,17 +283,7 @@ const MindmapModule = ({ venture }) => {
 
     const deleteNode = () => {
         if (!selectedId) return;
-        const toDelete = new Set([selectedId]);
-        let changed = true;
-        while(changed) {
-            changed = false;
-            nodes.forEach(n => {
-                if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
-                    toDelete.add(n.id);
-                    changed = true;
-                }
-            });
-        }
+        const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]);
         setNodes(nodes.filter(n => !toDelete.has(n.id)));
         setSelectedId(null);
     };
@@ -285,13 +293,16 @@ const MindmapModule = ({ venture }) => {
         setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n));
     };
 
-    // --- GESTION SOURIS ---
+    // --- GESTION SOURIS (PAN & DRAG EN CASCADE) ---
     const handleMouseDown = (e, nodeId = null) => {
         if (nodeId) {
             e.stopPropagation();
-            const node = nodes.find(n => n.id === nodeId);
             setSelectedId(nodeId);
-            setDraggingNode({ id: nodeId, startX: e.clientX, startY: e.clientY });
+            setDraggingNode({ 
+                id: nodeId, 
+                lastX: e.clientX, 
+                lastY: e.clientY 
+            });
         } else {
             setIsPanning(true);
             setLastMousePos({ x: e.clientX, y: e.clientY });
@@ -302,10 +313,22 @@ const MindmapModule = ({ venture }) => {
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (draggingNode) {
-                const dx = (e.clientX - draggingNode.startX) / scale;
-                const dy = (e.clientY - draggingNode.startY) / scale;
-                setNodes(prev => prev.map(n => n.id === draggingNode.id ? { ...n, x: n.x + dx, y: n.y + dy } : n));
-                setDraggingNode(prev => ({ ...prev, startX: e.clientX, startY: e.clientY }));
+                // Calcul du Delta (Déplacement depuis la dernière frame)
+                const deltaX = (e.clientX - draggingNode.lastX) / scale;
+                const deltaY = (e.clientY - draggingNode.lastY) / scale;
+                
+                // Trouver tous les noeuds à déplacer (le parent + ses descendants)
+                const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, nodes)]);
+
+                setNodes(prev => prev.map(n => 
+                    nodesToMove.has(n.id)
+                    ? { ...n, x: n.x + deltaX, y: n.y + deltaY } 
+                    : n
+                ));
+
+                // Mettre à jour la position de référence pour la prochaine frame
+                setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY }));
+
             } else if (isPanning) {
                 const dx = e.clientX - lastMousePos.x;
                 const dy = e.clientY - lastMousePos.y;
@@ -313,11 +336,19 @@ const MindmapModule = ({ venture }) => {
                 setLastMousePos({ x: e.clientX, y: e.clientY });
             }
         };
-        const handleMouseUp = () => { setDraggingNode(null); setIsPanning(false); };
+
+        const handleMouseUp = () => {
+            setDraggingNode(null);
+            setIsPanning(false);
+        };
+
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
-        return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
-    }, [draggingNode, isPanning, lastMousePos, scale]);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [draggingNode, isPanning, lastMousePos, scale, nodes]); // nodes added to dependency to allow recursion read
 
     const updateLabel = (id, newLabel) => {
         setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
@@ -329,12 +360,11 @@ const MindmapModule = ({ venture }) => {
             const parent = nodes.find(n => n.id === node.parentId);
             if (!parent) return null;
             
-            // Calculs pour les lignes courbes
-            const w = 180; const h = 80; // Taille approx des cartes
+            const w = 180; const h = 100; // Estimation de la taille de la carte
             const startX = parent.x + w; 
-            const startY = parent.y + h/2;
+            const startY = parent.y + 40; // Hauteur de la poignée approx
             const endX = node.x; 
-            const endY = node.y + h/2;
+            const endY = node.y + 40;
             const dist = Math.abs(endX - startX) / 2;
             const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`;
 
@@ -358,7 +388,6 @@ const MindmapModule = ({ venture }) => {
                     <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
                 </div>
                 
-                {/* Palette de couleurs (si sélectionné) */}
                 {selectedId && (
                     <div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">
                         {NODE_COLORS.map(c => (
@@ -372,7 +401,7 @@ const MindmapModule = ({ venture }) => {
                 )}
             </div>
 
-            {/* Zoom Controls */}
+            {/* Zoom */}
             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
                 <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button>
                 <button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button>
@@ -388,20 +417,29 @@ const MindmapModule = ({ venture }) => {
                         return (
                             <div 
                                 key={node.id}
-                                style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto', minHeight: '80px', cursor: draggingNode?.id === node.id ? 'grabbing' : 'grab' }}
-                                className={`absolute top-0 left-0 p-3 rounded-2xl shadow-sm transition-shadow duration-200 flex flex-col justify-center z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
-                                onMouseDown={(e) => handleMouseDown(e, node.id)}
+                                style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto' }}
+                                className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
+                                onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
                             >
-                                <textarea
-                                    value={node.label} 
-                                    onChange={(e) => updateLabel(node.id, e.target.value)}
-                                    // STOP PROPAGATION HERE TO ALLOW TYPING WITHOUT DRAGGING
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`}
-                                    placeholder="Idée..."
-                                    rows={Math.max(2, (node.label?.split('\n').length || 1))}
-                                />
-                                {node.type !== 'root' && <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-indigo-400 border-2 border-white dark:border-slate-800 rounded-full"></div>}
+                                {/* ZONE DE GRIP VISIBLE (HEADER) */}
+                                <div 
+                                    className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`}
+                                    onMouseDown={(e) => handleMouseDown(e, node.id)}
+                                >
+                                    <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500"/>
+                                </div>
+
+                                {/* ZONE DE TEXTE (MULTILIGNE) */}
+                                <div className="p-2">
+                                    <textarea
+                                        value={node.label} 
+                                        onChange={(e) => updateLabel(node.id, e.target.value)}
+                                        onMouseDown={(e) => e.stopPropagation()} // Permet de sélectionner le texte sans drag
+                                        className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`}
+                                        placeholder="Idée..."
+                                        rows={Math.max(2, (node.label?.split('\n').length || 1))}
+                                    />
+                                </div>
                             </div>
                         );
                     })}
