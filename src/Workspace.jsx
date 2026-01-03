@@ -4,17 +4,19 @@ import {
   Plus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
-  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus
+  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
+  Wallet, Clock // Ajout des icônes Finance
 } from 'lucide-react';
 
-// --- MODULES ---
+// --- MODULES (FINANCE AJOUTÉ) ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
+    { id: 'finance', label: 'Finance', icon: DollarSign }, // Nouveau module
 ];
 
-// --- COULEURS ---
+// --- COULEURS MINDMAP ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -34,12 +36,10 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (AUTO-EXPAND : S'AGRANDIT AVEC LE TEXTE)
+// COMPOSANT POST-IT (STRATÉGIE)
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
-
-    // Auto-resize : Le post-it grandit quand on écrit
     useLayoutEffect(() => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'; 
@@ -58,12 +58,7 @@ const PostIt = ({ item, update, remove, color }) => {
                 placeholder="..."
                 style={{ minHeight: '28px' }}
             />
-            <button 
-                onClick={() => remove(item.id)} 
-                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"
-            >
-                <Trash2 size={10}/>
-            </button>
+            <button onClick={() => remove(item.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"><Trash2 size={10}/></button>
         </div>
     );
 };
@@ -125,7 +120,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (FIXED ROW HEIGHT + SCROLL INTERNE)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -183,32 +178,14 @@ const StrategyModule = ({ venture }) => {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                {/* GRILLE A HAUTEUR FIXE POUR QUE LE SCROLL SE FASSE DANS LES BOITES */}
                 <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10 auto-rows-[400px]' : 'grid-cols-1 md:grid-cols-2 auto-rows-[400px]'}`}>
                     {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
                         <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden`}>
-                            {/* Titre fixe */}
-                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2 shrink-0">
-                                <s.icon size={14} className="text-indigo-500"/> {s.label}
-                            </h3>
-                            
-                            {/* Zone de contenu déroulante : C'EST ICI QUE CA SCROLL */}
+                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2 shrink-0"><s.icon size={14} className="text-indigo-500"/> {s.label}</h3>
                             <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
-                                {data[s.id]?.map(i => (
-                                    <PostIt 
-                                        key={i.id} 
-                                        item={i} 
-                                        color={s.color} 
-                                        update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} 
-                                        remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} 
-                                    />
-                                ))}
+                                {data[s.id]?.map(i => <PostIt key={i.id} item={i} color={s.color} update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} />)}
                             </div>
-
-                            {/* Bouton Ajouter fixe en bas */}
-                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0">
-                                <Plus size={12} className="inline mr-1"/> Ajouter
-                            </button>
+                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0"><Plus size={12} className="inline mr-1"/> Ajouter</button>
                         </div>
                     ))}
                 </div>
@@ -228,246 +205,171 @@ const MindmapModule = ({ venture }) => {
     const [isPanning, setIsPanning] = useState(false);
     const [draggingNode, setDraggingNode] = useState(null); 
     const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
-    
     const containerRef = useRef(null);
     const saveTimeoutRef = useRef(null);
 
-    // Initialisation
     useEffect(() => {
         const load = async () => {
             const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
-            if (data && data.content && data.content.length > 0) {
-                setNodes(data.content);
-                const centerX = window.innerWidth / 2 - 400; 
-                const centerY = window.innerHeight / 2 - 300;
-                setPan({ x: centerX, y: centerY });
-            } else {
-                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue', collapsed: false }];
-                setNodes(root);
-                await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' });
-            }
+            if (data && data.content && data.content.length > 0) { setNodes(data.content); const centerX = window.innerWidth / 2 - 400; const centerY = window.innerHeight / 2 - 300; setPan({ x: centerX, y: centerY }); } 
+            else { const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue', collapsed: false }]; setNodes(root); await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' }); }
         };
         load();
     }, [venture]);
 
-    // Sauvegarde Auto
     useEffect(() => {
         if (nodes.length === 0) return;
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(async () => {
-            await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: nodes }, { onConflict: 'venture_id' });
-        }, 1000);
+        saveTimeoutRef.current = setTimeout(async () => { await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: nodes }, { onConflict: 'venture_id' }); }, 1000);
     }, [nodes, venture.id]);
 
-    // --- UTILS RECURSIFS ---
-    const getDescendants = (nodeId, allNodes) => {
-        let descendants = [];
-        const children = allNodes.filter(n => n.parentId === nodeId);
-        children.forEach(child => {
-            descendants.push(child.id);
-            descendants = [...descendants, ...getDescendants(child.id, allNodes)];
-        });
-        return descendants;
-    };
+    const getDescendants = (nodeId, allNodes) => { let descendants = []; allNodes.filter(n => n.parentId === nodeId).forEach(child => { descendants.push(child.id); descendants = [...descendants, ...getDescendants(child.id, allNodes)]; }); return descendants; };
+    const isVisible = (nodeId) => { const node = nodes.find(n => n.id === nodeId); if (!node) return false; if (!node.parentId) return true; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return false; if (parent.collapsed) return false; return isVisible(parent.id); };
 
-    const isVisible = (nodeId) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) return false;
-        if (!node.parentId) return true; // Root always visible
-        const parent = nodes.find(n => n.id === node.parentId);
-        if (!parent) return false; 
-        if (parent.collapsed) return false; 
-        return isVisible(parent.id); 
-    };
+    const addNode = () => { if (!selectedId) { alert("Sélectionnez une carte !"); return; } const parent = nodes.find(n => n.id === selectedId); if (!parent) return; if (parent.collapsed) { setNodes(prev => prev.map(n => n.id === parent.id ? { ...n, collapsed: false } : n)); } const newNode = { id: Date.now().toString(), x: parent.x + 240, y: parent.y, label: 'Nouvelle idée', parentId: selectedId, type: 'child', color: parent.color || 'white', collapsed: false }; setNodes(prev => [...prev, newNode]); setSelectedId(newNode.id); };
+    const addRoot = () => { const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale; const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale; const newRoot = { id: Date.now().toString(), x: viewportCenterX - 90, y: viewportCenterY - 40, label: 'Nouvelle Source', type: 'root', color: 'blue', collapsed: false }; setNodes([...nodes, newRoot]); setSelectedId(newRoot.id); };
+    const deleteNode = () => { if (!selectedId) return; const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]); setNodes(nodes.filter(n => !toDelete.has(n.id))); setSelectedId(null); };
+    const toggleCollapse = (e, nodeId) => { e.stopPropagation(); setNodes(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n)); };
+    const updateColor = (colorId) => { if(!selectedId) return; setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n)); };
 
-    // --- ACTIONS ---
-    const addNode = () => {
-        if (!selectedId) { alert("Sélectionnez une carte parente d'abord !"); return; }
-        const parent = nodes.find(n => n.id === selectedId);
-        if (!parent) return;
+    const handleMouseDown = (e, nodeId = null) => { if (nodeId) { e.stopPropagation(); setSelectedId(nodeId); setDraggingNode({ id: nodeId, lastX: e.clientX, lastY: e.clientY }); } else { setIsPanning(true); setLastMousePos({ x: e.clientX, y: e.clientY }); setSelectedId(null); } };
+    useEffect(() => { const handleMouseMove = (e) => { if (draggingNode) { const deltaX = (e.clientX - draggingNode.lastX) / scale; const deltaY = (e.clientY - draggingNode.lastY) / scale; const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, nodes)]); setNodes(prev => prev.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n)); setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY })); } else if (isPanning) { const dx = e.clientX - lastMousePos.x; const dy = e.clientY - lastMousePos.y; setPan(prev => ({ x: prev.x + dx, y: prev.y + dy })); setLastMousePos({ x: e.clientX, y: e.clientY }); } }; const handleMouseUp = () => { setDraggingNode(null); setIsPanning(false); }; window.addEventListener('mousemove', handleMouseMove); window.addEventListener('mouseup', handleMouseUp); return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); }; }, [draggingNode, isPanning, lastMousePos, scale, nodes]);
+    const updateLabel = (id, newLabel) => { setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n)); };
 
-        if (parent.collapsed) {
-            setNodes(prev => prev.map(n => n.id === parent.id ? { ...n, collapsed: false } : n));
-        }
-
-        const newNode = {
-            id: Date.now().toString(),
-            x: parent.x + 240,
-            y: parent.y,
-            label: 'Nouvelle idée',
-            parentId: selectedId,
-            type: 'child',
-            color: parent.color || 'white',
-            collapsed: false
-        };
-        setNodes(prev => [...prev, newNode]);
-        setSelectedId(newNode.id);
-    };
-
-    const addRoot = () => {
-        const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale;
-        const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale;
-        const newRoot = {
-            id: Date.now().toString(),
-            x: viewportCenterX - 90,
-            y: viewportCenterY - 40,
-            label: 'Nouvelle Source',
-            type: 'root',
-            color: 'blue',
-            collapsed: false
-        };
-        setNodes([...nodes, newRoot]);
-        setSelectedId(newRoot.id);
-    };
-
-    const deleteNode = () => {
-        if (!selectedId) return;
-        const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]);
-        setNodes(nodes.filter(n => !toDelete.has(n.id)));
-        setSelectedId(null);
-    };
-
-    const toggleCollapse = (e, nodeId) => {
-        e.stopPropagation();
-        setNodes(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n));
-    };
-
-    const updateColor = (colorId) => {
-        if(!selectedId) return;
-        setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n));
-    };
-
-    // --- MOUSE HANDLING ---
-    const handleMouseDown = (e, nodeId = null) => {
-        if (nodeId) {
-            e.stopPropagation();
-            setSelectedId(nodeId);
-            setDraggingNode({ id: nodeId, lastX: e.clientX, lastY: e.clientY });
-        } else {
-            setIsPanning(true);
-            setLastMousePos({ x: e.clientX, y: e.clientY });
-            setSelectedId(null);
-        }
-    };
-
-    useEffect(() => {
-        const handleMouseMove = (e) => {
-            if (draggingNode) {
-                const deltaX = (e.clientX - draggingNode.lastX) / scale;
-                const deltaY = (e.clientY - draggingNode.lastY) / scale;
-                const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, nodes)]);
-                setNodes(prev => prev.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n));
-                setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY }));
-            } else if (isPanning) {
-                const dx = e.clientX - lastMousePos.x;
-                const dy = e.clientY - lastMousePos.y;
-                setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-                setLastMousePos({ x: e.clientX, y: e.clientY });
-            }
-        };
-        const handleMouseUp = () => { setDraggingNode(null); setIsPanning(false); };
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
-    }, [draggingNode, isPanning, lastMousePos, scale, nodes]);
-
-    const updateLabel = (id, newLabel) => {
-        setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
-    };
-
-    const renderLines = () => {
-        return nodes.map(node => {
-            if (!isVisible(node.id)) return null;
-            if (!node.parentId) return null;
-            
-            const parent = nodes.find(n => n.id === node.parentId);
-            if (!parent) return null; 
-            
-            const w = 180; const h = 100; 
-            const startX = parent.x + w; 
-            const startY = parent.y + 40; 
-            const endX = node.x; 
-            const endY = node.y + 40;
-            const dist = Math.abs(endX - startX) / 2;
-            const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`;
-
-            return (
-                <path 
-                    key={`link-${node.id}`} d={pathData}
-                    fill="none" stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-700"
-                />
-            );
-        });
-    };
+    const renderLines = () => nodes.map(node => { if (!isVisible(node.id)) return null; if (!node.parentId) return null; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return null; const w = 180; const startX = parent.x + w; const startY = parent.y + 40; const endX = node.x; const endY = node.y + 40; const dist = Math.abs(endX - startX) / 2; const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`; return (<path key={`link-${node.id}`} d={pathData} fill="none" stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-700" />); });
 
     return (
         <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-                <div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
-                    <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors" title="Ajouter Enfant"><GitCommit size={20}/></button>
-                    <button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors" title="Ajouter Source"><Plus size={20}/></button>
-                    <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                    <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2"><div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors"><GitCommit size={20}/></button><button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors"><Plus size={20}/></button><div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div><button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`}><Trash2 size={20}/></button></div>{selectedId && (<div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">{NODE_COLORS.map(c => (<button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>))}</div>)}</div>
+            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button><button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button><button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button></div>
+            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}><div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}><svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>{nodes.map(node => { if (!isVisible(node.id)) return null; const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0]; const hasChildren = nodes.some(n => n.parentId === node.id); return (<div key={node.id} style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto' }} className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`} onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}><div className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`} onMouseDown={(e) => handleMouseDown(e, node.id)}><GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/></div><div className="p-2 relative"><textarea value={node.label} onChange={(e) => updateLabel(node.id, e.target.value)} onMouseDown={(e) => e.stopPropagation()} className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`} placeholder="Idée..." rows={Math.max(2, (node.label?.split('\n').length || 1))}/>{hasChildren && (<button onClick={(e) => toggleCollapse(e, node.id)} className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50" title={node.collapsed ? "Afficher" : "Masquer"}>{node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}</button>)}</div></div>); })}</div></div>
+        </div>
+    );
+};
+
+// ==========================================
+// 4. MODULE FINANCE (SIMULATION RENTABILITÉ - NOUVEAU)
+// ==========================================
+const FinanceModule = ({ venture }) => {
+    const [activeScenario, setActiveScenario] = useState('realistic');
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const saveTimeoutRef = useRef(null);
+
+    const DEFAULT_DATA = {
+        capital: 5000,
+        realistic: { fixed: 1500, var: 10, price: 50, target: 100 },
+        optimistic: { fixed: 1500, var: 8, price: 60, target: 150 },
+        pessimistic: { fixed: 1800, var: 12, price: 40, target: 50 }
+    };
+
+    useEffect(() => {
+        const load = async () => {
+            const { data: dbData } = await supabase.from('venture_financials').select('scenarios').eq('venture_id', venture.id).single();
+            if (dbData) setData(dbData.scenarios);
+            else {
+                setData(DEFAULT_DATA);
+                await supabase.from('venture_financials').upsert({ venture_id: venture.id, scenarios: DEFAULT_DATA }, { onConflict: 'venture_id' });
+            }
+            setLoading(false);
+        };
+        load();
+    }, [venture]);
+
+    const updateData = (field, value, isGlobal = false) => {
+        const newData = { ...data };
+        if (isGlobal) newData[field] = parseFloat(value) || 0;
+        else newData[activeScenario][field] = parseFloat(value) || 0;
+        
+        setData(newData);
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            await supabase.from('venture_financials').upsert({ venture_id: venture.id, scenarios: newData }, { onConflict: 'venture_id' });
+        }, 1000);
+    };
+
+    if (loading || !data) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    const s = data[activeScenario];
+    const breakevenQty = s.price > s.var ? Math.ceil(s.fixed / (s.price - s.var)) : 0;
+    const breakevenRev = breakevenQty * s.price;
+    const projectedRevenue = s.target * s.price;
+    const projectedCost = s.fixed + (s.target * s.var);
+    const profit = projectedRevenue - projectedCost;
+    const runway = s.fixed > 0 ? (data.capital / s.fixed).toFixed(1) : "∞";
+
+    const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
+    const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
+    const xToPct = (val) => (val / graphMaxX) * 100;
+    const yToPct = (val) => 100 - (val / graphMaxY) * 100;
+
+    const ptStart = { x: 0, y: yToPct(s.fixed) };
+    const ptEndCost = { x: 100, y: yToPct(s.fixed + (s.var * graphMaxX)) };
+    const ptEndRev = { x: 100, y: yToPct(s.price * graphMaxX) };
+    const ptBreakeven = { x: xToPct(breakevenQty), y: yToPct(breakevenRev) };
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            <div className="h-16 px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+                <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    {['realistic', 'optimistic', 'pessimistic'].map(key => (
+                        <button key={key} onClick={() => setActiveScenario(key)} className={`px-4 py-1.5 rounded-md text-sm font-bold capitalize transition-all ${activeScenario === key ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>
+                            {key === 'realistic' ? 'Réaliste' : key === 'optimistic' ? 'Optimiste' : 'Pessimiste'}
+                        </button>
+                    ))}
                 </div>
-                {selectedId && (
-                    <div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">
-                        {NODE_COLORS.map(c => (
-                            <button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>
-                        ))}
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-400 uppercase">Capital Départ</span>
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-200 dark:border-slate-700">
+                        <Wallet size={16} className="text-slate-400 mr-2"/>
+                        <input type="number" value={data.capital} onChange={e => updateData('capital', e.target.value, true)} className="w-20 bg-transparent text-sm font-bold text-right outline-none text-slate-800 dark:text-white"/>
+                        <span className="text-xs font-bold text-slate-400 ml-1">€</span>
                     </div>
-                )}
+                    <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${parseFloat(runway) < 3 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                        <Clock size={14}/> Runway: {runway} mois
+                    </div>
+                </div>
             </div>
 
-            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
-                <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button>
-                <button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button>
-                <button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button>
-            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><Menu size={16}/> Paramètres ({activeScenario})</h3>
+                        <div className="space-y-4">
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coûts Fixes (Mensuel)</label><input type="number" value={s.fixed} onChange={e => updateData('fixed', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coût Variable (Unitaire)</label><input type="number" value={s.var} onChange={e => updateData('var', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Prix de Vente</label><input type="number" value={s.price} onChange={e => updateData('price', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Objectif Ventes (Unités)</label><input type="number" value={s.target} onChange={e => updateData('target', e.target.value)} className="w-full p-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-sm font-bold text-indigo-700 dark:text-indigo-300 outline-none focus:border-indigo-500"/></div>
+                        </div>
+                    </div>
 
-            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
-                <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
-                    <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
-                    
-                    {nodes.map(node => {
-                        if (!isVisible(node.id)) return null;
-                        const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0];
-                        const hasChildren = nodes.some(n => n.parentId === node.id);
+                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center text-center">
+                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Seuil de Rentabilité</h3>
+                        <div className="text-5xl font-black text-slate-800 dark:text-white mb-1">{breakevenQty}</div>
+                        <div className="text-sm font-medium text-slate-400">unités à vendre</div>
+                        <div className="mt-4 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold text-slate-500">soit {breakevenRev} € de CA</div>
+                    </div>
 
-                        return (
-                            <div 
-                                key={node.id}
-                                style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto' }}
-                                className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
-                                onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
-                            >
-                                <div 
-                                    className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`}
-                                    onMouseDown={(e) => handleMouseDown(e, node.id)}
-                                >
-                                    <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/>
-                                </div>
-                                <div className="p-2 relative">
-                                    <textarea
-                                        value={node.label} 
-                                        onChange={(e) => updateLabel(node.id, e.target.value)}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`}
-                                        placeholder="Idée..."
-                                        rows={Math.max(2, (node.label?.split('\n').length || 1))}
-                                    />
-                                    {hasChildren && (
-                                        <button 
-                                            onClick={(e) => toggleCollapse(e, node.id)}
-                                            className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50"
-                                            title={node.collapsed ? "Afficher" : "Masquer"}
-                                        >
-                                            {node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
+                    <div className={`p-5 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}`}>
+                        <h3 className={`text-xs font-bold uppercase mb-2 ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>Résultat Projeté</h3>
+                        <div className={`text-5xl font-black mb-1 ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{profit > 0 ? '+' : ''}{profit} €</div>
+                        <div className={`text-sm font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{profit >= 0 ? 'Rentable ! 🚀' : 'Déficitaire ⚠️'}</div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-80 relative">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 absolute top-6 left-6">Analyse du Point Mort</h3>
+                    <svg className="w-full h-full pt-8" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <polygon points={`${ptBreakeven.x},${ptBreakeven.y} 100,${ptEndRev.y} 100,${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
+                        <line x1="0" y1="100" x2="100" y2="100" stroke="#e2e8f0" strokeWidth="1" />
+                        <line x1="0" y1="0" x2="0" y2="100" stroke="#e2e8f0" strokeWidth="1" />
+                        <line x1="0" y1="100" x2="100" y2={ptEndRev.y} stroke="#10b981" strokeWidth="2" />
+                        <text x="98" y={ptEndRev.y - 2} textAnchor="end" className="text-[3px] fill-emerald-500 font-bold">Revenus</text>
+                        <line x1="0" y1={ptStart.y} x2="100" y2={ptEndCost.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="4" />
+                        <text x="98" y={ptEndCost.y - 2} textAnchor="end" className="text-[3px] fill-red-500 font-bold">Coûts</text>
+                        <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="1.5" fill="#1e293b" />
+                        <text x={ptBreakeven.x} y={ptBreakeven.y + 6} textAnchor="middle" className="text-[3px] fill-slate-500 font-bold">PM ({breakevenQty})</text>
+                    </svg>
                 </div>
             </div>
         </div>
@@ -511,7 +413,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
