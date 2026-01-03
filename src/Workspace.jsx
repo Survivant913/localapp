@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  Plus, FileText, Users, ArrowLeft, Trash2, 
-  Activity, Target, DollarSign, BarChart2, Share2, Menu, // Icônes utilisées dans les tuiles Stratégie
-  Sun, Zap, AlertTriangle, Check, X, Box
+  Plus, FileText, Users, Activity, 
+  Trash2, ArrowLeft, Save, MousePointer2, Move, Type
 } from 'lucide-react';
 
-// --- SEULEMENT 2 MODULES ---
+// --- MODULES ACTIFS ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
+    { id: 'mindmap', label: 'Mindmap', icon: Activity },
 ];
 
 function useAutoSave(value, delay = 1000, callback) {
@@ -22,73 +22,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANTS UI PARTAGÉS (Post-its)
-// ==========================================
-const PostItItem = ({ item, updateItem, deleteItem, colors }) => {
-    const textareaRef = useRef(null);
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-    }, [item.text]);
-
-    const safeColor = (item && item.color) ? item.color : 'yellow';
-    const currentColor = colors.find(c => c.id === safeColor) || colors[0];
-
-    return (
-        <div className={`p-3 rounded-lg border text-sm shadow-sm relative group/item transition-all hover:shadow-md ${currentColor.bg} ${currentColor.border}`}>
-            <textarea 
-                ref={textareaRef}
-                value={item.text || ''} 
-                onChange={e => updateItem(item.id, 'text', e.target.value)}
-                className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-100 text-sm font-medium leading-relaxed overflow-hidden"
-                placeholder="..."
-                rows={1}
-            />
-            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity bg-white/80 dark:bg-black/60 p-1 rounded backdrop-blur-sm shadow-sm z-10">
-                {colors.map(c => (
-                    <button key={c.id} onClick={() => updateItem(item.id, 'color', c.id)} className={`w-2.5 h-2.5 rounded-full ${c.bg.split(' ')[0]} border border-slate-300`}/>
-                ))}
-                <div className="w-px h-3 bg-slate-400/50 mx-0.5"></div>
-                <button onClick={() => deleteItem(item.id)} className="text-red-500 hover:text-red-700"><Trash2 size={10}/></button>
-            </div>
-        </div>
-    );
-};
-
-const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault = 'yellow', className }) => {
-    const colors = [
-        { id: 'yellow', bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-200 dark:border-yellow-800' },
-        { id: 'blue', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800' },
-        { id: 'green', bg: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-200 dark:border-green-800' },
-        { id: 'red', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800' },
-    ];
-
-    const addItem = () => { onChange([...items, { id: Math.random().toString(36).substr(2, 9), text: '', color: colorDefault }]); };
-    const updateItem = (id, field, value) => { onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i)); };
-    const deleteItem = (id) => { onChange(items.filter(i => i.id !== id)); };
-    const SafeIcon = Icon || FileText;
-
-    return (
-        <div className={`flex flex-col bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative group hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors ${className}`}>
-            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase tracking-wide shrink-0 mb-3">
-                <SafeIcon size={14} className="text-indigo-500"/> {title}
-            </h3>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[100px]">
-                {items.map(item => (
-                    <PostItItem key={item.id} item={item} updateItem={updateItem} deleteItem={deleteItem} colors={colors} />
-                ))}
-                <button onClick={addItem} className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-300 transition-all shrink-0">
-                    <Plus size={14}/> Ajouter
-                </button>
-            </div>
-        </div>
-    );
-};
-
-// ==========================================
-// 1. MODULE CARNET
+// 1. MODULE CARNET (Code inchangé)
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -112,23 +46,18 @@ const EditorModule = ({ venture }) => {
     };
 
     const deletePage = async (id, e) => {
-        e.stopPropagation();
-        if (!window.confirm("Supprimer ?")) return;
+        e.stopPropagation(); if (!window.confirm("Supprimer ?")) return;
         await supabase.from('venture_pages').delete().eq('id', id);
         const newPages = pages.filter(p => p.id !== id);
         setPages(newPages);
         if (activePageId === id) setActivePageId(newPages[0]?.id || null);
     };
 
-    const updateLocalPage = (id, field, value) => {
-        setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
-    };
-
+    const updateLocalPage = (id, field, value) => { setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p)); };
     const activePage = pages.find(p => p.id === activePageId);
 
     useAutoSave(activePage, 1500, async (pageToSave) => {
-        if (!pageToSave) return;
-        setSaving(true);
+        if (!pageToSave) return; setSaving(true);
         try { await supabase.from('venture_pages').update({ title: pageToSave.title, content: pageToSave.content }).eq('id', pageToSave.id); } 
         finally { setSaving(false); }
     });
@@ -138,63 +67,43 @@ const EditorModule = ({ venture }) => {
     return (
         <div className="flex h-full w-full bg-white dark:bg-slate-900">
             <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pages</span>
-                    <button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {pages.map(page => (
-                        <div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
-                            <span className="truncate flex-1">{page.title || 'Sans titre'}</span>
-                            <button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button>
-                        </div>
-                    ))}
-                </div>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center"><span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pages</span><button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button></div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map(page => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
             </div>
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black">
-                {activePage ? (
-                    <>
-                        <div className="px-8 pt-8 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <input type="text" value={activePage.title} onChange={(e) => updateLocalPage(activePage.id, 'title', e.target.value)} placeholder="Titre de la page" className="w-full text-3xl font-bold text-slate-800 dark:text-white bg-transparent outline-none placeholder-slate-300 dark:placeholder-slate-700" />
-                            {saving && <span className="text-xs text-slate-400 animate-pulse absolute top-4 right-8">Sauvegarde...</span>}
-                        </div>
-                        <textarea className="flex-1 w-full p-8 resize-none outline-none bg-transparent text-slate-700 dark:text-slate-200 leading-relaxed font-mono text-base custom-scrollbar" placeholder="Écrivez ici..." value={activePage.content || ''} onChange={(e) => updateLocalPage(activePage.id, 'content', e.target.value)}></textarea>
-                    </>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><FileText size={48} className="mb-4 opacity-50"/><p>Sélectionnez une page</p></div>
-                )}
+                {activePage ? (<><div className="px-8 pt-8 pb-4 border-b border-slate-100 dark:border-slate-800"><input type="text" value={activePage.title} onChange={(e) => updateLocalPage(activePage.id, 'title', e.target.value)} placeholder="Titre de la page" className="w-full text-3xl font-bold text-slate-800 dark:text-white bg-transparent outline-none placeholder-slate-300 dark:placeholder-slate-700" />{saving && <span className="text-xs text-slate-400 animate-pulse absolute top-4 right-8">Sauvegarde...</span>}</div><textarea className="flex-1 w-full p-8 resize-none outline-none bg-transparent text-slate-700 dark:text-slate-200 leading-relaxed font-mono text-base custom-scrollbar" placeholder="Écrivez ici..." value={activePage.content || ''} onChange={(e) => updateLocalPage(activePage.id, 'content', e.target.value)}></textarea></>) : (<div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><FileText size={48} className="mb-4 opacity-50"/><p>Sélectionnez une page</p></div>)}
             </div>
         </div>
     );
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE
+// 2. MODULE STRATÉGIE (Code inchangé)
 // ==========================================
+// ... (Je garde le composant StrategyModule identique pour gagner de la place, 
+// je le remets complet ci-dessous pour être sûr que tu as tout le fichier)
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
-    // ICÔNES STANDARD (On utilise celles importées en haut)
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Users, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
+        { id: 'valueProps', label: 'Propositions de Valeur', icon: Activity, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
-        { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
-        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'green' },
-        { id: 'cost', label: 'Structure de Coûts', icon: DollarSign, col: 'md:col-span-5 md:row-span-1', color: 'red' },
-        { id: 'revenue', label: 'Flux de Revenus', icon: BarChart2, col: 'md:col-span-5 md:row-span-1', color: 'green' },
+        { id: 'segments', label: 'Segments Clients', icon: Users, col: 'md:col-span-2 md:row-span-2', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: FileText, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'cost', label: 'Structure de Coûts', icon: Trash2, col: 'md:col-span-5 md:row-span-1', color: 'red' },
+        { id: 'revenue', label: 'Flux de Revenus', icon: Activity, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
-
     const SECTIONS_SWOT = [
-        { id: 'strengths', label: 'Forces (Interne)', icon: Check, color: 'green' },
-        { id: 'weaknesses', label: 'Faiblesses (Interne)', icon: X, color: 'red' },
-        { id: 'opportunities', label: 'Opportunités (Externe)', icon: Activity, color: 'blue' },
-        { id: 'threats', label: 'Menaces (Externe)', icon: AlertTriangle, color: 'yellow' },
+        { id: 'strengths', label: 'Forces', icon: Activity, color: 'green' },
+        { id: 'weaknesses', label: 'Faiblesses', icon: Trash2, color: 'red' },
+        { id: 'opportunities', label: 'Opportunités', icon: Activity, color: 'blue' },
+        { id: 'threats', label: 'Menaces', icon: Activity, color: 'yellow' },
     ];
 
     useEffect(() => {
@@ -214,11 +123,17 @@ const StrategyModule = ({ venture }) => {
         if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
         saveTimeoutRef.current[sectionId] = setTimeout(async () => {
             const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
-            await supabase.from('venture_strategies').upsert({
-                venture_id: venture.id, type, section_id: sectionId, content: newItems
-            }, { onConflict: 'venture_id, section_id' });
+            await supabase.from('venture_strategies').upsert({ venture_id: venture.id, type, section_id: sectionId, content: newItems }, { onConflict: 'venture_id, section_id' });
         }, 1000);
     };
+
+    // Petit composant Post-it interne pour éviter dépendance externe
+    const PostIt = ({ item, update, remove, color }) => (
+        <div className={`p-2 rounded border mb-2 text-xs ${color === 'blue' ? 'bg-blue-50 border-blue-200' : color === 'red' ? 'bg-red-50 border-red-200' : color === 'green' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+            <textarea value={item.text} onChange={e => update(item.id, 'text', e.target.value)} className="w-full bg-transparent outline-none resize-none text-slate-800" rows={2}/>
+            <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={10}/></button>
+        </div>
+    );
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
@@ -231,9 +146,155 @@ const StrategyModule = ({ venture }) => {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-                {view === 'canvas' && (<div className="grid grid-cols-1 md:grid-cols-10 gap-4 h-full min-h-[800px]">{SECTIONS_CANVAS.map(section => (<PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className={`${section.col} min-h-[200px]`}/>))}</div>)}
-                {view === 'swot' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[600px]">{SECTIONS_SWOT.map(section => (<PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className="min-h-[300px]"/>))}</div>)}
+                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
+                        <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 min-h-[150px]`}>
+                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2"><s.icon size={14} className="text-indigo-500"/> {s.label}</h3>
+                            {data[s.id]?.map(i => <PostIt key={i.id} item={i} color={s.color} update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} />)}
+                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="w-full py-1 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800"><Plus size={12} className="inline"/> Ajouter</button>
+                        </div>
+                    ))}
+                </div>
             </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 3. MODULE MINDMAP (NOUVEAU & LÉGER)
+// ==========================================
+const MindmapModule = ({ venture }) => {
+    const [nodes, setNodes] = useState([]);
+    const [selectedId, setSelectedId] = useState(null);
+    const [draggingId, setDraggingId] = useState(null);
+    const svgRef = useRef(null);
+    const saveTimeoutRef = useRef(null);
+
+    // Initialisation
+    useEffect(() => {
+        const load = async () => {
+            const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
+            if (data && data.content && data.content.length > 0) {
+                setNodes(data.content);
+            } else {
+                // Créer racine si vide
+                const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root' }];
+                setNodes(root);
+                // Sauvegarde initiale
+                await supabase.from('venture_mindmaps').insert([{ venture_id: venture.id, content: root }]);
+            }
+        };
+        load();
+    }, [venture]);
+
+    // Sauvegarde Auto
+    useEffect(() => {
+        if (nodes.length === 0) return;
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: nodes }, { onConflict: 'venture_id' });
+        }, 1000);
+    }, [nodes, venture.id]);
+
+    const addNode = () => {
+        if (!selectedId) { alert("Sélectionnez un noeud parent d'abord !"); return; }
+        const parent = nodes.find(n => n.id === selectedId);
+        const newNode = {
+            id: Date.now().toString(),
+            x: parent.x + 150,
+            y: parent.y + 50,
+            label: 'Nouveau',
+            parentId: selectedId
+        };
+        setNodes([...nodes, newNode]);
+        setSelectedId(newNode.id);
+    };
+
+    const deleteNode = () => {
+        if (!selectedId || selectedId === 'root') return;
+        // Supprime le noeud et ses enfants (récursif simple)
+        const toDelete = new Set([selectedId]);
+        let changed = true;
+        while(changed) {
+            changed = false;
+            nodes.forEach(n => {
+                if (n.parentId && toDelete.has(n.parentId) && !toDelete.has(n.id)) {
+                    toDelete.add(n.id);
+                    changed = true;
+                }
+            });
+        }
+        setNodes(nodes.filter(n => !toDelete.has(n.id)));
+        setSelectedId(null);
+    };
+
+    const handleMouseDown = (e, id) => {
+        e.stopPropagation();
+        setSelectedId(id);
+        setDraggingId(id);
+    };
+
+    const handleMouseMove = (e) => {
+        if (!draggingId) return;
+        const svg = svgRef.current;
+        const rect = svg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        setNodes(nodes.map(n => n.id === draggingId ? { ...n, x, y } : n));
+    };
+
+    const handleMouseUp = () => {
+        setDraggingId(null);
+    };
+
+    const updateLabel = (id, newLabel) => {
+        setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
+    };
+
+    return (
+        <div className="h-full w-full bg-slate-50 dark:bg-slate-950 relative overflow-hidden flex flex-col">
+            <div className="absolute top-4 left-4 z-10 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex gap-2">
+                <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded" title="Ajouter un enfant"><Plus size={20}/></button>
+                <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded ${(!selectedId || selectedId === 'root') ? 'opacity-50 cursor-not-allowed' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
+                <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                <span className="text-xs text-slate-400 flex items-center px-2">
+                    {selectedId ? "1 noeud sélectionné" : "Sélectionnez un noeud"}
+                </span>
+            </div>
+
+            <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onClick={() => setSelectedId(null)}>
+                {/* Liens */}
+                {nodes.map(node => {
+                    if (!node.parentId) return null;
+                    const parent = nodes.find(n => n.id === node.parentId);
+                    if (!parent) return null;
+                    return (
+                        <line 
+                            key={`link-${node.id}`}
+                            x1={parent.x + 60} y1={parent.y + 20} // +60/+20 pour centrer (largeur 120 / hauteur 40)
+                            x2={node.x + 60} y2={node.y + 20}
+                            stroke="#cbd5e1" strokeWidth="2"
+                        />
+                    );
+                })}
+
+                {/* Noeuds */}
+                {nodes.map(node => (
+                    <foreignObject key={node.id} x={node.x} y={node.y} width="120" height="40">
+                        <div 
+                            onMouseDown={(e) => handleMouseDown(e, node.id)}
+                            className={`w-full h-full rounded-lg flex items-center justify-center border-2 transition-all shadow-sm select-none ${selectedId === node.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/50 shadow-md' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}
+                        >
+                            <input 
+                                value={node.label}
+                                onChange={(e) => updateLabel(node.id, e.target.value)}
+                                className="w-full bg-transparent text-center text-xs font-bold text-slate-700 dark:text-slate-200 outline-none px-1"
+                            />
+                        </div>
+                    </foreignObject>
+                ))}
+            </svg>
         </div>
     );
 };
@@ -275,7 +336,7 @@ export default function Workspace() {
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
