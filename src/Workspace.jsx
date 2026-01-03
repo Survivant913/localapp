@@ -4,7 +4,8 @@ import {
   Plus, FolderOpen, ArrowRight, Trash2, ArrowLeft,
   FileText, Target, Users, DollarSign, 
   Network, BarChart3, Kanban,
-  Loader2, Save, Box, Activity, Sun, Zap, AlertTriangle, Check, X
+  Loader2, Save, Box, Activity, Sun, Zap, AlertTriangle, Check, X,
+  Eye, EyeOff, Settings
 } from 'lucide-react';
 
 // --- ICONS MAPPING ---
@@ -18,7 +19,6 @@ const MODULES = [
     { id: 'kanban', label: 'Organisation', icon: Kanban },
 ];
 
-// --- HOOK GENÉRIQUE SAVE AUTO ---
 function useAutoSave(value, delay = 1000, callback) {
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -182,13 +182,13 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (CORRIGÉ & ROBUSTE)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
     const [loading, setLoading] = useState(true);
-    const saveTimeoutRef = useRef({}); // Pour debouncer chaque section
+    const saveTimeoutRef = useRef({}); 
 
     const SECTIONS_CANVAS = [
         { id: 'partners', label: 'Partenaires Clés', icon: Network, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
@@ -221,24 +221,17 @@ const StrategyModule = ({ venture }) => {
     }, [venture.id]);
 
     const handleUpdate = (sectionId, newItems) => {
-        // 1. Mise à jour immédiate locale (Optimistic UI)
         setData(prev => ({ ...prev, [sectionId]: newItems }));
-        
-        // 2. Debounce pour la sauvegarde BDD (évite de spammer)
         if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
-        
         saveTimeoutRef.current[sectionId] = setTimeout(async () => {
             const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
             await supabase.from('venture_strategies').upsert({
-                venture_id: venture.id,
-                type,
-                section_id: sectionId,
-                content: newItems
-            }, { onConflict: 'venture_id, section_id' }); // <--- La clé magique qui nécessite la commande SQL
+                venture_id: venture.id, type, section_id: sectionId, content: newItems
+            }, { onConflict: 'venture_id, section_id' });
         }, 1000);
     };
 
-    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement de la stratégie...</div>;
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -263,6 +256,214 @@ const StrategyModule = ({ venture }) => {
                         ))}
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 3. MODULE CONCURRENCE (RADAR)
+// ==========================================
+const CompetitionModule = ({ venture }) => {
+    const [competitors, setCompetitors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [editingDim, setEditingDim] = useState(false);
+    
+    // Dimensions fixes pour simplifier l'enregistrement JSONB pour l'instant
+    const dimensions = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
+    const MAX_SCORE = 5;
+
+    useEffect(() => {
+        const loadCompetitors = async () => {
+            const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id);
+            if (data && data.length > 0) {
+                setCompetitors(data);
+            } else {
+                // Créer "Mon Projet" par défaut s'il n'existe pas
+                const myProject = {
+                    venture_id: venture.id,
+                    name: 'Mon Projet',
+                    is_me: true,
+                    stats: { 'Prix': 3, 'Qualité': 3, 'Innovation': 3, 'Service': 3, 'Design': 3 },
+                    color: 'bg-indigo-500',
+                    visible: true
+                };
+                const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
+                if (inserted) setCompetitors(inserted);
+            }
+            setLoading(false);
+        };
+        loadCompetitors();
+    }, [venture.id]);
+
+    const addCompetitor = async () => {
+        const newComp = {
+            venture_id: venture.id,
+            name: 'Nouveau',
+            is_me: false,
+            stats: { 'Prix': 3, 'Qualité': 3, 'Innovation': 3, 'Service': 3, 'Design': 3 },
+            color: 'bg-red-500',
+            visible: true
+        };
+        const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
+        if (data) setCompetitors([...competitors, data[0]]);
+    };
+
+    const handleUpdate = async (id, field, value, statKey = null) => {
+        // Mise à jour locale (Optimistic)
+        const updatedList = competitors.map(c => {
+            if (c.id === id) {
+                if (statKey) {
+                    return { ...c, stats: { ...c.stats, [statKey]: parseFloat(value) } };
+                }
+                return { ...c, [field]: value };
+            }
+            return c;
+        });
+        setCompetitors(updatedList);
+
+        // Mise à jour DB (Debounce simple ou direct pour les sliders)
+        const compToUpdate = updatedList.find(c => c.id === id);
+        await supabase.from('venture_competitors').upsert(compToUpdate);
+    };
+
+    const deleteCompetitor = async (id) => {
+        if (!window.confirm("Supprimer ?")) return;
+        await supabase.from('venture_competitors').delete().eq('id', id);
+        setCompetitors(competitors.filter(c => c.id !== id));
+    };
+
+    // --- LOGIQUE RADAR SVG ---
+    const radarSize = 300;
+    const centerX = radarSize / 2;
+    const centerY = radarSize / 2;
+    const radius = 100;
+
+    const getCoordinates = (value, index, total) => {
+        const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+        const r = (value / MAX_SCORE) * radius;
+        return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
+    };
+
+    const getPath = (stats) => {
+        const points = dimensions.map((dim, i) => {
+            const val = stats[dim] || 0;
+            const coords = getCoordinates(val, i, dimensions.length);
+            return `${coords.x},${coords.y}`;
+        });
+        return points.join(' ');
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            {/* PARTIE GAUCHE : RADAR */}
+            <div className="flex-1 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-800 p-6 relative">
+                <h3 className="absolute top-6 left-6 font-bold text-lg text-slate-700 dark:text-white flex items-center gap-2">
+                    <Target className="text-indigo-500"/> Radar de Positionnement
+                </h3>
+                
+                <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
+                    <svg width="100%" height="100%" viewBox={`0 0 ${radarSize} ${radarSize}`} className="overflow-visible">
+                        {/* Grille de fond */}
+                        {[1, 2, 3, 4, 5].map(level => (
+                            <polygon key={level} points={dimensions.map((_, i) => {
+                                const c = getCoordinates(level, i, dimensions.length);
+                                return `${c.x},${c.y}`;
+                            }).join(' ')} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.5" className="dark:stroke-slate-700" />
+                        ))}
+                        {/* Axes */}
+                        {dimensions.map((dim, i) => {
+                            const end = getCoordinates(MAX_SCORE, i, dimensions.length);
+                            return (
+                                <g key={dim}>
+                                    <line x1={centerX} y1={centerY} x2={end.x} y2={end.y} stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/>
+                                    <text x={end.x * 1.15 - centerX * 0.15} y={end.y * 1.15 - centerY * 0.15} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 dark:fill-slate-400 uppercase tracking-wide">
+                                        {dim}
+                                    </text>
+                                </g>
+                            );
+                        })}
+                        {/* Données */}
+                        {competitors.map(comp => (
+                            (comp.visible) && (
+                                <g key={comp.id} className="transition-all duration-500 ease-out">
+                                    <polygon 
+                                        points={getPath(comp.stats)} 
+                                        fill={comp.is_me ? "rgba(99, 102, 241, 0.2)" : "rgba(239, 68, 68, 0.1)"} 
+                                        stroke={comp.is_me ? "#6366f1" : "#ef4444"} 
+                                        strokeWidth={comp.is_me ? 2.5 : 1.5} 
+                                    />
+                                    {dimensions.map((dim, i) => {
+                                        const c = getCoordinates(comp.stats[dim], i, dimensions.length);
+                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={comp.is_me ? "#6366f1" : "#ef4444"} />;
+                                    })}
+                                </g>
+                            )
+                        ))}
+                    </svg>
+                </div>
+            </div>
+
+            {/* PARTIE DROITE : LISTE & ÉDITION */}
+            <div className="w-96 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shrink-0">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span>
+                    <button onClick={addCompetitor} className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:text-indigo-600 transition-colors"><Plus size={16}/></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {competitors.map(comp => (
+                        <div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
+                            {/* En-tête Carte */}
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${comp.is_me ? 'bg-indigo-500' : 'bg-red-500'}`}></div>
+                                    <input 
+                                        value={comp.name} 
+                                        onChange={e => handleUpdate(comp.id, 'name', e.target.value)} 
+                                        className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white"
+                                    />
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => handleUpdate(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">
+                                        {comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}
+                                    </button>
+                                    {!comp.is_me && (
+                                        <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Sliders */}
+                            <div className="space-y-3">
+                                {dimensions.map(dim => (
+                                    <div key={dim} className="flex items-center gap-3">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate">{dim}</span>
+                                        <input 
+                                            type="range" min="1" max="5" step="0.5" 
+                                            value={comp.stats[dim] || 1} 
+                                            onChange={e => handleUpdate(comp.id, null, e.target.value, dim)}
+                                            className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                        />
+                                        <span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats[dim]}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Notes rapides */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <textarea 
+                                    value={comp.strengths || ''}
+                                    onChange={e => handleUpdate(comp.id, 'strengths', e.target.value)}
+                                    placeholder="Forces / Atouts..."
+                                    className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12"
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -343,7 +544,8 @@ export default function Workspace() {
                 <main className="flex-1 overflow-hidden relative bg-white dark:bg-black">
                     {activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}
                     {activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}
-                    {!['editor', 'business'].includes(activeModuleId) && (
+                    {activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}
+                    {!['editor', 'business', 'competition'].includes(activeModuleId) && (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400"><Users size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>
                     )}
                 </main>
