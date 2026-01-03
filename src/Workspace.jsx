@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Target, Users, DollarSign, 
-  Share2, PieChart, Activity, List,
+  PieChart, Activity, List, Share2, // Icones sûres
   ArrowLeft, Trash2, Eye, EyeOff, Settings,
   Sun, Zap, AlertTriangle, Check, X, Box
 } from 'lucide-react';
 
-// --- ICONS MAPPING SÉCURISÉ ---
+// --- ICONS MAPPING ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
@@ -74,8 +74,6 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
     const addItem = () => { onChange([...items, { id: Math.random().toString(36).substr(2, 9), text: '', color: colorDefault }]); };
     const updateItem = (id, field, value) => { onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i)); };
     const deleteItem = (id) => { onChange(items.filter(i => i.id !== id)); };
-
-    // Protection contre icône manquante
     const SafeIcon = Icon || FileText;
 
     return (
@@ -177,7 +175,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (SÉCURISÉ)
+// 2. MODULE STRATÉGIE
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -185,7 +183,6 @@ const StrategyModule = ({ venture }) => {
     const [loading, setLoading] = useState(true);
     const saveTimeoutRef = useRef({}); 
 
-    // ICÔNES STABLES UNIQUEMENT
     const SECTIONS_CANVAS = [
         { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
@@ -247,10 +244,11 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (SÉCURISÉ & PERSISTANT)
+// 3. MODULE CONCURRENCE (LE CORRECTIF FINAL)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
-    if (!venture) return null;
+    if (!venture || !venture.id) return <div className="p-10 text-center">Chargement des données...</div>;
+    
     const [competitors, setCompetitors] = useState([]);
     const [dimensions, setDimensions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -278,51 +276,55 @@ const CompetitionModule = ({ venture }) => {
     const DEFAULT_DIMS = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
 
     useEffect(() => {
+        let mounted = true;
         const loadData = async () => {
-            // 1. Charger les dimensions
-            let { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            
-            // --- FIX RADICAL PERSISTANCE ---
-            // Si la DB est vide ou nulle, on l'initialise PHYSIQUEMENT et on attend la réponse
-            let loadedDims = vData?.dimensions;
-            if (!loadedDims || loadedDims.length === 0) {
-                loadedDims = DEFAULT_DIMS;
-                await supabase.from('ventures').update({ dimensions: loadedDims }).eq('id', venture.id);
-            }
-            setDimensions(loadedDims);
-
-            // 2. Charger les concurrents
-            const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
-            
-            if (cData && cData.length > 0) {
-                setCompetitors(cData);
-            } else {
-                const initialStats = {};
-                loadedDims.forEach(d => initialStats[d] = 3);
+            try {
+                // 1. Charger les dimensions
+                const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
                 
-                const myProject = {
-                    venture_id: venture.id,
-                    name: 'Mon Projet',
-                    is_me: true,
-                    stats: initialStats,
-                    color: 'bg-indigo-500',
-                    visible: true
-                };
-                // Initialisation physique du 1er concurrent
-                const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
-                if (inserted) setCompetitors(inserted);
+                // --- FIX FINAL : ON N'ÉCRIT JAMAIS DANS LE DB AU CHARGEMENT (READ-ONLY) ---
+                // Si la DB est vide, on affiche les défauts LOCALEMENT, mais on n'appelle pas .update()
+                const loadedDims = (vData?.dimensions && vData.dimensions.length > 0) ? vData.dimensions : DEFAULT_DIMS;
+                
+                if (mounted) setDimensions(loadedDims);
+
+                // 2. Charger les concurrents
+                const { data: cData } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('id', { ascending: true });
+                
+                if (cData && cData.length > 0) {
+                    if (mounted) setCompetitors(cData);
+                } else {
+                    // Initialiser "Mon Projet" UNIQUEMENT si la liste est vide (première fois)
+                    const initialStats = {};
+                    loadedDims.forEach(d => initialStats[d] = 3);
+                    const myProject = {
+                        venture_id: venture.id,
+                        name: 'Mon Projet',
+                        is_me: true,
+                        stats: initialStats,
+                        color: 'bg-indigo-500',
+                        visible: true
+                    };
+                    // Ici on écrit, car c'est une création nécessaire
+                    const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
+                    if (mounted && inserted) setCompetitors(inserted);
+                }
+            } catch (error) {
+                console.error("Erreur chargement concurrence:", error);
+            } finally {
+                if (mounted) setLoading(false);
             }
-            setLoading(false);
         };
         loadData();
+        return () => { mounted = false; };
     }, [venture]);
 
     const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
-            setDimensions(newDims); // Optimistic UI
+            setDimensions(newDims); // UI Update
             
-            // Sauvegarde DB
+            // DB Update (C'EST ICI QU'ON ÉCRIT)
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
             const updatedCompetitors = competitors.map(c => {
@@ -342,6 +344,7 @@ const CompetitionModule = ({ venture }) => {
         if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
         const newDims = dimensions.filter(d => d !== dim);
         setDimensions(newDims);
+        // DB Update
         await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
     };
 
