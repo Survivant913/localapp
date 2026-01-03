@@ -262,7 +262,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (AVEC CRITÈRES DYNAMIQUES)
+// 3. MODULE CONCURRENCE (CORRIGÉ : COULEURS & SAVE)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
@@ -273,10 +273,17 @@ const CompetitionModule = ({ venture }) => {
     
     const MAX_SCORE = 5;
     const saveTimeoutRef = useRef({});
+    
+    // NOUVEAU : Palette de couleurs pour éviter le rouge systématique
+    const COMPETITOR_COLORS = [
+        'bg-red-500', 'bg-orange-500', 'bg-amber-500', 
+        'bg-emerald-500', 'bg-cyan-500', 'bg-blue-500', 
+        'bg-violet-500', 'bg-pink-500'
+    ];
 
     useEffect(() => {
         const loadData = async () => {
-            // 1. Charger les dimensions du projet (ou défaut)
+            // 1. Charger les dimensions du projet
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
             const currentDims = vData?.dimensions || ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
             setDimensions(currentDims);
@@ -296,6 +303,7 @@ const CompetitionModule = ({ venture }) => {
                     name: 'Mon Projet',
                     is_me: true,
                     stats: initialStats,
+                    color: 'bg-indigo-500',
                     visible: true
                 };
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
@@ -312,23 +320,30 @@ const CompetitionModule = ({ venture }) => {
         await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
     };
 
-    const addDimension = () => {
+    const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
-            updateDimensionsInDB(newDims);
+            setDimensions(newDims);
             
-            // Ajouter la stat par défaut (3) aux concurrents existants
+            // 1. Sauvegarder la nouvelle liste de dimensions
+            await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
+
+            // 2. Ajouter la stat par défaut (3) à TOUS les concurrents existants
             const updatedCompetitors = competitors.map(c => ({
                 ...c, stats: { ...c.stats, [newDimText]: 3 }
             }));
             setCompetitors(updatedCompetitors);
-            // Sauvegarder les concurrents mis à jour
-            updatedCompetitors.forEach(c => handleUpdateCompetitor(c.id, null, 3, newDimText));
+
+            // 3. Sauvegarder chaque concurrent mis à jour dans la DB
+            for (const comp of updatedCompetitors) {
+                await supabase.from('venture_competitors').upsert(comp);
+            }
+            
             setNewDimText("");
         }
     };
 
-    const removeDimension = (dim) => {
+    const removeDimension = async (dim) => {
         if (dimensions.length <= 3) { alert("3 critères minimum !"); return; }
         const newDims = dimensions.filter(d => d !== dim);
         updateDimensionsInDB(newDims);
@@ -338,11 +353,16 @@ const CompetitionModule = ({ venture }) => {
     const addCompetitor = async () => {
         const initialStats = {};
         dimensions.forEach(d => initialStats[d] = 3);
+        
+        // NOUVEAU : Choix de couleur rotatif
+        const nextColor = COMPETITOR_COLORS[competitors.length % COMPETITOR_COLORS.length];
+
         const newComp = {
             venture_id: venture.id,
             name: 'Nouveau',
             is_me: false,
             stats: initialStats,
+            color: nextColor, // <--- Couleur dynamique
             visible: true
         };
         const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
@@ -432,13 +452,15 @@ const CompetitionModule = ({ venture }) => {
                                 <g key={comp.id} className="transition-all duration-500 ease-out">
                                     <polygon 
                                         points={getPath(comp.stats)} 
-                                        fill={comp.is_me ? "rgba(99, 102, 241, 0.2)" : "rgba(239, 68, 68, 0.1)"} 
-                                        stroke={comp.is_me ? "#6366f1" : "#ef4444"} 
+                                        fill={comp.is_me ? "rgba(99, 102, 241, 0.2)" : "rgba(100, 116, 139, 0.1)"} 
+                                        stroke={comp.is_me ? "#6366f1" : (comp.color?.replace('bg-', '') === 'red-500' ? '#ef4444' : '#cbd5e1')} // Fallback couleur simple pour SVG
                                         strokeWidth={comp.is_me ? 2.5 : 1.5} 
+                                        style={{ stroke: comp.is_me ? '#6366f1' : 'inherit' }}
                                     />
+                                    {/* Pour le SVG, on ne peut pas utiliser les classes tailwind bg-*, on garde une logique simple ici ou on mappe les couleurs Hex */}
                                     {dimensions.map((dim, i) => {
                                         const c = getCoordinates(comp.stats[dim], i, dimensions.length);
-                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={comp.is_me ? "#6366f1" : "#ef4444"} />;
+                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={comp.is_me ? "#6366f1" : "#94a3b8"} />;
                                     })}
                                 </g>
                             )
@@ -482,7 +504,7 @@ const CompetitionModule = ({ venture }) => {
                         <div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${comp.is_me ? 'bg-indigo-500' : 'bg-red-500'}`}></div>
+                                    <div className={`w-3 h-3 rounded-full ${comp.is_me ? 'bg-indigo-500' : comp.color}`}></div>
                                     <input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" />
                                 </div>
                                 <div className="flex gap-1">
