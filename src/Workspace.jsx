@@ -13,7 +13,7 @@ const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
-    { id: 'finance', label: 'Finance', icon: DollarSign }, // Le module est ici, pas besoin de l'ajouter ailleurs
+    { id: 'finance', label: 'Finance', icon: DollarSign },
 ];
 
 // --- COULEURS MINDMAP ---
@@ -248,7 +248,7 @@ const MindmapModule = ({ venture }) => {
 };
 
 // ==========================================
-// 4. MODULE FINANCE (CORRIGÉ & STABLE)
+// 4. MODULE FINANCE (OPTIMISÉ: NETTETÉ + CIBLE)
 // ==========================================
 const FinanceModule = ({ venture }) => {
     const [activeScenario, setActiveScenario] = useState('realistic');
@@ -290,7 +290,6 @@ const FinanceModule = ({ venture }) => {
 
     if (loading || !data) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
-    // --- CALCULS CORRIGÉS ---
     const s = data[activeScenario];
     const breakevenQty = s.price > s.var ? Math.ceil(s.fixed / (s.price - s.var)) : 0;
     const breakevenRev = breakevenQty * s.price;
@@ -298,36 +297,33 @@ const FinanceModule = ({ venture }) => {
     const projectedCost = s.fixed + (s.target * s.var);
     const profit = projectedRevenue - projectedCost;
     
-    // --- RUNWAY CORRIGÉ (SURVIE SI PERTE) ---
-    const monthlyNetFlow = projectedRevenue - projectedCost; // Résultat net mensuel
-    let runway;
-    if (monthlyNetFlow >= 0) {
-        runway = "∞"; // Rentable = infini
-    } else {
-        // Combien de mois on tient avec le capital si on perd 'monthlyNetFlow' par mois
-        runway = (data.capital / Math.abs(monthlyNetFlow)).toFixed(1);
-    }
+    // --- RUNWAY ---
+    const monthlyBurn = Math.abs(profit); 
+    const runway = profit >= 0 ? "∞" : (data.capital / monthlyBurn).toFixed(1);
 
-    // --- GRAPHIQUE (SVG FIXE & PADDE) ---
+    // --- GRAPHIQUE SVG NET & PRÉCIS ---
     const WIDTH = 1000;
     const HEIGHT = 400;
-    const PADDING = 40; // Marge interne pour ne pas couper les lignes
+    const PADDING = 40; 
     
-    // Echelles
+    // Calcul des échelles en incluant l'objectif (Target)
     const graphMaxX = Math.max(breakevenQty * 1.5, s.target * 1.2, 10);
     const graphMaxY = Math.max(breakevenRev * 1.2, projectedRevenue * 1.2, 100);
     
-    // Conversion Valeur -> Pixel (avec Padding)
-    const effectiveWidth = WIDTH - (PADDING * 2);
-    const effectiveHeight = HEIGHT - (PADDING * 2);
+    const effectiveW = WIDTH - (PADDING * 2);
+    const effectiveH = HEIGHT - (PADDING * 2);
 
-    const xToPx = (val) => PADDING + (val / graphMaxX) * effectiveWidth;
-    const yToPx = (val) => (HEIGHT - PADDING) - (val / graphMaxY) * effectiveHeight;
+    const xToPx = (val) => PADDING + (val / graphMaxX) * effectiveW;
+    const yToPx = (val) => (HEIGHT - PADDING) - (val / graphMaxY) * effectiveH;
 
+    // Coordonnées Lignes
     const ptStart = { x: PADDING, y: yToPx(s.fixed) };
     const ptEndCost = { x: WIDTH - PADDING, y: yToPx(s.fixed + (s.var * graphMaxX)) };
     const ptEndRev = { x: WIDTH - PADDING, y: yToPx(s.price * graphMaxX) };
     const ptBreakeven = { x: xToPx(breakevenQty), y: yToPx(breakevenRev) };
+    
+    // Coordonnées Objectif
+    const ptTarget = { x: xToPx(s.target), y: yToPx(projectedRevenue) };
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -346,8 +342,8 @@ const FinanceModule = ({ venture }) => {
                         <input type="number" value={data.capital} onChange={e => updateData('capital', e.target.value, true)} className="w-20 bg-transparent text-sm font-bold text-right outline-none text-slate-800 dark:text-white"/>
                         <span className="text-xs font-bold text-slate-400 ml-1">€</span>
                     </div>
-                    <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${parseFloat(runway) < 3 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                        <Clock size={14}/> Runway: {runway} mois
+                    <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${parseFloat(runway) < 3 && runway !== "∞" ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                        <Clock size={14}/> Runway: {runway} {runway !== "∞" ? 'mois' : ''}
                     </div>
                 </div>
             </div>
@@ -385,24 +381,31 @@ const FinanceModule = ({ venture }) => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
-                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none">
+                        <svg className="w-full h-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" shapeRendering="geometricPrecision">
                             {/* Zone Profit */}
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
                             
                             {/* Axes */}
-                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="2" />
-                            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="2" />
+                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
+                            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
 
-                            {/* Lignes */}
-                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={ptEndRev.y} stroke="#10b981" strokeWidth="3" />
-                            <text x={WIDTH-PADDING} y={ptEndRev.y - 10} textAnchor="end" className="text-lg fill-emerald-500 font-bold">Revenus</text>
+                            {/* Ligne Objectif Verticale (Pointillés Bleus) */}
+                            <line x1={ptTarget.x} y1={HEIGHT-PADDING} x2={ptTarget.x} y2={ptTarget.y} stroke="#6366f1" strokeWidth="1" strokeDasharray="4,4" />
 
-                            <line x1={PADDING} y1={ptStart.y} x2={WIDTH-PADDING} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="3" strokeDasharray="8,8" />
-                            <text x={WIDTH-PADDING} y={ptEndCost.y - 10} textAnchor="end" className="text-lg fill-red-500 font-bold">Coûts</text>
+                            {/* Lignes Courbes */}
+                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={ptEndRev.y} stroke="#10b981" strokeWidth="2" />
+                            <text x={WIDTH-PADDING} y={ptEndRev.y - 10} textAnchor="end" className="text-xs fill-emerald-500 font-bold">Revenus</text>
+
+                            <line x1={PADDING} y1={ptStart.y} x2={WIDTH-PADDING} y2={ptEndCost.y} stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" />
+                            <text x={WIDTH-PADDING} y={ptEndCost.y - 10} textAnchor="end" className="text-xs fill-red-500 font-bold">Coûts</text>
 
                             {/* Point Mort */}
-                            <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="6" fill="#1e293b" />
-                            <text x={ptBreakeven.x} y={ptBreakeven.y + 25} textAnchor="middle" className="text-sm fill-slate-500 font-bold">PM ({breakevenQty})</text>
+                            <circle cx={ptBreakeven.x} cy={ptBreakeven.y} r="4" fill="#1e293b" />
+                            <text x={ptBreakeven.x} y={ptBreakeven.y + 20} textAnchor="middle" className="text-[10px] fill-slate-500 font-bold">PM ({breakevenQty})</text>
+
+                            {/* Point Objectif (Bleu) */}
+                            <circle cx={ptTarget.x} cy={ptTarget.y} r="5" fill="#6366f1" />
+                            <text x={ptTarget.x} y={ptTarget.y - 15} textAnchor="middle" className="text-xs fill-indigo-500 font-bold">Objectif ({s.target})</text>
                         </svg>
                     </div>
                 </div>
