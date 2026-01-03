@@ -5,7 +5,7 @@ import {
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
-  Wallet, Clock, Trophy, Swords // Icônes ajoutées
+  Wallet, Clock, Trophy, Swords, Settings, Edit2 // Icônes ajoutées
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -14,10 +14,10 @@ const MODULES = [
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
     { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'competitors', label: 'Concurrence', icon: Swords }, // NOUVEAU MODULE
+    { id: 'competitors', label: 'Concurrence', icon: Swords },
 ];
 
-// --- COULEURS ---
+// --- COULEURS MINDMAP ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -396,18 +396,24 @@ const FinanceModule = ({ venture }) => {
 };
 
 // ==========================================
-// 5. MODULE CONCURRENCE (RADAR CHART) - NOUVEAU
+// 5. MODULE CONCURRENCE (RADAR CHART) - COMPLET
 // ==========================================
 const CompetitorModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showConfig, setShowConfig] = useState(false);
+    const [newCriterion, setNewCriterion] = useState("");
     const saveTimeoutRef = useRef({});
+
+    // Palette auto pour les concurrents
+    const COMP_COLORS = ['red', 'green', 'orange', 'purple', 'pink', 'cyan', 'yellow'];
 
     useEffect(() => {
         const load = async () => {
             const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('is_primary', { ascending: false });
             if (data && data.length > 0) { setCompetitors(data); } 
             else {
+                // Données initiales si vide
                 const me = { venture_id: venture.id, name: 'Mon Projet', is_primary: true, color: 'blue', scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
                 const comp = { venture_id: venture.id, name: 'Concurrent A', is_primary: false, color: 'red', scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
                 const { data: created } = await supabase.from('venture_competitors').insert([me, comp]).select();
@@ -435,7 +441,10 @@ const CompetitorModule = ({ venture }) => {
 
     const addCompetitor = async () => {
         const base = competitors[0] || { scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
-        const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: 'gray', scores: base.scores }]).select();
+        // Couleur auto rotative
+        const nextColor = COMP_COLORS[(competitors.length - 1) % COMP_COLORS.length];
+        
+        const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: nextColor, scores: base.scores }]).select();
         if (data) setCompetitors([...competitors, data[0]]);
     };
 
@@ -445,10 +454,46 @@ const CompetitorModule = ({ venture }) => {
         setCompetitors(competitors.filter(c => c.id !== id));
     };
 
+    // --- GESTION DES CRITÈRES ---
+    const updateAllScores = async (updatedCompetitors) => {
+        setCompetitors(updatedCompetitors);
+        for (const comp of updatedCompetitors) {
+            await supabase.from('venture_competitors').update({ scores: comp.scores }).eq('id', comp.id);
+        }
+    };
+
+    const addCriterion = async () => {
+        if (!newCriterion.trim()) return;
+        const key = newCriterion.trim();
+        const updated = competitors.map(c => ({ ...c, scores: { ...c.scores, [key]: 3 } })); // Default 3
+        await updateAllScores(updated);
+        setNewCriterion("");
+    };
+
+    const removeCriterion = async (key) => {
+        if (!window.confirm(`Supprimer le critère "${key}" pour tous ?`)) return;
+        const updated = competitors.map(c => {
+            const s = { ...c.scores }; delete s[key]; return { ...c, scores: s };
+        });
+        await updateAllScores(updated);
+    };
+
+    const renameCriterion = async (oldKey) => {
+        const newKey = prompt("Renommer le critère :", oldKey);
+        if (!newKey || newKey === oldKey) return;
+        const updated = competitors.map(c => {
+            const s = { ...c.scores };
+            s[newKey] = s[oldKey];
+            delete s[oldKey];
+            return { ...c, scores: s };
+        });
+        await updateAllScores(updated);
+    };
+
     // --- RADAR MATH ---
     const criteria = competitors.length > 0 ? Object.keys(competitors[0].scores) : [];
     const radius = 100; const center = 150;
-    const angleSlice = (Math.PI * 2) / criteria.length;
+    const angleSlice = (Math.PI * 2) / (criteria.length || 1);
 
     const getCoords = (val, i) => {
         const angle = i * angleSlice - Math.PI / 2;
@@ -458,10 +503,38 @@ const CompetitorModule = ({ venture }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+            
+            {/* Modal Config Critères */}
+            {showConfig && (
+                <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 dark:text-white">Gérer les Critères</h3>
+                            <button onClick={() => setShowConfig(false)}><X size={20}/></button>
+                        </div>
+                        <div className="flex gap-2 mb-4">
+                            <input type="text" value={newCriterion} onChange={e => setNewCriterion(e.target.value)} placeholder="Nouveau critère..." className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none text-sm"/>
+                            <button onClick={addCriterion} className="p-2 bg-indigo-600 text-white rounded-lg"><Plus size={18}/></button>
+                        </div>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {criteria.map(c => (
+                                <div key={c} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <span onClick={() => renameCriterion(c)} className="text-sm font-medium cursor-pointer hover:text-indigo-500">{c}</span>
+                                    <button onClick={() => removeCriterion(c)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 shrink-0">
                 <h3 className="font-bold text-slate-700 dark:text-white flex items-center gap-2"><Trophy size={18} className="text-indigo-500"/> Radar de Positionnement</h3>
-                <button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500" title="Configurer Critères"><Settings size={18}/></button>
+                    <button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -485,8 +558,11 @@ const CompetitorModule = ({ venture }) => {
                         {/* Data */}
                         {competitors.map(c => {
                             const points = criteria.map((k, i) => { const p = getCoords(c.scores[k] || 0, i); return `${p.x},${p.y}`; }).join(' ');
-                            const color = c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : '#94a3b8';
-                            return <polygon key={c.id} points={points} fill={color} fillOpacity={c.is_primary ? 0.2 : 0} stroke={color} strokeWidth={c.is_primary ? 3 : 2} />;
+                            const color = c.color === 'blue' ? '#3b82f6' : c.color; // Direct color mapping or tailwind class handled by style
+                            // Mapping simple pour le SVG stroke
+                            const strokeColor = c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : c.color === 'green' ? '#10b981' : c.color === 'orange' ? '#f97316' : c.color === 'purple' ? '#8b5cf6' : '#64748b';
+                            
+                            return <polygon key={c.id} points={points} fill={strokeColor} fillOpacity={c.is_primary ? 0.2 : 0} stroke={strokeColor} strokeWidth={c.is_primary ? 3 : 2} />;
                         })}
                     </svg>
                 </div>
@@ -497,22 +573,23 @@ const CompetitorModule = ({ venture }) => {
                         <div key={c.id} className={`p-4 rounded-xl border ${c.is_primary ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-800' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800'}`}>
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${c.color === 'blue' ? 'bg-blue-500' : c.color === 'red' ? 'bg-red-500' : 'bg-slate-400'}`}></div>
+                                    <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : c.color === 'green' ? '#10b981' : c.color === 'orange' ? '#f97316' : c.color === 'purple' ? '#8b5cf6' : c.color }}></div>
                                     <input type="text" value={c.name} onChange={e => handleUpdate(c.id, 'name', e.target.value)} className="font-bold bg-transparent outline-none text-slate-800 dark:text-white text-sm"/>
                                 </div>
                                 {!c.is_primary && <button onClick={() => deleteCompetitor(c.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}
                             </div>
                             <div className="grid grid-cols-2 gap-4 mb-4">
-                                {Object.keys(c.scores).map(k => (
+                                {criteria.map(k => (
                                     <div key={k}>
-                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1"><span>{k}</span><span>{c.scores[k]}/5</span></div>
-                                        <input type="range" min="0" max="5" step="1" value={c.scores[k]} onChange={e => handleScore(c.id, k, e.target.value)} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/>
+                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1"><span>{k}</span><span>{c.scores[k] || 0}/5</span></div>
+                                        <input type="range" min="0" max="5" step="1" value={c.scores[k] || 0} onChange={e => handleScore(c.id, k, e.target.value)} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/>
                                     </div>
                                 ))}
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                                 <textarea value={c.strengths || ''} onChange={e => handleUpdate(c.id, 'strengths', e.target.value)} placeholder="Forces..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
                                 <textarea value={c.weaknesses || ''} onChange={e => handleUpdate(c.id, 'weaknesses', e.target.value)} placeholder="Faiblesses..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
+                                <textarea value={c.notes || ''} onChange={e => handleUpdate(c.id, 'notes', e.target.value)} placeholder="Notes / Stratégie..." className="w-full bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded border border-yellow-100 dark:border-yellow-900/20 text-xs resize-none h-16 outline-none text-slate-700 dark:text-slate-300"/>
                             </div>
                         </div>
                     ))}
