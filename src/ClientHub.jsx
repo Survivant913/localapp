@@ -198,6 +198,14 @@ export default function ClientHub({ data, updateData }) {
                             </div>
                         </div>
                     ))}
+                    {filteredClients.length === 0 && !searchTerm && (
+                        <button onClick={() => { setEditing(null); setTempClient({ name: '' }); setForm(true); }} className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 text-slate-400 hover:text-amber-500 hover:border-amber-500/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group min-h-[240px]">
+                            <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/20 group-hover:text-amber-600 flex items-center justify-center transition-colors">
+                                <Plus size={24}/>
+                            </div>
+                            <span className="font-medium">Ajouter un premier client</span>
+                        </button>
+                    )}
                 </div>
             </div>
         );
@@ -239,6 +247,11 @@ export default function ClientHub({ data, updateData }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-sm">
+                            {catalog.length === 0 && (
+                                <tr>
+                                    <td colSpan="3" className="p-12 text-center text-slate-400">Votre catalogue est vide.</td>
+                                </tr>
+                            )}
                             {catalog.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                                     <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
@@ -300,7 +313,7 @@ export default function ClientHub({ data, updateData }) {
             if (!content) return;
 
             const printWindow = window.open('', '_blank');
-            if (!printWindow) return alert("Veuillez autoriser les pop-ups.");
+            if (!printWindow) return alert("Veuillez autoriser les pop-ups pour imprimer.");
 
             printWindow.document.write(`
                 <!DOCTYPE html>
@@ -311,7 +324,19 @@ export default function ClientHub({ data, updateData }) {
                     <style>
                         @page { size: A4; margin: 0; }
                         body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; }
-                        .print-container { width: 210mm; height: 297mm; margin: 0 auto; position: relative; background: white; box-sizing: border-box; }
+                        .print-container { width: 210mm; min-height: 297mm; margin: 0 auto; position: relative; background: white; padding: 40px; box-sizing: border-box; }
+                        
+                        /* Le pied de page fixe pour l'impression */
+                        .invoice-footer {
+                            position: fixed;
+                            bottom: 15mm;
+                            left: 40px;
+                            right: 40px;
+                            width: calc(100% - 80px);
+                            border-top: 1px solid #e2e8f0;
+                            padding-top: 20px;
+                            background: white;
+                        }
                     </style>
                 </head>
                 <body>
@@ -371,6 +396,15 @@ export default function ClientHub({ data, updateData }) {
                                     <input type="date" value={doc.dueDate} onChange={e => setDoc({...doc, dueDate: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white" />
                                 </div>
                             </div>
+                            {isInvoice && (
+                                <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-lg border border-amber-100 dark:border-amber-800/30">
+                                    <label className="text-xs font-bold text-amber-600 uppercase block mb-1 flex items-center gap-2"><Wallet size={12}/> Compte de réception</label>
+                                    <select value={doc.target_account_id} onChange={e => setDoc({...doc, target_account_id: e.target.value})} className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-slate-800 dark:text-white outline-none">
+                                        <option value="">-- Choisir un compte --</option>
+                                        {accounts.length > 0 ? accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>) : <option disabled>Aucun compte créé dans Budget</option>}
+                                    </select>
+                                </div>
+                            )}
                             <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Options fiscales</label>
                                 <button onClick={toggleAutoEntrepreneur} className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all border ${doc.taxRate === 0 && doc.notes.includes('293 B') ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300'}`}>
@@ -409,7 +443,7 @@ export default function ClientHub({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 bg-slate-200/50 dark:bg-black/50 overflow-auto flex justify-center p-8 relative">
-                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)', position: 'relative' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
+                        <div id="invoice-paper" style={{ width: '210mm', minHeight: '297mm', transform: `scale(${zoom})`, transformOrigin: 'top center', boxShadow: '0 0 40px rgba(0,0,0,0.1)' }} className="bg-white text-black p-12 flex flex-col shrink-0 transition-transform duration-200">
                             
                             {/* --- EN-TÊTE --- */}
                             <div className="flex justify-between items-start mb-12">
@@ -428,7 +462,7 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
                             
-                            {/* --- DESTINATAIRE --- */}
+                            {/* --- DESTINATAIRE (Style PRO) --- */}
                             <div className="flex justify-end mb-16">
                                 <div className="w-1/3 text-left pl-4 border-l-4 border-slate-900">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{isInvoice ? 'Facturé à' : 'Adressé à'}</p>
@@ -437,7 +471,7 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* --- TABLEAU --- */}
+                            {/* --- TABLEAU (Style PRO) --- */}
                             <table className="w-full mb-12">
                                 <thead>
                                     <tr>
@@ -459,7 +493,7 @@ export default function ClientHub({ data, updateData }) {
                                 </tbody>
                             </table>
 
-                            {/* --- RÉCAPITULATIF FINANCIER --- */}
+                            {/* --- TOTAUX --- */}
                             <div className="flex justify-end mb-24">
                                 <div className="w-1/3 text-right space-y-3">
                                     <div className="flex justify-between text-xs text-slate-500">
@@ -475,29 +509,26 @@ export default function ClientHub({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* --- PIED DE PAGE FIXÉ EN BAS --- */}
-                            <div className="mt-auto">
-                                <div className="grid grid-cols-2 gap-12 items-end pb-8">
-                                    {/* Infos Bancaires (Bas Gauche) */}
+                            {/* --- PIED DE PAGE FIXE (Classe unique pour l'impression) --- */}
+                            <div className="invoice-footer mt-auto pt-8 border-t border-slate-100">
+                                <div className="grid grid-cols-2 gap-12 items-end">
+                                    {/* Banque (Gauche) */}
                                     <div className="text-left">
                                         <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Informations de paiement</p>
-                                        <div className="text-[11px] text-slate-500 space-y-1 leading-relaxed">
+                                        <div className="text-[11px] text-slate-500 space-y-1">
                                             <p>IBAN : <span className="font-mono text-slate-700 font-bold">{profile.iban || "---"}</span></p>
                                             <p>BIC : <span className="font-mono text-slate-700 font-bold">{profile.bic || "---"}</span></p>
                                         </div>
                                     </div>
-                                    {/* Note (Bas Droite) */}
+                                    {/* Note (Droite) */}
                                     <div className="text-right">
                                         <p className="font-bold text-slate-800 mb-2 uppercase tracking-wide text-[10px]">Note</p>
                                         <p className="text-[11px] text-slate-500 whitespace-pre-wrap leading-relaxed italic">{doc.notes}</p>
                                     </div>
                                 </div>
-                                
-                                {/* SIRET (Tout en bas au milieu) */}
-                                <div className="border-t border-slate-100 pt-4 text-center">
-                                    <p className="text-[10px] text-slate-300 font-medium tracking-[0.2em] uppercase">
-                                        {profile.companyName} — SIRET {profile.siret}
-                                    </p>
+                                {/* SIRET (Centre Bas) */}
+                                <div className="mt-8 text-center text-[10px] text-slate-300 font-medium tracking-widest uppercase">
+                                    {profile.companyName} - SIRET {profile.siret}
                                 </div>
                             </div>
 
@@ -579,7 +610,7 @@ export default function ClientHub({ data, updateData }) {
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
                             {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-800 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
                             ))}
                         </div>
                     </div>
