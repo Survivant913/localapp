@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  Plus, FolderOpen, ArrowRight, Trash2, ArrowLeft,
-  FileText, Target, Users, DollarSign, 
+  Plus, FileText, Target, Users, DollarSign, 
   Network, BarChart3, Kanban,
-  Loader2, Save, Box, Activity, Sun, Zap, AlertTriangle, Check, X,
-  Eye, EyeOff, Settings
+  ArrowLeft, Trash2, Eye, EyeOff, Settings,
+  Activity, Sun, Zap, AlertTriangle, Check, X, Box, ArrowRight
 } from 'lucide-react';
 
 // --- ICONS MAPPING ---
@@ -71,18 +70,9 @@ const PostItSection = ({ title, icon: Icon, items = [], onChange, colorDefault =
         { id: 'red', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800' },
     ];
 
-    const addItem = () => {
-        const newItem = { id: Math.random().toString(36).substr(2, 9), text: '', color: colorDefault };
-        onChange([...items, newItem]);
-    };
-
-    const updateItem = (id, field, value) => {
-        onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i));
-    };
-
-    const deleteItem = (id) => {
-        onChange(items.filter(i => i.id !== id));
-    };
+    const addItem = () => { onChange([...items, { id: Math.random().toString(36).substr(2, 9), text: '', color: colorDefault }]); };
+    const updateItem = (id, field, value) => { onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i)); };
+    const deleteItem = (id) => { onChange(items.filter(i => i.id !== id)); };
 
     return (
         <div className={`flex flex-col bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm relative group hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors ${className}`}>
@@ -242,27 +232,15 @@ const StrategyModule = ({ venture }) => {
                 </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-                {view === 'canvas' && (
-                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 h-full min-h-[800px]">
-                        {SECTIONS_CANVAS.map(section => (
-                            <PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className={`${section.col} min-h-[200px]`}/>
-                        ))}
-                    </div>
-                )}
-                {view === 'swot' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[600px]">
-                        {SECTIONS_SWOT.map(section => (
-                            <PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className="min-h-[300px]"/>
-                        ))}
-                    </div>
-                )}
+                {view === 'canvas' && (<div className="grid grid-cols-1 md:grid-cols-10 gap-4 h-full min-h-[800px]">{SECTIONS_CANVAS.map(section => (<PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className={`${section.col} min-h-[200px]`}/>))}</div>)}
+                {view === 'swot' && (<div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full min-h-[600px]">{SECTIONS_SWOT.map(section => (<PostItSection key={section.id} title={section.label} icon={section.icon} items={data[section.id] || []} onChange={(val) => handleUpdate(section.id, val)} colorDefault={section.color} className="min-h-[300px]"/>))}</div>)}
             </div>
         </div>
     );
 };
 
 // ==========================================
-// 3. MODULE CONCURRENCE (CORRIGÉ : COULEURS & SAVE FIX)
+// 3. MODULE CONCURRENCE (FIXÉ : COULEURS & SAVE)
 // ==========================================
 const CompetitionModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
@@ -274,7 +252,7 @@ const CompetitionModule = ({ venture }) => {
     const MAX_SCORE = 5;
     const saveTimeoutRef = useRef({});
     
-    // MAP pour convertir Tailwind -> Hex pour le SVG
+    // --- LE CORRECTIF COULEUR EST ICI ---
     const TAILWIND_TO_HEX = {
         'bg-indigo-500': '#6366f1',
         'bg-red-500': '#ef4444',
@@ -286,24 +264,15 @@ const CompetitionModule = ({ venture }) => {
         'bg-violet-500': '#8b5cf6',
         'bg-pink-500': '#ec4899'
     };
-
     const COMPETITOR_COLORS = Object.keys(TAILWIND_TO_HEX);
-
-    const getHexColor = (tailwindClass) => {
-        return TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Gris par défaut
-    };
+    const getHexColor = (tailwindClass) => TAILWIND_TO_HEX[tailwindClass] || '#94a3b8'; // Fallback gris
 
     useEffect(() => {
         const loadData = async () => {
-            // 1. Charger les dimensions (Critères)
+            // 1. Charger les dimensions
             const { data: vData } = await supabase.from('ventures').select('dimensions').eq('id', venture.id).single();
-            let currentDims = vData?.dimensions;
-
-            // FIX RADICAL : Si pas de dimensions en BDD, on FORCE l'écriture par défaut
-            if (!currentDims || currentDims.length === 0) {
-                currentDims = ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
-                await supabase.from('ventures').update({ dimensions: currentDims }).eq('id', venture.id);
-            }
+            // Utiliser une valeur par défaut locale si vide, MAIS ne pas écraser la DB tout de suite pour éviter les conflits de rechargement
+            let currentDims = vData?.dimensions || ['Prix', 'Qualité', 'Innovation', 'Service', 'Design'];
             setDimensions(currentDims);
 
             // 2. Charger les concurrents
@@ -315,15 +284,7 @@ const CompetitionModule = ({ venture }) => {
                 // Initialiser "Mon Projet" si vide
                 const initialStats = {};
                 currentDims.forEach(d => initialStats[d] = 3);
-                
-                const myProject = {
-                    venture_id: venture.id,
-                    name: 'Mon Projet',
-                    is_me: true,
-                    stats: initialStats,
-                    color: 'bg-indigo-500',
-                    visible: true
-                };
+                const myProject = { venture_id: venture.id, name: 'Mon Projet', is_me: true, stats: initialStats, color: 'bg-indigo-500', visible: true };
                 const { data: inserted } = await supabase.from('venture_competitors').insert([myProject]).select();
                 if (inserted) setCompetitors(inserted);
             }
@@ -336,26 +297,21 @@ const CompetitionModule = ({ venture }) => {
     const addDimension = async () => {
         if (newDimText && !dimensions.includes(newDimText)) {
             const newDims = [...dimensions, newDimText];
-            setDimensions(newDims);
+            setDimensions(newDims); // Update UI
             
-            // 1. Sauvegarder la nouvelle liste
+            // Update DB
             await supabase.from('ventures').update({ dimensions: newDims }).eq('id', venture.id);
 
-            // 2. Mettre à jour TOUS les concurrents existants avec une note par défaut
+            // Update Competitors UI & DB
             const updatedCompetitors = competitors.map(c => {
-                // On s'assure que stats existe, sinon on le crée
-                const currentStats = c.stats || {};
-                const newStats = { ...currentStats, [newDimText]: 3 };
+                const newStats = { ...c.stats, [newDimText]: 3 };
                 return { ...c, stats: newStats };
             });
-            
             setCompetitors(updatedCompetitors);
 
-            // 3. Persister chaque concurrent en base
             for (const comp of updatedCompetitors) {
                 await supabase.from('venture_competitors').update({ stats: comp.stats }).eq('id', comp.id);
             }
-            
             setNewDimText("");
         }
     };
@@ -371,19 +327,9 @@ const CompetitionModule = ({ venture }) => {
     const addCompetitor = async () => {
         const initialStats = {};
         dimensions.forEach(d => initialStats[d] = 3);
-        
-        // Couleur suivante dans la liste (sauf la première qui est pour "Moi")
         const colorIndex = (competitors.length) % (COMPETITOR_COLORS.length - 1) + 1;
         const nextColor = COMPETITOR_COLORS[colorIndex];
-
-        const newComp = {
-            venture_id: venture.id,
-            name: 'Nouveau',
-            is_me: false,
-            stats: initialStats,
-            color: nextColor,
-            visible: true
-        };
+        const newComp = { venture_id: venture.id, name: 'Nouveau', is_me: false, stats: initialStats, color: nextColor, visible: true };
         const { data } = await supabase.from('venture_competitors').insert([newComp]).select();
         if (data) setCompetitors([...competitors, data[0]]);
     };
@@ -403,7 +349,6 @@ const CompetitionModule = ({ venture }) => {
             return c;
         });
         setCompetitors(updatedList);
-
         if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
         saveTimeoutRef.current[id] = setTimeout(async () => {
             const compToSave = updatedList.find(c => c.id === id);
@@ -411,18 +356,16 @@ const CompetitionModule = ({ venture }) => {
         }, 800);
     };
 
-    // --- RADAR LOGIC ---
+    // RADAR SVG
     const radarSize = 300;
     const centerX = radarSize / 2;
     const centerY = radarSize / 2;
     const radius = 100;
-
     const getCoordinates = (value, index, total) => {
         const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
         const r = (value / MAX_SCORE) * radius;
         return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
     };
-
     const getPath = (stats) => {
         const points = dimensions.map((dim, i) => {
             const val = stats ? (stats[dim] || 0) : 0;
@@ -437,106 +380,26 @@ const CompetitionModule = ({ venture }) => {
     return (
         <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className="flex-1 flex flex-col items-center justify-center border-r border-slate-200 dark:border-slate-800 p-6 relative">
-                <h3 className="absolute top-6 left-6 font-bold text-lg text-slate-700 dark:text-white flex items-center gap-2">
-                    <Target className="text-indigo-500"/> Radar de Positionnement
-                </h3>
-                
+                <h3 className="absolute top-6 left-6 font-bold text-lg text-slate-700 dark:text-white flex items-center gap-2"><Target className="text-indigo-500"/> Radar de Positionnement</h3>
                 <div className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
                     <svg width="100%" height="100%" viewBox={`0 0 ${radarSize} ${radarSize}`} className="overflow-visible">
-                        {[1, 2, 3, 4, 5].map(level => (
-                            <polygon key={level} points={dimensions.map((_, i) => {
-                                const c = getCoordinates(level, i, dimensions.length);
-                                return `${c.x},${c.y}`;
-                            }).join(' ')} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.5" className="dark:stroke-slate-700" />
-                        ))}
+                        {[1, 2, 3, 4, 5].map(level => (<polygon key={level} points={dimensions.map((_, i) => { const c = getCoordinates(level, i, dimensions.length); return `${c.x},${c.y}`; }).join(' ')} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeOpacity="0.5" className="dark:stroke-slate-700" />))}
                         {dimensions.map((dim, i) => {
                             const end = getCoordinates(MAX_SCORE, i, dimensions.length);
-                            return (
-                                <g key={dim}>
-                                    <line x1={centerX} y1={centerY} x2={end.x} y2={end.y} stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/>
-                                    <text x={end.x * 1.15 - centerX * 0.15} y={end.y * 1.15 - centerY * 0.15} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 dark:fill-slate-400 uppercase tracking-wide">
-                                        {dim}
-                                    </text>
-                                </g>
-                            );
+                            return (<g key={dim}><line x1={centerX} y1={centerY} x2={end.x} y2={end.y} stroke="#cbd5e1" strokeWidth="1" className="dark:stroke-slate-700"/><text x={end.x * 1.15 - centerX * 0.15} y={end.y * 1.15 - centerY * 0.15} textAnchor="middle" dominantBaseline="middle" className="text-[10px] font-bold fill-slate-500 dark:fill-slate-400 uppercase tracking-wide">{dim}</text></g>);
                         })}
-                        {competitors.map(comp => (
-                            (comp.visible) && (
-                                <g key={comp.id} className="transition-all duration-500 ease-out">
-                                    <polygon 
-                                        points={getPath(comp.stats)} 
-                                        fill={getHexColor(comp.color) + "33"} // +33 pour opacité
-                                        stroke={getHexColor(comp.color)} 
-                                        strokeWidth={comp.is_me ? 3 : 2} 
-                                    />
-                                    {dimensions.map((dim, i) => {
-                                        const c = getCoordinates(comp.stats?.[dim] || 0, i, dimensions.length);
-                                        return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={getHexColor(comp.color)} />;
-                                    })}
-                                </g>
-                            )
-                        ))}
+                        {competitors.map(comp => ((comp.visible) && (<g key={comp.id} className="transition-all duration-500 ease-out">
+                            {/* FIX COULEUR ICI : UTILISATION DE getHexColor */}
+                            <polygon points={getPath(comp.stats)} fill={getHexColor(comp.color) + "33"} stroke={getHexColor(comp.color)} strokeWidth={comp.is_me ? 3 : 2} />
+                            {dimensions.map((dim, i) => { const c = getCoordinates(comp.stats?.[dim] || 0, i, dimensions.length); return <circle key={i} cx={c.x} cy={c.y} r={comp.is_me ? 3 : 2} fill={getHexColor(comp.color)} />; })}
+                        </g>)))}
                     </svg>
                 </div>
             </div>
-
             <div className="w-96 flex flex-col bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setIsEditingDims(!isEditingDims)} className={`p-1.5 rounded transition-colors ${isEditingDims ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Modifier les critères">
-                            <Settings size={16}/>
-                        </button>
-                        <span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span>
-                    </div>
-                    <button onClick={addCompetitor} className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:text-indigo-600 transition-colors"><Plus size={16}/></button>
-                </div>
-
-                {isEditingDims && (
-                    <div className="p-4 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                        <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Gérer les critères du radar</h4>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {dimensions.map(dim => (
-                                <span key={dim} className="px-2 py-1 bg-white dark:bg-slate-700 rounded text-xs border border-slate-200 dark:border-slate-600 flex items-center gap-1">
-                                    {dim}
-                                    <button onClick={() => removeDimension(dim)} className="hover:text-red-500"><X size={10}/></button>
-                                </span>
-                            ))}
-                        </div>
-                        <div className="flex gap-2">
-                            <input value={newDimText} onChange={e => setNewDimText(e.target.value)} className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white" placeholder="Nouveau critère..." />
-                            <button onClick={addDimension} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded font-bold">OK</button>
-                        </div>
-                    </div>
-                )}
-                
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    {competitors.map(comp => (
-                        <div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}>
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${comp.color}`}></div>
-                                    <input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" />
-                                </div>
-                                <div className="flex gap-1">
-                                    <button onClick={() => handleUpdateCompetitor(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">{comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>
-                                    {!comp.is_me && <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {dimensions.map(dim => (
-                                    <div key={dim} className="flex items-center gap-3">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate" title={dim}>{dim}</span>
-                                        <input type="range" min="1" max="5" step="0.5" value={comp.stats?.[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-                                        <span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats?.[dim]}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                <textarea value={comp.strengths || ''} onChange={e => handleUpdateCompetitor(comp.id, 'strengths', e.target.value)} placeholder="Forces / Atouts..." className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900"><div className="flex items-center gap-2"><button onClick={() => setIsEditingDims(!isEditingDims)} className={`p-1.5 rounded transition-colors ${isEditingDims ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Modifier les critères"><Settings size={16}/></button><span className="text-xs font-bold text-slate-500 uppercase">Acteurs</span></div><button onClick={addCompetitor} className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded hover:text-indigo-600 transition-colors"><Plus size={16}/></button></div>
+                {isEditingDims && (<div className="p-4 bg-slate-100 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800"><h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Gérer les critères du radar</h4><div className="flex flex-wrap gap-2 mb-3">{dimensions.map(dim => (<span key={dim} className="px-2 py-1 bg-white dark:bg-slate-700 rounded text-xs border border-slate-200 dark:border-slate-600 flex items-center gap-1">{dim}<button onClick={() => removeDimension(dim)} className="hover:text-red-500"><X size={10}/></button></span>))}</div><div className="flex gap-2"><input value={newDimText} onChange={e => setNewDimText(e.target.value)} className="flex-1 text-xs px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white" placeholder="Nouveau critère..." /><button onClick={addDimension} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded font-bold">OK</button></div></div>)}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">{competitors.map(comp => (<div key={comp.id} className={`rounded-xl border p-4 transition-all ${comp.is_me ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'}`}><div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><div className={`w-3 h-3 rounded-full ${comp.color}`}></div><input value={comp.name} onChange={e => handleUpdateCompetitor(comp.id, 'name', e.target.value)} className="font-bold text-sm bg-transparent outline-none w-32 text-slate-800 dark:text-white" /></div><div className="flex gap-1"><button onClick={() => handleUpdateCompetitor(comp.id, 'visible', !comp.visible)} className="p-1 text-slate-400 hover:text-indigo-500">{comp.visible ? <Eye size={14}/> : <EyeOff size={14}/>}</button>{!comp.is_me && <button onClick={() => deleteCompetitor(comp.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>}</div></div><div className="space-y-3">{dimensions.map(dim => (<div key={dim} className="flex items-center gap-3"><span className="text-[10px] font-bold text-slate-500 uppercase w-16 truncate" title={dim}>{dim}</span><input type="range" min="1" max="5" step="0.5" value={comp.stats?.[dim] || 1} onChange={e => handleUpdateCompetitor(comp.id, null, e.target.value, dim)} className="flex-1 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" /><span className="text-xs font-mono font-bold w-4 text-right text-slate-700 dark:text-slate-300">{comp.stats?.[dim]}</span></div>))}</div><div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800"><textarea value={comp.strengths || ''} onChange={e => handleUpdateCompetitor(comp.id, 'strengths', e.target.value)} placeholder="Forces / Atouts..." className="w-full text-xs bg-transparent outline-none text-slate-600 dark:text-slate-400 resize-none h-12" /></div></div>))}</div>
             </div>
         </div>
     );
@@ -555,74 +418,31 @@ export default function Workspace() {
     useEffect(() => { fetchVentures(); }, []);
 
     const fetchVentures = async () => {
-        try {
-            const { data, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false });
-            if (error) throw error;
-            setVentures(data || []);
-        } catch (error) { console.error(error); } finally { setLoading(false); }
+        try { const { data, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false }); if (error) throw error; setVentures(data || []); } 
+        catch (error) { console.error(error); } finally { setLoading(false); }
     };
 
     const createVenture = async () => {
         if (!newVentureTitle.trim()) return;
-        try {
-            const { data } = await supabase.from('ventures').insert([{ title: newVentureTitle, status: 'Idea' }]).select();
-            setVentures([data[0], ...ventures]); setNewVentureTitle("");
-        } catch (error) { alert("Erreur"); }
+        try { const { data } = await supabase.from('ventures').insert([{ title: newVentureTitle, status: 'Idea' }]).select(); setVentures([data[0], ...ventures]); setNewVentureTitle(""); } 
+        catch (error) { alert("Erreur"); }
     };
 
     const deleteVenture = async (id, e) => {
-        e.stopPropagation();
-        if (!window.confirm("Supprimer ?")) return;
-        await supabase.from('ventures').delete().eq('id', id);
-        setVentures(ventures.filter(v => v.id !== id));
+        e.stopPropagation(); if (!window.confirm("Supprimer ?")) return;
+        await supabase.from('ventures').delete().eq('id', id); setVentures(ventures.filter(v => v.id !== id));
     };
 
     if (!activeVenture) {
         return (
-            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2>
-                </div>
-                <div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2">
-                    <input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} />
-                    <button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button>
-                </div>
-                {loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {ventures.map(v => (
-                            <div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative">
-                                <button onClick={(e) => deleteVenture(v.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button>
-                                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3>
-                                <div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowRight size={16}/></div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
+            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2></div><div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowRight size={16}/></div></div>))}</div>)}</div>
         );
     }
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
-            <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4">
-                <button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button>
-                <h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2>
-            </header>
-            <div className="flex-1 flex overflow-hidden">
-                <nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">
-                    {MODULES.map(module => (
-                        <button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>
-                    ))}
-                </nav>
-                <main className="flex-1 overflow-hidden relative bg-white dark:bg-black">
-                    {activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}
-                    {activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}
-                    {activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}
-                    {!['editor', 'business', 'competition'].includes(activeModuleId) && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400"><Users size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>
-                    )}
-                </main>
-            </div>
+            <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 shrink-0 z-20 gap-4"><button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button><h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2></header>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'competition' && <CompetitionModule venture={activeVenture} />}{!['editor', 'business', 'competition'].includes(activeModuleId) && (<div className="h-full flex flex-col items-center justify-center text-slate-400"><Users size={48} className="mb-4 opacity-20"/><p>Module {activeModuleId} en construction</p></div>)}</main></div>
         </div>
     );
 }
