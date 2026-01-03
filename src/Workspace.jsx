@@ -34,15 +34,15 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (AUTO-EXPAND)
+// COMPOSANT POST-IT (AUTO-EXPAND : S'AGRANDIT AVEC LE TEXTE)
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
 
-    // Auto-resize de la hauteur en fonction du contenu
+    // Auto-resize : Le post-it grandit quand on écrit
     useLayoutEffect(() => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto'; // Reset pour recalculer
+            textareaRef.current.style.height = 'auto'; 
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
     }, [item.text]);
@@ -53,10 +53,10 @@ const PostIt = ({ item, update, remove, color }) => {
                 ref={textareaRef}
                 value={item.text || ''} 
                 onChange={e => update(item.id, 'text', e.target.value)} 
-                className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-200 overflow-hidden block" 
+                className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-200 overflow-hidden block leading-relaxed" 
                 rows={1}
                 placeholder="..."
-                style={{ minHeight: '24px' }}
+                style={{ minHeight: '28px' }}
             />
             <button 
                 onClick={() => remove(item.id)} 
@@ -125,7 +125,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (SCROLL INTERNE + POST-IT EXPAND)
+// 2. MODULE STRATÉGIE (FIXED ROW HEIGHT + SCROLL INTERNE)
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -182,9 +182,9 @@ const StrategyModule = ({ venture }) => {
                     <button onClick={() => setView('swot')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'swot' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>SWOT</button>
                 </div>
             </div>
-            {/* CORRECTION STRUCTURE GRID + SCROLL */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10 auto-rows-[minmax(180px,auto)]' : 'grid-cols-1 md:grid-cols-2 auto-rows-[minmax(300px,auto)]'}`}>
+                {/* GRILLE A HAUTEUR FIXE POUR QUE LE SCROLL SE FASSE DANS LES BOITES */}
+                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10 auto-rows-[400px]' : 'grid-cols-1 md:grid-cols-2 auto-rows-[400px]'}`}>
                     {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
                         <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden`}>
                             {/* Titre fixe */}
@@ -192,7 +192,7 @@ const StrategyModule = ({ venture }) => {
                                 <s.icon size={14} className="text-indigo-500"/> {s.label}
                             </h3>
                             
-                            {/* Zone de contenu déroulante */}
+                            {/* Zone de contenu déroulante : C'EST ICI QUE CA SCROLL */}
                             <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
                                 {data[s.id]?.map(i => (
                                     <PostIt 
