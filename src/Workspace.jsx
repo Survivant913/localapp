@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  Plus, FileText, Users, Activity, 
-  Trash2, ArrowLeft, Save, MousePointer2, Move, Type
+  Plus, FileText, Users, ArrowLeft, Trash2, 
+  Activity, Target, DollarSign, BarChart2, Share2, Menu,
+  Sun, Zap, AlertTriangle, Check, X, Box, Move
 } from 'lucide-react';
 
-// --- MODULES ACTIFS ---
+// --- MODULES ---
 const MODULES = [
     { id: 'editor', label: 'Carnet', icon: FileText },
     { id: 'business', label: 'Stratégie', icon: Users },
@@ -22,7 +23,23 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// 1. MODULE CARNET (Code inchangé)
+// COMPOSANT POST-IT (SORTI DU MODULE POUR EVITER LE BUG DE FOCUS)
+// ==========================================
+const PostIt = ({ item, update, remove, color }) => (
+    <div className={`p-2 rounded border mb-2 text-xs ${color === 'blue' ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : color === 'red' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : color === 'green' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'}`}>
+        <textarea 
+            value={item.text || ''} 
+            onChange={e => update(item.id, 'text', e.target.value)} 
+            className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-200" 
+            rows={2}
+            placeholder="..."
+        />
+        <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600 mt-1"><Trash2 size={12}/></button>
+    </div>
+);
+
+// ==========================================
+// 1. MODULE CARNET
 // ==========================================
 const EditorModule = ({ venture }) => {
     const [pages, setPages] = useState([]);
@@ -78,10 +95,8 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE (Code inchangé)
+// 2. MODULE STRATÉGIE (CORRIGÉ : FOCUS INPUT)
 // ==========================================
-// ... (Je garde le composant StrategyModule identique pour gagner de la place, 
-// je le remets complet ci-dessous pour être sûr que tu as tout le fichier)
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
     const [data, setData] = useState({});
@@ -89,21 +104,21 @@ const StrategyModule = ({ venture }) => {
     const saveTimeoutRef = useRef({}); 
 
     const SECTIONS_CANVAS = [
-        { id: 'partners', label: 'Partenaires Clés', icon: Users, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
         { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'valueProps', label: 'Propositions de Valeur', icon: Activity, col: 'md:col-span-2 md:row-span-2', color: 'red' },
+        { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
         { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
-        { id: 'segments', label: 'Segments Clients', icon: Users, col: 'md:col-span-2 md:row-span-2', color: 'green' },
-        { id: 'resources', label: 'Ressources Clés', icon: FileText, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
-        { id: 'channels', label: 'Canaux', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'green' },
-        { id: 'cost', label: 'Structure de Coûts', icon: Trash2, col: 'md:col-span-5 md:row-span-1', color: 'red' },
-        { id: 'revenue', label: 'Flux de Revenus', icon: Activity, col: 'md:col-span-5 md:row-span-1', color: 'green' },
+        { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'cost', label: 'Structure de Coûts', icon: DollarSign, col: 'md:col-span-5 md:row-span-1', color: 'red' },
+        { id: 'revenue', label: 'Flux de Revenus', icon: BarChart2, col: 'md:col-span-5 md:row-span-1', color: 'green' },
     ];
     const SECTIONS_SWOT = [
-        { id: 'strengths', label: 'Forces', icon: Activity, color: 'green' },
-        { id: 'weaknesses', label: 'Faiblesses', icon: Trash2, color: 'red' },
-        { id: 'opportunities', label: 'Opportunités', icon: Activity, color: 'blue' },
-        { id: 'threats', label: 'Menaces', icon: Activity, color: 'yellow' },
+        { id: 'strengths', label: 'Forces', icon: Check, color: 'green' },
+        { id: 'weaknesses', label: 'Faiblesses', icon: X, color: 'red' },
+        { id: 'opportunities', label: 'Opportunités', icon: Zap, color: 'blue' },
+        { id: 'threats', label: 'Menaces', icon: AlertTriangle, color: 'yellow' },
     ];
 
     useEffect(() => {
@@ -127,14 +142,6 @@ const StrategyModule = ({ venture }) => {
         }, 1000);
     };
 
-    // Petit composant Post-it interne pour éviter dépendance externe
-    const PostIt = ({ item, update, remove, color }) => (
-        <div className={`p-2 rounded border mb-2 text-xs ${color === 'blue' ? 'bg-blue-50 border-blue-200' : color === 'red' ? 'bg-red-50 border-red-200' : color === 'green' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-            <textarea value={item.text} onChange={e => update(item.id, 'text', e.target.value)} className="w-full bg-transparent outline-none resize-none text-slate-800" rows={2}/>
-            <button onClick={() => remove(item.id)} className="text-red-400 hover:text-red-600"><Trash2 size={10}/></button>
-        </div>
-    );
-
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
@@ -150,7 +157,15 @@ const StrategyModule = ({ venture }) => {
                     {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
                         <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 min-h-[150px]`}>
                             <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2"><s.icon size={14} className="text-indigo-500"/> {s.label}</h3>
-                            {data[s.id]?.map(i => <PostIt key={i.id} item={i} color={s.color} update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} />)}
+                            {data[s.id]?.map(i => (
+                                <PostIt 
+                                    key={i.id} 
+                                    item={i} 
+                                    color={s.color} 
+                                    update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} 
+                                    remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} 
+                                />
+                            ))}
                             <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="w-full py-1 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800"><Plus size={12} className="inline"/> Ajouter</button>
                         </div>
                     ))}
@@ -161,13 +176,13 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (NOUVEAU & LÉGER)
+// 3. MODULE MINDMAP (PROTOTYPE HTML/CSS SOLIDE)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
     const [selectedId, setSelectedId] = useState(null);
-    const [draggingId, setDraggingId] = useState(null);
-    const svgRef = useRef(null);
+    const [dragging, setDragging] = useState(null); 
+    const containerRef = useRef(null);
     const saveTimeoutRef = useRef(null);
 
     // Initialisation
@@ -177,11 +192,9 @@ const MindmapModule = ({ venture }) => {
             if (data && data.content && data.content.length > 0) {
                 setNodes(data.content);
             } else {
-                // Créer racine si vide
                 const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root' }];
                 setNodes(root);
-                // Sauvegarde initiale
-                await supabase.from('venture_mindmaps').insert([{ venture_id: venture.id, content: root }]);
+                await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' });
             }
         };
         load();
@@ -197,14 +210,17 @@ const MindmapModule = ({ venture }) => {
     }, [nodes, venture.id]);
 
     const addNode = () => {
-        if (!selectedId) { alert("Sélectionnez un noeud parent d'abord !"); return; }
+        if (!selectedId) { alert("Sélectionnez une carte parente d'abord !"); return; }
         const parent = nodes.find(n => n.id === selectedId);
+        if (!parent) return;
+
         const newNode = {
             id: Date.now().toString(),
-            x: parent.x + 150,
-            y: parent.y + 50,
-            label: 'Nouveau',
-            parentId: selectedId
+            x: parent.x + 200,
+            y: parent.y + (Math.random() * 100 - 50),
+            label: 'Nouvelle idée',
+            parentId: selectedId,
+            type: 'child'
         };
         setNodes([...nodes, newNode]);
         setSelectedId(newNode.id);
@@ -212,7 +228,6 @@ const MindmapModule = ({ venture }) => {
 
     const deleteNode = () => {
         if (!selectedId || selectedId === 'root') return;
-        // Supprime le noeud et ses enfants (récursif simple)
         const toDelete = new Set([selectedId]);
         let changed = true;
         while(changed) {
@@ -231,70 +246,73 @@ const MindmapModule = ({ venture }) => {
     const handleMouseDown = (e, id) => {
         e.stopPropagation();
         setSelectedId(id);
-        setDraggingId(id);
+        const node = nodes.find(n => n.id === id);
+        setDragging({
+            id: id,
+            startX: e.clientX,
+            startY: e.clientY,
+            initialNodeX: node.x,
+            initialNodeY: node.y
+        });
     };
 
-    const handleMouseMove = (e) => {
-        if (!draggingId) return;
-        const svg = svgRef.current;
-        const rect = svg.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        setNodes(nodes.map(n => n.id === draggingId ? { ...n, x, y } : n));
-    };
-
-    const handleMouseUp = () => {
-        setDraggingId(null);
-    };
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!dragging) return;
+            const dx = e.clientX - dragging.startX;
+            const dy = e.clientY - dragging.startY;
+            setNodes(prev => prev.map(n => n.id === dragging.id ? { ...n, x: dragging.initialNodeX + dx, y: dragging.initialNodeY + dy } : n));
+        };
+        const handleMouseUp = () => { setDragging(null); };
+        if (dragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [dragging]);
 
     const updateLabel = (id, newLabel) => {
         setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n));
     };
 
+    const renderLines = () => {
+        return nodes.map(node => {
+            if (!node.parentId) return null;
+            const parent = nodes.find(n => n.id === node.parentId);
+            if (!parent) return null;
+            const startX = parent.x + 80;
+            const startY = parent.y + 25;
+            const endX = node.x + 80;
+            const endY = node.y + 25;
+            const midX = (startX + endX) / 2;
+            const pathData = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
+            return (
+                <path 
+                    key={`link-${node.id}`} d={pathData}
+                    fill="none" stroke="#94a3b8" strokeWidth="2" className="dark:stroke-slate-600"
+                />
+            );
+        });
+    };
+
     return (
-        <div className="h-full w-full bg-slate-50 dark:bg-slate-950 relative overflow-hidden flex flex-col">
-            <div className="absolute top-4 left-4 z-10 bg-white dark:bg-slate-800 p-2 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 flex gap-2">
-                <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded" title="Ajouter un enfant"><Plus size={20}/></button>
-                <button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded ${(!selectedId || selectedId === 'root') ? 'opacity-50 cursor-not-allowed' : ''}`} title="Supprimer"><Trash2 size={20}/></button>
-                <div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                <span className="text-xs text-slate-400 flex items-center px-2">
-                    {selectedId ? "1 noeud sélectionné" : "Sélectionnez un noeud"}
-                </span>
+        <div className="h-full w-full bg-slate-50 dark:bg-slate-950 relative overflow-hidden select-none cursor-move" onMouseDown={() => setSelectedId(null)}>
+            <div className="absolute top-4 left-4 z-20 flex gap-2">
+                <button onClick={addNode} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-lg font-medium transition-transform active:scale-95"><Plus size={18}/> Ajouter Enfant</button>
+                <button onClick={deleteNode} className={`flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 text-red-500 border border-red-200 dark:border-red-900 rounded-lg shadow-lg font-medium transition-all ${(!selectedId || selectedId === 'root') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50 dark:hover:bg-red-900/20'}`}><Trash2 size={18}/> Supprimer</button>
             </div>
-
-            <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onClick={() => setSelectedId(null)}>
-                {/* Liens */}
-                {nodes.map(node => {
-                    if (!node.parentId) return null;
-                    const parent = nodes.find(n => n.id === node.parentId);
-                    if (!parent) return null;
-                    return (
-                        <line 
-                            key={`link-${node.id}`}
-                            x1={parent.x + 60} y1={parent.y + 20} // +60/+20 pour centrer (largeur 120 / hauteur 40)
-                            x2={node.x + 60} y2={node.y + 20}
-                            stroke="#cbd5e1" strokeWidth="2"
-                        />
-                    );
-                })}
-
-                {/* Noeuds */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">{renderLines()}</svg>
+            <div className="absolute inset-0 w-full h-full z-10">
                 {nodes.map(node => (
-                    <foreignObject key={node.id} x={node.x} y={node.y} width="120" height="40">
-                        <div 
-                            onMouseDown={(e) => handleMouseDown(e, node.id)}
-                            className={`w-full h-full rounded-lg flex items-center justify-center border-2 transition-all shadow-sm select-none ${selectedId === node.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/50 shadow-md' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}
-                        >
-                            <input 
-                                value={node.label}
-                                onChange={(e) => updateLabel(node.id, e.target.value)}
-                                className="w-full bg-transparent text-center text-xs font-bold text-slate-700 dark:text-slate-200 outline-none px-1"
-                            />
-                        </div>
-                    </foreignObject>
+                    <div key={node.id} style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '160px', cursor: dragging?.id === node.id ? 'grabbing' : 'grab' }} className={`absolute top-0 left-0 p-3 rounded-xl border-2 shadow-sm transition-shadow duration-200 flex flex-col items-center justify-center bg-white dark:bg-slate-800 ${selectedId === node.id ? 'border-indigo-500 ring-2 ring-indigo-500/20 shadow-lg scale-105 z-50' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'} ${node.type === 'root' ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`} onMouseDown={(e) => handleMouseDown(e, node.id)}>
+                        <input value={node.label} onChange={(e) => updateLabel(node.id, e.target.value)} className={`w-full bg-transparent text-center outline-none break-words font-medium ${node.type === 'root' ? 'text-indigo-700 dark:text-indigo-300 text-sm font-bold' : 'text-slate-700 dark:text-slate-200 text-xs'}`} placeholder="Idée..." />
+                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-slate-300 dark:text-slate-600"><Move size={12} /></div>
+                    </div>
                 ))}
-            </svg>
+            </div>
         </div>
     );
 };
