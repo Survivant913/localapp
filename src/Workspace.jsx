@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
-  Plus, Minus, FileText, Users, ArrowLeft, Trash2, 
+  Plus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
-  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal
+  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -34,25 +34,39 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT (STRATÉGIE)
+// COMPOSANT POST-IT (AUTO-EXPAND)
 // ==========================================
-const PostIt = ({ item, update, remove, color }) => (
-    <div className={`p-2 rounded border mb-2 text-xs group relative ${color === 'blue' ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : color === 'red' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : color === 'green' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'}`}>
-        <textarea 
-            value={item.text || ''} 
-            onChange={e => update(item.id, 'text', e.target.value)} 
-            className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-200 leading-relaxed" 
-            rows={3}
-            placeholder="..."
-        />
-        <button 
-            onClick={() => remove(item.id)} 
-            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"
-        >
-            <Trash2 size={10}/>
-        </button>
-    </div>
-);
+const PostIt = ({ item, update, remove, color }) => {
+    const textareaRef = useRef(null);
+
+    // Auto-resize de la hauteur en fonction du contenu
+    useLayoutEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'; // Reset pour recalculer
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [item.text]);
+
+    return (
+        <div className={`p-2 rounded border mb-2 text-xs group relative shrink-0 ${color === 'blue' ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : color === 'red' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : color === 'green' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'}`}>
+            <textarea 
+                ref={textareaRef}
+                value={item.text || ''} 
+                onChange={e => update(item.id, 'text', e.target.value)} 
+                className="w-full bg-transparent outline-none resize-none text-slate-800 dark:text-slate-200 overflow-hidden block" 
+                rows={1}
+                placeholder="..."
+                style={{ minHeight: '24px' }}
+            />
+            <button 
+                onClick={() => remove(item.id)} 
+                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"
+            >
+                <Trash2 size={10}/>
+            </button>
+        </div>
+    );
+};
 
 // ==========================================
 // 1. MODULE CARNET
@@ -111,7 +125,7 @@ const EditorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 2. MODULE STRATÉGIE
+// 2. MODULE STRATÉGIE (SCROLL INTERNE + POST-IT EXPAND)
 // ==========================================
 const StrategyModule = ({ venture }) => {
     const [view, setView] = useState('canvas');
@@ -168,21 +182,33 @@ const StrategyModule = ({ venture }) => {
                     <button onClick={() => setView('swot')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'swot' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>SWOT</button>
                 </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10' : 'grid-cols-1 md:grid-cols-2'}`}>
+            {/* CORRECTION STRUCTURE GRID + SCROLL */}
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10 auto-rows-[minmax(180px,auto)]' : 'grid-cols-1 md:grid-cols-2 auto-rows-[minmax(300px,auto)]'}`}>
                     {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
-                        <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 min-h-[150px]`}>
-                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2"><s.icon size={14} className="text-indigo-500"/> {s.label}</h3>
-                            {data[s.id]?.map(i => (
-                                <PostIt 
-                                    key={i.id} 
-                                    item={i} 
-                                    color={s.color} 
-                                    update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} 
-                                    remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} 
-                                />
-                            ))}
-                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="w-full py-1 text-xs font-bold text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800"><Plus size={12} className="inline"/> Ajouter</button>
+                        <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden`}>
+                            {/* Titre fixe */}
+                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2 shrink-0">
+                                <s.icon size={14} className="text-indigo-500"/> {s.label}
+                            </h3>
+                            
+                            {/* Zone de contenu déroulante */}
+                            <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
+                                {data[s.id]?.map(i => (
+                                    <PostIt 
+                                        key={i.id} 
+                                        item={i} 
+                                        color={s.color} 
+                                        update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} 
+                                        remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} 
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Bouton Ajouter fixe en bas */}
+                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0">
+                                <Plus size={12} className="inline mr-1"/> Ajouter
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -192,7 +218,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP (CASCADE + COLLAPSE + GRIP)
+// 3. MODULE MINDMAP
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -249,9 +275,9 @@ const MindmapModule = ({ venture }) => {
         if (!node) return false;
         if (!node.parentId) return true; // Root always visible
         const parent = nodes.find(n => n.id === node.parentId);
-        if (!parent) return false; // Should not happen
-        if (parent.collapsed) return false; // Parent says hide
-        return isVisible(parent.id); // Recursively check up
+        if (!parent) return false; 
+        if (parent.collapsed) return false; 
+        return isVisible(parent.id); 
     };
 
     // --- ACTIONS ---
@@ -260,7 +286,6 @@ const MindmapModule = ({ venture }) => {
         const parent = nodes.find(n => n.id === selectedId);
         if (!parent) return;
 
-        // Si le parent était replié, on le déplie pour voir le nouvel enfant
         if (parent.collapsed) {
             setNodes(prev => prev.map(n => n.id === parent.id ? { ...n, collapsed: false } : n));
         }
@@ -330,12 +355,9 @@ const MindmapModule = ({ venture }) => {
             if (draggingNode) {
                 const deltaX = (e.clientX - draggingNode.lastX) / scale;
                 const deltaY = (e.clientY - draggingNode.lastY) / scale;
-                
-                // Déplacement en cascade
                 const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, nodes)]);
                 setNodes(prev => prev.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n));
                 setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY }));
-
             } else if (isPanning) {
                 const dx = e.clientX - lastMousePos.x;
                 const dy = e.clientY - lastMousePos.y;
@@ -355,12 +377,11 @@ const MindmapModule = ({ venture }) => {
 
     const renderLines = () => {
         return nodes.map(node => {
-            // Visibility Check
             if (!isVisible(node.id)) return null;
             if (!node.parentId) return null;
             
             const parent = nodes.find(n => n.id === node.parentId);
-            if (!parent) return null; // Parent hidden or deleted
+            if (!parent) return null; 
             
             const w = 180; const h = 100; 
             const startX = parent.x + w; 
@@ -381,7 +402,6 @@ const MindmapModule = ({ venture }) => {
 
     return (
         <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
-            {/* Toolbar */}
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
                 <div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
                     <button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors" title="Ajouter Enfant"><GitCommit size={20}/></button>
@@ -392,32 +412,24 @@ const MindmapModule = ({ venture }) => {
                 {selectedId && (
                     <div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">
                         {NODE_COLORS.map(c => (
-                            <button 
-                                key={c.id} 
-                                onClick={() => updateColor(c.id)}
-                                className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}
-                            />
+                            <button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>
                         ))}
                     </div>
                 )}
             </div>
 
-            {/* Zoom Controls */}
             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
                 <button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button>
                 <button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button>
                 <button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button>
             </div>
 
-            {/* Canvas */}
             <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
                 <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
                     <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
                     
                     {nodes.map(node => {
-                        // VISIBILITY CHECK
                         if (!isVisible(node.id)) return null;
-
                         const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0];
                         const hasChildren = nodes.some(n => n.parentId === node.id);
 
@@ -428,15 +440,12 @@ const MindmapModule = ({ venture }) => {
                                 className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`}
                                 onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
                             >
-                                {/* HEADER (GRIP) */}
                                 <div 
                                     className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`}
                                     onMouseDown={(e) => handleMouseDown(e, node.id)}
                                 >
                                     <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/>
                                 </div>
-
-                                {/* CONTENT */}
                                 <div className="p-2 relative">
                                     <textarea
                                         value={node.label} 
@@ -446,7 +455,6 @@ const MindmapModule = ({ venture }) => {
                                         placeholder="Idée..."
                                         rows={Math.max(2, (node.label?.split('\n').length || 1))}
                                     />
-                                    {/* COLLAPSE BUTTON */}
                                     {hasChildren && (
                                         <button 
                                             onClick={(e) => toggleCollapse(e, node.id)}
