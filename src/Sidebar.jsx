@@ -11,12 +11,12 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
   
   const handleLogout = async () => {
     try {
-      const currentTheme = localStorage.getItem('localAppTheme');
+      const currentTheme = localStorage.getItem('freelanceCockpitTheme'); // MAJ NOM DU STORAGE
       await supabase.auth.signOut();
       localStorage.clear();
       sessionStorage.clear();
       if (currentTheme) {
-        localStorage.setItem('localAppTheme', currentTheme);
+        localStorage.setItem('freelanceCockpitTheme', currentTheme); // MAJ NOM DU STORAGE
       }
       if (isMobileOpen && toggleMobile) {
         toggleMobile();
@@ -30,7 +30,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { id: 'workspace', label: 'Workspace', icon: Box }, // --- JUSTE "WORKSPACE" ---
+    { id: 'workspace', label: 'Workspace', icon: Box }, 
     { id: 'calendar', label: 'Planning', icon: Calendar },
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
@@ -62,7 +62,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <div className={`p-6 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isCollapsed && (
             <h1 className="text-xl font-bold tracking-tight text-white whitespace-nowrap overflow-hidden">
-              {labels?.appName || 'LocalApp'}
+              {/* MODIFICATION ICI : Fallback changé */}
+              {labels?.appName || 'Freelance Cockpit'}
             </h1>
           )}
 
