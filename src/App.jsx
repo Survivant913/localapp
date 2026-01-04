@@ -24,7 +24,7 @@ export default function App() {
   const isLoaded = useRef(false);
   
   const getInitialTheme = () => {
-    if (typeof window !== 'undefined') return localStorage.getItem('localAppTheme') || 'light';
+    if (typeof window !== 'undefined') return localStorage.getItem('freelanceCockpitTheme') || 'light';
     return 'light';
   };
 
@@ -43,9 +43,6 @@ export default function App() {
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
-        // CORRECTION : On laisse le navigateur convertir l'UTC en Local
-        // Cela évite que le 4 Janvier 23h00 UTC soit interprété comme le 4 Janvier
-        // Il sera bien vu comme le 5 Janvier 00h00 Local
         const d = new Date(dateStr);
         return new Date(d.getFullYear(), d.getMonth(), d.getDate());
     } catch(e) { return new Date(); }
@@ -75,7 +72,7 @@ export default function App() {
     const newTheme = data.settings?.theme === 'dark' ? 'light' : 'dark';
     const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
     setData(newData);
-    localStorage.setItem('localAppTheme', newTheme);
+    localStorage.setItem('freelanceCockpitTheme', newTheme);
     if (newTheme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
     updateData(newData); 
   };
@@ -83,7 +80,7 @@ export default function App() {
   useEffect(() => {
     const theme = data.settings?.theme || 'light';
     if (theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
-    localStorage.setItem('localAppTheme', theme);
+    localStorage.setItem('freelanceCockpitTheme', theme);
   }, [data.settings?.theme]);
 
   useEffect(() => {
@@ -232,7 +229,7 @@ export default function App() {
       const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
       const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
       
-      const loadedTheme = localStorage.getItem('localAppTheme') || profile?.settings?.theme || 'light';
+      const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'light';
       
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
@@ -350,7 +347,7 @@ export default function App() {
       
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
-          <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'LocalApp'}</h1>
+          <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'Freelance Cockpit'}</h1>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
         </header>
         
