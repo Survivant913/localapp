@@ -8,7 +8,8 @@ import {
 
 export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
     // --- ETATS LOCAUX ---
-    const [appName, setAppName] = useState(data.customLabels?.appName || 'LocalApp');
+    // MODIFICATION ICI : 'Freelance Cockpit' par défaut
+    const [appName, setAppName] = useState(data.customLabels?.appName || 'Freelance Cockpit');
     
     // Données combinées (Profil + Entreprise)
     const [companyData, setCompanyData] = useState({
@@ -29,11 +30,12 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     // Synchronisation initiale
     useEffect(() => {
         if (data.customLabels) {
-            setAppName(data.customLabels.appName || 'LocalApp');
+            // MODIFICATION ICI : Fallback sur 'Freelance Cockpit'
+            setAppName(data.customLabels.appName || 'Freelance Cockpit');
         }
         if (data.profile) {
             setCompanyData({
-                user_name: data.customLabels?.userName || '', // On récupère le nom utilisateur ici
+                user_name: data.customLabels?.userName || '', 
                 company_name: data.profile.company_name || '',
                 siret: data.profile.siret || '',
                 tva_number: data.profile.tva_number || '',
@@ -73,11 +75,10 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             customLabels: { 
                 ...data.customLabels, 
                 appName, 
-                userName: companyData.user_name // On met à jour le userName global
+                userName: companyData.user_name 
             },
             profile: { 
                 ...data.profile, 
-                // On étale toutes les données de companyData sauf user_name qui va dans customLabels
                 company_name: companyData.company_name,
                 siret: companyData.siret,
                 tva_number: companyData.tva_number,
@@ -94,7 +95,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         setTimeout(() => setIsSaved(false), 2000);
     };
 
-    // --- IMPORT / EXPORT / THEME (Inchangés mais conservés) ---
+    // --- IMPORT / EXPORT / THEME ---
     const handleThemeChange = (theme) => {
         if ((theme === 'dark' && !darkMode) || (theme === 'light' && darkMode)) toggleTheme();
     };
@@ -104,7 +105,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cleanData, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `backup_localapp_${new Date().toISOString().split('T')[0]}.json`);
+        downloadAnchorNode.setAttribute("download", `backup_freelance_cockpit_${new Date().toISOString().split('T')[0]}.json`);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -159,7 +160,6 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                     </div>
                 </div>
                 
-                {/* BOUTON SAUVEGARDER (Visible en haut aussi pour l'accès rapide) */}
                 <button 
                     onClick={handleSaveProfile} 
                     className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold text-white transition-all shadow-md ${isSaved ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}`}
@@ -172,7 +172,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             {/* --- SECTION PRINCIPALE : MON ENTREPRISE --- */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2 font-serif">
+                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                         <Building2 size={20} className="text-amber-500"/> Mon Entreprise
                     </h3>
                 </div>
