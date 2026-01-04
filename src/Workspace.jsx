@@ -5,7 +5,7 @@ import {
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
-  Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff // Icônes mises à jour
+  Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -14,10 +14,10 @@ const MODULES = [
     { id: 'business', label: 'Stratégie', icon: Users },
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
     { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'competitors', label: 'Concurrence', icon: Swords }, // Module ajouté
+    { id: 'competitors', label: 'Concurrence', icon: Swords },
 ];
 
-// --- COULEURS MINDMAP ---
+// --- COULEURS ---
 const NODE_COLORS = [
     { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
@@ -37,7 +37,7 @@ function useAutoSave(value, delay = 1000, callback) {
 }
 
 // ==========================================
-// COMPOSANT POST-IT
+// COMPOSANT POST-IT (STRATÉGIE)
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
@@ -60,6 +60,60 @@ const PostIt = ({ item, update, remove, color }) => {
                 style={{ minHeight: '28px' }}
             />
             <button onClick={() => remove(item.id)} className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 bg-white/50 dark:bg-black/50 rounded"><Trash2 size={10}/></button>
+        </div>
+    );
+};
+
+// ==========================================
+// COMPOSANT MINDMAP NODE (NOUVEAU : AUTO-RESIZE)
+// ==========================================
+const MindmapNode = ({ node, selectedId, setSelectedId, updateLabel, handleMouseDown, toggleCollapse, hasChildren, isVisible }) => {
+    const textareaRef = useRef(null);
+    
+    // Auto-resize pour la Mindmap
+    useLayoutEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [node.label]);
+
+    if (!isVisible) return null;
+
+    const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0];
+
+    return (
+        <div 
+            style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto' }} 
+            className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`} 
+            onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}
+        >
+            <div 
+                className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`} 
+                onMouseDown={(e) => handleMouseDown(e, node.id)}
+            >
+                <GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/>
+            </div>
+            <div className="p-2 relative">
+                <textarea 
+                    ref={textareaRef}
+                    value={node.label} 
+                    onChange={(e) => updateLabel(node.id, e.target.value)} 
+                    onMouseDown={(e) => e.stopPropagation()} 
+                    className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100 block`} 
+                    placeholder="Idée..." 
+                    rows={1}
+                />
+                {hasChildren && (
+                    <button 
+                        onClick={(e) => toggleCollapse(e, node.id)} 
+                        className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50" 
+                        title={node.collapsed ? "Afficher" : "Masquer"}
+                    >
+                        {node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}
+                    </button>
+                )}
+            </div>
         </div>
     );
 };
@@ -196,7 +250,7 @@ const StrategyModule = ({ venture }) => {
 };
 
 // ==========================================
-// 3. MODULE MINDMAP
+// 3. MODULE MINDMAP (CORRIGÉ: AUTO-RESIZE)
 // ==========================================
 const MindmapModule = ({ venture }) => {
     const [nodes, setNodes] = useState([]);
@@ -243,7 +297,24 @@ const MindmapModule = ({ venture }) => {
         <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2"><div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors"><GitCommit size={20}/></button><button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors"><Plus size={20}/></button><div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div><button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`}><Trash2 size={20}/></button></div>{selectedId && (<div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">{NODE_COLORS.map(c => (<button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>))}</div>)}</div>
             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button><button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button><button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button></div>
-            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}><div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}><svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>{nodes.map(node => { if (!isVisible(node.id)) return null; const style = NODE_COLORS.find(c => c.id === (node.color || 'white')) || NODE_COLORS[0]; const hasChildren = nodes.some(n => n.parentId === node.id); return (<div key={node.id} style={{ transform: `translate(${node.x}px, ${node.y}px)`, width: '180px', height: 'auto' }} className={`absolute top-0 left-0 rounded-xl shadow-sm transition-shadow duration-200 flex flex-col z-10 ${style.bg} border-2 ${selectedId === node.id ? 'border-indigo-500 shadow-xl z-50 ring-2 ring-indigo-500/20' : style.border}`} onClick={(e) => { e.stopPropagation(); setSelectedId(node.id); }}><div className={`h-6 rounded-t-lg w-full cursor-grab active:cursor-grabbing flex items-center justify-center ${style.header}`} onMouseDown={(e) => handleMouseDown(e, node.id)}><GripHorizontal size={14} className="text-slate-400 dark:text-slate-500 opacity-50"/></div><div className="p-2 relative"><textarea value={node.label} onChange={(e) => updateLabel(node.id, e.target.value)} onMouseDown={(e) => e.stopPropagation()} className={`w-full bg-transparent text-center outline-none resize-none overflow-hidden font-medium text-sm text-slate-800 dark:text-slate-100`} placeholder="Idée..." rows={Math.max(2, (node.label?.split('\n').length || 1))}/>{hasChildren && (<button onClick={(e) => toggleCollapse(e, node.id)} className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50" title={node.collapsed ? "Afficher" : "Masquer"}>{node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}</button>)}</div></div>); })}</div></div>
+            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
+                <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
+                    <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
+                    {nodes.map(node => (
+                        <MindmapNode 
+                            key={node.id} 
+                            node={node} 
+                            selectedId={selectedId} 
+                            setSelectedId={setSelectedId} 
+                            updateLabel={updateLabel} 
+                            handleMouseDown={handleMouseDown} 
+                            toggleCollapse={toggleCollapse}
+                            hasChildren={nodes.some(n => n.parentId === node.id)}
+                            isVisible={isVisible(node.id)}
+                        />
+                    ))}
+                </div>
+            </div>
         </div>
     );
 };
@@ -376,8 +447,8 @@ const FinanceModule = ({ venture }) => {
                     <div className="flex-1 w-full h-full relative">
                         <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
-                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
-                            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" />
+                            <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
+                            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
                             <line x1={ptTarget.x} y1={HEIGHT-PADDING} x2={ptTarget.x} y2={ptTarget.y} stroke="#6366f1" strokeWidth="1" strokeDasharray="4,4" />
                             <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={ptEndRev.y} stroke="#10b981" strokeWidth="2" />
                             <text x={WIDTH-PADDING} y={ptEndRev.y - 10} textAnchor="end" className="text-xs fill-emerald-500 font-bold">Revenus</text>
