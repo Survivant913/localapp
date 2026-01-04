@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from './supabaseClient';
-import { Loader2, ArrowRight, Lock, Mail, LayoutDashboard } from 'lucide-react';
+import { Loader2, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -35,21 +35,14 @@ export default function Login() {
         {/* Carte Glassmorphism */}
         <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 shadow-2xl shadow-black/50 ring-1 ring-white/5">
             
-            {/* En-tête */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-white/10 to-white/0 border border-white/10 mb-6 shadow-inner">
-                <LayoutDashboard size={26} className="text-indigo-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
-              </div>
-              
-              <div className="flex flex-col items-center gap-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Freelance Cockpit</h1>
-                <p className="text-slate-500 text-xs font-medium tracking-widest uppercase">
-                    Système de gestion
-                </p>
-              </div>
+            {/* En-tête Épuré */}
+            <div className="text-center mb-10 mt-2">
+                <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm">
+                    Freelance Cockpit
+                </h1>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-5">
                 {/* Input Email */}
                 <div className="group relative">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors">
