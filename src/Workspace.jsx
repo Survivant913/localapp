@@ -396,7 +396,7 @@ const FinanceModule = ({ venture }) => {
 };
 
 // ==========================================
-// 5. MODULE CONCURRENCE (RADAR CHART) - COMPLET V3 (ZOOM + VISIBILITÉ)
+// 5. MODULE CONCURRENCE (RADAR CHART) - COMPLET V4 (GRID DARK MODE FIX)
 // ==========================================
 const CompetitorModule = ({ venture }) => {
     const [competitors, setCompetitors] = useState([]);
@@ -405,6 +405,7 @@ const CompetitorModule = ({ venture }) => {
     const [newCriterion, setNewCriterion] = useState("");
     const saveTimeoutRef = useRef({});
 
+    // Palette auto pour les concurrents
     const COMP_COLORS = ['red', 'green', 'orange', 'purple', 'pink', 'cyan', 'yellow'];
 
     useEffect(() => {
@@ -412,6 +413,7 @@ const CompetitorModule = ({ venture }) => {
             const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('is_primary', { ascending: false });
             if (data && data.length > 0) { setCompetitors(data); } 
             else {
+                // Données initiales si vide
                 const me = { venture_id: venture.id, name: 'Mon Projet', is_primary: true, color: 'blue', is_visible: true, scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
                 const comp = { venture_id: venture.id, name: 'Concurrent A', is_primary: false, color: 'red', is_visible: true, scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
                 const { data: created } = await supabase.from('venture_competitors').insert([me, comp]).select();
@@ -444,7 +446,9 @@ const CompetitorModule = ({ venture }) => {
 
     const addCompetitor = async () => {
         const base = competitors[0] || { scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
+        // Couleur auto rotative
         const nextColor = COMP_COLORS[(competitors.length - 1) % COMP_COLORS.length];
+        
         const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: nextColor, is_visible: true, scores: base.scores }]).select();
         if (data) setCompetitors([...competitors, data[0]]);
     };
@@ -455,6 +459,7 @@ const CompetitorModule = ({ venture }) => {
         setCompetitors(competitors.filter(c => c.id !== id));
     };
 
+    // --- GESTION DES CRITÈRES ---
     const updateAllScores = async (updatedCompetitors) => {
         setCompetitors(updatedCompetitors);
         for (const comp of updatedCompetitors) {
@@ -465,7 +470,7 @@ const CompetitorModule = ({ venture }) => {
     const addCriterion = async () => {
         if (!newCriterion.trim()) return;
         const key = newCriterion.trim();
-        const updated = competitors.map(c => ({ ...c, scores: { ...c.scores, [key]: 3 } })); 
+        const updated = competitors.map(c => ({ ...c, scores: { ...c.scores, [key]: 3 } })); // Default 3
         await updateAllScores(updated);
         setNewCriterion("");
     };
@@ -482,7 +487,10 @@ const CompetitorModule = ({ venture }) => {
         const newKey = prompt("Renommer le critère :", oldKey);
         if (!newKey || newKey === oldKey) return;
         const updated = competitors.map(c => {
-            const s = { ...c.scores }; s[newKey] = s[oldKey]; delete s[oldKey]; return { ...c, scores: s };
+            const s = { ...c.scores };
+            s[newKey] = s[oldKey];
+            delete s[oldKey];
+            return { ...c, scores: s };
         });
         await updateAllScores(updated);
     };
@@ -502,35 +510,70 @@ const CompetitorModule = ({ venture }) => {
 
     return (
         <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+            
+            {/* Modal Config Critères */}
             {showConfig && (
                 <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800">
-                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800 dark:text-white">Gérer les Critères</h3><button onClick={() => setShowConfig(false)}><X size={20}/></button></div>
-                        <div className="flex gap-2 mb-4"><input type="text" value={newCriterion} onChange={e => setNewCriterion(e.target.value)} placeholder="Nouveau critère..." className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none text-sm"/><button onClick={addCriterion} className="p-2 bg-indigo-600 text-white rounded-lg"><Plus size={18}/></button></div>
-                        <div className="space-y-2 max-h-60 overflow-y-auto">{criteria.map(c => (<div key={c} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"><span onClick={() => renameCriterion(c)} className="text-sm font-medium cursor-pointer hover:text-indigo-500">{c}</span><button onClick={() => removeCriterion(c)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button></div>))}</div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 dark:text-white">Gérer les Critères</h3>
+                            <button onClick={() => setShowConfig(false)}><X size={20}/></button>
+                        </div>
+                        <div className="flex gap-2 mb-4">
+                            <input type="text" value={newCriterion} onChange={e => setNewCriterion(e.target.value)} placeholder="Nouveau critère..." className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none text-sm"/>
+                            <button onClick={addCriterion} className="p-2 bg-indigo-600 text-white rounded-lg"><Plus size={18}/></button>
+                        </div>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {criteria.map(c => (
+                                <div key={c} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <span onClick={() => renameCriterion(c)} className="text-sm font-medium cursor-pointer hover:text-indigo-500">{c}</span>
+                                    <button onClick={() => removeCriterion(c)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             )}
 
             <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 shrink-0">
                 <h3 className="font-bold text-slate-700 dark:text-white flex items-center gap-2"><Trophy size={18} className="text-indigo-500"/> Radar de Positionnement</h3>
-                <div className="flex gap-2"><button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500" title="Configurer Critères"><Settings size={18}/></button><button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button></div>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500" title="Configurer Critères"><Settings size={18}/></button>
+                    <button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* RADAR CHART */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center min-h-[400px]">
                     <svg width="350" height="350" viewBox="0 0 300 300" className="overflow-visible">
-                        {[1, 2, 3, 4, 5].map(level => (<polygon key={level} points={criteria.map((_, i) => `${getCoords(level, i).x},${getCoords(level, i).y}`).join(' ')} fill="none" stroke="#e2e8f0" strokeWidth="1" />))}
-                        {criteria.map((c, i) => { const p = getCoords(5, i); return (<g key={i}><line x1={center} y1={center} x2={p.x} y2={p.y} stroke="#e2e8f0" strokeWidth="1"/><text x={p.x} y={p.y} dx={p.x > center ? 15 : -15} dy={p.y > center ? 10 : -10} textAnchor={p.x > center ? 'start' : 'end'} className="text-[11px] font-bold fill-slate-500 uppercase">{c}</text></g>); })}
+                        {/* Grille - CORRIGÉ POUR DARK MODE */}
+                        {[1, 2, 3, 4, 5].map(level => (
+                            <polygon key={level} points={criteria.map((_, i) => `${getCoords(level, i).x},${getCoords(level, i).y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1" className="text-slate-200 dark:text-slate-700" />
+                        ))}
+                        {/* Axes - CORRIGÉ POUR DARK MODE */}
+                        {criteria.map((c, i) => {
+                            const p = getCoords(5, i);
+                            return (
+                                <g key={i}>
+                                    <line x1={center} y1={center} x2={p.x} y2={p.y} stroke="currentColor" strokeWidth="1" className="text-slate-200 dark:text-slate-700"/>
+                                    <text x={p.x} y={p.y} dx={p.x > center ? 15 : -15} dy={p.y > center ? 10 : -10} textAnchor={p.x > center ? 'start' : 'end'} className="text-[11px] font-bold fill-slate-500 uppercase">{c}</text>
+                                </g>
+                            );
+                        })}
+                        {/* Data */}
                         {competitors.map(c => {
                             if (!c.is_visible) return null;
                             const points = criteria.map((k, i) => { const p = getCoords(c.scores[k] || 0, i); return `${p.x},${p.y}`; }).join(' ');
                             const color = c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : c.color === 'green' ? '#10b981' : c.color === 'orange' ? '#f97316' : c.color === 'purple' ? '#8b5cf6' : c.color === 'pink' ? '#ec4899' : c.color === 'cyan' ? '#06b6d4' : c.color === 'yellow' ? '#eab308' : '#64748b';
+                            // Mapping simple pour le SVG stroke
+                            
                             return <polygon key={c.id} points={points} fill={color} fillOpacity={0.1} stroke={color} strokeWidth={c.is_primary ? 3 : 2} />;
                         })}
                     </svg>
                 </div>
 
+                {/* CARDS */}
                 <div className="space-y-4">
                     {competitors.map(c => (
                         <div key={c.id} className={`p-4 rounded-xl border ${c.is_primary ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-800' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800'} transition-opacity ${!c.is_visible ? 'opacity-60' : ''}`}>
@@ -545,7 +588,12 @@ const CompetitorModule = ({ venture }) => {
                             {c.is_visible && (
                                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="grid grid-cols-2 gap-4 mb-4">
-                                        {criteria.map(k => (<div key={k}><div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1"><span>{k}</span><span>{c.scores[k] || 0}/5</span></div><input type="range" min="0" max="5" step="1" value={c.scores[k] || 0} onChange={e => handleScore(c.id, k, e.target.value)} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/></div>))}
+                                        {criteria.map(k => (
+                                            <div key={k}>
+                                                <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1"><span>{k}</span><span>{c.scores[k] || 0}/5</span></div>
+                                                <input type="range" min="0" max="5" step="1" value={c.scores[k] || 0} onChange={e => handleScore(c.id, k, e.target.value)} className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"/>
+                                            </div>
+                                        ))}
                                     </div>
                                     <div className="grid grid-cols-3 gap-2">
                                         <textarea value={c.strengths || ''} onChange={e => handleUpdate(c.id, 'strengths', e.target.value)} placeholder="Forces..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
