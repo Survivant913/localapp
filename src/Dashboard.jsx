@@ -69,14 +69,15 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const labels = data.customLabels || {};
 
-    // --- 1. FILTRES & CALCULS FINANCIERS ---
+    // --- 1. FILTRES & CALCULS FINANCIERS (CORRIGÉ) ---
     const isRelevantAccount = (accId) => {
         if (dashboardFilter === 'total') return true;
-        return accId === dashboardFilter;
+        // CORRECTION : Comparaison souple pour gérer string/number (ex: "1" == 1)
+        return String(accId) === String(dashboardFilter);
     };
 
     const currentBalance = transactions
-        .filter(t => isRelevantAccount(t.accountId))
+        .filter(t => isRelevantAccount(t.accountId || t.account_id)) // Fallback si accountId manque
         .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     
     const renderAmount = (amount, withSign = false) => {
@@ -94,7 +95,7 @@ export default function Dashboard({ data, updateData, setView }) {
             let tempBalance = currentBalance;
             
             const sortedTrans = [...transactions]
-                .filter(t => isRelevantAccount(t.accountId))
+                .filter(t => isRelevantAccount(t.accountId || t.account_id))
                 .sort((a,b) => new Date(b.date) - new Date(a.date));
             
             history.push(tempBalance);
@@ -127,7 +128,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 2. CALCUL "À VENIR" ---
+    // --- 2. CALCUL "À VENIR" (CORRIGÉ) ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
@@ -136,13 +137,13 @@ export default function Dashboard({ data, updateData, setView }) {
 
             scheduled.forEach(s => {
                 if(s.status === 'pending') {
-                    if (dashboardFilter !== 'total' && s.accountId !== dashboardFilter) return;
+                    if (!isRelevantAccount(s.accountId || s.account_id)) return;
                     events.push({ type: 'scheduled', date: new Date(s.date), data: s, id: `s-${s.id}` });
                 }
             });
 
             recurring.forEach(r => {
-                if (dashboardFilter !== 'total' && r.accountId !== dashboardFilter) return;
+                if (!isRelevantAccount(r.accountId || r.account_id)) return;
                 let nextDate = r.nextDueDate ? new Date(r.nextDueDate) : new Date();
                 events.push({ type: 'recurring', date: nextDate, data: r, id: `r-${r.id}` });
             });
@@ -163,7 +164,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
     const getAccountBalanceForProject = (accId) => {
         return transactions
-            .filter(t => t.accountId === accId)
+            .filter(t => (t.accountId || t.account_id) === accId)
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
