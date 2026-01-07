@@ -69,10 +69,10 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const labels = data.customLabels || {};
 
-    // --- 1. FILTRES & CALCULS FINANCIERS (CORRIGÉ) ---
+    // --- 1. FILTRES & CALCULS FINANCIERS ---
     const isRelevantAccount = (accId) => {
         if (dashboardFilter === 'total') return true;
-        // CORRECTION : Comparaison souple pour gérer string/number (ex: "1" == 1)
+        // Comparaison souple pour gérer string/number (ex: "1" == 1)
         return String(accId) === String(dashboardFilter);
     };
 
@@ -128,7 +128,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 2. CALCUL "À VENIR" (CORRIGÉ) ---
+    // --- 2. CALCUL "À VENIR" ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
@@ -275,7 +275,10 @@ export default function Dashboard({ data, updateData, setView }) {
                                             </div>
                                         </div>
                                     </div>
-                                    <span className={`font-bold text-sm shrink-0 pl-2 ${e.data.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{renderAmount(parseFloat(e.data.amount), true)}</span>
+                                    <span className={`font-bold text-sm shrink-0 pl-2 ${e.data.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {/* CORRECTION DU SIGNE : Si c'est une dépense, on force le négatif */}
+                                        {renderAmount(e.data.type === 'income' ? parseFloat(e.data.amount) : -parseFloat(e.data.amount), true)}
+                                    </span>
                                 </div>
                             ))
                         )}
