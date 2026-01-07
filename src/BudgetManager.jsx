@@ -88,7 +88,8 @@ export default function BudgetManager({ data, updateData }) {
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
         const bal = transactionsList
-            .filter(t => t.accountId === accId || (!t.accountId && accId === accounts[0].id))
+            // CORRECTION : Comparaison souple String vs String
+            .filter(t => String(t.accountId || (t.accountId ? t.accountId : accounts[0].id)) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
         return round2(bal);
     };
@@ -101,12 +102,12 @@ export default function BudgetManager({ data, updateData }) {
         recurringList.forEach(r => {
             const amt = parseFloat(r.amount || 0);
             if (r.type === 'income') {
-                if (r.accountId === accId || (!r.accountId && accId === accounts[0].id)) monthlyIn += amt;
+                if (String(r.accountId) === String(accId) || (!r.accountId && String(accId) === String(accounts[0].id))) monthlyIn += amt;
             } else if (r.type === 'expense') {
-                if (r.accountId === accId) monthlyOut += amt;
+                if (String(r.accountId) === String(accId)) monthlyOut += amt;
             } else if (r.type === 'transfer') {
-                if (r.accountId === accId) monthlyOut += amt;
-                if (r.targetAccountId === accId) monthlyIn += amt;
+                if (String(r.accountId) === String(accId)) monthlyOut += amt;
+                if (String(r.targetAccountId) === String(accId)) monthlyIn += amt;
             }
         });
         return round2(monthlyIn - monthlyOut);
@@ -119,8 +120,11 @@ export default function BudgetManager({ data, updateData }) {
         const endOfMonthDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         const lastDay = endOfMonthDate.getDate();
 
-        let projected = currentTotalBalance;
-        if (forecastAccount !== 'total') {
+        // CORRECTION MAJEURE : Initialisation correcte du solde projeté
+        let projected = 0;
+        if (forecastAccount === 'total') {
+            projected = currentTotalBalance;
+        } else {
             projected = getBalanceForAccount(forecastAccount);
         }
 
@@ -130,10 +134,10 @@ export default function BudgetManager({ data, updateData }) {
                 const amt = parseFloat(r.amount || 0);
                 if (r.type === 'transfer') {
                     if (forecastAccount === 'total') return;
-                    if (r.accountId === forecastAccount) projected -= amt;
-                    if (r.targetAccountId === forecastAccount) projected += amt;
+                    if (String(r.accountId) === String(forecastAccount)) projected -= amt;
+                    if (String(r.targetAccountId) === String(forecastAccount)) projected += amt;
                 } else {
-                    if (forecastAccount !== 'total' && r.accountId !== forecastAccount) return;
+                    if (forecastAccount !== 'total' && String(r.accountId) !== String(forecastAccount)) return;
                     projected += (r.type === 'income' ? amt : -amt);
                 }
             }
@@ -148,10 +152,10 @@ export default function BudgetManager({ data, updateData }) {
                  const amt = parseFloat(s.amount || 0);
                  if (s.type === 'transfer') {
                     if (forecastAccount === 'total') return;
-                    if (s.accountId === forecastAccount) projected -= amt;
-                    if (s.targetAccountId === forecastAccount) projected += amt;
+                    if (String(s.accountId) === String(forecastAccount)) projected -= amt;
+                    if (String(s.targetAccountId) === String(forecastAccount)) projected += amt;
                 } else {
-                    if (forecastAccount !== 'total' && s.accountId !== forecastAccount) return;
+                    if (forecastAccount !== 'total' && String(s.accountId) !== String(forecastAccount)) return;
                     projected += (s.type === 'income' ? amt : -amt);
                 }
             }
@@ -203,7 +207,7 @@ export default function BudgetManager({ data, updateData }) {
     // Prévision 12 mois
     const forecastData = useMemo(() => {
         const today = new Date();
-        let projectedBalance = endOfMonthForecast;
+        let projectedBalance = endOfMonthForecast; // Prend déjà en compte le filtre
         const monthsData = [];
         for (let i = 1; i <= 12; i++) {
             const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
@@ -219,10 +223,10 @@ export default function BudgetManager({ data, updateData }) {
                 
                 if (r.type === 'transfer') {
                     if (forecastAccount === 'total') return;
-                    if (r.accountId === forecastAccount) monthlyChange -= amt;
-                    if (r.targetAccountId === forecastAccount) monthlyChange += amt;
+                    if (String(r.accountId) === String(forecastAccount)) monthlyChange -= amt;
+                    if (String(r.targetAccountId) === String(forecastAccount)) monthlyChange += amt;
                 } else {
-                    if (forecastAccount !== 'total' && r.accountId !== forecastAccount) return;
+                    if (forecastAccount !== 'total' && String(r.accountId) !== String(forecastAccount)) return;
                     monthlyChange += (r.type === 'income' ? amt : -amt);
                 }
             });
@@ -344,7 +348,6 @@ export default function BudgetManager({ data, updateData }) {
                                         {recurringList.map(r => (
                                             <li key={r.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
                                                 <div className="flex items-center gap-3">
-                                                    {/* CORRECTION ICI : Gestion de l'icône Virement */}
                                                     <div className={`p-1.5 rounded-full ${r.type === 'income' ? 'bg-green-100 text-green-600' : r.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                                         {r.type === 'income' ? <TrendingUp size={14}/> : r.type === 'transfer' ? <ArrowRightLeft size={14}/> : <TrendingDown size={14}/>}
                                                     </div>
@@ -377,7 +380,6 @@ export default function BudgetManager({ data, updateData }) {
                                         {visibleScheduled.map(s => (
                                             <li key={s.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
                                                 <div className="flex items-center gap-3">
-                                                    {/* CORRECTION ICI : Gestion de l'icône Virement */}
                                                     <div className={`p-1.5 rounded-full ${s.type === 'income' ? 'bg-green-100 text-green-600' : s.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                                         {s.type === 'income' ? <TrendingUp size={14}/> : s.type === 'transfer' ? <ArrowRightLeft size={14}/> : <TrendingDown size={14}/>}
                                                     </div>
