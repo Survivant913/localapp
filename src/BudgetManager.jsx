@@ -88,7 +88,6 @@ export default function BudgetManager({ data, updateData }) {
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
         const bal = transactionsList
-            // CORRECTION : Comparaison souple String vs String
             .filter(t => String(t.accountId || (t.accountId ? t.accountId : accounts[0].id)) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
         return round2(bal);
@@ -120,7 +119,6 @@ export default function BudgetManager({ data, updateData }) {
         const endOfMonthDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         const lastDay = endOfMonthDate.getDate();
 
-        // CORRECTION MAJEURE : Initialisation correcte du solde projeté
         let projected = 0;
         if (forecastAccount === 'total') {
             projected = currentTotalBalance;
@@ -163,7 +161,7 @@ export default function BudgetManager({ data, updateData }) {
         return round2(projected);
     }, [budgetData, forecastAccount, currentTotalBalance]);
 
-    // Planner logic
+    // Planner logic (CORRECTION MAJEURE ICI)
     const processedPlannerItems = useMemo(() => {
         const simulatedBalances = {};
         accounts.forEach(acc => {
@@ -183,21 +181,61 @@ export default function BudgetManager({ data, updateData }) {
             let dateStr = "Dispo !";
             
             if (pct < 100) {
-                const savingsRate = getMonthlySavingsForAccount(targetAcc);
-                const missing = cost - allocated;
                 const currentRealBalance = getBalanceForAccount(targetAcc);
                 const safetyTarget = planner.safetyBases?.[targetAcc] || 0;
                 let securityDrag = 0;
                 if (currentRealBalance < safetyTarget) securityDrag = safetyTarget - currentRealBalance;
-                const totalToSave = missing + Math.max(0, securityDrag);
+                
+                let remainingToSave = (cost - allocated) + Math.max(0, securityDrag);
+                let simulationDate = new Date();
+                let monthsPassed = 0;
+                let isPossible = false;
 
-                if (savingsRate <= 0) {
-                    dateStr = "Jamais (Épargne <= 0)";
+                // SIMULATION SUR 120 MOIS (10 ANS MAX)
+                while (monthsPassed < 120) {
+                    monthsPassed++;
+                    simulationDate.setMonth(simulationDate.getMonth() + 1); // On avance d'un mois
+                    
+                    // Calcul de l'épargne pour CE mois spécifique (en respectant les dates de fin)
+                    let monthlySavings = 0;
+                    let monthlyIn = 0;
+                    let monthlyOut = 0;
+
+                    recurringList.forEach(r => {
+                        // Vérifie si l'opération est active à la date simulée
+                        const isActive = !r.endDate || parseLocalDate(r.endDate) >= simulationDate;
+                        
+                        if (isActive) {
+                            const amt = parseFloat(r.amount || 0);
+                            if (r.type === 'income') {
+                                if (String(r.accountId) === String(targetAcc) || (!r.accountId && String(targetAcc) === String(accounts[0].id))) monthlyIn += amt;
+                            } else if (r.type === 'expense') {
+                                if (String(r.accountId) === String(targetAcc)) monthlyOut += amt;
+                            } else if (r.type === 'transfer') {
+                                if (String(r.accountId) === String(targetAcc)) monthlyOut += amt;
+                                if (String(r.targetAccountId) === String(targetAcc)) monthlyIn += amt;
+                            }
+                        }
+                    });
+
+                    monthlySavings = monthlyIn - monthlyOut;
+
+                    // Si on épargne, on réduit le reste à payer. Si on perd de l'argent, on n'avance pas (ou on recule).
+                    // Pour simplifier : on ne compte que si l'épargne est positive.
+                    if (monthlySavings > 0) {
+                        remainingToSave -= monthlySavings;
+                    }
+
+                    if (remainingToSave <= 0) {
+                        isPossible = true;
+                        break;
+                    }
+                }
+
+                if (isPossible) {
+                    dateStr = simulationDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
                 } else {
-                    const monthsToWait = Math.ceil(totalToSave / savingsRate);
-                    const targetDate = new Date();
-                    targetDate.setMonth(targetDate.getMonth() + monthsToWait);
-                    dateStr = targetDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+                    dateStr = "Impossible (Revenus insuffisants)";
                 }
             }
             return { ...item, allocated: round2(allocated), pct: round2(pct), dateStr, targetAccName: accounts.find(a=>a.id === targetAcc)?.name };
