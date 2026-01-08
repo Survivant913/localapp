@@ -437,7 +437,8 @@ const FinanceModule = ({ venture }) => {
 
                     <div className={`p-5 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}`}>
                         <h3 className={`text-xs font-bold uppercase mb-2 ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>Résultat Projeté</h3>
-                        <div className={`text-5xl font-black mb-1 ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{profit > 0 ? '+' : ''}{profit} €</div>
+                        {/* CORRECTION 1 : .toFixed(2) pour éviter les décimales infinies */}
+                        <div className={`text-5xl font-black mb-1 ${profit >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{profit > 0 ? '+' : ''}{parseFloat(profit).toFixed(2)} €</div>
                         <div className={`text-sm font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{profit >= 0 ? 'Rentable ! 🚀' : 'Déficitaire ⚠️'}</div>
                     </div>
                 </div>
@@ -445,7 +446,8 @@ const FinanceModule = ({ venture }) => {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
-                        <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
+                        {/* CORRECTION 2 : overflow-hidden sur le SVG pour couper ce qui dépasse */}
+                        <svg className="w-full h-full overflow-hidden rounded-lg" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
                             <line x1={PADDING} y1={HEIGHT-PADDING} x2={WIDTH-PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
                             <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT-PADDING} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
