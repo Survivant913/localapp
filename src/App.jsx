@@ -128,66 +128,104 @@ export default function App() {
         { data: ventures }
       ] = results;
 
-      // --- CATCH-UP ENGINE ---
+      // --- CATCH-UP ENGINE (MOTEUR DE RATTRAPAGE BLINDÉ) ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
       
       const validAccounts = accounts || [];
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : 'offline-account';
+      const existingTransactions = transactions || [];
 
-      // 1. Scheduled Catch-up
+      // Helper pour vérifier les doublons STRICTS (Même description, même montant, même jour)
+      const isDuplicate = (desc, amount, dateStr) => {
+          const targetDate = parseLocalDate(dateStr);
+          // On vérifie dans la DB existante
+          const inDB = existingTransactions.some(t => {
+              const tDate = parseLocalDate(t.date);
+              return t.description === desc && 
+                     Math.abs(parseFloat(t.amount) - parseFloat(amount)) < 0.01 &&
+                     tDate.getFullYear() === targetDate.getFullYear() &&
+                     tDate.getMonth() === targetDate.getMonth() &&
+                     tDate.getDate() === targetDate.getDate();
+          });
+          // On vérifie aussi dans ce qu'on vient juste de générer (pour éviter les boucles rapides)
+          const inQueue = newDBTransactions.some(t => {
+              const tDate = parseLocalDate(t.date);
+              return t.description === desc && 
+                     Math.abs(parseFloat(t.amount) - parseFloat(amount)) < 0.01 &&
+                     tDate.getFullYear() === targetDate.getFullYear() &&
+                     tDate.getMonth() === targetDate.getMonth() &&
+                     tDate.getDate() === targetDate.getDate();
+          });
+          return inDB || inQueue;
+      };
+
+      // 1. Scheduled Catch-up (Rattrapage Planifié)
       (scheduled || []).forEach(s => {
           if (s.status === 'pending' && isDatePastOrToday(s.date)) {
-              const baseId = Date.now() + Math.floor(Math.random() * 1000000);
-              const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
-              
-              const common = { 
-                  id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, 
-                  type: s.type, description: s.description, account_id: accId 
-              };
+              // VÉRIFICATION ANTI-DOUBLON AVANT CRÉATION
+              if (!isDuplicate(s.description, s.amount, s.date)) {
+                  const baseId = Date.now() + Math.floor(Math.random() * 1000000);
+                  const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
+                  
+                  const common = { 
+                      id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, 
+                      type: s.type, description: s.description, account_id: accId 
+                  };
 
-              if (s.type === 'transfer' && s.target_account_id) {
-                  const targetAccId = s.target_account_id;
-                  const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
-                  const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
-                  newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
-                  newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
-              } else { 
-                  newDBTransactions.push(common); 
+                  if (s.type === 'transfer' && s.target_account_id) {
+                      const targetAccId = s.target_account_id;
+                      const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
+                      const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
+                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
+                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
+                  } else { 
+                      newDBTransactions.push(common); 
+                  }
               }
+              // On marque comme exécuté DANS TOUS LES CAS (même si doublon détecté, pour ne pas rebloquer)
               updatedDBScheduled.push({ ...s, status: 'executed' });
           }
       });
 
-      // 2. Recurring Catch-up
+      // 2. Recurring Catch-up (Rattrapage Récurrent)
       (recurring || []).forEach(r => {
           let hasChanged = false;
           let tempR = { ...r };
+          
+          // Initialisation date si vide
           if (!tempR.next_due_date) {
               const d = new Date(); d.setDate(tempR.day_of_month);
               if (d < new Date()) d.setMonth(d.getMonth() + 1);
               tempR.next_due_date = d.toISOString();
               hasChanged = true;
           }
+
           let loopSafety = 0;
           while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
               const nextDueObj = parseLocalDate(tempR.next_due_date);
-              const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
-              const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
               
-              const common = { 
-                  id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, 
-                  type: tempR.type, description: tempR.description, account_id: accId 
-              };
+              // VÉRIFICATION ANTI-DOUBLON STRICTE
+              // Si la transaction existe déjà pour ce mois-ci, on ne la crée pas, on avance juste la date.
+              if (!isDuplicate(tempR.description, tempR.amount, tempR.next_due_date)) {
+                  const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
+                  const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
+                  
+                  const common = { 
+                      id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, 
+                      type: tempR.type, description: tempR.description, account_id: accId 
+                  };
 
-              if (tempR.type === 'transfer' && tempR.target_account_id) {
-                  newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
-                  newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
-              } else { 
-                  newDBTransactions.push(common); 
+                  if (tempR.type === 'transfer' && tempR.target_account_id) {
+                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
+                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
+                  } else { 
+                      newDBTransactions.push(common); 
+                  }
               }
               
+              // Calcul prochaine échéance
               let nextMonth = nextDueObj.getMonth() + 1;
               let nextYear = nextDueObj.getFullYear();
               if (nextMonth > 11) { nextMonth = 0; nextYear++; }
