@@ -110,11 +110,9 @@ export default function CalendarView({ data }) {
         today.setHours(0,0,0,0);
 
         // --- CORRECTION : CALCUL UNIVERSEL DU SOLDE DE DÉBUT DE MOIS ---
-        // On part d'aujourd'hui (currentBalance) et on remonte ou avance jusqu'au 1er du mois affiché
         let startOfMonthProjection = currentBalance;
         const firstDayOfView = new Date(year, month, 1);
         
-        // Fonction pour calculer l'impact d'un élément sur le solde
         const calculateImpact = (item) => {
             const amt = parseFloat(item.amount || 0);
             const disp = getContextDisplay(item);
@@ -129,13 +127,11 @@ export default function CalendarView({ data }) {
             }
         };
 
-        // Si le mois affiché est dans le FUTUR par rapport à aujourd'hui
         if (firstDayOfView > today) {
             let simDate = new Date(today);
-            simDate.setDate(simDate.getDate() + 1); // On commence demain
+            simDate.setDate(simDate.getDate() + 1); 
             
             while (simDate < firstDayOfView) {
-                // On ajoute l'impact des futurs paiements prévus jusqu'au début du mois
                 budget.scheduled.forEach(s => {
                     if (s.status === 'pending' && isSameDay(parseLocalDate(s.date), simDate)) {
                         if (checkFilter(s.accountId, s.targetAccountId)) {
@@ -154,14 +150,9 @@ export default function CalendarView({ data }) {
                 simDate.setDate(simDate.getDate() + 1);
             }
         } 
-        // Si le mois affiché est dans le PASSÉ par rapport à aujourd'hui
         else if (firstDayOfView < today && !isSameDay(firstDayOfView, new Date(today.getFullYear(), today.getMonth(), 1))) {
-             // NOTE: Pour simplifier et éviter de rejouer tout l'historique des transactions depuis l'an 0,
-             // si on regarde un mois passé, on ne projette pas le solde (trop complexe sans un solde initial stocké).
-             // On affiche juste les mouvements.
              startOfMonthProjection = 0; 
         }
-        // Si on est dans le mois COURANT, le point de départ est calculé dynamiquement plus bas
 
         const daysMap = {};
 
@@ -185,7 +176,6 @@ export default function CalendarView({ data }) {
                 }
 
                 dailyChange += impact;
-                // CORRECTION DOUBLON : On ajoute un ID unique pour React
                 events.push({ id: item.id, data: item, type, source, impact, display });
             };
 
@@ -214,15 +204,24 @@ export default function CalendarView({ data }) {
                 budget.recurring.forEach(r => {
                     if (r.dayOfMonth === d && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
                         if (checkFilter(r.accountId, r.targetAccountId)) {
-                            // Vérification anti-doublon : Si un paiement récurrent a déjà été généré en "scheduled" ce jour-là, on l'ignore
+                            
+                            // CHECK 1 : Existe-t-il déjà en "scheduled" ?
                             const alreadyScheduled = budget.scheduled.some(s => 
                                 s.status === 'pending' && 
                                 isSameDay(parseLocalDate(s.date), date) && 
                                 Math.abs(parseFloat(s.amount) - parseFloat(r.amount)) < 0.01 &&
                                 s.description === r.description
                             );
+
+                            // CHECK 2 (CRITIQUE) : Existe-t-il déjà en "transaction" aujourd'hui ?
+                            // Si le paiement a été généré ce matin, on ne doit plus afficher le récurrent prévisionnel
+                            const alreadyPaidToday = budget.transactions.some(t => 
+                                isSameDay(parseLocalDate(t.date), date) && 
+                                Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 &&
+                                t.description === r.description
+                            );
                             
-                            if (!alreadyScheduled) {
+                            if (!alreadyScheduled && !alreadyPaidToday) {
                                 addEvent(r, 'recurring', 'recurring');
                             }
                         }
@@ -238,12 +237,10 @@ export default function CalendarView({ data }) {
         }
 
         // --- CALCUL DES SOLDES DE FIN DE JOURNÉE ---
-        
-        // Cas 1 : Mois Courant
         if (today.getMonth() === month && today.getFullYear() === year) {
             const todayDay = today.getDate();
             
-            // Futur : On part d'aujourd'hui et on avance
+            // Futur
             let futureBalance = currentBalance;
             for (let d = todayDay + 1; d <= daysInMonth; d++) {
                 if (daysMap[d]) {
@@ -252,20 +249,17 @@ export default function CalendarView({ data }) {
                 }
             }
 
-            // Passé : On part d'aujourd'hui et on recule (Reverse Engineering)
+            // Passé
             let pastBalance = currentBalance;
-            if (daysMap[todayDay]) daysMap[todayDay].endBalance = pastBalance; // Fin de journée ajd = solde actuel
+            if (daysMap[todayDay]) daysMap[todayDay].endBalance = pastBalance;
             
             for (let d = todayDay; d >= 1; d--) {
                 if (daysMap[d]) {
-                    // Pour trouver le solde de la VEILLE, on soustrait le changement du jour
-                    // Solde(Veille) = Solde(Jour) - Changement(Jour)
                     pastBalance -= daysMap[d].dailyChange;
                     if (daysMap[d-1]) daysMap[d-1].endBalance = pastBalance;
                 }
             }
         } 
-        // Cas 2 : Mois Futur
         else if (firstDayOfView > today) {
             let projected = startOfMonthProjection; 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -275,7 +269,6 @@ export default function CalendarView({ data }) {
                 }
             }
         } 
-        // Cas 3 : Mois Passé (Pas de projection fiable sans historique complet)
         else {
             for (let d = 1; d <= daysInMonth; d++) if (daysMap[d]) daysMap[d].endBalance = null;
         }
@@ -339,9 +332,7 @@ export default function CalendarView({ data }) {
                 <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                     {daysLabels.map((day, i) => (
                         <div key={day} className="py-2 md:py-3 text-center">
-                            {/* Version Mobile: LUN, MAR... */}
                             <span className="md:hidden text-[9px] font-bold text-slate-500 uppercase tracking-wide">{day.substring(0, 3)}</span>
-                            {/* Version PC: Lundi, Mardi... */}
                             <span className="hidden md:block text-xs font-bold text-slate-500 uppercase tracking-wider">{day}</span>
                         </div>
                     ))}
