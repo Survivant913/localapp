@@ -161,7 +161,7 @@ export default function BudgetManager({ data, updateData }) {
         return round2(projected);
     }, [budgetData, forecastAccount, currentTotalBalance]);
 
-    // Planner logic (CORRECTION MAJEURE ICI)
+    // Planner logic (CORRECTION : Prise en compte des Planifiés + Récurrents)
     const processedPlannerItems = useMemo(() => {
         const simulatedBalances = {};
         accounts.forEach(acc => {
@@ -196,15 +196,12 @@ export default function BudgetManager({ data, updateData }) {
                     monthsPassed++;
                     simulationDate.setMonth(simulationDate.getMonth() + 1); // On avance d'un mois
                     
-                    // Calcul de l'épargne pour CE mois spécifique (en respectant les dates de fin)
-                    let monthlySavings = 0;
                     let monthlyIn = 0;
                     let monthlyOut = 0;
 
+                    // 1. Impact des Récurrents
                     recurringList.forEach(r => {
-                        // Vérifie si l'opération est active à la date simulée
                         const isActive = !r.endDate || parseLocalDate(r.endDate) >= simulationDate;
-                        
                         if (isActive) {
                             const amt = parseFloat(r.amount || 0);
                             if (r.type === 'income') {
@@ -218,10 +215,25 @@ export default function BudgetManager({ data, updateData }) {
                         }
                     });
 
-                    monthlySavings = monthlyIn - monthlyOut;
+                    // 2. Impact des Planifiés (NOUVEAU)
+                    scheduledList.forEach(s => {
+                        const sDate = parseLocalDate(s.date);
+                        // On vérifie si le planifié tombe dans le mois simulé
+                        if (s.status === 'pending' && sDate.getMonth() === simulationDate.getMonth() && sDate.getFullYear() === simulationDate.getFullYear()) {
+                            const amt = parseFloat(s.amount || 0);
+                            if (s.type === 'income') {
+                                if (String(s.accountId) === String(targetAcc) || (!s.accountId && String(targetAcc) === String(accounts[0].id))) monthlyIn += amt;
+                            } else if (s.type === 'expense') {
+                                if (String(s.accountId) === String(targetAcc)) monthlyOut += amt;
+                            } else if (s.type === 'transfer') {
+                                if (String(s.accountId) === String(targetAcc)) monthlyOut += amt;
+                                if (String(s.targetAccountId) === String(targetAcc)) monthlyIn += amt;
+                            }
+                        }
+                    });
 
-                    // Si on épargne, on réduit le reste à payer. Si on perd de l'argent, on n'avance pas (ou on recule).
-                    // Pour simplifier : on ne compte que si l'épargne est positive.
+                    let monthlySavings = monthlyIn - monthlyOut;
+
                     if (monthlySavings > 0) {
                         remainingToSave -= monthlySavings;
                     }
@@ -240,9 +252,9 @@ export default function BudgetManager({ data, updateData }) {
             }
             return { ...item, allocated: round2(allocated), pct: round2(pct), dateStr, targetAccName: accounts.find(a=>a.id === targetAcc)?.name };
         });
-    }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, accounts]);
+    }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, budgetData.scheduled, accounts]);
 
-    // Prévision 12 mois
+    // Prévision 12 mois (CORRECTION BUG FÉVRIER + PLANIFIÉS)
     const forecastData = useMemo(() => {
         const today = new Date();
         let projectedBalance = endOfMonthForecast; // Prend déjà en compte le filtre
@@ -254,9 +266,12 @@ export default function BudgetManager({ data, updateData }) {
             const year = targetDate.getFullYear();
             let monthlyChange = 0;
 
-            // 1. Récurrents
+            // 1. Récurrents (Avec correction des dates invalides ex: 30 Fév)
             recurringList.forEach(r => {
-                const occurrenceDate = new Date(year, monthIndex, r.dayOfMonth);
+                const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+                const clampedDay = Math.min(r.dayOfMonth, daysInMonth); // Correction ici
+                const occurrenceDate = new Date(year, monthIndex, clampedDay);
+                
                 if (r.endDate && parseLocalDate(r.endDate) < occurrenceDate) return;
                 const amt = parseFloat(r.amount || 0);
                 
@@ -270,11 +285,10 @@ export default function BudgetManager({ data, updateData }) {
                 }
             });
 
-            // 2. Planifiés (CORRECTION : On ajoute les éléments planifiés uniques à la projection)
+            // 2. Planifiés (Déjà ajouté précédement, conservé)
             scheduledList.forEach(s => {
                 if (s.status !== 'pending') return;
                 const sDate = parseLocalDate(s.date);
-                // Si l'élément planifié tombe exactement dans ce mois/année
                 if (sDate.getMonth() === monthIndex && sDate.getFullYear() === year) {
                     const amt = parseFloat(s.amount || 0);
                     if (s.type === 'transfer') {
