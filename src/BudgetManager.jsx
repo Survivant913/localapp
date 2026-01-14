@@ -254,6 +254,7 @@ export default function BudgetManager({ data, updateData }) {
             const year = targetDate.getFullYear();
             let monthlyChange = 0;
 
+            // 1. Récurrents
             recurringList.forEach(r => {
                 const occurrenceDate = new Date(year, monthIndex, r.dayOfMonth);
                 if (r.endDate && parseLocalDate(r.endDate) < occurrenceDate) return;
@@ -268,6 +269,25 @@ export default function BudgetManager({ data, updateData }) {
                     monthlyChange += (r.type === 'income' ? amt : -amt);
                 }
             });
+
+            // 2. Planifiés (CORRECTION : On ajoute les éléments planifiés uniques à la projection)
+            scheduledList.forEach(s => {
+                if (s.status !== 'pending') return;
+                const sDate = parseLocalDate(s.date);
+                // Si l'élément planifié tombe exactement dans ce mois/année
+                if (sDate.getMonth() === monthIndex && sDate.getFullYear() === year) {
+                    const amt = parseFloat(s.amount || 0);
+                    if (s.type === 'transfer') {
+                        if (forecastAccount === 'total') return;
+                        if (String(s.accountId) === String(forecastAccount)) monthlyChange -= amt;
+                        if (String(s.targetAccountId) === String(forecastAccount)) monthlyChange += amt;
+                    } else {
+                        if (forecastAccount !== 'total' && String(s.accountId) !== String(forecastAccount)) return;
+                        monthlyChange += (s.type === 'income' ? amt : -amt);
+                    }
+                }
+            });
+
             projectedBalance += monthlyChange;
             monthsData.push({ label: monthName, endBalance: round2(projectedBalance), change: round2(monthlyChange) });
         }
