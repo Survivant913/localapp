@@ -132,6 +132,10 @@ export default function CalendarView({ data }) {
             simDate.setDate(simDate.getDate() + 1); 
             
             while (simDate < firstDayOfView) {
+                const simDay = simDate.getDate();
+                const simMaxDays = new Date(simDate.getFullYear(), simDate.getMonth() + 1, 0).getDate();
+                const isSimLastDay = simDay === simMaxDays;
+
                 budget.scheduled.forEach(s => {
                     if (s.status === 'pending' && isSameDay(parseLocalDate(s.date), simDate)) {
                         if (checkFilter(s.accountId, s.targetAccountId)) {
@@ -140,8 +144,10 @@ export default function CalendarView({ data }) {
                     }
                 });
                 budget.recurring.forEach(r => {
-                    const simDayOfMonth = simDate.getDate();
-                    if (r.dayOfMonth === simDayOfMonth && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
+                    // Logique "Filet" pour la projection du solde
+                    const matchDay = r.dayOfMonth === simDay || (isSimLastDay && r.dayOfMonth > simDay);
+                    
+                    if (matchDay && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
                         if (checkFilter(r.accountId, r.targetAccountId)) {
                             startOfMonthProjection += calculateImpact(r);
                         }
@@ -199,10 +205,16 @@ export default function CalendarView({ data }) {
                 }
             });
 
-            // Récurrents (Futur)
+            // Récurrents (Futur) - AVEC CORRECTION VISUELLE "MOIS COURTS"
             if (date >= today) {
                 budget.recurring.forEach(r => {
-                    if (r.dayOfMonth === d && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
+                    // EST-CE LE DERNIER JOUR DU MOIS ?
+                    const isLastDay = d === daysInMonth;
+                    
+                    // RÈGLE : On affiche si c'est le bon jour, OU SI c'est le dernier jour et que le paiement tombe "après" (ex: paiement le 30, on est le 28)
+                    const matchDay = r.dayOfMonth === d || (isLastDay && r.dayOfMonth > d);
+
+                    if (matchDay && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
                         if (checkFilter(r.accountId, r.targetAccountId)) {
                             
                             // CHECK 1 : Existe-t-il déjà en "scheduled" ?
