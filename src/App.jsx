@@ -194,10 +194,21 @@ export default function App() {
           let hasChanged = false;
           let tempR = { ...r };
           
-          // Initialisation date si vide
+          // Initialisation date si vide (CORRIGÉ BUG FÉVRIER)
           if (!tempR.next_due_date) {
-              const d = new Date(); d.setDate(tempR.day_of_month);
-              if (d < new Date()) d.setMonth(d.getMonth() + 1);
+              const d = new Date(); 
+              // Au lieu de setDate brute, on vérifie la fin de mois
+              const currentMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+              const safeDay = Math.min(tempR.day_of_month, currentMonthMaxDays);
+              d.setDate(safeDay);
+              
+              if (d < new Date()) {
+                  // Si on passe au mois suivant, on re-vérifie le max jours
+                  d.setMonth(d.getMonth() + 1);
+                  const nextMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                  const safeNextDay = Math.min(tempR.day_of_month, nextMonthMaxDays);
+                  d.setDate(safeNextDay);
+              }
               tempR.next_due_date = d.toISOString();
               hasChanged = true;
           }
@@ -225,11 +236,12 @@ export default function App() {
                   }
               }
               
-              // Calcul prochaine échéance
+              // Calcul prochaine échéance (AVEC SÉCURITÉ FIN DE MOIS)
               let nextMonth = nextDueObj.getMonth() + 1;
               let nextYear = nextDueObj.getFullYear();
               if (nextMonth > 11) { nextMonth = 0; nextYear++; }
               const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+              // La ligne ci-dessous empêche le bug de Février (30 -> 28 ou 29)
               const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
               const newDate = new Date(nextYear, nextMonth, targetDay);
               
