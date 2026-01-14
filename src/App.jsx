@@ -1,931 +1,410 @@
-import { useState, useMemo } from 'react';
-
-import {
-
-  ChevronLeft, ChevronRight, Wallet, TrendingUp, TrendingDown,
-
-  CheckSquare, Target, Calendar as CalendarIcon, X, ArrowRightLeft
-
-} from 'lucide-react';
-
-
-
-export default function CalendarView({ data }) {
-
-    const [viewDate, setViewDate] = useState(new Date());
-
-    const [selectedDateDetails, setSelectedDateDetails] = useState(null);
-
-    const [calendarFilter, setCalendarFilter] = useState('total');
-
-
-
-    // --- DONNÉES ---
-
-    const budget = data.budget || { transactions: [], recurring: [], scheduled: [], accounts: [] };
-
-    const accounts = budget.accounts || [];
-
-    const todos = data.todos || [];
-
-    const projects = data.projects || [];
-
-
-
-    // --- OUTILS ---
-
-    const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val);
-
-   
-
-    // CORRECTION DATE : On force minuit locale pour éviter les décalages UTC
-
-    const parseLocalDate = (dateStr) => {
-
-        if (!dateStr) return new Date();
-
-        try {
-
-            if (dateStr instanceof Date) {
-
-                const d = new Date(dateStr);
-
-                d.setHours(0,0,0,0);
-
-                return d;
-
-            }
-
-            if (typeof dateStr === 'string') {
-
-                const d = new Date(dateStr);
-
-                d.setHours(0,0,0,0);
-
-                return d;
-
-            }
-
-            return new Date();
-
-        } catch (e) { return new Date(); }
-
-    };
-
-
-
-    const isSameDay = (d1, d2) => {
-
-        if (!d1 || !d2) return false;
-
-        return d1.getFullYear() === d2.getFullYear() &&
-
-               d1.getMonth() === d2.getMonth() &&
-
-               d1.getDate() === d2.getDate();
-
-    };
-
-
-
-    // --- 1. INTELLIGENCE VISUELLE (FILTRAGE CORRIGÉ) ---
-
-    const checkFilter = (itemId, targetId = null) => {
-
-        if (calendarFilter === 'total') return true;
-
-        // Comparaison souple String vs String
-
-        if (itemId && String(itemId) === String(calendarFilter)) return true;
-
-        if (targetId && String(targetId) === String(calendarFilter)) return true;
-
-        return false;
-
-    };
-
-
-
-    const getContextDisplay = (item) => {
-
-        // VUE GLOBALE
-
-        if (calendarFilter === 'total') {
-
-            if (item.type === 'transfer') {
-
-                return {
-
-                    colorClass: 'text-blue-600 dark:text-blue-400',
-
-                    bgClass: 'bg-blue-100 dark:bg-blue-900/30',
-
-                    borderClass: 'border-blue-200 dark:border-blue-800',
-
-                    icon: ArrowRightLeft,
-
-                    sign: '',
-
-                    label: 'Virement',
-
-                    isExpense: false, isIncome: false
-
-                };
-
-            }
-
-            if (item.type === 'income') {
-
-                return { colorClass: 'text-green-700 dark:text-green-400', bgClass: 'bg-green-100 dark:bg-green-900/30', borderClass: 'border-green-200 dark:border-green-800', icon: TrendingUp, sign: '+', label: 'Revenu', isExpense: false, isIncome: true };
-
-            }
-
-            return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Dépense', isExpense: true, isIncome: false };
-
-        }
-
-
-
-        // VUE COMPTE SPÉCIFIQUE
-
-        if (item.type === 'transfer') {
-
-            if (String(item.targetAccountId) === String(calendarFilter)) {
-
-                return { colorClass: 'text-green-700 dark:text-green-400', bgClass: 'bg-green-100 dark:bg-green-900/30', borderClass: 'border-green-200 dark:border-green-800', icon: TrendingUp, sign: '+', label: 'Reçu', isExpense: false, isIncome: true };
-
-            }
-
-            if (String(item.accountId) === String(calendarFilter)) {
-
-                return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Envoyé', isExpense: true, isIncome: false };
-
-            }
-
-        }
-
-
-
-        if (item.type === 'income') return { colorClass: 'text-green-700 dark:text-green-400', bgClass: 'bg-green-100 dark:bg-green-900/30', borderClass: 'border-green-200 dark:border-green-800', icon: TrendingUp, sign: '+', label: 'Revenu', isExpense: false, isIncome: true };
-
-        return { colorClass: 'text-red-700 dark:text-red-400', bgClass: 'bg-red-100 dark:bg-red-900/30', borderClass: 'border-red-200 dark:border-red-800', icon: TrendingDown, sign: '-', label: 'Dépense', isExpense: true, isIncome: false };
-
-    };
-
-
-
-    // --- 2. CALCUL DU SOLDE ACTUEL (CORRIGÉ) ---
-
-    const currentBalance = useMemo(() => {
-
-        return budget.transactions
-
-            .filter(t => checkFilter(t.accountId, t.targetAccountId))
-
-            .reduce((acc, t) => {
-
-                const amt = parseFloat(t.amount || 0);
-
-                if (t.type === 'transfer') {
-
-                    if (calendarFilter === 'total') return acc;
-
-                    if (String(t.accountId) === String(calendarFilter)) return acc - amt;
-
-                    if (String(t.targetAccountId) === String(calendarFilter)) return acc + amt;
-
-                }
-
-                return t.type === 'income' ? acc + amt : acc - amt;
-
-            }, 0);
-
-    }, [budget.transactions, calendarFilter]);
-
-
-
-    // --- 3. MOTEUR JOURNALIER INTELLIGENT (CORRIGÉ & ROBUSTE) ---
-
-    const dailyData = useMemo(() => {
-
-        const year = viewDate.getFullYear();
-
-        const month = viewDate.getMonth();
-
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        const today = new Date();
-
-        today.setHours(0,0,0,0);
-
-
-
-        // --- CORRECTION : CALCUL UNIVERSEL DU SOLDE DE DÉBUT DE MOIS ---
-
-        let startOfMonthProjection = currentBalance;
-
-        const firstDayOfView = new Date(year, month, 1);
-
-       
-
-        const calculateImpact = (item) => {
-
-            const amt = parseFloat(item.amount || 0);
-
-            const disp = getContextDisplay(item);
-
-            if (calendarFilter === 'total') {
-
-                if (item.type === 'income') return amt;
-
-                if (item.type !== 'transfer') return -amt;
-
-                return 0;
-
-            } else {
-
-                if (disp.isIncome) return amt;
-
-                if (disp.isExpense) return -amt;
-
-                return 0;
-
-            }
-
-        };
-
-
-
-        if (firstDayOfView > today) {
-
-            let simDate = new Date(today);
-
-            simDate.setDate(simDate.getDate() + 1);
-
-           
-
-            while (simDate < firstDayOfView) {
-
-                budget.scheduled.forEach(s => {
-
-                    if (s.status === 'pending' && isSameDay(parseLocalDate(s.date), simDate)) {
-
-                        if (checkFilter(s.accountId, s.targetAccountId)) {
-
-                            startOfMonthProjection += calculateImpact(s);
-
-                        }
-
-                    }
-
-                });
-
-                budget.recurring.forEach(r => {
-
-                    const simDayOfMonth = simDate.getDate();
-
-                    if (r.dayOfMonth === simDayOfMonth && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
-
-                        if (checkFilter(r.accountId, r.targetAccountId)) {
-
-                            startOfMonthProjection += calculateImpact(r);
-
-                        }
-
-                    }
-
-                });
-
-                simDate.setDate(simDate.getDate() + 1);
-
-            }
-
-        }
-
-        else if (firstDayOfView < today && !isSameDay(firstDayOfView, new Date(today.getFullYear(), today.getMonth(), 1))) {
-
-             startOfMonthProjection = 0;
-
-        }
-
-
-
-        const daysMap = {};
-
-
-
-        for (let d = 1; d <= daysInMonth; d++) {
-
-            const date = new Date(year, month, d);
-
-            const events = [];
-
-            let dailyChange = 0;
-
-
-
-            const addEvent = (item, type, source) => {
-
-                const amt = parseFloat(item.amount || 0);
-
-                const display = getContextDisplay(item);
-
-                let impact = 0;
-
-               
-
-                if (calendarFilter === 'total') {
-
-                    if (item.type === 'transfer') impact = 0;
-
-                    else if (item.type === 'income') impact = amt;
-
-                    else impact = -amt;
-
-                } else {
-
-                    if (display.isIncome) impact = amt;
-
-                    else if (display.isExpense) impact = -amt;
-
-                }
-
-
-
-                dailyChange += impact;
-
-                events.push({ id: item.id, data: item, type, source, impact, display });
-
-            };
-
-
-
-            // Transactions passées (Historique)
-
-            budget.transactions.forEach(t => {
-
-                if (isSameDay(parseLocalDate(t.date), date)) {
-
-                    if (checkFilter(t.accountId, t.targetAccountId)) {
-
-                        addEvent(t, 'transaction', 'history');
-
-                    }
-
-                }
-
-            });
-
-
-
-            // Transactions prévues (Futur)
-
-            budget.scheduled.forEach(s => {
-
-                if (s.status === 'pending') {
-
-                    if (isSameDay(parseLocalDate(s.date), date)) {
-
-                        if (checkFilter(s.accountId, s.targetAccountId)) {
-
-                            addEvent(s, 'scheduled', 'planned');
-
-                        }
-
-                    }
-
-                }
-
-            });
-
-
-
-            // Récurrents (Futur)
-
-            if (date >= today) {
-
-                budget.recurring.forEach(r => {
-
-                    if (r.dayOfMonth === d && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
-
-                        if (checkFilter(r.accountId, r.targetAccountId)) {
-
-                           
-
-                            // CHECK 1 : Existe-t-il déjà en "scheduled" ?
-
-                            const alreadyScheduled = budget.scheduled.some(s =>
-
-                                s.status === 'pending' &&
-
-                                isSameDay(parseLocalDate(s.date), date) &&
-
-                                Math.abs(parseFloat(s.amount) - parseFloat(r.amount)) < 0.01 &&
-
-                                s.description === r.description
-
-                            );
-
-
-
-                            // CHECK 2 (CRITIQUE) : Existe-t-il déjà en "transaction" aujourd'hui ?
-
-                            // Si le paiement a été généré ce matin, on ne doit plus afficher le récurrent prévisionnel
-
-                            const alreadyPaidToday = budget.transactions.some(t =>
-
-                                isSameDay(parseLocalDate(t.date), date) &&
-
-                                Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 &&
-
-                                t.description === r.description
-
-                            );
-
-                           
-
-                            if (!alreadyScheduled && !alreadyPaidToday) {
-
-                                addEvent(r, 'recurring', 'recurring');
-
-                            }
-
-                        }
-
-                    }
-
-                });
-
-            }
-
-
-
-            const extras = [];
-
-            todos.forEach(t => { if (!t.completed && t.deadline && isSameDay(parseLocalDate(t.deadline), date)) extras.push({ type: 'todo', text: t.text }); });
-
-            projects.forEach(p => { if (p.deadline && p.status !== 'done' && isSameDay(parseLocalDate(p.deadline), date)) extras.push({ type: 'project', text: p.title }); });
-
-
-
-            daysMap[d] = { date, events, dailyChange, extras, endBalance: 0 };
-
-        }
-
-
-
-        // --- CALCUL DES SOLDES DE FIN DE JOURNÉE ---
-
-        if (today.getMonth() === month && today.getFullYear() === year) {
-
-            const todayDay = today.getDate();
-
-           
-
-            // Futur
-
-            let futureBalance = currentBalance;
-
-            for (let d = todayDay + 1; d <= daysInMonth; d++) {
-
-                if (daysMap[d]) {
-
-                    futureBalance += daysMap[d].dailyChange;
-
-                    daysMap[d].endBalance = futureBalance;
-
-                }
-
-            }
-
-
-
-            // Passé
-
-            let pastBalance = currentBalance;
-
-            if (daysMap[todayDay]) daysMap[todayDay].endBalance = pastBalance;
-
-           
-
-            for (let d = todayDay; d >= 1; d--) {
-
-                if (daysMap[d]) {
-
-                    pastBalance -= daysMap[d].dailyChange;
-
-                    if (daysMap[d-1]) daysMap[d-1].endBalance = pastBalance;
-
-                }
-
-            }
-
-        }
-
-        else if (firstDayOfView > today) {
-
-            let projected = startOfMonthProjection;
-
-            for (let d = 1; d <= daysInMonth; d++) {
-
-                if (daysMap[d]) {
-
-                    projected += daysMap[d].dailyChange;
-
-                    daysMap[d].endBalance = projected;
-
-                }
-
-            }
-
-        }
-
-        else {
-
-            for (let d = 1; d <= daysInMonth; d++) if (daysMap[d]) daysMap[d].endBalance = null;
-
-        }
-
-
-
-        return daysMap;
-
-    }, [viewDate, budget, calendarFilter, currentBalance, accounts]);
-
-
-
-    const changeMonth = (delta) => {
-
-        const newDate = new Date(viewDate);
-
-        newDate.setMonth(newDate.getMonth() + delta);
-
-        setViewDate(newDate);
-
-        setSelectedDateDetails(null);
-
-    };
-
-
-
-    // --- RENDU ---
-
-    const year = viewDate.getFullYear();
-
-    const month = viewDate.getMonth();
-
-    const firstDayIndex = new Date(year, month, 1).getDay();
-
-    const offset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
-
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const today = new Date();
-
-
-
-    const daysLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-
-
-
-    return (
-
-        <div className="space-y-6 fade-in p-4 pb-24 md:pb-20 max-w-[1600px] mx-auto h-full flex flex-col">
-
-           
-
-            {/* Header */}
-
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm">
-
-                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 w-full md:w-auto">
-
-                    <div className="flex items-center justify-between w-full sm:w-auto bg-gray-100 dark:bg-slate-700 rounded-lg p-1">
-
-                        <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"><ChevronLeft size={20}/></button>
-
-                        <button onClick={() => setViewDate(new Date())} className="px-4 text-sm font-bold text-gray-700 dark:text-gray-200">Aujourd'hui</button>
-
-                        <button onClick={() => changeMonth(1)} className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"><ChevronRight size={20}/></button>
-
-                    </div>
-
-                    <h2 className="text-xl md:text-2xl font-bold capitalize text-slate-800 dark:text-white text-center">
-
-                        {viewDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-
-                    </h2>
-
-                </div>
-
-               
-
-                <div className="flex items-center gap-3 bg-blue-50 dark:bg-slate-700/50 px-4 py-2 rounded-xl w-full md:w-auto">
-
-                    <Wallet size={20} className="text-blue-600 dark:text-blue-400 shrink-0"/>
-
-                    <select
-
-                        value={calendarFilter}
-
-                        onChange={(e) => setCalendarFilter(e.target.value)}
-
-                        className="bg-transparent text-sm font-bold text-slate-700 dark:text-white outline-none cursor-pointer w-full md:w-auto"
-
-                        style={{ colorScheme: 'dark' }}
-
-                    >
-
-                        <option value="total" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Vue Globale</option>
-
-                        {accounts.map(acc => (
-
-                            <option key={acc.id} value={acc.id} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-
-                                {acc.name}
-
-                            </option>
-
-                        ))}
-
-                    </select>
-
-                </div>
-
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabaseClient';
+import Login from './Login';
+import Sidebar from './Sidebar';
+import Dashboard from './Dashboard';
+import CalendarView from './CalendarView';
+import ProjectsManager from './ProjectsManager';
+import BudgetManager from './BudgetManager';
+import NotesManager from './NotesManager';
+import TodoList from './TodoList';
+import DataSettings from './DataSettings';
+import ClientHub from './ClientHub';
+import ZenMode from './ZenMode';
+import Workspace from './Workspace'; 
+import { Loader2, Lock } from 'lucide-react';
+
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [currentView, setView] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [notifMessage, setNotifMessage] = useState(null);
+  const isLoaded = useRef(false);
+  
+  const getInitialTheme = () => {
+    if (typeof window !== 'undefined') return localStorage.getItem('freelanceCockpitTheme') || 'light';
+    return 'light';
+  };
+
+  const [data, setData] = useState({
+    todos: [], projects: [], 
+    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
+    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
+    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
+    ventures: [] 
+  });
+
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // --- UTILS (CORRECTION CRITIQUE DATE LOCALE) ---
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    try {
+        const d = new Date(dateStr);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    } catch(e) { return new Date(); }
+  };
+
+  const isDatePastOrToday = (dateStr) => {
+      if (!dateStr) return false;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const checkDate = parseLocalDate(dateStr); 
+      checkDate.setHours(0,0,0,0);
+      return checkDate <= today;
+  };
+
+  // --- BATCH SAVE ---
+  const upsertInBatches = async (table, items, batchSize = 50, mapFunction) => {
+    if (!items || items.length === 0) return;
+    const validItems = items.filter(i => i && i.id);
+    const mappedItems = validItems.map(mapFunction);
+    for (let i = 0; i < mappedItems.length; i += batchSize) {
+      const batch = mappedItems.slice(i, i + batchSize);
+      await supabase.from(table).upsert(batch);
+    }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = data.settings?.theme === 'dark' ? 'light' : 'dark';
+    const newData = { ...data, settings: { ...data.settings, theme: newTheme } };
+    setData(newData);
+    localStorage.setItem('freelanceCockpitTheme', newTheme);
+    if (newTheme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
+    updateData(newData); 
+  };
+
+  useEffect(() => {
+    const theme = data.settings?.theme || 'light';
+    if (theme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
+    localStorage.setItem('freelanceCockpitTheme', theme);
+  }, [data.settings?.theme]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) initDataLoad(session.user.id); else setLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session && !isLoaded.current) initDataLoad(session.user.id); else if (!session) setLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const initDataLoad = async (userId) => {
+    if (isLoaded.current) return;
+    isLoaded.current = true;
+    setLoading(true);
+
+    try {
+      const results = await Promise.all([
+        supabase.from('profiles').select('*').single(),
+        supabase.from('todos').select('*'),
+        supabase.from('notes').select('*'),
+        supabase.from('projects').select('*'),
+        supabase.from('accounts').select('*'),
+        supabase.from('transactions').select('*'),
+        supabase.from('recurring').select('*'),
+        supabase.from('scheduled').select('*'),
+        supabase.from('events').select('*'),
+        supabase.from('planner_items').select('*'),
+        supabase.from('safety_bases').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('quotes').select('*'),
+        supabase.from('invoices').select('*'),
+        supabase.from('catalog_items').select('*'),
+        supabase.from('ventures').select('*')
+      ]);
+
+      const [
+        { data: profile }, { data: todos }, { data: notes }, { data: projects },
+        { data: accounts }, { data: transactions }, { data: recurring }, 
+        { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
+        { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
+        { data: ventures }
+      ] = results;
+
+      // --- CATCH-UP ENGINE (MOTEUR DE RATTRAPAGE BLINDÉ) ---
+      let newDBTransactions = [];
+      let updatedDBScheduled = [];
+      let updatedDBRecurring = [];
+      
+      const validAccounts = accounts || [];
+      const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : 'offline-account';
+      const existingTransactions = transactions || [];
+
+      // Helper pour vérifier les doublons STRICTS (Même description, même montant, même jour)
+      const isDuplicate = (desc, amount, dateStr) => {
+          const targetDate = parseLocalDate(dateStr);
+          // On vérifie dans la DB existante
+          const inDB = existingTransactions.some(t => {
+              const tDate = parseLocalDate(t.date);
+              return t.description === desc && 
+                     Math.abs(parseFloat(t.amount) - parseFloat(amount)) < 0.01 &&
+                     tDate.getFullYear() === targetDate.getFullYear() &&
+                     tDate.getMonth() === targetDate.getMonth() &&
+                     tDate.getDate() === targetDate.getDate();
+          });
+          // On vérifie aussi dans ce qu'on vient juste de générer (pour éviter les boucles rapides)
+          const inQueue = newDBTransactions.some(t => {
+              const tDate = parseLocalDate(t.date);
+              return t.description === desc && 
+                     Math.abs(parseFloat(t.amount) - parseFloat(amount)) < 0.01 &&
+                     tDate.getFullYear() === targetDate.getFullYear() &&
+                     tDate.getMonth() === targetDate.getMonth() &&
+                     tDate.getDate() === targetDate.getDate();
+          });
+          return inDB || inQueue;
+      };
+
+      // 1. Scheduled Catch-up (Rattrapage Planifié)
+      (scheduled || []).forEach(s => {
+          if (s.status === 'pending' && isDatePastOrToday(s.date)) {
+              // VÉRIFICATION ANTI-DOUBLON AVANT CRÉATION
+              if (!isDuplicate(s.description, s.amount, s.date)) {
+                  const baseId = Date.now() + Math.floor(Math.random() * 1000000);
+                  const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
+                  
+                  const common = { 
+                      id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, 
+                      type: s.type, description: s.description, account_id: accId 
+                  };
+
+                  if (s.type === 'transfer' && s.target_account_id) {
+                      const targetAccId = s.target_account_id;
+                      const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
+                      const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
+                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
+                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
+                  } else { 
+                      newDBTransactions.push(common); 
+                  }
+              }
+              // On marque comme exécuté DANS TOUS LES CAS (même si doublon détecté, pour ne pas rebloquer)
+              updatedDBScheduled.push({ ...s, status: 'executed' });
+          }
+      });
+
+      // 2. Recurring Catch-up (Rattrapage Récurrent)
+      (recurring || []).forEach(r => {
+          let hasChanged = false;
+          let tempR = { ...r };
+          
+          // Initialisation date si vide (CORRECTION BUG FÉVRIER ICI)
+          // Si on est le 30 et qu'on initialise en Février, on force le 28.
+          if (!tempR.next_due_date) {
+              const d = new Date(); 
+              const currentMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+              const safeDay = Math.min(tempR.day_of_month, currentMonthMaxDays);
+              d.setDate(safeDay);
+              
+              if (d < new Date()) {
+                  d.setMonth(d.getMonth() + 1);
+                  const nextMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                  const safeNextDay = Math.min(tempR.day_of_month, nextMonthMaxDays);
+                  d.setDate(safeNextDay);
+              }
+              tempR.next_due_date = d.toISOString();
+              hasChanged = true;
+          }
+
+          let loopSafety = 0;
+          while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
+              const nextDueObj = parseLocalDate(tempR.next_due_date);
+              
+              // VÉRIFICATION ANTI-DOUBLON STRICTE
+              // Si la transaction existe déjà pour ce mois-ci, on ne la crée pas, on avance juste la date.
+              if (!isDuplicate(tempR.description, tempR.amount, tempR.next_due_date)) {
+                  const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
+                  const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
+                  
+                  const common = { 
+                      id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, 
+                      type: tempR.type, description: tempR.description, account_id: accId 
+                  };
+
+                  if (tempR.type === 'transfer' && tempR.target_account_id) {
+                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
+                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
+                  } else { 
+                      newDBTransactions.push(common); 
+                  }
+              }
+              
+              // Calcul prochaine échéance
+              let nextMonth = nextDueObj.getMonth() + 1;
+              let nextYear = nextDueObj.getFullYear();
+              if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+              const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+              const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
+              const newDate = new Date(nextYear, nextMonth, targetDay);
+              
+              if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
+              tempR.next_due_date = newDate.toISOString();
+              hasChanged = true;
+              loopSafety++;
+          }
+          if (hasChanged) updatedDBRecurring.push(tempR);
+      });
+
+      let finalTransactions = [...(transactions || []), ...newDBTransactions];
+      let finalScheduled = (scheduled || []).map(s => { const updated = updatedDBScheduled.find(u => u.id == s.id); return updated || s; });
+      let finalRecurring = (recurring || []).map(r => { const updated = updatedDBRecurring.find(u => u.id == r.id); return updated || r; });
+
+      if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
+          const syncAsync = async () => {
+             try {
+                 if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
+                 if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
+                 if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
+             } catch (err) {
+                 console.error("Erreur Sync Rattrapage:", err);
+                 setUnsavedChanges(true); 
+             }
+          };
+          syncAsync();
+      }
+
+      const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
+      const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
+      const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
+      const mappedPlannerItems = (plannerItems || []).map(i => ({ ...i, targetAccountId: i.target_account_id }));
+      const plannerBases = {}; (safetyBases || []).forEach(b => plannerBases[b.account_id] = b.amount);
+      const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
+      const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
+      
+      const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'light';
+      
+      const newData = {
+        todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
+        budget: {
+          accounts: validAccounts, 
+          transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
+          recurring: mappedRecurring, scheduled: mappedScheduled,
+          planner: { base: 0, items: mappedPlannerItems, safetyBases: plannerBases }
+        },
+        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
+        ventures: ventures || [], 
+        profile: profile || {},
+        settings: { ...(profile?.settings || {}), theme: loadedTheme },
+        customLabels: profile?.custom_labels || {}, mainNote: ""
+      };
+
+      setData(newData);
+      if (newData.settings?.pin) setIsLocked(true);
+
+    } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
+  };
+
+  const updateData = async (newData, deleteRequest = null) => {
+    setData(newData);
+    setUnsavedChanges(true);
+    if (deleteRequest) {
+      const { table, id } = deleteRequest;
+      if (table && id) try { await supabase.from(table).delete().eq('id', id); } catch (e) { console.error("Erreur suppression", e); }
+    }
+  };
+
+  useEffect(() => {
+    if (!unsavedChanges) return;
+    const timer = setTimeout(() => { saveDataToSupabase(); }, 3000);
+    return () => clearTimeout(timer);
+  }, [data, unsavedChanges]);
+
+  const saveDataToSupabase = async () => {
+    if (!session) return;
+    setIsSaving(true);
+    try {
+      const { user } = session;
+      await supabase.from('profiles').upsert({ 
+          id: user.id, settings: data.settings, custom_labels: data.customLabels,
+          company_name: data.profile?.company_name, siret: data.profile?.siret, 
+          address: data.profile?.address, email_contact: data.profile?.email_contact, 
+          phone_contact: data.profile?.phone_contact, iban: data.profile?.iban, 
+          bic: data.profile?.bic, tva_number: data.profile?.tva_number, logo: data.profile?.logo
+      });
+      await upsertInBatches('accounts', data.budget.accounts.filter(a => a && a.name && a.id).map(a => ({ id: a.id, user_id: user.id, name: a.name })), 50, a => a);
+      await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, date: t.date, account_id: t.accountId || t.account_id, archived: t.archived }));
+      await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
+      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
+      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
+      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
+      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
+      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
+      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
+      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
+      await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
+      await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
+      const bases = data.budget.planner.safetyBases;
+      const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
+      if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
+      setUnsavedChanges(false);
+      setNotifMessage(null);
+    } catch (err) { 
+        console.error("Erreur sauvegarde critique", err); 
+        setNotifMessage("Erreur : " + (err.message || "Sauvegarde échouée")); 
+    } finally { setIsSaving(false); }
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
+  if (!session) return <Login />;
+
+  const renderContent = () => {
+    switch(currentView) {
+      case 'dashboard': return <Dashboard data={data} updateData={updateData} setView={setView} />;
+      case 'calendar': return <CalendarView data={data} updateData={updateData} />;
+      case 'projects': return <ProjectsManager data={data} updateData={updateData} />;
+      case 'budget': return <BudgetManager data={data} updateData={updateData} />;
+      case 'notes': return <NotesManager data={data} updateData={updateData} />;
+      case 'todo': return <TodoList data={data} updateData={updateData} />;
+      case 'clients': return <ClientHub data={data} updateData={updateData} />;
+      case 'workspace': return <Workspace data={data} updateData={updateData} />;
+      case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
+      default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
+    }
+  };
+
+  const isWorkspace = currentView === 'workspace';
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+      
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
+        {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`}></div>}
+        {notifMessage && notifMessage.includes('Erreur') && (
+            <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100">
+                {notifMessage}
             </div>
-
-
-
-            {/* Grille Calendrier */}
-
-            <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden flex flex-col min-h-[500px] md:min-h-[700px]">
-
-                <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
-
-                    {daysLabels.map((day, i) => (
-
-                        <div key={day} className="py-2 md:py-3 text-center">
-
-                            <span className="md:hidden text-[9px] font-bold text-slate-500 uppercase tracking-wide">{day.substring(0, 3)}</span>
-
-                            <span className="hidden md:block text-xs font-bold text-slate-500 uppercase tracking-wider">{day}</span>
-
-                        </div>
-
-                    ))}
-
-                </div>
-
-
-
-                <div className="grid grid-cols-7 auto-rows-fr flex-1 bg-gray-200 dark:bg-slate-700 gap-px border-b border-gray-200 dark:border-slate-700">
-
-                    {Array.from({ length: offset }).map((_, i) => (
-
-                        <div key={`blank-${i}`} className="bg-gray-50/50 dark:bg-slate-900/30"></div>
-
-                    ))}
-
-
-
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-
-                        const d = i + 1;
-
-                        const dayData = dailyData[d];
-
-                        const isToday = isSameDay(new Date(year, month, d), today);
-
-                       
-
-                        return (
-
-                            <div
-
-                                key={d}
-
-                                onClick={() => setSelectedDateDetails(dayData)}
-
-                                className={`
-
-                                    bg-white dark:bg-slate-800 p-1 md:p-2 relative flex flex-col gap-1 md:gap-2 cursor-pointer transition-colors group min-h-[90px] md:min-h-[120px]
-
-                                    ${isToday ? 'bg-blue-50/40 dark:bg-slate-800 ring-inset ring-2 ring-blue-500' : 'hover:bg-gray-50 dark:hover:bg-slate-700'}
-
-                                `}
-
-                            >
-
-                                <div className="flex justify-between items-start">
-
-                                    <span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-7 md:h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300'}`}>
-
-                                        {d}
-
-                                    </span>
-
-                                    {dayData.dailyChange !== 0 && (
-
-                                        <span className={`text-[8px] md:text-[10px] font-bold px-1 py-0.5 rounded ${dayData.dailyChange > 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>
-
-                                            {dayData.dailyChange > 0 ? '+' : ''}{Math.round(dayData.dailyChange)}€
-
-                                        </span>
-
-                                    )}
-
-                                </div>
-
-
-
-                                <div className="flex-1 flex flex-col gap-0.5 md:gap-1 overflow-hidden min-h-[40px] md:min-h-[60px]">
-
-                                    {dayData.events.slice(0, 4).map((e, idx) => {
-
-                                        const d = e.display;
-
-                                        const Icon = d.icon;
-
-                                        return (
-
-                                            <div key={idx} className={`text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 md:py-1 rounded border flex justify-between items-center gap-1 ${d.bgClass} ${d.colorClass} ${d.borderClass}`}>
-
-                                                <div className="flex items-center gap-1 min-w-0">
-
-                                                    <Icon size={8} className="shrink-0 md:w-[10px] md:h-[10px]"/>
-
-                                                    <span className="truncate font-medium max-w-[40px] md:max-w-none">{e.data.description}</span>
-
-                                                </div>
-
-                                                <span className="font-bold whitespace-nowrap hidden sm:inline">{Math.round(e.data.amount)}€</span>
-
-                                            </div>
-
-                                        );
-
-                                    })}
-
-                                    {dayData.extras.map((ex, idx) => (
-
-                                        <div key={`ex-${idx}`} className="flex items-center gap-1 text-[8px] md:text-[9px] text-slate-500 px-1">
-
-                                            {ex.type === 'todo' ? <CheckSquare size={8} className="text-orange-500"/> : <Target size={8} className="text-purple-500"/>}
-
-                                            <span className="truncate">{ex.text}</span>
-
-                                        </div>
-
-                                    ))}
-
-                                    {(dayData.events.length > 4) && (
-
-                                        <span className="text-[8px] md:text-[9px] text-slate-400 text-center">+ {dayData.events.length - 4}</span>
-
-                                    )}
-
-                                </div>
-
-
-
-                                {dayData.endBalance !== null && dayData.endBalance !== undefined && (
-
-                                    <div className="mt-auto pt-1 md:pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex justify-end">
-
-                                        <span className={`text-[9px] md:text-xs font-extrabold ${dayData.endBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
-
-                                            {formatCurrency(dayData.endBalance)}
-
-                                        </span>
-
-                                    </div>
-
-                                )}
-
-                            </div>
-
-                        );
-
-                    })}
-
-                </div>
-
-            </div>
-
-
-
-            {/* Modale Détail Journée */}
-
-            {selectedDateDetails && (
-
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setSelectedDateDetails(null)}>
-
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-
-                        <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-start bg-gray-50 dark:bg-slate-800/50">
-
-                            <div>
-
-                                <h3 className="text-2xl font-bold text-slate-800 dark:text-white capitalize">
-
-                                    {selectedDateDetails.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-
-                                </h3>
-
-                                {selectedDateDetails.endBalance !== null && (
-
-                                    <p className="text-sm font-medium text-slate-500 mt-1">
-
-                                        Solde estimé en fin de journée : <span className={`font-bold ${selectedDateDetails.endBalance < 0 ? 'text-red-500' : 'text-blue-600'}`}>{formatCurrency(selectedDateDetails.endBalance)}</span>
-
-                                    </p>
-
-                                )}
-
-                            </div>
-
-                            <button onClick={() => setSelectedDateDetails(null)} className="p-2 bg-white dark:bg-slate-700 rounded-full hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"><X size={20}/></button>
-
-                        </div>
-
-                       
-
-                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-
-                            {selectedDateDetails.events.length === 0 && selectedDateDetails.extras.length === 0 ? (
-
-                                <p className="text-center text-gray-400 italic">Aucune activité ce jour-là.</p>
-
-                            ) : (
-
-                                <>
-
-                                    {selectedDateDetails.events.map((e, i) => {
-
-                                        const d = e.display;
-
-                                        const Icon = d.icon;
-
-                                        return (
-
-                                            <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-700 border border-gray-100 dark:border-slate-600 shadow-sm">
-
-                                                <div className="flex items-center gap-3">
-
-                                                    <div className={`p-2 rounded-full ${d.bgClass} ${d.colorClass}`}>
-
-                                                        <Icon size={18}/>
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <p className="font-bold text-slate-800 dark:text-white text-sm">{e.data.description}</p>
-
-                                                        <p className="text-xs text-slate-400 capitalize">{d.label} • {e.source === 'history' ? 'Réalisé' : e.source === 'planned' ? 'Planifié' : 'Récurrent'}</p>
-
-                                                    </div>
-
-                                                </div>
-
-                                                <span className={`font-bold ${d.colorClass}`}>
-
-                                                    {d.sign}{formatCurrency(e.data.amount)}
-
-                                                </span>
-
-                                            </div>
-
-                                        );
-
-                                    })}
-
-                                    {selectedDateDetails.extras.map((ex, i) => (
-
-                                        <div key={`ex-d-${i}`} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-slate-700/50 border border-dashed border-gray-300 dark:border-slate-600">
-
-                                            {ex.type === 'todo' ? <CheckSquare size={18} className="text-orange-500"/> : <Target size={18} className="text-purple-500"/>}
-
-                                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{ex.text}</span>
-
-                                        </div>
-
-                                    ))}
-
-                                </>
-
-                            )}
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            )}
-
+        )}
+      </div>
+
+      {isLocked && (
+        <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
+           <div className="mb-4 bg-blue-600 p-4 rounded-full"><Lock size={32} className="text-white"/></div>
+           <input type="password" maxLength="4" className="text-center text-2xl tracking-widest p-2 rounded bg-slate-800 text-white border border-slate-700 w-40 outline-none" onChange={(e) => { if(e.target.value === data.settings.pin) setIsLocked(false); }} autoFocus />
         </div>
+      )}
 
-    );
-
+      {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
+      
+      <Sidebar currentView={currentView} setView={setView} isMobileOpen={isMobileMenuOpen} toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} labels={data.customLabels} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />
+      
+      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
+        <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
+          <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'Freelance Cockpit'}</h1>
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
+        </header>
+        
+        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
+          <div className={`w-full ${isWorkspace ? 'h-full' : 'max-w-7xl mx-auto'}`}> 
+            {renderContent()} 
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
