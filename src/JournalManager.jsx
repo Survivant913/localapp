@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter // <--- AJOUT SURLIGNEUR
+  X, CornerDownRight, Highlighter
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -20,7 +20,7 @@ export default function JournalManager({ data, updateData }) {
     const [newName, setNewName] = useState('');
     const [targetParentId, setTargetParentId] = useState(null);
 
-    // État pour savoir quels boutons sont actifs (Gras, Italique, etc.)
+    // État Formats Actifs
     const [activeFormats, setActiveFormats] = useState({});
 
     // Refs
@@ -31,9 +31,10 @@ export default function JournalManager({ data, updateData }) {
     const folders = Array.isArray(data.journal_folders) ? data.journal_folders : [];
     const pages = Array.isArray(data.journal_pages) ? data.journal_pages : [];
 
+    // Les carnets sont les dossiers racines (sans parent)
     const notebooks = folders.filter(f => !f.parent_id);
 
-    // --- LOGIQUE D'ARBORESCENCE (INTACTE) ---
+    // --- LOGIQUE ARBORESCENCE ---
     const treeStructure = useMemo(() => {
         if (!activeNotebookId) return [];
 
@@ -74,7 +75,6 @@ export default function JournalManager({ data, updateData }) {
                 }
             }
         }
-        // Reset des formats actifs au changement de page
         setActiveFormats({});
     }, [activePageId, pages]);
 
@@ -118,15 +118,28 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => titleRef.current?.focus(), 100);
     };
 
+    // --- SUPPRESSION (CORRIGÉE) ---
     const deleteItem = (item) => {
         if (!window.confirm(`Supprimer "${item.title || item.name}" ?`)) return;
         
-        if (item.type === 'folder') {
+        // DÉTECTION TYPE : Si 'name' existe c'est un dossier, sinon c'est une page
+        const isFolder = item.type === 'folder' || item.name !== undefined;
+
+        if (isFolder) {
+            // Suppression Dossier/Carnet : On supprime le dossier ET les pages qu'il contient directement
+            // (Note: pour une suppression récursive complète des sous-dossiers, il faudrait une fonction plus complexe, 
+            // ici on fait le nettoyage niveau 1 + l'ID folder lui-même)
             const updatedFolders = folders.filter(f => f.id !== item.id);
-            const updatedPages = pages.filter(p => p.folder_id !== item.id);
+            const updatedPages = pages.filter(p => String(p.folder_id) !== String(item.id));
+            
             updateData({ ...data, journal_folders: updatedFolders, journal_pages: updatedPages }, { table: 'journal_folders', id: item.id });
-            if (activeNotebookId === item.id) setActiveNotebookId(null);
+            
+            // Si on supprime le carnet actif, on retourne à la bibliothèque
+            if (String(activeNotebookId) === String(item.id)) {
+                setActiveNotebookId(null);
+            }
         } else {
+            // Suppression Page
             const updatedPages = pages.filter(p => p.id !== item.id);
             updateData({ ...data, journal_pages: updatedPages }, { table: 'journal_pages', id: item.id });
             if (activePageId === item.id) setActivePageId(null);
@@ -143,9 +156,7 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => setIsSaving(false), 800);
     };
 
-    // --- LOGIQUE ÉDITEUR & FORMATS ---
-
-    // Vérifie l'état du curseur pour allumer/éteindre les boutons
+    // --- ÉDITEUR ---
     const checkFormats = () => {
         if (!document) return;
         setActiveFormats({
@@ -155,7 +166,6 @@ export default function JournalManager({ data, updateData }) {
             strikethrough: document.queryCommandState('strikethrough'),
             insertUnorderedList: document.queryCommandState('insertUnorderedList'),
             insertOrderedList: document.queryCommandState('insertOrderedList'),
-            // Pour les blocs, on vérifie la valeur
             blockquote: document.queryCommandValue('formatBlock') === 'blockquote',
             h2: document.queryCommandValue('formatBlock') === 'h2',
             h3: document.queryCommandValue('formatBlock') === 'h3',
@@ -166,7 +176,7 @@ export default function JournalManager({ data, updateData }) {
         e.preventDefault(); 
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
-        checkFormats(); // Vérifier les formats immédiatement après le clic
+        checkFormats();
     };
 
     const handleKeyDown = (e) => {
@@ -183,9 +193,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // Bouton Toolbar avec gestion de l'état actif (bleu)
     const ToolbarButton = ({ icon: Icon, cmd, val, title, isActiveOverride }) => {
-        // Est-ce actif via queryCommandState OU via une prop forcée ?
         const isActive = isActiveOverride !== undefined 
             ? isActiveOverride 
             : activeFormats[cmd] || (val && activeFormats[val.toLowerCase()]);
@@ -194,8 +202,8 @@ export default function JournalManager({ data, updateData }) {
             <button 
                 onMouseDown={(e) => execCmd(e, cmd, val)} 
                 className={`p-2 rounded transition-all duration-200 ${isActive 
-                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300' // Style Actif
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300' // Style Inactif
+                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300' 
                 }`}
                 title={title}
             >
@@ -323,12 +331,11 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* BOUTON SURLIGNEUR (Highlight) */}
+                            {/* HIGHLIGHT BUTTON */}
                             <ToolbarButton icon={Highlighter} cmd="hiliteColor" val="yellow" title="Surligner (Jaune)" />
 
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             
-                            {/* TITRES */}
                             <button onMouseDown={(e) => execCmd(e, 'formatBlock', 'H2')} className={`px-2 py-1 text-xs font-bold rounded transition-colors ${activeFormats.h2 ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300'}`}>H1</button>
                             <button onMouseDown={(e) => execCmd(e, 'formatBlock', 'H3')} className={`px-2 py-1 text-xs font-bold rounded transition-colors ${activeFormats.h3 ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300'}`}>H2</button>
                             
@@ -356,8 +363,8 @@ export default function JournalManager({ data, updateData }) {
                                 className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300"
                                 contentEditable
                                 onKeyDown={handleKeyDown} 
-                                onKeyUp={checkFormats} // Vérifie l'état quand on tape
-                                onMouseUp={checkFormats} // Vérifie l'état quand on clique ou sélectionne
+                                onKeyUp={checkFormats}
+                                onMouseUp={checkFormats}
                                 onBlur={saveContent}
                                 onInput={() => { if(!isSaving) setIsSaving(true); }} 
                             />
