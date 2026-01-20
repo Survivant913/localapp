@@ -12,7 +12,8 @@ import DataSettings from './DataSettings';
 import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
 import Workspace from './Workspace'; 
-import GoalsManager from './GoalsManager'; // NOUVEAU
+import GoalsManager from './GoalsManager'; 
+import JournalManager from './JournalManager'; // <--- VÉRIFIE QUE CE FICHIER EXISTE BIEN
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -31,7 +32,8 @@ export default function App() {
 
   const [data, setData] = useState({
     todos: [], projects: [], 
-    goals: [], goal_milestones: [], // NOUVEAU
+    goals: [], goal_milestones: [], 
+    journal_folders: [], journal_pages: [], // <--- DONNÉES DU CARNET
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
@@ -41,7 +43,7 @@ export default function App() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- UTILS (CORRECTION CRITIQUE DATE LOCALE) ---
+  // --- UTILS ---
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
     try {
@@ -120,8 +122,10 @@ export default function App() {
         supabase.from('invoices').select('*'),
         supabase.from('catalog_items').select('*'),
         supabase.from('ventures').select('*'),
-        supabase.from('goals').select('*'), // NOUVEAU
-        supabase.from('goal_milestones').select('*') // NOUVEAU
+        supabase.from('goals').select('*'),
+        supabase.from('goal_milestones').select('*'),
+        supabase.from('journal_folders').select('*'), // <--- CHARGEMENT CARNET
+        supabase.from('journal_pages').select('*')    // <--- CHARGEMENT CARNET
       ]);
 
       const [
@@ -129,10 +133,11 @@ export default function App() {
         { data: accounts }, { data: transactions }, { data: recurring }, 
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
-        { data: ventures }, { data: goals }, { data: goal_milestones } // NOUVEAU
+        { data: ventures }, { data: goals }, { data: goal_milestones },
+        { data: journal_folders }, { data: journal_pages } // <--- RÉCUPÉRATION DONNÉES
       ] = results;
 
-      // --- CATCH-UP ENGINE (MOTEUR DE RATTRAPAGE BLINDÉ) ---
+      // --- CATCH-UP ENGINE ---
       let newDBTransactions = [];
       let updatedDBScheduled = [];
       let updatedDBRecurring = [];
@@ -141,10 +146,8 @@ export default function App() {
       const defaultAccountId = validAccounts.length > 0 ? validAccounts[0].id : 'offline-account';
       const existingTransactions = transactions || [];
 
-      // Helper pour vérifier les doublons STRICTS (Même description, même montant, même jour)
       const isDuplicate = (desc, amount, dateStr) => {
           const targetDate = parseLocalDate(dateStr);
-          // On vérifie dans la DB existante
           const inDB = existingTransactions.some(t => {
               const tDate = parseLocalDate(t.date);
               return t.description === desc && 
@@ -153,7 +156,6 @@ export default function App() {
                      tDate.getMonth() === targetDate.getMonth() &&
                      tDate.getDate() === targetDate.getDate();
           });
-          // On vérifie aussi dans ce qu'on vient juste de générer (pour éviter les boucles rapides)
           const inQueue = newDBTransactions.some(t => {
               const tDate = parseLocalDate(t.date);
               return t.description === desc && 
@@ -165,46 +167,32 @@ export default function App() {
           return inDB || inQueue;
       };
 
-      // 1. Scheduled Catch-up (Rattrapage Planifié)
       (scheduled || []).forEach(s => {
           if (s.status === 'pending' && isDatePastOrToday(s.date)) {
-              // VÉRIFICATION ANTI-DOUBLON AVANT CRÉATION
               if (!isDuplicate(s.description, s.amount, s.date)) {
                   const baseId = Date.now() + Math.floor(Math.random() * 1000000);
                   const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
-                  
-                  const common = { 
-                      id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, 
-                      type: s.type, description: s.description, account_id: accId 
-                  };
-
+                  const common = { id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, type: s.type, description: s.description, account_id: accId };
                   if (s.type === 'transfer' && s.target_account_id) {
                       const targetAccId = s.target_account_id;
                       const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
                       const targetName = validAccounts.find(a => a.id === targetAccId)?.name || 'Cible';
                       newDBTransactions.push({ ...common, type: 'expense', description: `Virement vers ${targetName} : ${s.description}`, account_id: accId });
                       newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${s.description}`, account_id: targetAccId });
-                  } else { 
-                      newDBTransactions.push(common); 
-                  }
+                  } else { newDBTransactions.push(common); }
               }
-              // On marque comme exécuté DANS TOUS LES CAS (même si doublon détecté, pour ne pas rebloquer)
               updatedDBScheduled.push({ ...s, status: 'executed' });
           }
       });
 
-      // 2. Recurring Catch-up (Rattrapage Récurrent)
       (recurring || []).forEach(r => {
           let hasChanged = false;
           let tempR = { ...r };
-          
-          // Initialisation date si vide (CORRECTION BUG FÉVRIER ICI)
           if (!tempR.next_due_date) {
               const d = new Date(); 
               const currentMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
               const safeDay = Math.min(tempR.day_of_month, currentMonthMaxDays);
               d.setDate(safeDay);
-              
               if (d < new Date()) {
                   d.setMonth(d.getMonth() + 1);
                   const nextMonthMaxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
@@ -214,38 +202,24 @@ export default function App() {
               tempR.next_due_date = d.toISOString();
               hasChanged = true;
           }
-
           let loopSafety = 0;
           while (isDatePastOrToday(tempR.next_due_date) && loopSafety < 12) {
               const nextDueObj = parseLocalDate(tempR.next_due_date);
-              
-              // VÉRIFICATION ANTI-DOUBLON STRICTE
-              // Si la transaction existe déjà pour ce mois-ci, on ne la crée pas, on avance juste la date.
               if (!isDuplicate(tempR.description, tempR.amount, tempR.next_due_date)) {
                   const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
                   const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
-                  
-                  const common = { 
-                      id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, 
-                      type: tempR.type, description: tempR.description, account_id: accId 
-                  };
-
+                  const common = { id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, type: tempR.type, description: tempR.description, account_id: accId };
                   if (tempR.type === 'transfer' && tempR.target_account_id) {
                       newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
                       newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
-                  } else { 
-                      newDBTransactions.push(common); 
-                  }
+                  } else { newDBTransactions.push(common); }
               }
-              
-              // Calcul prochaine échéance
               let nextMonth = nextDueObj.getMonth() + 1;
               let nextYear = nextDueObj.getFullYear();
               if (nextMonth > 11) { nextMonth = 0; nextYear++; }
               const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
               const targetDay = Math.min(tempR.day_of_month, daysInNextMonth);
               const newDate = new Date(nextYear, nextMonth, targetDay);
-              
               if (tempR.end_date && parseLocalDate(tempR.end_date) < newDate) break;
               tempR.next_due_date = newDate.toISOString();
               hasChanged = true;
@@ -264,10 +238,7 @@ export default function App() {
                  if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
                  if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
                  if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
-             } catch (err) {
-                 console.error("Erreur Sync Rattrapage:", err);
-                 setUnsavedChanges(true); 
-             }
+             } catch (err) { console.error("Erreur Sync Rattrapage:", err); setUnsavedChanges(true); }
           };
           syncAsync();
       }
@@ -284,7 +255,8 @@ export default function App() {
       
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
-        goals: goals || [], goal_milestones: goal_milestones || [], // NOUVEAU
+        goals: goals || [], goal_milestones: goal_milestones || [], 
+        journal_folders: journal_folders || [], journal_pages: journal_pages || [], // <--- AJOUT DANS LE STATE
         budget: {
           accounts: validAccounts, 
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -344,14 +316,18 @@ export default function App() {
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
       
-      // MODIFICATION CRITIQUE ICI : Sauvegarde des NOUVEAUX champs (category, priority, motivation)
+      // OBJECTIFS (PREMIUM - AVEC TOUS LES CHAMPS)
       await upsertInBatches('goals', data.goals, 50, g => ({ 
           id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, 
           status: g.status, is_favorite: g.is_favorite,
           category: g.category, priority: g.priority, motivation: g.motivation 
       })); 
-      
       await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
+      
+      // CARNET (JOURNAL - SAUVEGARDE)
+      await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
+      await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
+
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
@@ -374,7 +350,8 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
-      case 'goals': return <GoalsManager data={data} updateData={updateData} />; // NOUVEAU
+      case 'goals': return <GoalsManager data={data} updateData={updateData} />;
+      case 'journal': return <JournalManager data={data} updateData={updateData} />; // <--- C'EST ICI QUE C'ÉTAIT MANQUANT !
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
