@@ -76,10 +76,14 @@ export default function Dashboard({ data, updateData, setView }) {
         return String(accId) === String(dashboardFilter);
     };
 
+    // Solde affiché (dépend du filtre)
     const currentBalance = transactions
         .filter(t => isRelevantAccount(t.accountId || t.account_id)) // Fallback si accountId manque
         .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     
+    // NOUVEAU : Solde GLOBAL TOTAL (pour le calcul des projets non liés, indépendant du filtre)
+    const globalTotalBalance = transactions.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+
     const renderAmount = (amount, withSign = false) => {
         if (isPrivacyMode) return '**** €';
         const val = parseFloat(amount || 0);
@@ -162,9 +166,10 @@ export default function Dashboard({ data, updateData, setView }) {
         updateData({ ...data, todos: newTodos });
     };
 
+    // CORRECTION : Comparaison String vs String pour éviter le bug des projets liés
     const getAccountBalanceForProject = (accId) => {
         return transactions
-            .filter(t => (t.accountId || t.account_id) === accId)
+            .filter(t => String(t.accountId || t.account_id) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
@@ -276,7 +281,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                         </div>
                                     </div>
                                     <span className={`font-bold text-sm shrink-0 pl-2 ${e.data.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                        {/* CORRECTION DU SIGNE : Si c'est une dépense, on force le négatif */}
                                         {renderAmount(e.data.type === 'income' ? parseFloat(e.data.amount) : -parseFloat(e.data.amount), true)}
                                     </span>
                                 </div>
@@ -302,16 +306,25 @@ export default function Dashboard({ data, updateData, setView }) {
                                 <p className="text-gray-400 dark:text-slate-500 text-sm italic text-center py-4">Aucun projet en cours.</p>
                             ) : (
                                 activeProjects.map(p => {
+                                    // LOGIQUE CORRIGÉE : Même formule que ProjectsManager
+                                    const cost = parseFloat(p.cost || 0);
                                     let fundingPercentage = 0;
                                     let isFunded = true;
                                     let budgetAvailable = 0;
-                                    if (p.cost > 0) {
-                                        budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, currentBalance);
-                                        fundingPercentage = Math.min(100, (Math.max(0, budgetAvailable) / p.cost) * 100);
-                                        isFunded = budgetAvailable >= p.cost;
+                                    
+                                    if (cost > 0) {
+                                        // Si lié à un compte, on regarde ce compte. Sinon, on regarde le GLOBAL TOTAL (pas le filtré)
+                                        budgetAvailable = p.linkedAccountId 
+                                            ? getAccountBalanceForProject(p.linkedAccountId) 
+                                            : Math.max(0, globalTotalBalance);
+                                            
+                                        fundingPercentage = Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100);
+                                        isFunded = budgetAvailable >= cost;
                                     }
+                                    
                                     let globalScore = p.progress || 0;
-                                    if (p.cost > 0) globalScore = (globalScore + fundingPercentage) / 2;
+                                    // Mix tâches + argent
+                                    if (cost > 0) globalScore = (globalScore + fundingPercentage) / 2;
 
                                     return (
                                         <div key={p.id} className="bg-gray-50 dark:bg-slate-800/50 p-4 md:p-5 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-slate-600 transition-colors cursor-pointer" onClick={() => setView('projects')}>
@@ -348,7 +361,7 @@ export default function Dashboard({ data, updateData, setView }) {
                                                                 <div className="h-full bg-blue-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
                                                             </div>
                                                         </div>
-                                                        {p.cost > 0 && (
+                                                        {cost > 0 && (
                                                             <div className="space-y-1">
                                                                 <div className="flex justify-between text-[10px] text-gray-500 dark:text-slate-400">
                                                                     <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
