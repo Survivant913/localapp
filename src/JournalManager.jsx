@@ -4,7 +4,8 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter, PanelLeft // <--- Icône pour le menu pliable
+  X, CornerDownRight, Highlighter, PanelLeft,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify // <--- NOUVEAUX IMPORTS
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -16,7 +17,7 @@ export default function JournalManager({ data, updateData }) {
     const [isSaving, setIsSaving] = useState(false);
     
     // État Interface
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Pour plier/déplier le menu
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // États Création
     const [isCreating, setIsCreating] = useState(false);
@@ -86,7 +87,7 @@ export default function JournalManager({ data, updateData }) {
         updateData({ ...data, journal_pages: [...pages, newPage] });
         setExpandedFolders(prev => ({ ...prev, [finalFolderId]: true }));
         setActivePageId(newPage.id);
-        if (window.innerWidth < 768) setIsSidebarOpen(false); // Ferme le menu sur mobile après création
+        if (window.innerWidth < 768) setIsSidebarOpen(false); 
         setTimeout(() => titleRef.current?.focus(), 100);
     };
 
@@ -125,6 +126,12 @@ export default function JournalManager({ data, updateData }) {
             strikethrough: document.queryCommandState('strikethrough'),
             insertUnorderedList: document.queryCommandState('insertUnorderedList'),
             insertOrderedList: document.queryCommandState('insertOrderedList'),
+            // Alignements
+            justifyLeft: document.queryCommandState('justifyLeft'),
+            justifyCenter: document.queryCommandState('justifyCenter'),
+            justifyRight: document.queryCommandState('justifyRight'),
+            justifyFull: document.queryCommandState('justifyFull'),
+            
             blockquote: document.queryCommandValue('formatBlock') === 'blockquote',
             h2: document.queryCommandValue('formatBlock') === 'h2',
             h3: document.queryCommandValue('formatBlock') === 'h3',
@@ -139,7 +146,6 @@ export default function JournalManager({ data, updateData }) {
         if (command === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // Couleurs douces (0.3 opacité)
     const applyHighlight = (e, color) => {
         if(e) e.preventDefault();
         document.execCommand('hiliteColor', false, color); 
@@ -294,7 +300,7 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* --- MENU SURLIGNEUR EN LIGNE (TRANSPARENT + PROPRE) --- */}
+                            {/* --- MENU SURLIGNEUR EN LIGNE --- */}
                             <div className="flex items-center gap-1 mx-1 px-1 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <button 
                                     onMouseDown={(e) => { e.preventDefault(); setShowColorPalette(!showColorPalette); }} 
@@ -313,6 +319,14 @@ export default function JournalManager({ data, updateData }) {
                                     </div>
                                 )}
                             </div>
+
+                            <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
+                            
+                            {/* ALIGNEMENT */}
+                            <ToolbarButton icon={AlignLeft} cmd="justifyLeft" title="Aligner à gauche" />
+                            <ToolbarButton icon={AlignCenter} cmd="justifyCenter" title="Centrer" />
+                            <ToolbarButton icon={AlignRight} cmd="justifyRight" title="Aligner à droite" />
+                            <ToolbarButton icon={AlignJustify} cmd="justifyFull" title="Justifier" />
 
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             
