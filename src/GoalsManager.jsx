@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { 
   Target, Calendar, CheckSquare, Square, Heart, 
   Trash2, Plus, ChevronDown, Clock, X,
-  Briefcase, Activity, Banknote, User, Flame, CheckCircle2
+  Briefcase, Activity, Banknote, User, Flame, CheckCircle2,
+  GraduationCap, Users, Gamepad2, Plane, Home
 } from 'lucide-react';
 
 export default function GoalsManager({ data, updateData }) {
@@ -21,16 +22,19 @@ export default function GoalsManager({ data, updateData }) {
     const [newMilestoneText, setNewMilestoneText] = useState({});
     const [expandedGoalId, setExpandedGoalId] = useState(null);
 
-    // --- CONFIGURATION ---
+    // --- CONFIGURATION ÉTENDUE (8 CATÉGORIES) ---
     const categories = {
         business: { label: 'Business', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200', icon: Briefcase },
-        health: { label: 'Santé', color: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200', icon: Activity },
-        finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-200', icon: Banknote },
-        perso: { label: 'Perso', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200', icon: User },
+        finance: { label: 'Finance', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200', icon: Banknote },
+        health: { label: 'Santé', color: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200', icon: Activity },
+        education: { label: 'Formation', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-200', icon: GraduationCap },
+        social: { label: 'Social', color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-200', icon: Users },
+        hobby: { label: 'Loisirs', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200', icon: Gamepad2 },
+        travel: { label: 'Voyage', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200', icon: Plane },
+        perso: { label: 'Perso', color: 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-200', icon: User },
     };
 
     // --- DONNÉES SÉCURISÉES ---
-    // On s'assure que ce sont toujours des tableaux, jamais null/undefined
     const goals = Array.isArray(data.goals) ? data.goals : [];
     const milestones = Array.isArray(data.goal_milestones) ? data.goal_milestones : [];
 
@@ -69,18 +73,13 @@ export default function GoalsManager({ data, updateData }) {
             created_at: new Date().toISOString()
         };
         updateData({ ...data, goals: [newGoal, ...goals] });
-        
-        // Reset
-        setNewGoalTitle(''); 
-        setNewGoalDeadline(''); 
-        setNewGoalMotivation('');
+        setNewGoalTitle(''); setNewGoalDeadline(''); setNewGoalMotivation('');
         setIsFormOpen(false);
     };
 
     const deleteGoal = (id) => {
         if (!window.confirm("Supprimer cet objectif et ses jalons ?")) return;
         const updatedGoals = goals.filter(g => g.id !== id);
-        // Suppression en cascade des jalons liés
         const updatedMilestones = milestones.filter(m => String(m.goal_id) !== String(id));
         updateData({ ...data, goals: updatedGoals, goal_milestones: updatedMilestones }, { table: 'goals', id: id });
     };
@@ -90,39 +89,29 @@ export default function GoalsManager({ data, updateData }) {
         updateData({ ...data, goals: updated });
     };
 
-    // --- ACTIONS JALONS (ANTI-CRASH) ---
+    // --- ACTIONS JALONS ---
     const addMilestone = (goalId) => {
         const text = newMilestoneText[goalId];
         if (!text || !text.trim()) return;
-        
-        const newM = { 
-            id: Date.now(), 
-            goal_id: goalId, 
-            title: text, 
-            is_completed: false 
-        };
-        
+        const newM = { id: Date.now(), goal_id: goalId, title: text, is_completed: false };
         updateData({ ...data, goal_milestones: [...milestones, newM] });
         setNewMilestoneText({ ...newMilestoneText, [goalId]: '' });
     };
 
     const toggleMilestone = (e, mId) => {
-        e.stopPropagation(); // EMPÊCHE LE CRASH (fermeture accordéon)
-        
+        e.stopPropagation(); 
         const updated = milestones.map(m => m.id === mId ? { ...m, is_completed: !m.is_completed } : m);
         updateData({ ...data, goal_milestones: updated });
     };
 
     const deleteMilestone = (e, mId) => {
-        e.stopPropagation(); // EMPÊCHE LE CRASH
+        e.stopPropagation();
         const updated = milestones.filter(m => m.id !== mId);
         updateData({ ...data, goal_milestones: updated }, { table: 'goal_milestones', id: mId });
     };
 
     // --- FILTRAGE & TRI ---
     const filteredGoals = goals.filter(g => activeFilter === 'all' || g.category === activeFilter);
-    
-    // Tri intelligent
     const sortedGoals = [...filteredGoals].sort((a, b) => {
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
         const pMap = { high: 3, medium: 2, low: 1 };
@@ -135,24 +124,27 @@ export default function GoalsManager({ data, updateData }) {
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => calculateProgress(g.id) === 100).length;
 
-    // CSS CLASSES SÉCURISÉES (Anti-page blanche / texte illisible)
     const inputClass = "w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 transition-colors";
     const labelClass = "block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2";
 
     return (
-        <div className="space-y-8 fade-in p-4 pb-24 md:pb-20 max-w-6xl mx-auto">
+        <div className="space-y-8 fade-in p-4 pb-24 md:pb-20 max-w-7xl mx-auto">
             
-            {/* 1. HEADER STATS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-center min-h-[120px]">
+            {/* 1. HEADER STATS ÉTENDU */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {/* Carte Principale "Total" */}
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-center min-h-[120px] lg:col-span-2 xl:col-span-1">
                     <div className="relative z-10">
-                        <p className="text-xs font-bold opacity-60 uppercase tracking-wider mb-1">Total Objectifs</p>
-                        <h3 className="text-4xl font-bold">{completedGoals} / {totalGoals}</h3>
+                        <p className="text-xs font-bold opacity-60 uppercase tracking-wider mb-1">Accomplissement Total</p>
+                        <div className="flex items-baseline gap-2">
+                            <h3 className="text-4xl font-bold">{completedGoals} <span className="text-xl font-normal opacity-50">/ {totalGoals}</span></h3>
+                        </div>
                     </div>
                     <Target size={80} className="absolute -right-6 -bottom-6 opacity-10 rotate-12"/>
                 </div>
                 
-                {['business', 'health', 'finance'].map(catKey => {
+                {/* Cartes Catégories (Boucle dynamique sur TOUTES les catégories) */}
+                {Object.keys(categories).map(catKey => {
                     const catGoals = goals.filter(g => g.category === catKey);
                     const catProgress = catGoals.length > 0 
                         ? Math.round(catGoals.reduce((acc, g) => acc + calculateProgress(g.id), 0) / catGoals.length) 
@@ -161,13 +153,16 @@ export default function GoalsManager({ data, updateData }) {
                     const Icon = Conf.icon;
                     
                     return (
-                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col justify-between min-h-[120px]">
+                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between min-h-[120px] hover:border-blue-200 dark:hover:border-slate-600 transition-colors">
                             <div className="flex justify-between items-start mb-2">
                                 <div className={`p-2 rounded-lg ${Conf.color}`}><Icon size={20}/></div>
                                 <span className="text-2xl font-bold text-gray-800 dark:text-white">{catProgress}%</span>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{Conf.label}</p>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-300 flex justify-between">
+                                    {Conf.label}
+                                    <span className="text-xs opacity-50">{catGoals.length} obj.</span>
+                                </p>
                                 <div className="h-1.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
                                     <div className="h-full bg-current opacity-70 transition-all duration-1000" style={{ width: `${catProgress}%`, color: 'inherit' }}></div>
                                 </div>
@@ -177,26 +172,30 @@ export default function GoalsManager({ data, updateData }) {
                 })}
             </div>
 
-            {/* 2. BARRE D'ACTIONS */}
+            {/* 2. BARRE DE FILTRES (Défilable) */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-800 rounded-xl overflow-x-auto max-w-full no-scrollbar">
-                    <button onClick={() => setActiveFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>Tous</button>
-                    {Object.keys(categories).map(cat => (
-                        <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeFilter === cat ? 'bg-white dark:bg-slate-600 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>
-                            {categories[cat].label}
+                <div className="w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <div className="flex gap-2 p-1">
+                        <button onClick={() => setActiveFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeFilter === 'all' ? 'bg-slate-900 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>
+                            Tout voir
                         </button>
-                    ))}
+                        {Object.keys(categories).map(cat => (
+                            <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center gap-2 ${activeFilter === cat ? 'bg-slate-900 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>
+                                {categories[cat].label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <button 
                     onClick={() => setIsFormOpen(!isFormOpen)}
-                    className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-bold shadow-lg transition-transform active:scale-95 ${isFormOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                    className={`shrink-0 flex items-center gap-2 px-5 py-3 text-white rounded-xl font-bold shadow-lg transition-transform active:scale-95 ${isFormOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
                     {isFormOpen ? <><X size={20}/> Fermer</> : <><Plus size={20}/> Nouvel Objectif</>}
                 </button>
             </div>
 
-            {/* 3. FORMULAIRE (CORRIGÉ & LISIBLE) */}
+            {/* 3. FORMULAIRE D'AJOUT */}
             {isFormOpen && (
                 <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 animate-in slide-in-from-top-4 fade-in duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -205,9 +204,9 @@ export default function GoalsManager({ data, updateData }) {
                             <input type="text" className={inputClass} placeholder="Ex: Devenir bilingue en Anglais" value={newGoalTitle} onChange={e => setNewGoalTitle(e.target.value)} autoFocus />
                         </div>
                         
-                        <div>
+                        <div className="md:col-span-2">
                             <label className={labelClass}>Catégorie</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 {Object.keys(categories).map(cat => {
                                     const Icon = categories[cat].icon;
                                     const isSelected = newGoalCategory === cat;
@@ -215,9 +214,9 @@ export default function GoalsManager({ data, updateData }) {
                                         <button 
                                             key={cat} 
                                             onClick={() => setNewGoalCategory(cat)}
-                                            className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                                            className={`flex flex-col items-center justify-center gap-2 py-3 rounded-xl border transition-all ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
                                         >
-                                            <Icon size={16}/> {categories[cat].label}
+                                            <Icon size={20}/> <span className="text-xs font-bold">{categories[cat].label}</span>
                                         </button>
                                     );
                                 })}
@@ -260,21 +259,18 @@ export default function GoalsManager({ data, updateData }) {
                 {sortedGoals.length === 0 ? (
                     <div className="text-center py-20 opacity-50">
                         <Target size={64} className="mx-auto mb-4 text-gray-300 dark:text-slate-600"/>
-                        <p className="text-gray-500 dark:text-slate-400">Aucun objectif trouvé. Visez la lune !</p>
+                        <p className="text-gray-500 dark:text-slate-400">Aucun objectif trouvé dans cette catégorie.</p>
                     </div>
                 ) : (
                     sortedGoals.map(goal => {
                         const progress = calculateProgress(goal.id);
-                        // IMPORTANT: Sécurisation de l'accès aux jalons
                         const goalMilestones = milestones ? milestones.filter(m => String(m.goal_id) === String(goal.id)) : [];
-                        
                         const Conf = categories[goal.category || 'perso'];
                         const daysLeft = getDaysRemaining(goal.deadline);
                         const isExpanded = expandedGoalId === goal.id;
 
                         return (
                             <div key={goal.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden group transition-all hover:shadow-md">
-                                {/* CARD HEADER (Clicable pour ouvrir) */}
                                 <div className="p-6 cursor-pointer" onClick={() => setExpandedGoalId(isExpanded ? null : goal.id)}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="flex gap-3 flex-wrap">
@@ -309,8 +305,6 @@ export default function GoalsManager({ data, updateData }) {
                                                 </p>
                                             )}
                                         </div>
-                                        
-                                        {/* BARRE DE PROGRESSION */}
                                         <div className="w-full md:w-48 shrink-0">
                                             <div className="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
                                                 <span>Progression</span>
@@ -321,21 +315,18 @@ export default function GoalsManager({ data, updateData }) {
                                             </div>
                                         </div>
                                     </div>
-                                    
                                     <div className="mt-4 flex justify-center">
                                         {isExpanded ? <ChevronDown size={20} className="text-gray-300 dark:text-slate-600 rotate-180 transition-transform"/> : <ChevronDown size={20} className="text-gray-300 dark:text-slate-600 transition-transform"/>}
                                     </div>
                                 </div>
 
-                                {/* CARD BODY (ACCORDEON) */}
                                 {isExpanded && (
                                     <div className="bg-gray-50 dark:bg-slate-900/50 p-6 border-t border-gray-100 dark:border-slate-700 animate-in slide-in-from-top-2">
                                         <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
                                             <CheckSquare size={16} className="text-blue-500"/> Étapes Clés (Jalons)
                                         </h4>
-                                        
                                         <div className="space-y-2 mb-4">
-                                            {goalMilestones.length === 0 && <p className="text-sm text-gray-400 dark:text-slate-500 italic pl-6">Aucune étape définie. Découpez votre objectif !</p>}
+                                            {goalMilestones.length === 0 && <p className="text-sm text-gray-400 dark:text-slate-500 italic pl-6">Aucune étape définie.</p>}
                                             {goalMilestones.map(m => (
                                                 <div key={m.id} className="flex items-center gap-3 group/item bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" onClick={(e) => toggleMilestone(e, m.id)}>
                                                     <div className={`transition-all active:scale-90 ${m.is_completed ? 'text-green-500' : 'text-gray-300 hover:text-blue-500'}`}>
@@ -350,7 +341,6 @@ export default function GoalsManager({ data, updateData }) {
                                                 </div>
                                             ))}
                                         </div>
-
                                         <div className="flex gap-2">
                                             <input 
                                                 type="text" 
