@@ -3,7 +3,8 @@ import {
   Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, MoreHorizontal, FolderPlus, FilePlus,
-  ArrowLeft, LayoutGrid, Underline, Strikethrough, Type, AlignLeft
+  ArrowLeft, LayoutGrid, Underline, Strikethrough, Type, AlignLeft,
+  X
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -29,18 +30,17 @@ export default function JournalManager({ data, updateData }) {
 
     const notebooks = folders.filter(f => !f.parent_id);
 
-    // --- EFFET CRITIQUE : CHARGEMENT DU CONTENU (FIX PAGE BLANCHE/SAUT) ---
-    // On ne met à jour le HTML de l'éditeur QUE si on change de page.
-    // On ne le fait PAS à chaque frappe, sinon le curseur saute ou le texte s'efface.
+    // --- CHARGEMENT DU CONTENU (UNE SEULE FOIS AU CHANGEMENT DE PAGE) ---
     useEffect(() => {
         if (activePageId && editorRef.current) {
             const page = pages.find(p => p.id === activePageId);
             if (page) {
-                editorRef.current.innerHTML = page.content || '';
+                // On met le contenu dans le DOM
+                editorRef.current.innerHTML = page.content || '<p><br/></p>'; 
                 if(titleRef.current) titleRef.current.value = page.title || '';
             }
         }
-    }, [activePageId]); // Dépendance uniquement sur l'ID, pas sur le contenu !
+    }, [activePageId]); 
 
     // --- ARBORESCENCE ---
     const structure = useMemo(() => {
@@ -57,7 +57,7 @@ export default function JournalManager({ data, updateData }) {
         return [...buildNode(activeNotebookId), ...rootPages.map(p => ({...p, type: 'page'}))];
     }, [folders, pages, activeNotebookId]);
 
-    // --- ACTIONS ---
+    // --- ACTIONS CRUD ---
     const createItem = () => {
         if (!newName.trim()) return;
         if (isCreating === 'notebook') {
@@ -73,7 +73,7 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const createPage = (folderId) => {
-        const newPage = { id: Date.now(), folder_id: folderId, title: '', content: '', updated_at: new Date().toISOString() };
+        const newPage = { id: Date.now(), folder_id: folderId, title: '', content: '<p><br/></p>', updated_at: new Date().toISOString() };
         updateData({ ...data, journal_pages: [...pages, newPage] });
         setActivePageId(newPage.id);
         if (folderId) setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
@@ -97,7 +97,6 @@ export default function JournalManager({ data, updateData }) {
     const saveContent = () => {
         if (!activePageId) return;
         setIsSaving(true);
-        // On lit directement le DOM pour avoir la dernière version brute
         const content = editorRef.current.innerHTML;
         const title = titleRef.current.value;
         const updatedPages = pages.map(p => p.id === activePageId ? { ...p, title, content, updated_at: new Date().toISOString() } : p);
@@ -105,12 +104,34 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => setIsSaving(false), 800);
     };
 
-    // --- ÉDITEUR RICHE (RÉPARÉ) ---
+    // --- LOGIQUE ÉDITEUR AVANCÉE ---
+    
+    // Fonction pour exécuter les commandes sans perdre le focus
     const execCmd = (e, command, value = null) => {
         e.preventDefault(); // Empêche le bouton de voler le focus
         document.execCommand(command, false, value);
-        // Force le focus retour sur l'éditeur pour continuer à écrire
+        // On force le focus à revenir dans l'éditeur
         if(editorRef.current) editorRef.current.focus();
+    };
+
+    // GESTION INTELLIGENTE DE LA TOUCHE ENTRÉE
+    // Si on est dans un Titre ou une Citation, Entrée crée un nouveau paragraphe normal
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const anchorNode = selection.anchorNode;
+            // On cherche le bloc parent (H1, H2, Blockquote, etc.)
+            const parentBlock = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement;
+            
+            // Si on est dans un titre ou une citation
+            if (['H1', 'H2', 'H3', 'BLOCKQUOTE'].includes(parentBlock.tagName)) {
+                e.preventDefault();
+                // On insère un saut de paragraphe standard
+                document.execCommand('insertParagraph');
+            }
+        }
     };
 
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
@@ -263,18 +284,20 @@ export default function JournalManager({ data, updateData }) {
             <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 relative">
                 {activePageId ? (
                     <>
-                        {/* BARRE D'OUTILS AMÉLIORÉE */}
+                        {/* BARRE D'OUTILS */}
                         <div className="h-14 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-1 bg-white dark:bg-slate-900 z-10 sticky top-0 overflow-x-auto">
+                            <ToolbarButton icon={Type} cmd="formatBlock" val="P" title="Texte Normal (Paragraphe)" />
+                            <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
+                            
                             <ToolbarButton icon={Bold} cmd="bold" title="Gras" />
                             <ToolbarButton icon={Italic} cmd="italic" title="Italique" />
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             
-                            {/* Titres et Paragraphe */}
+                            {/* Titres */}
                             <button onMouseDown={(e) => execCmd(e, 'formatBlock', 'H2')} className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300">H1</button>
                             <button onMouseDown={(e) => execCmd(e, 'formatBlock', 'H3')} className="px-2 py-1 text-xs font-bold rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300">H2</button>
-                            <ToolbarButton icon={Type} cmd="formatBlock" val="P" title="Paragraphe Normal" />
                             
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             <ToolbarButton icon={List} cmd="insertUnorderedList" title="Liste à puces" />
@@ -286,7 +309,7 @@ export default function JournalManager({ data, updateData }) {
                             <button onClick={saveContent} className={`p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}><Save size={18}/></button>
                         </div>
 
-                        {/* ZONE D'ÉDITION STABLE */}
+                        {/* ZONE D'ÉDITION */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-12 max-w-4xl mx-auto w-full">
                             <input 
                                 ref={titleRef}
@@ -300,6 +323,7 @@ export default function JournalManager({ data, updateData }) {
                                 ref={editorRef}
                                 className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300"
                                 contentEditable
+                                onKeyDown={handleKeyDown} // INTERCEPTION DE LA TOUCHE ENTRÉE
                                 onBlur={saveContent}
                                 onInput={() => { if(!isSaving) setIsSaving(true); }} 
                             />
@@ -314,13 +338,15 @@ export default function JournalManager({ data, updateData }) {
                 )}
             </div>
 
-            {/* STYLE CSS POUR LES LISTES (IMPORTANT) */}
+            {/* STYLE CSS POUR LE RENDU DU TEXTE */}
             <style jsx>{`
-                .prose ul { list-style-type: disc; padding-left: 1.5rem; }
-                .prose ol { list-style-type: decimal; padding-left: 1.5rem; }
-                .prose h2 { font-size: 1.75em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: inherit; }
-                .prose h3 { font-size: 1.4em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; color: inherit; }
-                .prose blockquote { border-left: 4px solid #e5e7eb; padding-left: 1rem; font-style: italic; color: gray; }
+                .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1em; }
+                .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1em; }
+                .prose li { margin-bottom: 0.25em; }
+                .prose h2 { font-size: 1.75em; font-weight: 800; margin-top: 1.5em; margin-bottom: 0.5em; color: inherit; line-height: 1.2; }
+                .prose h3 { font-size: 1.4em; font-weight: 700; margin-top: 1.2em; margin-bottom: 0.5em; color: inherit; line-height: 1.3; }
+                .prose blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 1.5em 0; font-style: italic; color: #6b7280; background: rgba(59, 130, 246, 0.05); padding: 1rem; border-radius: 0 0.5rem 0.5rem 0; }
+                .dark .prose blockquote { border-left-color: #60a5fa; color: #9ca3af; background: rgba(59, 130, 246, 0.1); }
             `}</style>
         </div>
     );
