@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter
+  X, CornerDownRight, Highlighter, Palette
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -20,8 +20,9 @@ export default function JournalManager({ data, updateData }) {
     const [newName, setNewName] = useState('');
     const [targetParentId, setTargetParentId] = useState(null);
 
-    // État Formats Actifs
+    // État Formats & Menu Couleur
     const [activeFormats, setActiveFormats] = useState({});
+    const [showColorMenu, setShowColorMenu] = useState(false); // Menu couleur ouvert/fermé
 
     // Refs
     const editorRef = useRef(null);
@@ -30,38 +31,24 @@ export default function JournalManager({ data, updateData }) {
     // --- DONNÉES SÉCURISÉES ---
     const folders = Array.isArray(data.journal_folders) ? data.journal_folders : [];
     const pages = Array.isArray(data.journal_pages) ? data.journal_pages : [];
-
-    // Les carnets sont les dossiers racines (sans parent)
     const notebooks = folders.filter(f => !f.parent_id);
 
     // --- LOGIQUE ARBORESCENCE ---
     const treeStructure = useMemo(() => {
         if (!activeNotebookId) return [];
-
         const buildLevel = (parentId) => {
             const childFolders = folders
                 .filter(f => String(f.parent_id) === String(parentId))
-                .map(f => ({
-                    ...f,
-                    type: 'folder',
-                    children: buildLevel(f.id)
-                }));
-
+                .map(f => ({ ...f, type: 'folder', children: buildLevel(f.id) }));
             const childPages = pages
                 .filter(p => String(p.folder_id) === String(parentId))
-                .map(p => ({
-                    ...p,
-                    type: 'page'
-                }));
-
+                .map(p => ({ ...p, type: 'page' }));
             return [...childFolders, ...childPages];
         };
-
         return buildLevel(activeNotebookId);
     }, [folders, pages, activeNotebookId]);
 
-
-    // --- CHARGEMENT ÉDITEUR ---
+    // --- CHARGEMENT ---
     useEffect(() => {
         if (activePageId && editorRef.current) {
             const page = pages.find(p => String(p.id) === String(activePageId));
@@ -76,70 +63,38 @@ export default function JournalManager({ data, updateData }) {
             }
         }
         setActiveFormats({});
+        setShowColorMenu(false);
     }, [activePageId, pages]);
-
 
     // --- ACTIONS ---
     const createContainer = () => {
         if (!newName.trim()) return;
         const newId = Date.now();
-        
-        const newFolder = {
-            id: newId,
-            name: newName,
-            parent_id: isCreating === 'notebook' ? null : targetParentId,
-            created_at: new Date().toISOString()
-        };
-
+        const newFolder = { id: newId, name: newName, parent_id: isCreating === 'notebook' ? null : targetParentId, created_at: new Date().toISOString() };
         updateData({ ...data, journal_folders: [...folders, newFolder] });
-        
-        if (isCreating === 'folder' && targetParentId) {
-            setExpandedFolders(prev => ({ ...prev, [targetParentId]: true }));
-        }
-        
+        if (isCreating === 'folder' && targetParentId) setExpandedFolders(prev => ({ ...prev, [targetParentId]: true }));
         setNewName('');
         setIsCreating(false);
     };
 
     const createPage = (targetFolderId) => {
         const finalFolderId = targetFolderId || activeNotebookId;
-
-        const newPage = {
-            id: Date.now(),
-            folder_id: finalFolderId,
-            title: '',
-            content: '<p><br/></p>',
-            updated_at: new Date().toISOString()
-        };
-
+        const newPage = { id: Date.now(), folder_id: finalFolderId, title: '', content: '<p><br/></p>', updated_at: new Date().toISOString() };
         updateData({ ...data, journal_pages: [...pages, newPage] });
         setExpandedFolders(prev => ({ ...prev, [finalFolderId]: true }));
         setActivePageId(newPage.id);
         setTimeout(() => titleRef.current?.focus(), 100);
     };
 
-    // --- SUPPRESSION (CORRIGÉE) ---
     const deleteItem = (item) => {
         if (!window.confirm(`Supprimer "${item.title || item.name}" ?`)) return;
-        
-        // DÉTECTION TYPE : Si 'name' existe c'est un dossier, sinon c'est une page
         const isFolder = item.type === 'folder' || item.name !== undefined;
-
         if (isFolder) {
-            // Suppression Dossier/Carnet : On supprime le dossier ET les pages qu'il contient directement
-            // (Note: pour une suppression récursive complète des sous-dossiers, il faudrait une fonction plus complexe, 
-            // ici on fait le nettoyage niveau 1 + l'ID folder lui-même)
             const updatedFolders = folders.filter(f => f.id !== item.id);
             const updatedPages = pages.filter(p => String(p.folder_id) !== String(item.id));
-            
             updateData({ ...data, journal_folders: updatedFolders, journal_pages: updatedPages }, { table: 'journal_folders', id: item.id });
-            
-            // Si on supprime le carnet actif, on retourne à la bibliothèque
-            if (String(activeNotebookId) === String(item.id)) {
-                setActiveNotebookId(null);
-            }
+            if (String(activeNotebookId) === String(item.id)) setActiveNotebookId(null);
         } else {
-            // Suppression Page
             const updatedPages = pages.filter(p => p.id !== item.id);
             updateData({ ...data, journal_pages: updatedPages }, { table: 'journal_pages', id: item.id });
             if (activePageId === item.id) setActivePageId(null);
@@ -156,7 +111,7 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => setIsSaving(false), 800);
     };
 
-    // --- ÉDITEUR ---
+    // --- ÉDITEUR & FORMATAGE ---
     const checkFormats = () => {
         if (!document) return;
         setActiveFormats({
@@ -173,19 +128,25 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const execCmd = (e, command, value = null) => {
-        e.preventDefault(); 
+        if(e) e.preventDefault(); 
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
         checkFormats();
+        if (command === 'hiliteColor') setShowColorMenu(false); // Fermer menu après choix
+    };
+
+    const applyHighlight = (color) => {
+        // 'transparent' permet d'effacer le surlignage
+        document.execCommand('hiliteColor', false, color); 
+        if(editorRef.current) editorRef.current.focus();
+        setShowColorMenu(false);
     };
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
             const selection = window.getSelection();
             if (!selection.rangeCount) return;
-            const anchorNode = selection.anchorNode;
-            const parentBlock = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement;
-            
+            const parentBlock = selection.anchorNode.nodeType === 1 ? selection.anchorNode : selection.anchorNode.parentElement;
             if (['H1', 'H2', 'H3', 'BLOCKQUOTE'].includes(parentBlock.tagName)) {
                 e.preventDefault();
                 document.execCommand('insertParagraph');
@@ -194,17 +155,11 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const ToolbarButton = ({ icon: Icon, cmd, val, title, isActiveOverride }) => {
-        const isActive = isActiveOverride !== undefined 
-            ? isActiveOverride 
-            : activeFormats[cmd] || (val && activeFormats[val.toLowerCase()]);
-
+        const isActive = isActiveOverride !== undefined ? isActiveOverride : activeFormats[cmd];
         return (
             <button 
                 onMouseDown={(e) => execCmd(e, cmd, val)} 
-                className={`p-2 rounded transition-all duration-200 ${isActive 
-                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300' 
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300' 
-                }`}
+                className={`p-2 rounded transition-all duration-200 ${isActive ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-300' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300'}`}
                 title={title}
             >
                 <Icon size={18}/>
@@ -212,15 +167,13 @@ export default function JournalManager({ data, updateData }) {
         );
     };
 
-    // --- RENDU ARBRE ---
+    // --- ARBRE ---
     const renderTree = (nodes, depth = 0) => {
         return nodes.map(node => {
             if (searchQuery && node.type === 'page' && !node.title.toLowerCase().includes(searchQuery.toLowerCase())) return null;
-            
             if (node.type === 'folder') {
                 const isOpen = expandedFolders[node.id] || searchQuery.length > 0;
                 const hasChildren = node.children && node.children.length > 0;
-                
                 return (
                     <div key={node.id} className="select-none text-sm my-0.5">
                         <div 
@@ -234,32 +187,18 @@ export default function JournalManager({ data, updateData }) {
                                 <span className="truncate font-medium">{node.name}</span>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); createPage(node.id); }} className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 text-gray-400 hover:text-green-600 rounded" title="Nouvelle Page"><FilePlus size={14}/></button>
-                                <button onClick={(e) => { e.stopPropagation(); setTargetParentId(node.id); setIsCreating('folder'); }} className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 hover:text-blue-600 rounded" title="Nouveau Dossier"><FolderPlus size={14}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); createPage(node.id); }} className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 text-gray-400 hover:text-green-600 rounded"><FilePlus size={14}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); setTargetParentId(node.id); setIsCreating('folder'); }} className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 hover:text-blue-600 rounded"><FolderPlus size={14}/></button>
                                 <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded"><Trash2 size={14}/></button>
                             </div>
                         </div>
-                        {isOpen && (
-                            <div className="border-l border-gray-200 dark:border-slate-700 ml-[calc(12px+0.4rem)]">
-                                {node.children && node.children.length > 0 ? renderTree(node.children, depth + 1) : (
-                                    <div className="py-1 pl-4 text-xs text-gray-400 italic flex items-center gap-2"><CornerDownRight size={10}/> Vide</div>
-                                )}
-                            </div>
-                        )}
+                        {isOpen && <div className="border-l border-gray-200 dark:border-slate-700 ml-[calc(12px+0.4rem)]">{node.children && node.children.length > 0 ? renderTree(node.children, depth + 1) : <div className="py-1 pl-4 text-xs text-gray-400 italic flex items-center gap-2"><CornerDownRight size={10}/> Vide</div>}</div>}
                     </div>
                 );
             }
             return (
-                <div 
-                    key={node.id} 
-                    onClick={() => setActivePageId(node.id)}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer group mb-0.5 text-sm transition-colors ${String(activePageId) === String(node.id) ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-medium' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400'}`}
-                    style={{ paddingLeft: `${depth * 12 + 28}px` }}
-                >
-                    <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                        <FileText size={14} className="shrink-0"/>
-                        <span className={`truncate ${!node.title ? 'italic opacity-50' : ''}`}>{node.title || 'Sans titre'}</span>
-                    </div>
+                <div key={node.id} onClick={() => setActivePageId(node.id)} className={`flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer group mb-0.5 text-sm transition-colors ${String(activePageId) === String(node.id) ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-medium' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400'}`} style={{ paddingLeft: `${depth * 12 + 28}px` }}>
+                    <div className="flex items-center gap-2 overflow-hidden min-w-0"><FileText size={14} className="shrink-0"/><span className={`truncate ${!node.title ? 'italic opacity-50' : ''}`}>{node.title || 'Sans titre'}</span></div>
                     <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded transition-all"><Trash2 size={12}/></button>
                 </div>
             );
@@ -331,8 +270,26 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* HIGHLIGHT BUTTON */}
-                            <ToolbarButton icon={Highlighter} cmd="hiliteColor" val="yellow" title="Surligner (Jaune)" />
+                            {/* --- MENU SURLIGNEUR AMÉLIORÉ --- */}
+                            <div className="relative">
+                                <button 
+                                    onMouseDown={(e) => { e.preventDefault(); setShowColorMenu(!showColorMenu); }} 
+                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 transition-colors ${showColorMenu ? 'bg-gray-200 dark:bg-slate-600' : ''}`}
+                                    title="Couleur de surlignage"
+                                >
+                                    <Highlighter size={18} className={showColorMenu ? "text-blue-500" : ""}/>
+                                </button>
+                                {showColorMenu && (
+                                    <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 flex gap-2 z-50 animate-in slide-in-from-top-2">
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#fde047'); }} className="w-6 h-6 rounded-full bg-yellow-300 hover:ring-2 ring-gray-300 transition-all" title="Jaune"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#86efac'); }} className="w-6 h-6 rounded-full bg-green-300 hover:ring-2 ring-gray-300 transition-all" title="Vert"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#f9a8d4'); }} className="w-6 h-6 rounded-full bg-pink-300 hover:ring-2 ring-gray-300 transition-all" title="Rose"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#93c5fd'); }} className="w-6 h-6 rounded-full bg-blue-300 hover:ring-2 ring-gray-300 transition-all" title="Bleu"></button>
+                                        <div className="w-px h-6 bg-gray-200 dark:bg-slate-600 mx-1"></div>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('transparent'); }} className="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-red-500" title="Effacer"><X size={12}/></button>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             
@@ -357,10 +314,9 @@ export default function JournalManager({ data, updateData }) {
                                 className="text-3xl md:text-4xl font-extrabold w-full mb-8 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-none p-0 focus:ring-0"
                                 onBlur={saveContent}
                             />
-                            
                             <div 
                                 ref={editorRef}
-                                className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300"
+                                className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300 selection:bg-blue-200 dark:selection:bg-blue-900"
                                 contentEditable
                                 onKeyDown={handleKeyDown} 
                                 onKeyUp={checkFormats}
