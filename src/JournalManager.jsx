@@ -20,9 +20,9 @@ export default function JournalManager({ data, updateData }) {
     const [newName, setNewName] = useState('');
     const [targetParentId, setTargetParentId] = useState(null);
 
-    // État Formats & Menu Couleur
+    // États Outils
     const [activeFormats, setActiveFormats] = useState({});
-    const [showColorMenu, setShowColorMenu] = useState(false);
+    const [showColorPalette, setShowColorPalette] = useState(false); // Palette en ligne
 
     // Refs
     const editorRef = useRef(null);
@@ -63,7 +63,7 @@ export default function JournalManager({ data, updateData }) {
             }
         }
         setActiveFormats({});
-        setShowColorMenu(false);
+        setShowColorPalette(false);
     }, [activePageId, pages]);
 
     // --- ACTIONS ---
@@ -132,14 +132,15 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
         checkFormats();
-        if (command === 'hiliteColor') setShowColorMenu(false);
+        if (command === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // Utilisation de RGBA pour la transparence (Effet Surligneur doux)
-    const applyHighlight = (color) => {
-        document.execCommand('hiliteColor', false, color); 
+    // SURLIGNAGE : Utilise des couleurs avec transparence pour ne pas masquer le texte
+    const applyHighlight = (e, color) => {
+        e.preventDefault();
+        document.execCommand('hiliteColor', false, color);
         if(editorRef.current) editorRef.current.focus();
-        setShowColorMenu(false);
+        setShowColorPalette(false); // Ferme la palette après choix
     };
 
     const handleKeyDown = (e) => {
@@ -270,24 +271,23 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* --- MENU SURLIGNEUR FIXÉ (Position Relative) --- */}
-                            <div className="relative">
+                            {/* --- MENU SURLIGNEUR EN LIGNE (Zéro Bug Visuel) --- */}
+                            <div className="flex items-center gap-1 mx-1 px-1 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <button 
-                                    onMouseDown={(e) => { e.preventDefault(); setShowColorMenu(!showColorMenu); }} 
-                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 transition-colors ${showColorMenu ? 'bg-gray-200 dark:bg-slate-700' : ''}`}
-                                    title="Surligner"
+                                    onMouseDown={(e) => { e.preventDefault(); setShowColorPalette(!showColorPalette); }} 
+                                    className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${showColorPalette ? 'text-blue-500' : 'text-gray-500'}`}
+                                    title="Ouvrir Palette"
                                 >
-                                    <Highlighter size={18} className={showColorMenu ? "text-blue-500" : ""}/>
+                                    <Highlighter size={16} />
                                 </button>
-                                {showColorMenu && (
-                                    <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 flex gap-2 z-50 animate-in slide-in-from-top-2">
-                                        {/* Couleurs Translucides pour lisibilité (RGBA) */}
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(253, 224, 71, 0.4)'); }} className="w-6 h-6 rounded-full bg-yellow-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Jaune"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(134, 239, 172, 0.4)'); }} className="w-6 h-6 rounded-full bg-green-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Vert"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(249, 168, 212, 0.4)'); }} className="w-6 h-6 rounded-full bg-pink-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Rose"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(147, 197, 253, 0.4)'); }} className="w-6 h-6 rounded-full bg-blue-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Bleu"></button>
-                                        <div className="w-px h-6 bg-gray-200 dark:bg-slate-600 mx-1"></div>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('transparent'); }} className="w-6 h-6 rounded-full bg-gray-100 dark:bg-slate-600 border border-gray-300 dark:border-slate-500 flex items-center justify-center hover:bg-gray-200 text-gray-500" title="Effacer"><X size={12}/></button>
+                                
+                                {showColorPalette && (
+                                    <div className="flex items-center gap-1 animate-in slide-in-from-left-2 fade-in duration-200">
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(253, 224, 71, 0.4)')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Jaune"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(134, 239, 172, 0.4)')} className="w-4 h-4 rounded-full bg-green-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Vert"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(249, 168, 212, 0.4)')} className="w-4 h-4 rounded-full bg-pink-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Rose"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(147, 197, 253, 0.4)')} className="w-4 h-4 rounded-full bg-blue-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Bleu"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'transparent')} className="w-4 h-4 rounded-full bg-white border border-gray-300 flex items-center justify-center text-red-500 hover:bg-red-50" title="Effacer"><X size={10}/></button>
                                     </div>
                                 )}
                             </div>
