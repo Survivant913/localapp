@@ -1,14 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { 
   Target, Calendar, CheckSquare, Square, Heart, 
-  Trash2, Plus, ChevronDown, ChevronRight, Trophy, AlertCircle,
-  Briefcase, Activity, Banknote, User, Flame, Filter, Clock
+  Trash2, Plus, ChevronDown, Trophy,
+  Briefcase, Activity, Banknote, User, Flame, Clock, X
 } from 'lucide-react';
 
 export default function GoalsManager({ data, updateData }) {
     // --- ÉTATS ---
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('all'); // all, business, health, finance, perso
+    const [activeFilter, setActiveFilter] = useState('all'); 
     
     // Formulaire
     const [newGoalTitle, setNewGoalTitle] = useState('');
@@ -17,30 +17,26 @@ export default function GoalsManager({ data, updateData }) {
     const [newGoalPriority, setNewGoalPriority] = useState('medium');
     const [newGoalMotivation, setNewGoalMotivation] = useState('');
     
-    // États pour l'ajout de jalons rapides
+    // États pour l'ajout de jalons rapides et l'accordéon
     const [newMilestoneText, setNewMilestoneText] = useState({});
     const [expandedGoalId, setExpandedGoalId] = useState(null);
 
     // --- CONFIGURATION ---
     const categories = {
-        business: { label: 'Business', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', icon: Briefcase },
-        health: { label: 'Santé', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', icon: Activity },
-        finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300', icon: Banknote },
-        perso: { label: 'Perso', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300', icon: User },
-    };
-
-    const priorities = {
-        high: { label: 'Haute', icon: Flame, color: 'text-red-500' },
-        medium: { label: 'Moyenne', icon: Target, color: 'text-orange-500' },
-        low: { label: 'Basse', icon: Calendar, color: 'text-blue-500' },
+        business: { label: 'Business', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200', icon: Briefcase },
+        health: { label: 'Santé', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200', icon: Activity },
+        finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200', icon: Banknote },
+        perso: { label: 'Perso', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200', icon: User },
     };
 
     // --- DONNÉES SÉCURISÉES ---
     const goals = Array.isArray(data.goals) ? data.goals : [];
     const milestones = Array.isArray(data.goal_milestones) ? data.goal_milestones : [];
 
-    // --- HELPERS ---
+    // --- HELPERS (SÉCURISÉS) ---
     const calculateProgress = (goalId) => {
+        if (!milestones) return 0;
+        // On convertit les ID en String pour éviter les bugs de comparaison (number vs string)
         const goalMilestones = milestones.filter(m => String(m.goal_id) === String(goalId));
         if (goalMilestones.length === 0) return 0;
         const completed = goalMilestones.filter(m => m.is_completed).length;
@@ -72,15 +68,20 @@ export default function GoalsManager({ data, updateData }) {
             is_favorite: false,
             created_at: new Date().toISOString()
         };
+        // Mise à jour sécurisée
         updateData({ ...data, goals: [newGoal, ...goals] });
+        
         // Reset
-        setNewGoalTitle(''); setNewGoalDeadline(''); setNewGoalMotivation('');
+        setNewGoalTitle(''); 
+        setNewGoalDeadline(''); 
+        setNewGoalMotivation('');
         setIsFormOpen(false);
     };
 
     const deleteGoal = (id) => {
         if (!window.confirm("Supprimer cet objectif et ses jalons ?")) return;
         const updatedGoals = goals.filter(g => g.id !== id);
+        // Suppression en cascade des jalons liés
         const updatedMilestones = milestones.filter(m => String(m.goal_id) !== String(id));
         updateData({ ...data, goals: updatedGoals, goal_milestones: updatedMilestones }, { table: 'goals', id: id });
     };
@@ -90,16 +91,26 @@ export default function GoalsManager({ data, updateData }) {
         updateData({ ...data, goals: updated });
     };
 
-    // --- ACTIONS JALONS ---
+    // --- ACTIONS JALONS (SÉCURISÉES) ---
     const addMilestone = (goalId) => {
         const text = newMilestoneText[goalId];
         if (!text || !text.trim()) return;
-        const newM = { id: Date.now(), goal_id: goalId, title: text, is_completed: false };
-        updateData({ ...data, goal_milestones: [...milestones, newM] });
+        
+        const newM = { 
+            id: Date.now(), 
+            goal_id: goalId, 
+            title: text, 
+            is_completed: false 
+        };
+        
+        // On s'assure que milestones est un tableau avant d'ajouter
+        const currentMilestones = Array.isArray(milestones) ? milestones : [];
+        updateData({ ...data, goal_milestones: [...currentMilestones, newM] });
         setNewMilestoneText({ ...newMilestoneText, [goalId]: '' });
     };
 
     const toggleMilestone = (mId) => {
+        if (!milestones) return;
         const updated = milestones.map(m => m.id === mId ? { ...m, is_completed: !m.is_completed } : m);
         updateData({ ...data, goal_milestones: updated });
     };
@@ -111,27 +122,32 @@ export default function GoalsManager({ data, updateData }) {
 
     // --- FILTRAGE & TRI ---
     const filteredGoals = goals.filter(g => activeFilter === 'all' || g.category === activeFilter);
+    
+    // Tri intelligent : Favoris > Priorité > Avancement
     const sortedGoals = [...filteredGoals].sort((a, b) => {
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
-        return calculateProgress(b.id) - calculateProgress(a.id); // Les plus avancés en haut
+        // Priorité
+        const pMap = { high: 3, medium: 2, low: 1 };
+        const pA = pMap[a.priority] || 2;
+        const pB = pMap[b.priority] || 2;
+        if (pA !== pB) return pB - pA;
+        return 0; 
     });
 
-    // Stats
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => calculateProgress(g.id) === 100).length;
 
     return (
         <div className="space-y-8 fade-in p-4 pb-24 md:pb-20 max-w-6xl mx-auto">
             
-            {/* 1. HEADER STATS */}
+            {/* 1. HEADER STATS (DESIGN CLEAN) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-center min-h-[120px]">
                     <div className="relative z-10">
-                        <p className="text-xs font-bold opacity-60 uppercase tracking-wider mb-1">Vision Globale</p>
-                        <h3 className="text-3xl font-bold">{completedGoals} / {totalGoals}</h3>
-                        <p className="text-xs opacity-50 mt-1">Objectifs atteints</p>
+                        <p className="text-xs font-bold opacity-60 uppercase tracking-wider mb-1">Total Objectifs</p>
+                        <h3 className="text-4xl font-bold">{totalGoals}</h3>
                     </div>
-                    <Trophy size={60} className="absolute -right-4 -bottom-4 opacity-10 rotate-12"/>
+                    <Target size={80} className="absolute -right-6 -bottom-6 opacity-10 rotate-12"/>
                 </div>
                 
                 {['business', 'health', 'finance'].map(catKey => {
@@ -143,10 +159,10 @@ export default function GoalsManager({ data, updateData }) {
                     const Icon = Conf.icon;
                     
                     return (
-                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between min-h-[120px]">
                             <div className="flex justify-between items-start mb-2">
                                 <div className={`p-2 rounded-lg ${Conf.color}`}><Icon size={20}/></div>
-                                <span className="text-xl font-bold text-gray-800 dark:text-white">{catProgress}%</span>
+                                <span className="text-2xl font-bold text-gray-800 dark:text-white">{catProgress}%</span>
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{Conf.label}</p>
@@ -159,9 +175,9 @@ export default function GoalsManager({ data, updateData }) {
                 })}
             </div>
 
-            {/* 2. BARRE D'ACTIONS & FILTRES */}
+            {/* 2. BARRE D'ACTIONS */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-800 rounded-xl overflow-x-auto max-w-full">
+                <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-800 rounded-xl overflow-x-auto max-w-full no-scrollbar">
                     <button onClick={() => setActiveFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>Tous</button>
                     {Object.keys(categories).map(cat => (
                         <button key={cat} onClick={() => setActiveFilter(cat)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeFilter === cat ? 'bg-white dark:bg-slate-600 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400'}`}>
@@ -172,13 +188,13 @@ export default function GoalsManager({ data, updateData }) {
 
                 <button 
                     onClick={() => setIsFormOpen(!isFormOpen)}
-                    className="flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg shadow-slate-900/20 transition-transform active:scale-95"
+                    className={`flex items-center gap-2 px-5 py-3 text-white rounded-xl font-bold shadow-lg transition-transform active:scale-95 ${isFormOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
-                    <Plus size={20}/> {isFormOpen ? 'Fermer' : 'Nouvel Objectif'}
+                    {isFormOpen ? <><X size={20}/> Fermer</> : <><Plus size={20}/> Nouvel Objectif</>}
                 </button>
             </div>
 
-            {/* 3. FORMULAIRE D'AJOUT (ANIMÉ) */}
+            {/* 3. FORMULAIRE (CSS CORRIGÉ) */}
             {isFormOpen && (
                 <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 animate-in slide-in-from-top-4 fade-in duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -196,7 +212,7 @@ export default function GoalsManager({ data, updateData }) {
                                         <button 
                                             key={cat} 
                                             onClick={() => setNewGoalCategory(cat)}
-                                            className={`flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-medium transition-all ${newGoalCategory === cat ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400'}`}
+                                            className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${newGoalCategory === cat ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
                                         >
                                             <Icon size={16}/> {categories[cat].label}
                                         </button>
@@ -223,15 +239,15 @@ export default function GoalsManager({ data, updateData }) {
                         <div className="md:col-span-2">
                             <label className="label">Motivation (Le "Pourquoi")</label>
                             <textarea 
-                                className="input-field min-h-[80px]" 
-                                placeholder="Pourquoi est-ce important pour vous ? (Cela vous aidera dans les moments difficiles)"
+                                className="input-field min-h-[100px]" 
+                                placeholder="Pourquoi est-ce important pour vous ?"
                                 value={newGoalMotivation} 
                                 onChange={e => setNewGoalMotivation(e.target.value)}
                             />
                         </div>
                     </div>
-                    <div className="mt-6 flex justify-end">
-                        <button onClick={addGoal} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-colors">C'est parti 🚀</button>
+                    <div className="mt-8 flex justify-end">
+                        <button onClick={addGoal} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md transition-colors w-full md:w-auto">C'est parti 🚀</button>
                     </div>
                 </div>
             )}
@@ -240,15 +256,16 @@ export default function GoalsManager({ data, updateData }) {
             <div className="grid grid-cols-1 gap-6">
                 {sortedGoals.length === 0 ? (
                     <div className="text-center py-20 opacity-50">
-                        <Target size={64} className="mx-auto mb-4 text-gray-300"/>
-                        <p>Aucun objectif pour le moment. Visez la lune !</p>
+                        <Target size={64} className="mx-auto mb-4 text-gray-300 dark:text-slate-600"/>
+                        <p className="text-gray-500 dark:text-slate-400">Aucun objectif trouvé. Visez la lune !</p>
                     </div>
                 ) : (
                     sortedGoals.map(goal => {
                         const progress = calculateProgress(goal.id);
-                        const goalMilestones = milestones.filter(m => String(m.goal_id) === String(goal.id));
+                        // On convertit en String pour éviter le plantage filter
+                        const goalMilestones = milestones ? milestones.filter(m => String(m.goal_id) === String(goal.id)) : [];
+                        
                         const Conf = categories[goal.category || 'perso'];
-                        const PriorityConf = priorities[goal.priority || 'medium'];
                         const daysLeft = getDaysRemaining(goal.deadline);
                         const isExpanded = expandedGoalId === goal.id;
 
@@ -262,9 +279,12 @@ export default function GoalsManager({ data, updateData }) {
                                                 <Conf.icon size={12}/> {Conf.label}
                                             </span>
                                             {goal.deadline && (
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${daysLeft < 0 ? 'bg-red-100 text-red-600' : daysLeft <= 14 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'}`}>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${daysLeft < 0 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 14 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'}`}>
                                                     <Clock size={12}/> {daysLeft < 0 ? 'En retard' : `J-${daysLeft}`}
                                                 </span>
+                                            )}
+                                            {goal.priority === 'high' && (
+                                                <span className="px-2 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 text-xs"><Flame size={12}/></span>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -287,11 +307,11 @@ export default function GoalsManager({ data, updateData }) {
                                             )}
                                         </div>
                                         
-                                        {/* PROGRESS CIRCLE (Mobile) / BAR (Desktop) */}
+                                        {/* BARRE DE PROGRESSION */}
                                         <div className="w-full md:w-48 shrink-0">
-                                            <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                                            <div className="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
                                                 <span>Progression</span>
-                                                <span className={progress === 100 ? 'text-green-600' : 'text-blue-600'}>{progress}%</span>
+                                                <span className={progress === 100 ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}>{progress}%</span>
                                             </div>
                                             <div className="h-2.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                                 <div className={`h-full transition-all duration-700 ease-out ${progress === 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`} style={{ width: `${progress}%` }}></div>
@@ -300,11 +320,11 @@ export default function GoalsManager({ data, updateData }) {
                                     </div>
                                     
                                     <div className="mt-4 flex justify-center">
-                                        {isExpanded ? <ChevronDown size={20} className="text-gray-300"/> : <ChevronDown size={20} className="text-gray-300"/>}
+                                        {isExpanded ? <ChevronDown size={20} className="text-gray-300 dark:text-slate-600 rotate-180 transition-transform"/> : <ChevronDown size={20} className="text-gray-300 dark:text-slate-600 transition-transform"/>}
                                     </div>
                                 </div>
 
-                                {/* CARD BODY (EXPANDED) */}
+                                {/* CARD BODY (ACCORDEON) */}
                                 {isExpanded && (
                                     <div className="bg-gray-50 dark:bg-slate-700/30 p-6 border-t border-gray-100 dark:border-slate-700 animate-in slide-in-from-top-2">
                                         <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
@@ -312,16 +332,18 @@ export default function GoalsManager({ data, updateData }) {
                                         </h4>
                                         
                                         <div className="space-y-2 mb-4">
-                                            {goalMilestones.length === 0 && <p className="text-sm text-gray-400 italic pl-6">Aucune étape définie. Ajoutez-en une !</p>}
+                                            {goalMilestones.length === 0 && <p className="text-sm text-gray-400 dark:text-slate-500 italic pl-6">Aucune étape définie. Découpez votre objectif !</p>}
                                             {goalMilestones.map(m => (
-                                                <div key={m.id} className="flex items-center gap-3 group/item bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm">
-                                                    <button onClick={() => toggleMilestone(m.id)} className={`transition-all active:scale-90 ${m.is_completed ? 'text-green-500' : 'text-gray-300 hover:text-blue-500'}`}>
+                                                <div key={m.id} className="flex items-center gap-3 group/item bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" onClick={() => toggleMilestone(m.id)}>
+                                                    <div className={`transition-all active:scale-90 ${m.is_completed ? 'text-green-500' : 'text-gray-300 hover:text-blue-500'}`}>
                                                         {m.is_completed ? <CheckCircle2 size={22} className="fill-green-100 dark:fill-green-900"/> : <Square size={22}/>}
-                                                    </button>
-                                                    <span className={`text-sm flex-1 font-medium ${m.is_completed ? 'text-gray-400 line-through' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                    </div>
+                                                    <span className={`text-sm flex-1 font-medium ${m.is_completed ? 'text-gray-400 dark:text-slate-500 line-through' : 'text-gray-700 dark:text-gray-200'}`}>
                                                         {m.title}
                                                     </span>
-                                                    <button onClick={() => deleteMilestone(m.id)} className="opacity-0 group-hover/item:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"><Trash2 size={16}/></button>
+                                                    <button onClick={(e) => {e.stopPropagation(); deleteMilestone(m.id);}} className="opacity-0 group-hover/item:opacity-100 text-gray-300 hover:text-red-500 transition-opacity p-1">
+                                                        <Trash2 size={16}/>
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
@@ -329,13 +351,14 @@ export default function GoalsManager({ data, updateData }) {
                                         <div className="flex gap-2">
                                             <input 
                                                 type="text" 
-                                                className="flex-1 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                                                 placeholder="Ajouter une nouvelle étape..."
                                                 value={newMilestoneText[goal.id] || ''}
                                                 onChange={(e) => setNewMilestoneText({...newMilestoneText, [goal.id]: e.target.value})}
                                                 onKeyDown={(e) => e.key === 'Enter' && addMilestone(goal.id)}
+                                                onClick={(e) => e.stopPropagation()} 
                                             />
-                                            <button onClick={() => addMilestone(goal.id)} className="px-4 py-2 bg-slate-900 dark:bg-slate-600 text-white rounded-xl hover:bg-blue-600 transition-colors">
+                                            <button onClick={(e) => {e.stopPropagation(); addMilestone(goal.id);}} className="px-4 py-2 bg-slate-900 dark:bg-slate-600 text-white rounded-xl hover:bg-blue-600 transition-colors shadow-sm">
                                                 <Plus size={20}/>
                                             </button>
                                         </div>
@@ -349,7 +372,8 @@ export default function GoalsManager({ data, updateData }) {
 
             <style jsx>{`
                 .label { @apply block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5; }
-                .input-field { @apply w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white transition-all; }
+                /* FIX CSS : Couleurs explicites pour le mode sombre */
+                .input-field { @apply w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white placeholder-gray-400 transition-all; }
             `}</style>
         </div>
     );
