@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter
+  X, CornerDownRight, Highlighter, PanelLeft // <--- Icône pour le menu pliable
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -15,12 +15,15 @@ export default function JournalManager({ data, updateData }) {
     const [expandedFolders, setExpandedFolders] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     
+    // État Interface
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Pour plier/déplier le menu
+
     // États Création
     const [isCreating, setIsCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [targetParentId, setTargetParentId] = useState(null);
 
-    // État Formats & Menu Couleur (Inline)
+    // État Formats & Menu Couleur
     const [activeFormats, setActiveFormats] = useState({});
     const [showColorPalette, setShowColorPalette] = useState(false);
 
@@ -83,6 +86,7 @@ export default function JournalManager({ data, updateData }) {
         updateData({ ...data, journal_pages: [...pages, newPage] });
         setExpandedFolders(prev => ({ ...prev, [finalFolderId]: true }));
         setActivePageId(newPage.id);
+        if (window.innerWidth < 768) setIsSidebarOpen(false); // Ferme le menu sur mobile après création
         setTimeout(() => titleRef.current?.focus(), 100);
     };
 
@@ -132,9 +136,10 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
         checkFormats();
+        if (command === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // Surlignage propre avec fermeture du menu
+    // Couleurs douces (0.3 opacité)
     const applyHighlight = (e, color) => {
         if(e) e.preventDefault();
         document.execCommand('hiliteColor', false, color); 
@@ -208,7 +213,7 @@ export default function JournalManager({ data, updateData }) {
     // --- VUES ---
     if (!activeNotebookId) {
         return (
-            <div className="fade-in p-6 max-w-7xl mx-auto pb-24">
+            <div className="fade-in p-6 w-full max-w-[1920px] mx-auto pb-24">
                 <div className="flex justify-between items-center mb-8">
                     <div><h2 className="text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3"><Book className="text-blue-600"/> Ma Bibliothèque</h2><p className="text-gray-500 dark:text-slate-400 mt-1">Gérez vos carnets, notes et documentations.</p></div>
                     <button onClick={() => { setIsCreating('notebook'); setNewName(''); }} className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-transform active:scale-95"><Plus size={20}/> Nouveau Carnet</button>
@@ -236,32 +241,51 @@ export default function JournalManager({ data, updateData }) {
     const activeNotebookName = notebooks.find(n => n.id === activeNotebookId)?.name || 'Carnet';
 
     return (
-        <div className="flex h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] max-w-[1920px] mx-auto overflow-hidden bg-white dark:bg-slate-900 shadow-sm border border-gray-200 dark:border-slate-700 fade-in relative">
-            <div className="w-80 border-r border-gray-200 dark:border-slate-700 flex flex-col bg-gray-50/80 dark:bg-slate-950/50">
-                <div className="p-4 border-b border-gray-200 dark:border-slate-700">
-                    <button onClick={() => { setActiveNotebookId(null); setActivePageId(null); }} className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-blue-600 mb-4 transition-colors"><ArrowLeft size={12}/> RETOUR BIBLIOTHÈQUE</button>
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-white truncate mb-4 px-1">{activeNotebookName}</h3>
-                    <div className="flex gap-2">
-                        <button onClick={() => createPage(activeNotebookId)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"><Plus size={14}/> Page</button>
-                        <button onClick={() => { setIsCreating('folder'); setTargetParentId(activeNotebookId); setNewName(''); }} className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-bold transition-colors"><FolderPlus size={14}/> Dossier</button>
+        <div className="flex h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] w-full overflow-hidden bg-white dark:bg-slate-900 shadow-sm border border-gray-200 dark:border-slate-700 fade-in relative">
+            
+            {/* SIDEBAR PLIABLE */}
+            {isSidebarOpen && (
+                <div className="w-80 border-r border-gray-200 dark:border-slate-700 flex flex-col bg-gray-50/80 dark:bg-slate-950/50 shrink-0 transition-all duration-300">
+                    <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+                        <button onClick={() => { setActiveNotebookId(null); setActivePageId(null); }} className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-blue-600 mb-4 transition-colors"><ArrowLeft size={12}/> RETOUR BIBLIOTHÈQUE</button>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg text-gray-800 dark:text-white truncate px-1">{activeNotebookName}</h3>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => createPage(activeNotebookId)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-xs font-bold transition-colors shadow-sm"><Plus size={14}/> Page</button>
+                            <button onClick={() => { setIsCreating('folder'); setTargetParentId(activeNotebookId); setNewName(''); }} className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-bold transition-colors"><FolderPlus size={14}/> Dossier</button>
+                        </div>
+                    </div>
+                    {isCreating === 'folder' && (
+                        <div className="p-2 m-2 bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm animate-in slide-in-from-top-2">
+                            <input autoFocus type="text" placeholder="Nom du dossier..." className="w-full text-sm mb-2 px-2 py-1 bg-transparent border-b border-blue-200 outline-none dark:text-white" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createContainer()} />
+                            <div className="flex justify-end gap-2 text-xs"><button onClick={() => setIsCreating(false)} className="text-gray-400 hover:text-gray-600">Annuler</button><button onClick={createContainer} className="text-blue-600 font-bold">Créer</button></div>
+                        </div>
+                    )}
+                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                        {renderTree(treeStructure)}
+                        {treeStructure.length === 0 && <div className="text-center mt-10 opacity-40"><FileText size={32} className="mx-auto mb-2"/><p className="text-xs">Carnet vide</p></div>}
                     </div>
                 </div>
-                {isCreating === 'folder' && (
-                    <div className="p-2 m-2 bg-white dark:bg-slate-800 rounded-lg border border-blue-200 dark:border-blue-800 shadow-sm animate-in slide-in-from-top-2">
-                        <input autoFocus type="text" placeholder="Nom du dossier..." className="w-full text-sm mb-2 px-2 py-1 bg-transparent border-b border-blue-200 outline-none dark:text-white" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createContainer()} />
-                        <div className="flex justify-end gap-2 text-xs"><button onClick={() => setIsCreating(false)} className="text-gray-400 hover:text-gray-600">Annuler</button><button onClick={createContainer} className="text-blue-600 font-bold">Créer</button></div>
-                    </div>
-                )}
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                    {renderTree(treeStructure)}
-                    {treeStructure.length === 0 && <div className="text-center mt-10 opacity-40"><FileText size={32} className="mx-auto mb-2"/><p className="text-xs">Carnet vide</p></div>}
-                </div>
-            </div>
+            )}
 
-            <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 relative">
+            {/* ZONE ÉDITEUR (PLEIN ÉCRAN) */}
+            <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 relative min-w-0">
                 {activePageId ? (
                     <>
                         <div className="h-14 border-b border-gray-100 dark:border-slate-800 flex items-center px-4 gap-1 bg-white dark:bg-slate-900 z-10 sticky top-0 overflow-x-auto">
+                            
+                            {/* BOUTON TOGGLE SIDEBAR */}
+                            <button 
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                                className="mr-3 p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                title={isSidebarOpen ? "Fermer le menu" : "Ouvrir le menu"}
+                            >
+                                <PanelLeft size={20} className={isSidebarOpen ? "text-blue-500" : ""} />
+                            </button>
+
+                            <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mr-2 shrink-0"></div>
+
                             <ToolbarButton icon={Type} cmd="formatBlock" val="P" title="Texte Normal" />
                             <div className="w-px h-5 bg-gray-200 dark:bg-slate-700 mx-2 shrink-0"></div>
                             
@@ -270,7 +294,7 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* --- MENU COULEUR EN LIGNE (PLUS DE POPUP) --- */}
+                            {/* --- MENU SURLIGNEUR EN LIGNE (TRANSPARENT + PROPRE) --- */}
                             <div className="flex items-center gap-1 mx-1 px-1 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <button 
                                     onMouseDown={(e) => { e.preventDefault(); setShowColorPalette(!showColorPalette); }} 
@@ -279,7 +303,6 @@ export default function JournalManager({ data, updateData }) {
                                 >
                                     <Highlighter size={16} />
                                 </button>
-                                
                                 {showColorPalette && (
                                     <div className="flex items-center gap-1 animate-in slide-in-from-left-2 fade-in duration-200">
                                         <button onMouseDown={(e) => applyHighlight(e, 'rgba(253, 224, 71, 0.3)')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Jaune"></button>
@@ -306,8 +329,8 @@ export default function JournalManager({ data, updateData }) {
                             <button onClick={saveContent} className={`p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}><Save size={18}/></button>
                         </div>
 
-                        {/* ZONE ÉDITEUR (FULL WIDTH FIX) */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 w-full">
+                        {/* DOCUMENT FULL WIDTH */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 w-full">
                             <input 
                                 ref={titleRef}
                                 type="text" 
@@ -315,6 +338,7 @@ export default function JournalManager({ data, updateData }) {
                                 className="text-3xl font-bold w-full mb-6 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-none p-0 focus:ring-0"
                                 onBlur={saveContent}
                             />
+                            
                             <div 
                                 ref={editorRef}
                                 className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300 selection:bg-blue-100 dark:selection:bg-blue-900/50"
@@ -329,6 +353,12 @@ export default function JournalManager({ data, updateData }) {
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-300 dark:text-slate-600 bg-gray-50/30 dark:bg-slate-900">
+                        {/* BOUTON D'OUVERTURE SI PAS DE PAGE SÉLECTIONNÉE */}
+                        {!isSidebarOpen && (
+                            <button onClick={() => setIsSidebarOpen(true)} className="absolute top-4 left-4 p-2 bg-white dark:bg-slate-800 shadow-md rounded-lg text-gray-500 hover:text-blue-600">
+                                <PanelLeft size={20}/>
+                            </button>
+                        )}
                         <div className="w-20 h-20 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6"><Book size={40} className="text-gray-400 dark:text-slate-500"/></div>
                         <p className="text-xl font-bold text-gray-700 dark:text-slate-300">Sélectionnez une page</p>
                         <p className="text-sm mt-2">pour commencer à écrire.</p>
