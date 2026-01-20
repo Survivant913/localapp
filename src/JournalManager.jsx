@@ -20,9 +20,9 @@ export default function JournalManager({ data, updateData }) {
     const [newName, setNewName] = useState('');
     const [targetParentId, setTargetParentId] = useState(null);
 
-    // États Outils
+    // État Formats & Menu Couleur (Inline)
     const [activeFormats, setActiveFormats] = useState({});
-    const [showColorPalette, setShowColorPalette] = useState(false); // Palette en ligne
+    const [showColorPalette, setShowColorPalette] = useState(false);
 
     // Refs
     const editorRef = useRef(null);
@@ -132,15 +132,14 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
         checkFormats();
-        if (command === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // SURLIGNAGE : Utilise des couleurs avec transparence pour ne pas masquer le texte
+    // Surlignage propre avec fermeture du menu
     const applyHighlight = (e, color) => {
-        e.preventDefault();
-        document.execCommand('hiliteColor', false, color);
+        if(e) e.preventDefault();
+        document.execCommand('hiliteColor', false, color); 
         if(editorRef.current) editorRef.current.focus();
-        setShowColorPalette(false); // Ferme la palette après choix
+        setShowColorPalette(false);
     };
 
     const handleKeyDown = (e) => {
@@ -271,23 +270,23 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* --- MENU SURLIGNEUR EN LIGNE (Zéro Bug Visuel) --- */}
+                            {/* --- MENU COULEUR EN LIGNE (PLUS DE POPUP) --- */}
                             <div className="flex items-center gap-1 mx-1 px-1 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                 <button 
                                     onMouseDown={(e) => { e.preventDefault(); setShowColorPalette(!showColorPalette); }} 
                                     className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-slate-600 ${showColorPalette ? 'text-blue-500' : 'text-gray-500'}`}
-                                    title="Ouvrir Palette"
+                                    title="Surligner"
                                 >
                                     <Highlighter size={16} />
                                 </button>
                                 
                                 {showColorPalette && (
                                     <div className="flex items-center gap-1 animate-in slide-in-from-left-2 fade-in duration-200">
-                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(253, 224, 71, 0.4)')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Jaune"></button>
-                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(134, 239, 172, 0.4)')} className="w-4 h-4 rounded-full bg-green-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Vert"></button>
-                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(249, 168, 212, 0.4)')} className="w-4 h-4 rounded-full bg-pink-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Rose"></button>
-                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(147, 197, 253, 0.4)')} className="w-4 h-4 rounded-full bg-blue-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Bleu"></button>
-                                        <button onMouseDown={(e) => applyHighlight(e, 'transparent')} className="w-4 h-4 rounded-full bg-white border border-gray-300 flex items-center justify-center text-red-500 hover:bg-red-50" title="Effacer"><X size={10}/></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(253, 224, 71, 0.3)')} className="w-4 h-4 rounded-full bg-yellow-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Jaune"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(134, 239, 172, 0.3)')} className="w-4 h-4 rounded-full bg-green-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Vert"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(249, 168, 212, 0.3)')} className="w-4 h-4 rounded-full bg-pink-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Rose"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'rgba(147, 197, 253, 0.3)')} className="w-4 h-4 rounded-full bg-blue-300 hover:scale-110 transition-transform ring-1 ring-black/10" title="Bleu"></button>
+                                        <button onMouseDown={(e) => applyHighlight(e, 'transparent')} className="w-4 h-4 rounded-full bg-white border border-gray-300 flex items-center justify-center text-red-500 hover:bg-red-50" title="Aucun"><X size={10}/></button>
                                     </div>
                                 )}
                             </div>
@@ -307,12 +306,13 @@ export default function JournalManager({ data, updateData }) {
                             <button onClick={saveContent} className={`p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}><Save size={18}/></button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-12 max-w-4xl mx-auto w-full">
+                        {/* ZONE ÉDITEUR (FULL WIDTH FIX) */}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 w-full">
                             <input 
                                 ref={titleRef}
                                 type="text" 
                                 placeholder="Titre de la page..."
-                                className="text-3xl md:text-4xl font-extrabold w-full mb-8 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-none p-0 focus:ring-0"
+                                className="text-3xl font-bold w-full mb-6 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-none p-0 focus:ring-0"
                                 onBlur={saveContent}
                             />
                             <div 
