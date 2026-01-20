@@ -30,42 +30,57 @@ export default function JournalManager({ data, updateData }) {
 
     const notebooks = folders.filter(f => !f.parent_id);
 
-    // --- CHARGEMENT DU CONTENU ---
+    // --- CHARGEMENT DU CONTENU (Fix Page Blanche) ---
     useEffect(() => {
         if (activePageId && editorRef.current) {
-            const page = pages.find(p => p.id === activePageId);
+            const page = pages.find(p => String(p.id) === String(activePageId));
             if (page) {
-                editorRef.current.innerHTML = page.content || '<p><br/></p>'; 
-                if(titleRef.current) titleRef.current.value = page.title || '';
+                // On injecte le HTML une seule fois au chargement
+                if (editorRef.current.innerHTML !== page.content) {
+                    editorRef.current.innerHTML = page.content || '<p><br/></p>';
+                }
+                if(titleRef.current && titleRef.current.value !== page.title) {
+                    titleRef.current.value = page.title || '';
+                }
             }
         }
-    }, [activePageId]); 
+    }, [activePageId]); // Ne dépend PAS de 'pages' pour éviter le refresh à chaque frappe
 
-    // --- ARBORESCENCE ---
+    // --- ARBORESCENCE (Fix Création Sous-Dossier) ---
     const structure = useMemo(() => {
         if (!activeNotebookId) return [];
+        
         const buildNode = (folderId) => {
+            // Conversion String() pour être sûr de matcher les IDs
             const subFolders = folders.filter(f => String(f.parent_id) === String(folderId));
             const folderPages = pages.filter(p => String(p.folder_id) === String(folderId));
+            
             return subFolders.map(sub => ({
-                ...sub, type: 'folder',
-                children: [...buildNode(sub.id), ...folderPages.map(p => ({...p, type: 'page'}))]
+                ...sub, 
+                type: 'folder',
+                children: [
+                    ...buildNode(sub.id), 
+                    ...folderPages.map(p => ({...p, type: 'page'}))
+                ]
             }));
         };
+
         const rootPages = pages.filter(p => String(p.folder_id) === String(activeNotebookId));
         return [...buildNode(activeNotebookId), ...rootPages.map(p => ({...p, type: 'page'}))];
     }, [folders, pages, activeNotebookId]);
 
-    // --- ACTIONS CRUD ---
+    // --- ACTIONS ---
     const createItem = () => {
         if (!newName.trim()) return;
+        const newId = Date.now();
+        
         if (isCreating === 'notebook') {
-            const newFolder = { id: Date.now(), name: newName, parent_id: null, created_at: new Date().toISOString() };
+            const newFolder = { id: newId, name: newName, parent_id: null, created_at: new Date().toISOString() };
             updateData({ ...data, journal_folders: [...folders, newFolder] });
         } else if (isCreating === 'folder') {
-            const newFolder = { id: Date.now(), name: newName, parent_id: targetParentId, created_at: new Date().toISOString() };
+            const newFolder = { id: newId, name: newName, parent_id: targetParentId, created_at: new Date().toISOString() };
             updateData({ ...data, journal_folders: [...folders, newFolder] });
-            // Force l'ouverture du dossier parent pour voir le nouveau dossier
+            // Ouvrir le dossier parent pour voir le nouveau dossier
             setExpandedFolders(prev => ({ ...prev, [targetParentId]: true }));
         }
         setNewName('');
@@ -73,17 +88,24 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const createPage = (folderId) => {
-        const newPage = { id: Date.now(), folder_id: folderId, title: '', content: '<p><br/></p>', updated_at: new Date().toISOString() };
+        const newPage = { 
+            id: Date.now(), 
+            folder_id: folderId, // L'ID est passé tel quel (Number ou String)
+            title: '', 
+            content: '<p><br/></p>', 
+            updated_at: new Date().toISOString() 
+        };
+        
+        // Mise à jour immédiate des données
         updateData({ ...data, journal_pages: [...pages, newPage] });
         
-        setActivePageId(newPage.id);
-        
-        // BUG FIX: Force l'ouverture du dossier où on crée la page
+        // On force l'ouverture du dossier où on crée la page
         if (folderId) {
             setExpandedFolders(prev => ({ ...prev, [folderId]: true }));
         }
         
-        // Focus sur le titre
+        // On active la page et on focus le titre
+        setActivePageId(newPage.id);
         setTimeout(() => titleRef.current?.focus(), 100);
     };
 
@@ -111,7 +133,7 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => setIsSaving(false), 800);
     };
 
-    // --- ÉDITEUR RICHE ---
+    // --- ÉDITEUR (Commandes) ---
     const execCmd = (e, command, value = null) => {
         e.preventDefault(); 
         document.execCommand(command, false, value);
@@ -141,9 +163,9 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    const activePageData = pages.find(p => p.id === activePageId);
+    const activePageData = pages.find(p => String(p.id) === String(activePageId));
 
-    // --- ARBRE ---
+    // --- ARBRE RECURSIF ---
     const renderTree = (nodes, depth = 0) => {
         return nodes.map(node => {
             if (searchQuery && node.type === 'page' && !node.title.toLowerCase().includes(searchQuery.toLowerCase())) return null;
@@ -155,41 +177,38 @@ export default function JournalManager({ data, updateData }) {
                 return (
                     <div key={node.id} className="select-none text-sm">
                         <div 
-                            className={`flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer group`}
+                            className={`flex items-center justify-between px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer group transition-colors`}
                             style={{ paddingLeft: `${depth * 12 + 12}px` }}
                             onClick={() => setExpandedFolders(prev => ({ ...prev, [node.id]: !prev[node.id] }))}
                         >
                             <div className="flex items-center gap-2 overflow-hidden text-gray-700 dark:text-gray-200">
                                 {hasChildren ? (isOpen ? <ChevronDown size={14}/> : <ChevronRight size={14}/>) : <span className="w-3.5"></span>}
                                 <Folder size={16} className="text-blue-500 shrink-0 fill-blue-500/20"/>
-                                <span className="truncate">{node.name}</span>
+                                <span className="truncate font-medium">{node.name}</span>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {/* BOUTONS D'AJOUT DANS LE DOSSIER */}
+                            
+                            {/* BOUTONS ACTIONS DOSSIER */}
+                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); createPage(node.id); }} 
                                     className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/30 text-gray-400 hover:text-green-600 rounded"
-                                    title="Ajouter une page ici"
+                                    title="Ajouter Page"
                                 >
-                                    <FilePlus size={14}/>
+                                    <FilePlus size={15}/>
                                 </button>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); setTargetParentId(node.id); setIsCreating('folder'); }} 
                                     className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-400 hover:text-blue-600 rounded"
-                                    title="Ajouter un sous-dossier"
+                                    title="Ajouter Sous-dossier"
                                 >
-                                    <FolderPlus size={14}/>
+                                    <FolderPlus size={15}/>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded"><Trash2 size={14}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded">
+                                    <Trash2 size={15}/>
+                                </button>
                             </div>
                         </div>
                         {isOpen && node.children && <div className="border-l border-gray-200 dark:border-slate-800 ml-4">{renderTree(node.children, depth + 1)}</div>}
-                        {/* Indication visuelle si dossier vide et ouvert */}
-                        {isOpen && (!node.children || node.children.length === 0) && (
-                            <div className="ml-8 py-1 text-xs text-gray-400 italic flex items-center gap-2">
-                                <CornerDownRight size={10}/> Vide
-                            </div>
-                        )}
                     </div>
                 );
             }
@@ -204,12 +223,15 @@ export default function JournalManager({ data, updateData }) {
                         <FileText size={14} className="shrink-0"/>
                         <span className={`truncate ${!node.title ? 'italic opacity-50' : ''}`}>{node.title || 'Sans titre'}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteItem(node); }} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded transition-all">
+                        <Trash2 size={14}/>
+                    </button>
                 </div>
             );
         });
     };
 
+    // --- VUE BIBLIOTHÈQUE ---
     if (!activeNotebookId) {
         return (
             <div className="fade-in p-6 max-w-7xl mx-auto pb-24">
@@ -272,6 +294,7 @@ export default function JournalManager({ data, updateData }) {
 
     const activeNotebookName = notebooks.find(n => n.id === activeNotebookId)?.name || 'Carnet';
 
+    // --- VUE ÉDITEUR ---
     return (
         <div className="flex h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] max-w-[1920px] mx-auto overflow-hidden bg-white dark:bg-slate-900 shadow-sm border border-gray-200 dark:border-slate-700 fade-in relative">
             <div className="w-72 border-r border-gray-200 dark:border-slate-700 flex flex-col bg-gray-50/80 dark:bg-slate-950/50">
@@ -320,13 +343,13 @@ export default function JournalManager({ data, updateData }) {
                             <button onClick={saveContent} className={`p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}><Save size={18}/></button>
                         </div>
 
-                        {/* ZONE TITRE ET CONTENU CORRIGÉE */}
+                        {/* ZONE D'ÉDITION AVEC TITRE STYLISÉ */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-8 md:p-12 max-w-4xl mx-auto w-full">
                             <input 
                                 ref={titleRef}
                                 type="text" 
                                 placeholder="Titre de la page..."
-                                className="text-3xl font-bold w-full mb-6 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-b border-transparent focus:border-gray-200 dark:focus:border-slate-700 transition-colors pb-2"
+                                className="text-3xl md:text-4xl font-extrabold w-full mb-8 outline-none bg-transparent text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-slate-700 border-none p-0 focus:ring-0"
                                 onBlur={saveContent}
                             />
                             
