@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { 
   Target, Calendar, CheckSquare, Square, Heart, 
-  Trash2, Plus, ChevronDown, Trophy,
-  Briefcase, Activity, Banknote, User, Flame, Clock, X
+  Trash2, Plus, ChevronDown, Clock, X,
+  Briefcase, Activity, Banknote, User, Flame, CheckCircle2
 } from 'lucide-react';
 
 export default function GoalsManager({ data, updateData }) {
@@ -23,20 +23,20 @@ export default function GoalsManager({ data, updateData }) {
 
     // --- CONFIGURATION ---
     const categories = {
-        business: { label: 'Business', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200', icon: Briefcase },
-        health: { label: 'Santé', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200', icon: Activity },
-        finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200', icon: Banknote },
-        perso: { label: 'Perso', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200', icon: User },
+        business: { label: 'Business', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200', icon: Briefcase },
+        health: { label: 'Santé', color: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200', icon: Activity },
+        finance: { label: 'Finance', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-200', icon: Banknote },
+        perso: { label: 'Perso', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-200', icon: User },
     };
 
     // --- DONNÉES SÉCURISÉES ---
+    // On s'assure que ce sont toujours des tableaux, jamais null/undefined
     const goals = Array.isArray(data.goals) ? data.goals : [];
     const milestones = Array.isArray(data.goal_milestones) ? data.goal_milestones : [];
 
     // --- HELPERS (SÉCURISÉS) ---
     const calculateProgress = (goalId) => {
-        if (!milestones) return 0;
-        // On convertit les ID en String pour éviter les bugs de comparaison (number vs string)
+        if (!milestones || milestones.length === 0) return 0;
         const goalMilestones = milestones.filter(m => String(m.goal_id) === String(goalId));
         if (goalMilestones.length === 0) return 0;
         const completed = goalMilestones.filter(m => m.is_completed).length;
@@ -68,7 +68,6 @@ export default function GoalsManager({ data, updateData }) {
             is_favorite: false,
             created_at: new Date().toISOString()
         };
-        // Mise à jour sécurisée
         updateData({ ...data, goals: [newGoal, ...goals] });
         
         // Reset
@@ -91,7 +90,7 @@ export default function GoalsManager({ data, updateData }) {
         updateData({ ...data, goals: updated });
     };
 
-    // --- ACTIONS JALONS (SÉCURISÉES) ---
+    // --- ACTIONS JALONS (ANTI-CRASH) ---
     const addMilestone = (goalId) => {
         const text = newMilestoneText[goalId];
         if (!text || !text.trim()) return;
@@ -103,19 +102,19 @@ export default function GoalsManager({ data, updateData }) {
             is_completed: false 
         };
         
-        // On s'assure que milestones est un tableau avant d'ajouter
-        const currentMilestones = Array.isArray(milestones) ? milestones : [];
-        updateData({ ...data, goal_milestones: [...currentMilestones, newM] });
+        updateData({ ...data, goal_milestones: [...milestones, newM] });
         setNewMilestoneText({ ...newMilestoneText, [goalId]: '' });
     };
 
-    const toggleMilestone = (mId) => {
-        if (!milestones) return;
+    const toggleMilestone = (e, mId) => {
+        e.stopPropagation(); // EMPÊCHE LE CRASH (fermeture accordéon)
+        
         const updated = milestones.map(m => m.id === mId ? { ...m, is_completed: !m.is_completed } : m);
         updateData({ ...data, goal_milestones: updated });
     };
 
-    const deleteMilestone = (mId) => {
+    const deleteMilestone = (e, mId) => {
+        e.stopPropagation(); // EMPÊCHE LE CRASH
         const updated = milestones.filter(m => m.id !== mId);
         updateData({ ...data, goal_milestones: updated }, { table: 'goal_milestones', id: mId });
     };
@@ -123,10 +122,9 @@ export default function GoalsManager({ data, updateData }) {
     // --- FILTRAGE & TRI ---
     const filteredGoals = goals.filter(g => activeFilter === 'all' || g.category === activeFilter);
     
-    // Tri intelligent : Favoris > Priorité > Avancement
+    // Tri intelligent
     const sortedGoals = [...filteredGoals].sort((a, b) => {
         if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
-        // Priorité
         const pMap = { high: 3, medium: 2, low: 1 };
         const pA = pMap[a.priority] || 2;
         const pB = pMap[b.priority] || 2;
@@ -137,15 +135,19 @@ export default function GoalsManager({ data, updateData }) {
     const totalGoals = goals.length;
     const completedGoals = goals.filter(g => calculateProgress(g.id) === 100).length;
 
+    // CSS CLASSES SÉCURISÉES (Anti-page blanche / texte illisible)
+    const inputClass = "w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-blue-500 transition-colors";
+    const labelClass = "block text-sm font-bold text-gray-700 dark:text-gray-200 mb-2";
+
     return (
         <div className="space-y-8 fade-in p-4 pb-24 md:pb-20 max-w-6xl mx-auto">
             
-            {/* 1. HEADER STATS (DESIGN CLEAN) */}
+            {/* 1. HEADER STATS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-center min-h-[120px]">
                     <div className="relative z-10">
                         <p className="text-xs font-bold opacity-60 uppercase tracking-wider mb-1">Total Objectifs</p>
-                        <h3 className="text-4xl font-bold">{totalGoals}</h3>
+                        <h3 className="text-4xl font-bold">{completedGoals} / {totalGoals}</h3>
                     </div>
                     <Target size={80} className="absolute -right-6 -bottom-6 opacity-10 rotate-12"/>
                 </div>
@@ -159,7 +161,7 @@ export default function GoalsManager({ data, updateData }) {
                     const Icon = Conf.icon;
                     
                     return (
-                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex flex-col justify-between min-h-[120px]">
+                        <div key={catKey} className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col justify-between min-h-[120px]">
                             <div className="flex justify-between items-start mb-2">
                                 <div className={`p-2 rounded-lg ${Conf.color}`}><Icon size={20}/></div>
                                 <span className="text-2xl font-bold text-gray-800 dark:text-white">{catProgress}%</span>
@@ -194,25 +196,26 @@ export default function GoalsManager({ data, updateData }) {
                 </button>
             </div>
 
-            {/* 3. FORMULAIRE (CSS CORRIGÉ) */}
+            {/* 3. FORMULAIRE (CORRIGÉ & LISIBLE) */}
             {isFormOpen && (
                 <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 animate-in slide-in-from-top-4 fade-in duration-300">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="label">Titre de l'objectif</label>
-                            <input type="text" className="input-field text-lg font-bold" placeholder="Ex: Devenir bilingue en Anglais" value={newGoalTitle} onChange={e => setNewGoalTitle(e.target.value)} autoFocus />
+                            <label className={labelClass}>Titre de l'objectif</label>
+                            <input type="text" className={inputClass} placeholder="Ex: Devenir bilingue en Anglais" value={newGoalTitle} onChange={e => setNewGoalTitle(e.target.value)} autoFocus />
                         </div>
                         
                         <div>
-                            <label className="label">Catégorie</label>
+                            <label className={labelClass}>Catégorie</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {Object.keys(categories).map(cat => {
                                     const Icon = categories[cat].icon;
+                                    const isSelected = newGoalCategory === cat;
                                     return (
                                         <button 
                                             key={cat} 
                                             onClick={() => setNewGoalCategory(cat)}
-                                            className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${newGoalCategory === cat ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                                            className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${isSelected ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500' : 'border-gray-200 dark:border-slate-600 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
                                         >
                                             <Icon size={16}/> {categories[cat].label}
                                         </button>
@@ -223,12 +226,12 @@ export default function GoalsManager({ data, updateData }) {
 
                         <div className="space-y-4">
                             <div>
-                                <label className="label">Date limite (Deadline)</label>
-                                <input type="date" className="input-field" value={newGoalDeadline} onChange={e => setNewGoalDeadline(e.target.value)} />
+                                <label className={labelClass}>Date limite (Deadline)</label>
+                                <input type="date" className={inputClass} value={newGoalDeadline} onChange={e => setNewGoalDeadline(e.target.value)} />
                             </div>
                             <div>
-                                <label className="label">Priorité</label>
-                                <select className="input-field" value={newGoalPriority} onChange={e => setNewGoalPriority(e.target.value)}>
+                                <label className={labelClass}>Priorité</label>
+                                <select className={inputClass} value={newGoalPriority} onChange={e => setNewGoalPriority(e.target.value)}>
                                     <option value="high">🔥 Haute Priorité</option>
                                     <option value="medium">🎯 Moyenne</option>
                                     <option value="low">📅 Basse</option>
@@ -237,9 +240,9 @@ export default function GoalsManager({ data, updateData }) {
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="label">Motivation (Le "Pourquoi")</label>
+                            <label className={labelClass}>Motivation (Le "Pourquoi")</label>
                             <textarea 
-                                className="input-field min-h-[100px]" 
+                                className={`${inputClass} min-h-[100px]`} 
                                 placeholder="Pourquoi est-ce important pour vous ?"
                                 value={newGoalMotivation} 
                                 onChange={e => setNewGoalMotivation(e.target.value)}
@@ -262,7 +265,7 @@ export default function GoalsManager({ data, updateData }) {
                 ) : (
                     sortedGoals.map(goal => {
                         const progress = calculateProgress(goal.id);
-                        // On convertit en String pour éviter le plantage filter
+                        // IMPORTANT: Sécurisation de l'accès aux jalons
                         const goalMilestones = milestones ? milestones.filter(m => String(m.goal_id) === String(goal.id)) : [];
                         
                         const Conf = categories[goal.category || 'perso'];
@@ -271,10 +274,10 @@ export default function GoalsManager({ data, updateData }) {
 
                         return (
                             <div key={goal.id} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden group transition-all hover:shadow-md">
-                                {/* CARD HEADER */}
+                                {/* CARD HEADER (Clicable pour ouvrir) */}
                                 <div className="p-6 cursor-pointer" onClick={() => setExpandedGoalId(isExpanded ? null : goal.id)}>
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className="flex gap-3">
+                                        <div className="flex gap-3 flex-wrap">
                                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${Conf.color}`}>
                                                 <Conf.icon size={12}/> {Conf.label}
                                             </span>
@@ -284,7 +287,7 @@ export default function GoalsManager({ data, updateData }) {
                                                 </span>
                                             )}
                                             {goal.priority === 'high' && (
-                                                <span className="px-2 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 text-xs"><Flame size={12}/></span>
+                                                <span className="px-2 py-1 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 text-xs flex items-center"><Flame size={12}/></span>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -326,7 +329,7 @@ export default function GoalsManager({ data, updateData }) {
 
                                 {/* CARD BODY (ACCORDEON) */}
                                 {isExpanded && (
-                                    <div className="bg-gray-50 dark:bg-slate-700/30 p-6 border-t border-gray-100 dark:border-slate-700 animate-in slide-in-from-top-2">
+                                    <div className="bg-gray-50 dark:bg-slate-900/50 p-6 border-t border-gray-100 dark:border-slate-700 animate-in slide-in-from-top-2">
                                         <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
                                             <CheckSquare size={16} className="text-blue-500"/> Étapes Clés (Jalons)
                                         </h4>
@@ -334,14 +337,14 @@ export default function GoalsManager({ data, updateData }) {
                                         <div className="space-y-2 mb-4">
                                             {goalMilestones.length === 0 && <p className="text-sm text-gray-400 dark:text-slate-500 italic pl-6">Aucune étape définie. Découpez votre objectif !</p>}
                                             {goalMilestones.map(m => (
-                                                <div key={m.id} className="flex items-center gap-3 group/item bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" onClick={() => toggleMilestone(m.id)}>
+                                                <div key={m.id} className="flex items-center gap-3 group/item bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-slate-600 shadow-sm cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" onClick={(e) => toggleMilestone(e, m.id)}>
                                                     <div className={`transition-all active:scale-90 ${m.is_completed ? 'text-green-500' : 'text-gray-300 hover:text-blue-500'}`}>
                                                         {m.is_completed ? <CheckCircle2 size={22} className="fill-green-100 dark:fill-green-900"/> : <Square size={22}/>}
                                                     </div>
                                                     <span className={`text-sm flex-1 font-medium ${m.is_completed ? 'text-gray-400 dark:text-slate-500 line-through' : 'text-gray-700 dark:text-gray-200'}`}>
                                                         {m.title}
                                                     </span>
-                                                    <button onClick={(e) => {e.stopPropagation(); deleteMilestone(m.id);}} className="opacity-0 group-hover/item:opacity-100 text-gray-300 hover:text-red-500 transition-opacity p-1">
+                                                    <button onClick={(e) => deleteMilestone(e, m.id)} className="opacity-0 group-hover/item:opacity-100 text-gray-300 hover:text-red-500 transition-opacity p-1">
                                                         <Trash2 size={16}/>
                                                     </button>
                                                 </div>
@@ -351,14 +354,14 @@ export default function GoalsManager({ data, updateData }) {
                                         <div className="flex gap-2">
                                             <input 
                                                 type="text" 
-                                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-800 dark:text-white text-sm outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                                className={inputClass}
                                                 placeholder="Ajouter une nouvelle étape..."
                                                 value={newMilestoneText[goal.id] || ''}
                                                 onChange={(e) => setNewMilestoneText({...newMilestoneText, [goal.id]: e.target.value})}
                                                 onKeyDown={(e) => e.key === 'Enter' && addMilestone(goal.id)}
                                                 onClick={(e) => e.stopPropagation()} 
                                             />
-                                            <button onClick={(e) => {e.stopPropagation(); addMilestone(goal.id);}} className="px-4 py-2 bg-slate-900 dark:bg-slate-600 text-white rounded-xl hover:bg-blue-600 transition-colors shadow-sm">
+                                            <button onClick={(e) => { e.stopPropagation(); addMilestone(goal.id); }} className="px-4 py-2 bg-slate-900 dark:bg-blue-600 text-white rounded-xl hover:opacity-90 transition-colors shadow-sm">
                                                 <Plus size={20}/>
                                             </button>
                                         </div>
@@ -369,12 +372,6 @@ export default function GoalsManager({ data, updateData }) {
                     })
                 )}
             </div>
-
-            <style jsx>{`
-                .label { @apply block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5; }
-                /* FIX CSS : Couleurs explicites pour le mode sombre */
-                .input-field { @apply w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white placeholder-gray-400 transition-all; }
-            `}</style>
         </div>
     );
 }
