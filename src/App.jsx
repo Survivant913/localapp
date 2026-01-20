@@ -12,7 +12,7 @@ import DataSettings from './DataSettings';
 import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
 import Workspace from './Workspace'; 
-import GoalsManager from './GoalsManager'; // NOUVEAU
+import GoalsManager from './GoalsManager'; 
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -31,7 +31,7 @@ export default function App() {
 
   const [data, setData] = useState({
     todos: [], projects: [], 
-    goals: [], goal_milestones: [], // NOUVEAU
+    goals: [], goal_milestones: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
@@ -120,8 +120,8 @@ export default function App() {
         supabase.from('invoices').select('*'),
         supabase.from('catalog_items').select('*'),
         supabase.from('ventures').select('*'),
-        supabase.from('goals').select('*'), // NOUVEAU
-        supabase.from('goal_milestones').select('*') // NOUVEAU
+        supabase.from('goals').select('*'), 
+        supabase.from('goal_milestones').select('*') 
       ]);
 
       const [
@@ -129,7 +129,7 @@ export default function App() {
         { data: accounts }, { data: transactions }, { data: recurring }, 
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
-        { data: ventures }, { data: goals }, { data: goal_milestones } // NOUVEAU
+        { data: ventures }, { data: goals }, { data: goal_milestones } 
       ] = results;
 
       // --- CATCH-UP ENGINE (MOTEUR DE RATTRAPAGE BLINDÉ) ---
@@ -284,7 +284,7 @@ export default function App() {
       
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
-        goals: goals || [], goal_milestones: goal_milestones || [], // NOUVEAU
+        goals: goals || [], goal_milestones: goal_milestones || [], 
         budget: {
           accounts: validAccounts, 
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -343,8 +343,15 @@ export default function App() {
       await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
-      await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite })); // NOUVEAU
-      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed })); // NOUVEAU
+      
+      // MODIFICATION CRITIQUE ICI : Sauvegarde des NOUVEAUX champs (category, priority, motivation)
+      await upsertInBatches('goals', data.goals, 50, g => ({ 
+          id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, 
+          status: g.status, is_favorite: g.is_favorite,
+          category: g.category, priority: g.priority, motivation: g.motivation 
+      })); 
+      
+      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
       if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
@@ -367,7 +374,7 @@ export default function App() {
       case 'budget': return <BudgetManager data={data} updateData={updateData} />;
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
-      case 'goals': return <GoalsManager data={data} updateData={updateData} />; // NOUVEAU
+      case 'goals': return <GoalsManager data={data} updateData={updateData} />;
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;

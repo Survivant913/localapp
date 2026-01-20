@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users, Box, Target 
+  Users, Box, Target, Book // <-- Import de l'icône Book
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -33,10 +33,11 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'workspace', label: 'Workspace', icon: Box }, 
     { id: 'calendar', label: 'Planning', icon: Calendar },
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
-    { id: 'goals', label: 'Objectifs', icon: Target }, // NOUVEAU
+    { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
     { id: 'clients', label: 'Clients', icon: Users },
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
+    { id: 'journal', label: 'Carnet', icon: Book }, // <-- NOUVEAU MENU ICI
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ];
@@ -149,8 +150,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
           {!isCollapsed && (
             <div className="text-center animate-in fade-in duration-500">
-              {/* MODIFICATION ICI : Texte plus discret (plus petit, moins opaque) */}
-              <p className="text-[9px] text-slate-700 font-medium uppercase tracking-widest opacity-40 hover:opacity-80 transition-all cursor-default leading-tight">
+              {/* MODIFICATION ICI : Texte plus petit (text-[8px]) et moins opaque (opacity-30) */}
+              <p className="text-[8px] text-slate-600 font-medium uppercase tracking-widest opacity-30 hover:opacity-100 transition-all cursor-default leading-tight">
                 Created by <br/> Henni Mohammed Al Amine
               </p>
             </div>
