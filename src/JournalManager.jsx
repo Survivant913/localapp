@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter, Palette
+  X, CornerDownRight, Highlighter
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -22,7 +22,7 @@ export default function JournalManager({ data, updateData }) {
 
     // État Formats & Menu Couleur
     const [activeFormats, setActiveFormats] = useState({});
-    const [showColorMenu, setShowColorMenu] = useState(false); // Menu couleur ouvert/fermé
+    const [showColorMenu, setShowColorMenu] = useState(false);
 
     // Refs
     const editorRef = useRef(null);
@@ -132,11 +132,11 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand(command, false, value);
         if(editorRef.current) editorRef.current.focus();
         checkFormats();
-        if (command === 'hiliteColor') setShowColorMenu(false); // Fermer menu après choix
+        if (command === 'hiliteColor') setShowColorMenu(false);
     };
 
+    // Utilisation de RGBA pour la transparence (Effet Surligneur doux)
     const applyHighlight = (color) => {
-        // 'transparent' permet d'effacer le surlignage
         document.execCommand('hiliteColor', false, color); 
         if(editorRef.current) editorRef.current.focus();
         setShowColorMenu(false);
@@ -270,23 +270,24 @@ export default function JournalManager({ data, updateData }) {
                             <ToolbarButton icon={Underline} cmd="underline" title="Souligné" />
                             <ToolbarButton icon={Strikethrough} cmd="strikethrough" title="Barré" />
                             
-                            {/* --- MENU SURLIGNEUR AMÉLIORÉ --- */}
+                            {/* --- MENU SURLIGNEUR FIXÉ (Position Relative) --- */}
                             <div className="relative">
                                 <button 
                                     onMouseDown={(e) => { e.preventDefault(); setShowColorMenu(!showColorMenu); }} 
-                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 transition-colors ${showColorMenu ? 'bg-gray-200 dark:bg-slate-600' : ''}`}
-                                    title="Couleur de surlignage"
+                                    className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 transition-colors ${showColorMenu ? 'bg-gray-200 dark:bg-slate-700' : ''}`}
+                                    title="Surligner"
                                 >
                                     <Highlighter size={18} className={showColorMenu ? "text-blue-500" : ""}/>
                                 </button>
                                 {showColorMenu && (
                                     <div className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 flex gap-2 z-50 animate-in slide-in-from-top-2">
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#fde047'); }} className="w-6 h-6 rounded-full bg-yellow-300 hover:ring-2 ring-gray-300 transition-all" title="Jaune"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#86efac'); }} className="w-6 h-6 rounded-full bg-green-300 hover:ring-2 ring-gray-300 transition-all" title="Vert"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#f9a8d4'); }} className="w-6 h-6 rounded-full bg-pink-300 hover:ring-2 ring-gray-300 transition-all" title="Rose"></button>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('#93c5fd'); }} className="w-6 h-6 rounded-full bg-blue-300 hover:ring-2 ring-gray-300 transition-all" title="Bleu"></button>
+                                        {/* Couleurs Translucides pour lisibilité (RGBA) */}
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(253, 224, 71, 0.4)'); }} className="w-6 h-6 rounded-full bg-yellow-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Jaune"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(134, 239, 172, 0.4)'); }} className="w-6 h-6 rounded-full bg-green-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Vert"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(249, 168, 212, 0.4)'); }} className="w-6 h-6 rounded-full bg-pink-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Rose"></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('rgba(147, 197, 253, 0.4)'); }} className="w-6 h-6 rounded-full bg-blue-300 hover:ring-2 ring-gray-300 transition-all border border-black/10" title="Bleu"></button>
                                         <div className="w-px h-6 bg-gray-200 dark:bg-slate-600 mx-1"></div>
-                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('transparent'); }} className="w-6 h-6 rounded-full bg-white border border-gray-300 flex items-center justify-center hover:bg-gray-100 text-red-500" title="Effacer"><X size={12}/></button>
+                                        <button onMouseDown={(e) => { e.preventDefault(); applyHighlight('transparent'); }} className="w-6 h-6 rounded-full bg-gray-100 dark:bg-slate-600 border border-gray-300 dark:border-slate-500 flex items-center justify-center hover:bg-gray-200 text-gray-500" title="Effacer"><X size={12}/></button>
                                     </div>
                                 )}
                             </div>
@@ -316,7 +317,7 @@ export default function JournalManager({ data, updateData }) {
                             />
                             <div 
                                 ref={editorRef}
-                                className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300 selection:bg-blue-200 dark:selection:bg-blue-900"
+                                className="prose prose-lg dark:prose-invert max-w-none outline-none min-h-[60vh] text-gray-700 dark:text-gray-300 leading-relaxed empty:before:content-['Commencez_à_écrire_ici...'] empty:before:text-gray-300 selection:bg-blue-100 dark:selection:bg-blue-900/50"
                                 contentEditable
                                 onKeyDown={handleKeyDown} 
                                 onKeyUp={checkFormats}
