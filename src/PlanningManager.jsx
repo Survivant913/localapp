@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
@@ -10,7 +10,6 @@ import {
   setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-// On n'a plus besoin d'importer supabase ici, tout passe par updateData
 
 export default function PlanningManager({ data, updateData }) {
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -18,8 +17,14 @@ export default function PlanningManager({ data, updateData }) {
     const [isCreating, setIsCreating] = useState(false);
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
+    
+    // Drag & Drop (Déplacement)
     const [draggedItem, setDraggedItem] = useState(null);
     const [previewSlot, setPreviewSlot] = useState(null);
+
+    // Resize (Redimensionnement)
+    const [resizingEvent, setResizingEvent] = useState(null); // { id, startY, startDuration, currentDuration }
+    const resizeRef = useRef(null); // Pour suivre les valeurs dans les event listeners
 
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
@@ -30,6 +35,78 @@ export default function PlanningManager({ data, updateData }) {
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
     const scheduledTodos = (data.todos || []).filter(t => t.scheduled_date && !t.completed);
     const backlogTodos = (data.todos || []).filter(t => !t.scheduled_date && !t.completed);
+
+    // --- GESTION RESIZE ---
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!resizeRef.current) return;
+            const { startY, startDuration } = resizeRef.current;
+            const deltaY = e.clientY - startY;
+            const deltaMinutes = Math.round(deltaY); // 1px = 1min
+            
+            // Snap 15 min
+            let newDuration = startDuration + deltaMinutes;
+            newDuration = Math.round(newDuration / 15) * 15;
+            if (newDuration < 15) newDuration = 15; // Minimum 15 min
+
+            setResizingEvent(prev => ({ ...prev, currentDuration: newDuration }));
+        };
+
+        const handleMouseUp = () => {
+            if (!resizeRef.current) return;
+            const { event, currentDuration } = resizeRef.current;
+            
+            // Fin du resize -> Sauvegarde
+            finishResize(event, resizeRef.current.currentDuration || currentDuration);
+            
+            setResizingEvent(null);
+            resizeRef.current = null;
+        };
+
+        if (resizingEvent) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [resizingEvent]);
+
+    const startResize = (e, evt) => {
+        e.stopPropagation(); // Empêcher le drag & drop de démarrer
+        const startDuration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
+        const initData = { 
+            id: evt.id, 
+            startY: e.clientY, 
+            startDuration: startDuration, 
+            currentDuration: startDuration,
+            event: evt 
+        };
+        setResizingEvent(initData);
+        resizeRef.current = initData;
+    };
+
+    const finishResize = (evt, newDuration) => {
+        const start = parseISO(evt.start_time);
+        const newEnd = addMinutes(start, newDuration);
+
+        // Si récurrent -> Demander confirmation
+        if (evt.recurrence_group_id) {
+            setEventForm({
+                id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
+                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event'
+            });
+            setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration });
+            setConfirmMode('ask_update');
+            setIsCreating(true);
+        } else {
+            // Sinon update direct
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
+            updateData({ ...data, calendar_events: updatedEvents });
+        }
+    };
 
     // --- NAVIGATION ---
     const handlePreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
@@ -47,7 +124,13 @@ export default function PlanningManager({ data, updateData }) {
             if (!isValid(start) || !isValid(end)) return;
 
             const startMin = getHours(start) * 60 + getMinutes(start);
-            const duration = differenceInMinutes(end, start);
+            let duration = differenceInMinutes(end, start);
+            
+            // Si c'est l'élément en train d'être redimensionné, on utilise la durée temporaire
+            if (resizingEvent && item.data.id === resizingEvent.id) {
+                duration = resizingEvent.currentDuration;
+            }
+
             const top = Math.max(0, startMin - (6 * 60)); 
             
             let placed = false;
@@ -55,15 +138,29 @@ export default function PlanningManager({ data, updateData }) {
                 if (!col.some(ev => {
                     const evStart = parseISO(ev.startStr);
                     const evEnd = parseISO(ev.endStr);
-                    return (start < evEnd && end > evStart);
+                    // Collision logic
+                    // On doit aussi prendre en compte la durée visuelle si resize
+                    let evDuration = differenceInMinutes(evEnd, evStart);
+                    if (resizingEvent && ev.data.id === resizingEvent.id) evDuration = resizingEvent.currentDuration;
+                    
+                    // Recalcul simple de collision basé sur les positions
+                    const myTop = top;
+                    const myBottom = top + duration;
+                    
+                    const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
+                    const otherTop = Math.max(0, otherStartMin - (6 * 60));
+                    const otherBottom = otherTop + evDuration;
+
+                    return (myTop < otherBottom && myBottom > otherTop);
                 })) {
-                    col.push({ ...item, top, height: Math.max(30, duration) });
+                    col.push({ ...item, top, height: Math.max(15, duration) });
                     placed = true;
                     break;
                 }
             }
-            if (!placed) columns.push([{ ...item, top, height: Math.max(30, duration) }]);
+            if (!placed) columns.push([{ ...item, top, height: Math.max(15, duration) }]);
         });
+        
         const result = [];
         columns.forEach((col, colIndex) => {
             col.forEach(item => {
@@ -144,7 +241,6 @@ export default function PlanningManager({ data, updateData }) {
         let updatedEvents = [...events];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            // MODE SÉRIE : ÉCRASEMENT TOTAL (SYNCHRO)
             const targetDayOfWeek = startObj.getDay();
             const targetHours = getHours(startObj);
             const targetMinutes = getMinutes(startObj);
@@ -172,7 +268,6 @@ export default function PlanningManager({ data, updateData }) {
                 return ev;
             });
         } else {
-            // MODE SINGLE : DÉTACHEMENT
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
                 ...ev, title: formData.title, color: formData.color,
                 start_time: startObj.toISOString(), end_time: endObj.toISOString(),
@@ -194,47 +289,23 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- CORRECTION CRUCIALE DE LA SUPPRESSION ---
     const performDelete = (evt, series) => {
         if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
-
         let updatedEvents = [...events];
-        
-        // 1. SUPPRESSION SÉRIE
         if (series && evt.recurrence_group_id) {
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
-            
-            // APPEL SPÉCIAL À APP.JSX AVEC FILTRE
-            updateData(
-                { ...data, calendar_events: updatedEvents }, 
-                { 
-                    table: 'calendar_events', 
-                    filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } 
-                }
-            );
-        } 
-        // 2. SUPPRESSION SIMPLE
-        else {
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } });
+        } else {
             updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
             updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
         }
-        
         setSelectedEvent(null);
         setConfirmMode(null);
     };
 
-    // --- RÉINITIALISATION (CLEAR ALL) ---
     const handleClearAll = async () => {
         if(!window.confirm("ATTENTION : Cela va effacer TOUS les événements de l'agenda.\nÊtes-vous sûr ?")) return;
-        
-        // On vide tout localement
-        updateData(
-            { ...data, calendar_events: [] },
-            { 
-                table: 'calendar_events', 
-                filter: { column: 'user_id', value: data.profile?.id } // Hack pour tout supprimer via App.jsx
-            }
-        );
+        updateData({ ...data, calendar_events: [] }, { table: 'calendar_events', filter: { column: 'user_id', value: data.profile?.id } });
     };
 
     // --- DRAG & DROP ---
@@ -314,19 +385,21 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* CALENDRIER PLEINE LARGEUR */}
+            {/* CALENDRIER */}
             <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 relative">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
                     <div className="flex items-center gap-6"><h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight">{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2><div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner"><button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button><button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button><button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button></div></div>
                 </div>
                 <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
-                    <div className="flex w-full h-full min-h-[1140px]"> {/* W-FULL FORCÉ */}
-                        <div className="w-16 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
-                            <div className="h-14 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
+                    <div className="flex w-full h-full min-h-[1140px]">
+                        {/* COLONNE HEURES */}
+                        <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
+                            <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
                             {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">{h}:00</div>)}
                             <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">00:00</div>
                         </div>
-                        <div className="flex-1 grid grid-cols-7 divide-x divide-slate-100 dark:divide-slate-800">
+                        {/* GRILLE */}
+                        <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
                             {weekDays.map((day, dayIndex) => {
                                 const isToday = isSameDay(day, new Date());
                                 const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
@@ -334,18 +407,42 @@ export default function PlanningManager({ data, updateData }) {
                                 const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
                                 return (
                                     <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
-                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
+                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
                                         <div className="relative h-[1140px]">
-                                            {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-slate-50 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
+                                            {/* LIGNES PLUS VISIBLES EN MODE CLAIR */}
+                                            {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-200 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
                                             {isToday && currentTimeMin > 0 && <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none" style={{ top: `${currentTimeMin}px` }}></div>}
                                             {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
+                                            
                                             {layoutItems.map((item) => {
                                                 const isTodo = item.type === 'todo';
                                                 const dataItem = item.data;
                                                 const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                 const isRecurrent = !!dataItem.recurrence_group_id;
                                                 const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100 border-l-4 border-l-orange-400' : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-100 border-l-4 border-l-emerald-500' : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 border-l-4 border-l-slate-400' : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100 border-l-4 border-l-blue-500';
-                                                return (<div key={`${item.type}-${dataItem.id}`} style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} draggable onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}><span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span><div className="flex items-center gap-1 mt-auto pt-1 opacity-70"><span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div></div>);
+                                                
+                                                return (
+                                                    <div key={`${item.type}-${dataItem.id}`} 
+                                                        style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
+                                                        draggable 
+                                                        onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} 
+                                                        className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}
+                                                    >
+                                                        <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
+                                                        <div className="flex items-center gap-1 mt-auto pt-1 opacity-70 mb-1">
+                                                            <span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>
+                                                            {isRecurrent && <Repeat size={10} />}
+                                                        </div>
+                                                        {/* BARRE DE RESIZE (POIGNÉE) */}
+                                                        {!isTodo && (
+                                                            <div 
+                                                                className="absolute bottom-0 left-0 w-full h-2 cursor-s-resize hover:bg-black/10 dark:hover:bg-white/20 transition-colors z-40"
+                                                                onMouseDown={(e) => startResize(e, dataItem)}
+                                                            ></div>
+                                                        )}
+                                                    </div>
+                                                );
                                             })}
                                         </div>
                                     </div>
