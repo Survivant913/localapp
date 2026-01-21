@@ -16,40 +16,32 @@ export default function PlanningManager({ data, updateData }) {
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
     
-    // Modes de confirmation (Delete ou Update)
-    const [confirmMode, setConfirmMode] = useState(null); // 'ask_delete' | 'ask_update' | null
-    const [pendingUpdate, setPendingUpdate] = useState(null); // Stocke les modifs Drag & Drop ou Form en attente
+    // Modes de confirmation
+    const [confirmMode, setConfirmMode] = useState(null); 
+    const [pendingUpdate, setPendingUpdate] = useState(null); 
 
     // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
     const [previewSlot, setPreviewSlot] = useState(null);
 
-    // --- FORMULAIRE (Création & Édition) ---
+    // Formulaire
     const [eventForm, setEventForm] = useState({ 
-        id: null,
-        title: '', 
-        date: format(new Date(), 'yyyy-MM-dd'),
-        startHour: 9, 
-        startMin: 0,
-        duration: 60, 
-        type: 'event', 
-        recurrence: false, 
-        recurrenceWeeks: 12,
-        recurrenceGroupId: null,
-        color: 'blue' 
+        id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
+        startHour: 9, startMin: 0, duration: 60, 
+        type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue' 
     });
 
-    // --- DONNÉES ---
+    // Données
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
     const scheduledTodos = (data.todos || []).filter(t => t.scheduled_date && !t.completed);
     const backlogTodos = (data.todos || []).filter(t => !t.scheduled_date && !t.completed);
 
-    // --- NAVIGATION ---
+    // Navigation
     const handlePreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // --- LAYOUT ---
+    // Layout
     const getLayoutForDay = (dayItems) => {
         const sorted = [...dayItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
@@ -90,7 +82,7 @@ export default function PlanningManager({ data, updateData }) {
         return result;
     };
 
-    // --- GESTION FORMULAIRE ---
+    // Actions Formulaire
     const openCreateModal = (dayOffset = 0, hour = 9) => {
         const targetDate = addDays(currentWeekStart, dayOffset);
         setEventForm({
@@ -116,7 +108,6 @@ export default function PlanningManager({ data, updateData }) {
         setSelectedEvent(null);
     };
 
-    // --- SAUVEGARDE ---
     const handleSave = () => {
         if (!eventForm.title) return alert("Titre requis");
         const baseDate = parse(eventForm.date, 'yyyy-MM-dd', new Date());
@@ -124,7 +115,7 @@ export default function PlanningManager({ data, updateData }) {
         const newEnd = addMinutes(newStart, eventForm.duration);
 
         if (!eventForm.id) {
-            // CRÉATION
+            // Création
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
             const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null };
             let newEvents = [];
@@ -143,32 +134,76 @@ export default function PlanningManager({ data, updateData }) {
             return;
         }
 
-        // MODIFICATION
+        // Modification
         if (eventForm.recurrenceGroupId) {
             setPendingUpdate({ newStart, newEnd, ...eventForm }); 
-            setConfirmMode('ask_update'); // Popup confirmation
-            setIsCreating(true); // On garde la modal ouverte pour afficher la confirmation
+            setConfirmMode('ask_update'); 
+            setIsCreating(true); 
         } else {
             applyUpdate(eventForm.id, newStart, newEnd, eventForm, 'single');
         }
     };
 
+    // --- C'EST ICI QUE LA LOGIQUE A ÉTÉ CORRIGÉE ---
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updatedEvents = [...events];
-        if (mode === 'series' && formData.recurrenceGroupId) {
-            const originalEvent = events.find(e => e.id === targetId);
-            if (!originalEvent) return;
-            const timeDiff = differenceInMinutes(startObj, parseISO(originalEvent.start_time));
 
+        if (mode === 'series' && formData.recurrenceGroupId) {
+            // LOGIQUE SYNCHRO ABSOLUE : On force l'heure et les minutes sur toute la série
+            // sans se soucier de l'ancien décalage.
+            const targetHours = getHours(startObj);
+            const targetMinutes = getMinutes(startObj);
+            
+            // Calculer si on a changé de jour (Delta Jours)
+            // Utile si l'utilisateur déplace le lundi au mardi, on veut que toute la série glisse d'un jour
+            const originalEvent = events.find(e => e.id === targetId);
+            const originalStart = parseISO(originalEvent.start_time);
+            
+            // Calculer le décalage en jours (pour gérer le changement de jour)
+            // On compare juste les jours de la semaine ou la différence brute
+            const dayDiff = Math.floor((startObj - originalStart) / (1000 * 60 * 60 * 24)); 
+            // Note: dayDiff est approximatif ici mais suffisant pour la plupart des cas Drag&Drop.
+            // Pour être plus précis en Drag & Drop simple, on va souvent rester sur le même jour relatif.
+            
+            // Pour la demande utilisateur (Resynchro des heures), voici la clé :
             updatedEvents = updatedEvents.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
-                    const newEvStart = addMinutes(parseISO(ev.start_time), timeDiff);
+                    let evStart = parseISO(ev.start_time);
+                    
+                    // 1. On applique le décalage de jour si nécessaire (ex: Lundi -> Mardi)
+                    // (On compare la date cible vs la date originale de l'event modifié)
+                    const diffTime = startObj.getTime() - originalStart.getTime();
+                    // On ne touche à la date QUE si le jour a changé.
+                    // Sinon on garde le jour de l'événement courant (ev)
+                    
+                    // MÉTHODE ROBUSTE "ALIGNEMENT HEURE" :
+                    // On garde le jour de 'ev', mais on lui impose l'Heure et les Minutes de 'startObj'
+                    let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    
+                    // Si on a changé de jour (ex: Lundi -> Mardi), on ajoute la différence de jours
+                    // On détecte si l'event maitre a changé de jour
+                    if (!isSameDay(startObj, originalStart)) {
+                         // C'est un changement de jour, on applique le delta brut
+                         newEvStart = addMinutes(evStart, differenceInMinutes(startObj, originalStart));
+                    } else {
+                         // C'est juste un changement d'heure (cas utilisateur), on force l'heure
+                         newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    }
+
                     const newEvEnd = addMinutes(newEvStart, formData.duration);
-                    return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString() };
+                    
+                    return { 
+                        ...ev, 
+                        title: formData.title, 
+                        color: formData.color, 
+                        start_time: newEvStart.toISOString(), 
+                        end_time: newEvEnd.toISOString() 
+                    };
                 }
                 return ev;
             });
         } else {
+            // MODE SINGLE
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
                 ...ev, title: formData.title, color: formData.color,
                 start_time: startObj.toISOString(), end_time: endObj.toISOString()
@@ -180,11 +215,9 @@ export default function PlanningManager({ data, updateData }) {
         setIsCreating(false);
     };
 
-    // --- SUPPRESSION ---
     const handleDeleteRequest = (evt) => {
         if (evt.recurrence_group_id) {
-            setSelectedEvent(evt); 
-            setConfirmMode('ask_delete');
+            setSelectedEvent(evt); setConfirmMode('ask_delete');
         } else {
             if(window.confirm("Supprimer cet événement ?")) performDelete(evt, false);
         }
@@ -202,7 +235,7 @@ export default function PlanningManager({ data, updateData }) {
         setConfirmMode(null);
     };
 
-    // --- DRAG & DROP ---
+    // Drag & Drop
     const onDragStart = (e, item, type) => {
         setDraggedItem({ type, data: item });
         e.dataTransfer.effectAllowed = "move";
@@ -214,15 +247,11 @@ export default function PlanningManager({ data, updateData }) {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
-        let hour = Math.floor(y / 60) + 6;
-        if (hour < 6) hour = 6; if (hour > 23) hour = 23;
-        let rawMinutes = Math.floor(y % 60);
-        let snappedMinutes = Math.round(rawMinutes / 15) * 15;
-
+        let hour = Math.floor(y / 60) + 6; if (hour < 6) hour = 6; if (hour > 23) hour = 23;
+        let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         let duration = 60;
         if (draggedItem?.type === 'event') duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
         else if (draggedItem?.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
-
         setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
     };
 
@@ -243,26 +272,15 @@ export default function PlanningManager({ data, updateData }) {
             const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
             const newEnd = addMinutes(newStart, duration);
 
-            // GESTION RÉCURRENCE DRAG & DROP
             if (evt.recurrence_group_id) {
-                // On prépare le formulaire fantôme pour que la modal puisse fonctionner
                 setEventForm({
-                    id: evt.id, title: evt.title, color: evt.color,
-                    recurrenceGroupId: evt.recurrence_group_id, duration: duration, 
-                    // Champs techniques
-                    date: format(newStart, 'yyyy-MM-dd'), startHour: h, startMin: m,
-                    recurrence: true, recurrenceWeeks: 12, type: 'event'
+                    id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: duration, 
+                    date: format(newStart, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true, recurrenceWeeks: 12, type: 'event'
                 });
-                
-                setPendingUpdate({ 
-                    newStart, newEnd, 
-                    title: evt.title, color: evt.color, 
-                    recurrenceGroupId: evt.recurrence_group_id, duration 
-                });
+                setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration });
                 setConfirmMode('ask_update');
-                setIsCreating(true); // On ouvre la modal en mode "Question"
+                setIsCreating(true);
             } else {
-                // Modif simple sans confirmation
                 const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString() } : ev);
                 updateData({ ...data, calendar_events: updatedEvents });
             }
@@ -281,11 +299,8 @@ export default function PlanningManager({ data, updateData }) {
 
     return (
         <div className="fade-in flex flex-col md:flex-row h-[calc(100vh-2rem)] overflow-hidden bg-white dark:bg-slate-900 font-sans">
-            {/* SIDEBAR */}
             <div className="w-full md:w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none">
-                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                    <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire</h2>
-                </div>
+                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire</h2></div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                     {backlogTodos.map(todo => (
                         <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
@@ -295,22 +310,12 @@ export default function PlanningManager({ data, updateData }) {
                     ))}
                     {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
                 </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                    <button onClick={() => openCreateModal()} className="w-full py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
-                </div>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><button onClick={() => openCreateModal()} className="w-full py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button></div>
             </div>
 
-            {/* CALENDRIER */}
             <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 relative">
                 <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
-                    <div className="flex items-center gap-6">
-                        <h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight">{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
-                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner">
-                            <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button>
-                            <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button>
-                            <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button>
-                        </div>
-                    </div>
+                    <div className="flex items-center gap-6"><h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight">{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2><div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner"><button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button><button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button><button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button></div></div>
                 </div>
                 <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
                     <div className="flex min-w-[800px] pb-20">
@@ -325,35 +330,20 @@ export default function PlanningManager({ data, updateData }) {
                                 const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
                                 const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
                                 const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
-
                                 return (
-                                    <div key={dayIndex} className={`relative min-w-[120px] bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
-                                        onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
-                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
-                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
-                                            <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
-                                        </div>
+                                    <div key={dayIndex} className={`relative min-w-[120px] bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
+                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
                                         <div className="relative h-[1140px]">
                                             {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-slate-50 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
                                             {isToday && currentTimeMin > 0 && <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none" style={{ top: `${currentTimeMin}px` }}></div>}
-                                            {previewSlot && previewSlot.dayIndex === dayIndex && (
-                                                <div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center"
-                                                    style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>
-                                                    <span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span>
-                                                </div>
-                                            )}
+                                            {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
                                             {layoutItems.map((item) => {
                                                 const isTodo = item.type === 'todo';
                                                 const dataItem = item.data;
                                                 const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                 const isRecurrent = !!dataItem.recurrence_group_id;
                                                 const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100 border-l-4 border-l-orange-400' : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-100 border-l-4 border-l-emerald-500' : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 border-l-4 border-l-slate-400' : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100 border-l-4 border-l-blue-500';
-                                                return (
-                                                    <div key={`${item.type}-${dataItem.id}`} style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} draggable onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}>
-                                                        <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
-                                                        <div className="flex items-center gap-1 mt-auto pt-1 opacity-70"><span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
-                                                    </div>
-                                                );
+                                                return (<div key={`${item.type}-${dataItem.id}`} style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} draggable onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}><span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span><div className="flex items-center gap-1 mt-auto pt-1 opacity-70"><span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div></div>);
                                             })}
                                         </div>
                                     </div>
@@ -364,7 +354,6 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
