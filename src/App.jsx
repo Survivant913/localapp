@@ -13,7 +13,8 @@ import ClientHub from './ClientHub';
 import ZenMode from './ZenMode';
 import Workspace from './Workspace'; 
 import GoalsManager from './GoalsManager'; 
-import JournalManager from './JournalManager'; // <--- VÉRIFIE QUE CE FICHIER EXISTE BIEN
+import JournalManager from './JournalManager';
+import PlanningManager from './PlanningManager'; // <--- NOUVEAU IMPORT
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -33,7 +34,8 @@ export default function App() {
   const [data, setData] = useState({
     todos: [], projects: [], 
     goals: [], goal_milestones: [], 
-    journal_folders: [], journal_pages: [], // <--- DONNÉES DU CARNET
+    journal_folders: [], journal_pages: [],
+    calendar_events: [], // <--- NOUVEL ÉTAT POUR LE PLANNING
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
@@ -124,8 +126,9 @@ export default function App() {
         supabase.from('ventures').select('*'),
         supabase.from('goals').select('*'),
         supabase.from('goal_milestones').select('*'),
-        supabase.from('journal_folders').select('*'), // <--- CHARGEMENT CARNET
-        supabase.from('journal_pages').select('*')    // <--- CHARGEMENT CARNET
+        supabase.from('journal_folders').select('*'),
+        supabase.from('journal_pages').select('*'),
+        supabase.from('calendar_events').select('*') // <--- CHARGEMENT PLANNING
       ]);
 
       const [
@@ -134,7 +137,8 @@ export default function App() {
         { data: scheduled }, { data: events }, { data: plannerItems }, { data: safetyBases },
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
         { data: ventures }, { data: goals }, { data: goal_milestones },
-        { data: journal_folders }, { data: journal_pages } // <--- RÉCUPÉRATION DONNÉES
+        { data: journal_folders }, { data: journal_pages },
+        { data: calendar_events } // <--- RÉCUPÉRATION
       ] = results;
 
       // --- CATCH-UP ENGINE ---
@@ -256,7 +260,8 @@ export default function App() {
       const newData = {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
         goals: goals || [], goal_milestones: goal_milestones || [], 
-        journal_folders: journal_folders || [], journal_pages: journal_pages || [], // <--- AJOUT DANS LE STATE
+        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
+        calendar_events: calendar_events || [], // <--- INTÉGRATION DONNÉES PLANNING
         budget: {
           accounts: validAccounts, 
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -309,14 +314,14 @@ export default function App() {
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
       await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline }));
+      // TODOS : Ajout des champs pour le planning
+      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
       await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
       await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
       await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
       
-      // OBJECTIFS (PREMIUM - AVEC TOUS LES CHAMPS)
       await upsertInBatches('goals', data.goals, 50, g => ({ 
           id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, 
           status: g.status, is_favorite: g.is_favorite,
@@ -324,9 +329,14 @@ export default function App() {
       })); 
       await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
       
-      // CARNET (JOURNAL - SAUVEGARDE)
       await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
       await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
+
+      // PLANNING (SAUVEGARDE NOUVELLE)
+      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
+          id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
+          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type 
+      }));
 
       const bases = data.budget.planner.safetyBases;
       const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
@@ -351,10 +361,11 @@ export default function App() {
       case 'notes': return <NotesManager data={data} updateData={updateData} />;
       case 'todo': return <TodoList data={data} updateData={updateData} />;
       case 'goals': return <GoalsManager data={data} updateData={updateData} />;
-      case 'journal': return <JournalManager data={data} updateData={updateData} />; // <--- C'EST ICI QUE C'ÉTAIT MANQUANT !
+      case 'journal': return <JournalManager data={data} updateData={updateData} />;
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
+      case 'planning': return <PlanningManager data={data} updateData={updateData} />; // <--- NOUVELLE ROUTE
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
   };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users, Box, Target, Book // <-- Import de l'icône Book
+  Users, Box, Target, Book, CalendarRange // <-- Ajout de CalendarRange
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -31,13 +31,14 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'workspace', label: 'Workspace', icon: Box }, 
-    { id: 'calendar', label: 'Planning', icon: Calendar },
+    { id: 'planning', label: 'Agenda', icon: CalendarRange }, // <-- LE NOUVEAU PLANNING EST ICI
+    { id: 'calendar', label: 'Calendrier (Mois)', icon: Calendar }, // (L'ancien calendrier reste accessible)
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
     { id: 'clients', label: 'Clients', icon: Users },
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
-    { id: 'journal', label: 'Carnet', icon: Book }, // <-- NOUVEAU MENU ICI
+    { id: 'journal', label: 'Carnet', icon: Book },
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ];
@@ -150,7 +151,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
           {!isCollapsed && (
             <div className="text-center animate-in fade-in duration-500">
-              {/* MODIFICATION ICI : Texte plus petit (text-[8px]) et moins opaque (opacity-30) */}
               <p className="text-[8px] text-slate-600 font-medium uppercase tracking-widest opacity-30 hover:opacity-100 transition-all cursor-default leading-tight">
                 Created by <br/> Henni Mohammed Al Amine
               </p>
