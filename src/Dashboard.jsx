@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import FocusProjectModal from './FocusProjectModal';
 
-// --- COMPOSANT SPARKLINE (Graphique Mini) ---
+// --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
 const SparkLine = ({ data, height = 50 }) => {
     if (!data || !Array.isArray(data) || data.length < 2) return null;
     
@@ -75,15 +75,14 @@ export default function Dashboard({ data, updateData, setView }) {
         return String(accId) === String(dashboardFilter);
     };
 
-    // Solde affiché (dépend du filtre)
+    // Solde affiché (Arrondi strict pour éviter 1450.000004)
     const currentBalanceRaw = transactions
         .filter(t => isRelevantAccount(t.accountId || t.account_id))
         .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     
-    // CORRECTIF 1: Arrondi strict pour éviter les erreurs flottantes (ex: 1450.0000001)
     const currentBalance = Math.round(currentBalanceRaw * 100) / 100;
 
-    // Solde GLOBAL TOTAL (pour projets)
+    // Solde GLOBAL (pour projets)
     const globalTotalBalance = Math.round(
         transactions.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0) 
         * 100
@@ -97,50 +96,36 @@ export default function Dashboard({ data, updateData, setView }) {
         return formatted;
     };
 
-    // CORRECTIF 3: Optimisation Performance Sparkline (O(N) au lieu de O(N²))
+    // Graphique Performant (Hashmap O(N))
     const getSparklineData = () => {
         try {
             const days = 30; 
             const history = [];
             let tempBalance = currentBalance;
             
-            // Étape 1 : Pré-calculer les mouvements par jour (Hash Map)
             const dailyChanges = {};
             const relevantTransactions = transactions.filter(t => isRelevantAccount(t.accountId || t.account_id));
             
             relevantTransactions.forEach(t => {
-                // On utilise une clé date simple "YYYY-MM-DD" ou locale string
                 const d = new Date(t.date);
-                // Astuce: setHours à 0 pour normaliser la clé
                 d.setHours(0,0,0,0);
-                const key = d.getTime(); // Timestamp du début de journée comme clé unique rapide
-                
+                const key = d.getTime();
                 const amount = parseFloat(t.amount || 0);
                 const delta = t.type === 'income' ? amount : -amount;
-                
                 dailyChanges[key] = (dailyChanges[key] || 0) + delta;
             });
 
-            // Étape 2 : Boucle simple sur 30 jours
             let currentDateCursor = new Date();
             currentDateCursor.setHours(0,0,0,0); 
 
             for (let i = 0; i < days; i++) {
-                // On enregistre le solde (arrondi)
                 history.unshift(Number(tempBalance.toFixed(2)));
-                
-                // Pour remonter dans le temps, on SOUSTRAIT ce qui s'est passé ce jour-là
-                // (Si j'ai gagné 10€ aujourd'hui, hier j'avais 10€ de moins)
                 const key = currentDateCursor.getTime();
-                const changeToday = dailyChanges[key] || 0;
-                
-                tempBalance -= changeToday;
-                
-                // Reculer d'un jour
+                tempBalance -= (dailyChanges[key] || 0);
                 currentDateCursor.setDate(currentDateCursor.getDate() - 1);
             }
             return history;
-        } catch (e) { console.error(e); return [0, 0]; }
+        } catch (e) { return [0, 0]; }
     };
     
     const sparkData = getSparklineData();
@@ -185,7 +170,7 @@ export default function Dashboard({ data, updateData, setView }) {
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
-    // CORRECTIF 2: Tri par Priorité Complet (High > Medium > Low > None)
+    // Tri intelligent (High > Medium > Low > None)
     const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
     
     const activeProjects = projects
@@ -193,7 +178,7 @@ export default function Dashboard({ data, updateData, setView }) {
         .sort((a, b) => {
             const weightA = priorityWeight[a.priority] || 0;
             const weightB = priorityWeight[b.priority] || 0;
-            return weightB - weightA; // Descendant (plus haute priorité en premier)
+            return weightB - weightA; 
         })
         .slice(0, 3);
 
@@ -338,17 +323,24 @@ export default function Dashboard({ data, updateData, setView }) {
                                         isFunded = budgetAvailable >= cost;
                                     }
                                     
-                                    let globalScore = p.progress || 0;
-                                    if (cost > 0) globalScore = (globalScore + fundingPercentage) / 2;
+                                    // Clamp des valeurs pour les jauges
+                                    let safeProgress = Math.min(100, Math.max(0, p.progress || 0));
+                                    let safeFunding = Math.min(100, Math.max(0, fundingPercentage));
+                                    
+                                    let globalScore = safeProgress;
+                                    if (cost > 0) globalScore = (safeProgress + safeFunding) / 2;
 
                                     return (
                                         <div key={p.id} className="bg-gray-50 dark:bg-slate-800/50 p-4 md:p-5 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-slate-600 transition-colors cursor-pointer" onClick={() => setView('projects')}>
                                             <div className="flex items-center gap-4 md:gap-5">
-                                                {/* CERCLE GAUCHE */}
+                                                
+                                                {/* --- CERCLE DE PROGRESSION CORRIGÉ (SVG VECTORIEL PRÉCIS) --- */}
                                                 <div className="relative inline-flex items-center justify-center w-12 h-12 md:w-14 md:h-14 shrink-0">
-                                                    <svg className="w-full h-full transform -rotate-90">
-                                                        <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="none" className="text-gray-200 dark:text-slate-700" />
-                                                        <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray={2 * Math.PI * 22} strokeDashoffset={2 * Math.PI * 22 * (1 - globalScore / 100)} className={`transition-all duration-1000 ${globalScore >= 100 ? 'text-green-500' : 'text-blue-500'}`} strokeLinecap="round" />
+                                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                                        {/* Fond du cercle */}
+                                                        <path className="text-gray-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                                        {/* Indicateur de progression */}
+                                                        <path className={`transition-all duration-1000 ${globalScore >= 100 ? 'text-green-500' : 'text-blue-500'}`} strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                                     </svg>
                                                     <span className="absolute text-[10px] md:text-xs font-bold text-gray-700 dark:text-slate-200">{Math.round(globalScore)}%</span>
                                                 </div>
@@ -370,12 +362,13 @@ export default function Dashboard({ data, updateData, setView }) {
                                                         <div className="space-y-1">
                                                             <div className="flex justify-between text-[10px] text-gray-500 dark:text-slate-400">
                                                                 <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
-                                                                <span>{Math.round(p.progress || 0)}%</span>
+                                                                <span>{Math.round(safeProgress)}%</span>
                                                             </div>
+                                                            {/* BARRE LINÉAIRE CORRIGÉE (bornée 0-100) */}
                                                             <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                                                 <div 
-                                                                    className="h-full bg-blue-500 rounded-full" 
-                                                                    style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }}
+                                                                    className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                                                                    style={{ width: `${safeProgress}%` }}
                                                                 ></div>
                                                             </div>
                                                         </div>
@@ -383,12 +376,13 @@ export default function Dashboard({ data, updateData, setView }) {
                                                             <div className="space-y-1">
                                                                 <div className="flex justify-between text-[10px] text-gray-500 dark:text-slate-400">
                                                                     <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
-                                                                    <span className={isFunded ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}>{Math.round(fundingPercentage)}%</span>
+                                                                    <span className={isFunded ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}>{Math.round(safeFunding)}%</span>
                                                                 </div>
+                                                                {/* BARRE LINÉAIRE CORRIGÉE (bornée 0-100) */}
                                                                 <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                                                         <div 
-                                                                            className={`h-full rounded-full ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} 
-                                                                            style={{ width: `${Math.min(100, Math.max(0, fundingPercentage))}%` }}
+                                                                            className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} 
+                                                                            style={{ width: `${safeFunding}%` }}
                                                                         ></div>
                                                                 </div>
                                                             </div>
