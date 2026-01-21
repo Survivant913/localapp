@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil
+  X, Clock, AlertTriangle, Pencil, RotateCcw
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -10,38 +10,33 @@ import {
   setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { supabase } from './supabaseClient';
 
 export default function PlanningManager({ data, updateData }) {
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
-    
-    // Modes de confirmation
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
-
-    // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
     const [previewSlot, setPreviewSlot] = useState(null);
 
-    // Formulaire
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
         startHour: 9, startMin: 0, duration: 60, 
         type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue' 
     });
 
-    // Données
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
     const scheduledTodos = (data.todos || []).filter(t => t.scheduled_date && !t.completed);
     const backlogTodos = (data.todos || []).filter(t => !t.scheduled_date && !t.completed);
 
-    // Navigation
+    // --- NAVIGATION ---
     const handlePreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // Layout
+    // --- LOGIQUE LAYOUT ---
     const getLayoutForDay = (dayItems) => {
         const sorted = [...dayItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
@@ -85,7 +80,7 @@ export default function PlanningManager({ data, updateData }) {
         return result;
     };
 
-    // Actions Formulaire
+    // --- ACTIONS ---
     const openCreateModal = (dayOffset = 0, hour = 9) => {
         const targetDate = addDays(currentWeekStart, dayOffset);
         setEventForm({
@@ -118,7 +113,6 @@ export default function PlanningManager({ data, updateData }) {
         const newEnd = addMinutes(newStart, eventForm.duration);
 
         if (!eventForm.id) {
-            // Création
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
             const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null };
             let newEvents = [];
@@ -137,7 +131,6 @@ export default function PlanningManager({ data, updateData }) {
             return;
         }
 
-        // Modification
         if (eventForm.recurrenceGroupId) {
             setPendingUpdate({ newStart, newEnd, ...eventForm }); 
             setConfirmMode('ask_update'); 
@@ -151,8 +144,7 @@ export default function PlanningManager({ data, updateData }) {
         let updatedEvents = [...events];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            // LOGIQUE DE RESYNCHRONISATION TOTALE
-            // 1. On identifie le jour de la semaine cible (0 = Dimanche, 1 = Lundi...)
+            // MODE SÉRIE : ÉCRASEMENT TOTAL (SYNCHRO)
             const targetDayOfWeek = startObj.getDay();
             const targetHours = getHours(startObj);
             const targetMinutes = getMinutes(startObj);
@@ -161,63 +153,32 @@ export default function PlanningManager({ data, updateData }) {
             updatedEvents = updatedEvents.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let evStart = parseISO(ev.start_time);
-                    
-                    // Si on a changé de jour de la semaine (ex: déplacé du Lundi au Mardi)
-                    // On doit ajuster la date de base de chaque événement
                     const currentDayOfWeek = evStart.getDay();
+                    
                     if (currentDayOfWeek !== targetDayOfWeek) {
-                        const diff = targetDayOfWeek - currentDayOfWeek;
-                        // Correction pour le passage de semaine (ex: Dimanche -> Lundi)
-                        // Mais pour faire simple, on va juste prendre la différence brute en jours
-                        // Attention: Cela suppose que la série est hebdomadaire simple.
-                        
-                        // Méthode plus sûre : Calculer le delta exact depuis l'événement ORIGINAL cliqué
-                        // Mais comme on veut tout forcer, on va simplement caler l'heure.
-                        
-                        // Si le jour change, on ajoute la différence de jours
-                        // Pour gérer le changement de jour correctement, il faut connaître le décalage de jours exact appliqué
-                        // entre "l'ancien événement cible" et le "nouvel événement cible"
-                        
-                        // On retrouve l'événement qu'on est en train de modifier dans la base (avant modif)
-                        const eventInDb = events.find(e => e.id === targetId);
-                        if (eventInDb) {
-                             const dbStart = parseISO(eventInDb.start_time);
-                             // Calcul de la différence de jours entre l'ancienne position et la nouvelle
-                             const daysDelta = differenceInMinutes(startOfDay(startObj), startOfDay(dbStart)) / 60 / 24;
-                             if (Math.abs(daysDelta) >= 1) {
-                                 evStart = addDays(evStart, Math.round(daysDelta));
-                             }
+                        const originalEvent = events.find(e => e.id === targetId);
+                        if(originalEvent) {
+                            const originalStart = parseISO(originalEvent.start_time);
+                            const daysDelta = Math.round((startOfDay(startObj) - startOfDay(originalStart)) / (1000 * 60 * 60 * 24));
+                            evStart = addDays(evStart, daysDelta);
                         }
                     }
-
-                    // On FORCE l'heure et les minutes
+                    
                     let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
                     let newEvEnd = addMinutes(newEvStart, targetDuration);
 
-                    return { 
-                        ...ev, 
-                        title: formData.title, 
-                        color: formData.color, 
-                        start_time: newEvStart.toISOString(), 
-                        end_time: newEvEnd.toISOString() 
-                    };
+                    return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString() };
                 }
                 return ev;
             });
         } else {
-            // MODE SINGLE : On modifie l'événement MAIS on enlève son lien de groupe pour éviter les bugs futurs
-            // C'est ça qui empêchait la suppression : un événement "mutant" restait lié au groupe.
-            // Maintenant, si tu modifies "Juste celui-là", il devient indépendant.
+            // MODE SINGLE : DÉTACHEMENT
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
-                ...ev, 
-                title: formData.title, 
-                color: formData.color,
-                start_time: startObj.toISOString(), 
-                end_time: endObj.toISOString(),
-                recurrence_group_id: null // <-- ON LE DÉTACHE DU GROUPE
+                ...ev, title: formData.title, color: formData.color,
+                start_time: startObj.toISOString(), end_time: endObj.toISOString(),
+                recurrence_group_id: null 
             } : ev);
         }
-
         updateData({ ...data, calendar_events: updatedEvents });
         setConfirmMode(null);
         setPendingUpdate(null);
@@ -226,7 +187,6 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleDeleteRequest = (evt) => {
         if (!evt) return;
-        // Si l'événement a un groupe, on demande. Sinon delete direct.
         if (evt.recurrence_group_id) {
             setSelectedEvent(evt); setConfirmMode('ask_delete');
         } else {
@@ -234,15 +194,25 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    const performDelete = (evt, series) => {
+    // --- CORRECTION SUPPRESSION SÉRIE ---
+    const performDelete = async (evt, series) => {
         if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
 
         let updatedEvents = [...events];
         
         if (series && evt.recurrence_group_id) {
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
+            try {
+                await supabase.from('calendar_events').delete().eq('recurrence_group_id', evt.recurrence_group_id);
+            } catch (err) {
+                console.error("Erreur suppression série:", err);
+            }
         } else {
             updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
+            setSelectedEvent(null);
+            setConfirmMode(null);
+            return;
         }
         
         updateData({ ...data, calendar_events: updatedEvents });
@@ -250,14 +220,26 @@ export default function PlanningManager({ data, updateData }) {
         setConfirmMode(null);
     };
 
-    // Drag & Drop
+    // --- RÉINITIALISATION (CLEAR ALL) ---
+    const handleClearAll = async () => {
+        if(!window.confirm("ATTENTION : Cela va effacer TOUS les événements de l'agenda.\nÊtes-vous sûr ?")) return;
+        try {
+            await supabase.from('calendar_events').delete().neq('id', 0); // Hack pour tout supprimer
+            updateData({ ...data, calendar_events: [] });
+            alert("Agenda réinitialisé !");
+        } catch (err) {
+            console.error("Erreur reset:", err);
+            alert("Erreur lors de la réinitialisation.");
+        }
+    };
+
+    // --- DRAG & DROP ---
     const onDragStart = (e, item, type) => {
         setDraggedItem({ type, data: item });
         e.dataTransfer.effectAllowed = "move";
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         e.dataTransfer.setDragImage(img, 0, 0);
     };
-
     const onDragOver = (e, dayIndex) => {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
@@ -269,12 +251,10 @@ export default function PlanningManager({ data, updateData }) {
         else if (draggedItem?.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
         setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
     };
-
     const onDrop = (e, day) => {
         e.preventDefault();
         setPreviewSlot(null);
         if (!draggedItem || !previewSlot) return;
-
         const [h, m] = previewSlot.timeLabel.split(':').map(Number);
         const newStart = setMinutes(setHours(day, h), m);
 
@@ -286,7 +266,6 @@ export default function PlanningManager({ data, updateData }) {
             const evt = draggedItem.data;
             const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
             const newEnd = addMinutes(newStart, duration);
-
             if (evt.recurrence_group_id) {
                 setEventForm({
                     id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: duration, 
@@ -302,7 +281,6 @@ export default function PlanningManager({ data, updateData }) {
         }
         setDraggedItem(null);
     };
-
     const unscheduleTodo = (todo) => {
         updateData({ ...data, todos: data.todos.map(t => t.id === todo.id ? { ...t, scheduled_date: null } : t) });
         setSelectedEvent(null);
@@ -313,7 +291,8 @@ export default function PlanningManager({ data, updateData }) {
     const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date()) - (6 * 60);
 
     return (
-        <div className="fade-in flex flex-col md:flex-row h-[calc(100vh-2rem)] overflow-hidden bg-white dark:bg-slate-900 font-sans">
+        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-white dark:bg-slate-900 font-sans">
+            {/* SIDEBAR */}
             <div className="w-full md:w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none">
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire</h2></div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
@@ -325,19 +304,23 @@ export default function PlanningManager({ data, updateData }) {
                     ))}
                     {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
                 </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><button onClick={() => openCreateModal()} className="w-full py-3.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button></div>
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                    <button onClick={() => openCreateModal()} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
+                    <button onClick={handleClearAll} className="w-full py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-2 border border-red-100"><RotateCcw size={14}/> Tout Effacer</button>
+                </div>
             </div>
 
+            {/* CALENDRIER PLEINE LARGEUR */}
             <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 relative">
-                <div className="flex items-center justify-between px-8 py-5 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
                     <div className="flex items-center gap-6"><h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight">{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2><div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner"><button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button><button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button><button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button></div></div>
                 </div>
                 <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
-                    <div className="flex min-w-[800px] pb-20">
-                        <div className="w-20 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
+                    <div className="flex w-full h-full min-h-[1140px]"> {/* W-FULL FORCÉ */}
+                        <div className="w-16 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
                             <div className="h-14 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
-                            {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-4 pt-1 relative -top-2.5">{h}:00</div>)}
-                            <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-4 pt-1 relative -top-2.5">00:00</div>
+                            {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">{h}:00</div>)}
+                            <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">00:00</div>
                         </div>
                         <div className="flex-1 grid grid-cols-7 divide-x divide-slate-100 dark:divide-slate-800">
                             {weekDays.map((day, dayIndex) => {
@@ -346,7 +329,7 @@ export default function PlanningManager({ data, updateData }) {
                                 const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
                                 const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
                                 return (
-                                    <div key={dayIndex} className={`relative min-w-[120px] bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
+                                    <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
                                         <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
                                         <div className="relative h-[1140px]">
                                             {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-slate-50 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
@@ -369,6 +352,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
+            {/* MODALS (Identique précédent mais avec fix suppression) */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">

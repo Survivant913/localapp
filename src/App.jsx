@@ -335,7 +335,8 @@ export default function App() {
       // PLANNING (SAUVEGARDE NOUVELLE)
       await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
           id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
-          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type 
+          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
+          recurrence_group_id: e.recurrence_group_id 
       }));
 
       const bases = data.budget.planner.safetyBases;
@@ -370,7 +371,8 @@ export default function App() {
     }
   };
 
-  const isWorkspace = currentView === 'workspace';
+  // MODIFICATION ICI POUR PLEINE LARGEUR
+  const isWorkspace = currentView === 'workspace' || currentView === 'planning';
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
