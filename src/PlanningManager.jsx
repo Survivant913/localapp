@@ -7,7 +7,7 @@ import {
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
   isSameDay, parseISO, getHours, getMinutes, 
-  setHours, setMinutes, addMinutes, differenceInMinutes, parse
+  setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -31,7 +31,7 @@ export default function PlanningManager({ data, updateData }) {
         type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue' 
     });
 
-    // Données
+    // Données sécurisées
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
     const scheduledTodos = (data.todos || []).filter(t => t.scheduled_date && !t.completed);
     const backlogTodos = (data.todos || []).filter(t => !t.scheduled_date && !t.completed);
@@ -46,8 +46,11 @@ export default function PlanningManager({ data, updateData }) {
         const sorted = [...dayItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
         sorted.forEach((item) => {
+            if(!item.startStr || !item.endStr) return;
             const start = parseISO(item.startStr);
             const end = parseISO(item.endStr);
+            if (!isValid(start) || !isValid(end)) return;
+
             const startMin = getHours(start) * 60 + getMinutes(start);
             const duration = differenceInMinutes(end, start);
             const top = Math.max(0, startMin - (6 * 60)); 
@@ -144,54 +147,49 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- C'EST ICI QUE LA LOGIQUE A ÉTÉ CORRIGÉE ---
+    // --- CORRECTION MAJEURE DU BUG DE SYNCHRONISATION ---
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updatedEvents = [...events];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            // LOGIQUE SYNCHRO ABSOLUE : On force l'heure et les minutes sur toute la série
-            // sans se soucier de l'ancien décalage.
+            // On récupère les infos cibles : HEURE et MINUTES précises
             const targetHours = getHours(startObj);
             const targetMinutes = getMinutes(startObj);
+            const targetDuration = formData.duration;
             
-            // Calculer si on a changé de jour (Delta Jours)
-            // Utile si l'utilisateur déplace le lundi au mardi, on veut que toute la série glisse d'un jour
+            // On doit aussi savoir si on a changé de JOUR de la semaine
             const originalEvent = events.find(e => e.id === targetId);
+            
+            // Sécurité crash si event introuvable
+            if (!originalEvent) {
+                setIsCreating(false);
+                setConfirmMode(null);
+                return; 
+            }
+
             const originalStart = parseISO(originalEvent.start_time);
             
-            // Calculer le décalage en jours (pour gérer le changement de jour)
-            // On compare juste les jours de la semaine ou la différence brute
-            const dayDiff = Math.floor((startObj - originalStart) / (1000 * 60 * 60 * 24)); 
-            // Note: dayDiff est approximatif ici mais suffisant pour la plupart des cas Drag&Drop.
-            // Pour être plus précis en Drag & Drop simple, on va souvent rester sur le même jour relatif.
-            
-            // Pour la demande utilisateur (Resynchro des heures), voici la clé :
+            // Calcul du décalage en jours (ex: Lundi -> Mardi = +1 jour)
+            // On utilise setHours(0,0,0,0) pour comparer les jours purs
+            const startDayZero = new Date(startObj); startDayZero.setHours(0,0,0,0);
+            const originalDayZero = new Date(originalStart); originalDayZero.setHours(0,0,0,0);
+            const dayDiff = Math.round((startDayZero - originalDayZero) / (1000 * 60 * 60 * 24));
+
             updatedEvents = updatedEvents.map(ev => {
+                // On applique à TOUT le groupe, même ceux déjà modifiés auparavant
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let evStart = parseISO(ev.start_time);
                     
-                    // 1. On applique le décalage de jour si nécessaire (ex: Lundi -> Mardi)
-                    // (On compare la date cible vs la date originale de l'event modifié)
-                    const diffTime = startObj.getTime() - originalStart.getTime();
-                    // On ne touche à la date QUE si le jour a changé.
-                    // Sinon on garde le jour de l'événement courant (ev)
-                    
-                    // MÉTHODE ROBUSTE "ALIGNEMENT HEURE" :
-                    // On garde le jour de 'ev', mais on lui impose l'Heure et les Minutes de 'startObj'
-                    let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
-                    
-                    // Si on a changé de jour (ex: Lundi -> Mardi), on ajoute la différence de jours
-                    // On détecte si l'event maitre a changé de jour
-                    if (!isSameDay(startObj, originalStart)) {
-                         // C'est un changement de jour, on applique le delta brut
-                         newEvStart = addMinutes(evStart, differenceInMinutes(startObj, originalStart));
-                    } else {
-                         // C'est juste un changement d'heure (cas utilisateur), on force l'heure
-                         newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    // 1. Appliquer le décalage de jours (si on a changé de jour)
+                    if (dayDiff !== 0) {
+                        evStart = addDays(evStart, dayDiff);
                     }
 
-                    const newEvEnd = addMinutes(newEvStart, formData.duration);
-                    
+                    // 2. FORCER l'heure et les minutes (Synchronisation absolue)
+                    // C'est ça qui corrige le bug : on n'ajoute pas +1h, on DIT "C'est 11h00".
+                    let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    let newEvEnd = addMinutes(newEvStart, targetDuration);
+
                     return { 
                         ...ev, 
                         title: formData.title, 
@@ -203,12 +201,13 @@ export default function PlanningManager({ data, updateData }) {
                 return ev;
             });
         } else {
-            // MODE SINGLE
+            // MODE SINGLE : On modifie juste l'événement, mais ON GARDE LE GROUPE (pour pouvoir le rattraper plus tard si besoin)
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
                 ...ev, title: formData.title, color: formData.color,
                 start_time: startObj.toISOString(), end_time: endObj.toISOString()
             } : ev);
         }
+
         updateData({ ...data, calendar_events: updatedEvents });
         setConfirmMode(null);
         setPendingUpdate(null);
@@ -216,6 +215,7 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const handleDeleteRequest = (evt) => {
+        if (!evt) return;
         if (evt.recurrence_group_id) {
             setSelectedEvent(evt); setConfirmMode('ask_delete');
         } else {
@@ -223,14 +223,29 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
+    // --- CORRECTION DU CRASH SUR SUPPRESSION ---
     const performDelete = (evt, series) => {
-        let updatedEvents = events;
-        if (series && evt.recurrence_group_id) {
-            updatedEvents = events.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
-        } else {
-            updatedEvents = events.filter(e => e.id !== evt.id);
+        if (!evt) {
+             // Sécurité crash
+             setConfirmMode(null);
+             setSelectedEvent(null);
+             return;
         }
-        updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: series ? null : evt.id });
+
+        let updatedEvents = [...events]; // Copie propre
+        
+        if (series && evt.recurrence_group_id) {
+            // Suppression par ID de groupe (Robuste)
+            updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
+        } else {
+            // Suppression par ID unique
+            updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
+        }
+        
+        // On passe null comme ID pour forcer une sauvegarde globale de la table 'calendar_events'
+        // au lieu d'une suppression par ID unique côté serveur, ce qui évite les conflits
+        updateData({ ...data, calendar_events: updatedEvents });
+        
         setSelectedEvent(null);
         setConfirmMode(null);
     };
