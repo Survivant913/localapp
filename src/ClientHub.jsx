@@ -20,7 +20,6 @@ export default function ClientHub({ data, updateData }) {
     const profile = data.profile || {}; 
 
     // --- CORRECTION NOM ENTREPRISE ---
-    // On cherche d'abord 'company_name' (format DataSettings), sinon le nom utilisateur, sinon le défaut.
     const companyDisplayName = profile.company_name || profile.companyName || profile.name || "Votre Entreprise";
 
     // --- UTILS ---
@@ -452,6 +451,18 @@ export default function ClientHub({ data, updateData }) {
                                     <button onClick={addItem} className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-600 rounded text-xs font-bold text-slate-500 hover:text-blue-500 hover:border-blue-500 transition-colors">+ Ajouter ligne</button>
                                 </div>
                             </div>
+                            
+                            {/* --- NOUVEAU CHAMP : ÉDITION DES NOTES --- */}
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Notes / Conditions</label>
+                                <textarea
+                                    value={doc.notes}
+                                    onChange={e => setDoc({...doc, notes: e.target.value})}
+                                    className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white h-20 outline-none resize-none"
+                                    placeholder="Conditions de paiement, mentions légales..."
+                                />
+                            </div>
+
                         </div>
                     </div>
 
@@ -578,7 +589,21 @@ export default function ClientHub({ data, updateData }) {
             const year = new Date().getFullYear();
             const count = invoices.length + 1;
             const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
-            const newInvoice = { ...quote, id: Date.now(), number: newInvoiceNumber, status: 'Draft', date: new Date().toISOString(), type: 'invoice' };
+            
+            // --- FIX : Réinitialisation des dates et des notes pour la facture ---
+            const newInvoice = { 
+                ...quote, 
+                id: Date.now(), 
+                number: newInvoiceNumber, 
+                status: 'Draft', 
+                date: new Date().toISOString(), 
+                // Réinitialise l'échéance à J+30
+                dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+                type: 'invoice',
+                // Enlève la mention "Validité devis"
+                notes: 'Paiement à réception.' 
+            };
+
             updateData({ ...data, invoices: [newInvoice, ...invoices] });
             alert(`Facture brouillon ${newInvoiceNumber} créée !`);
         };
