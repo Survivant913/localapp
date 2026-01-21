@@ -36,7 +36,7 @@ export default function PlanningManager({ data, updateData }) {
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
         startHour: 9, startMin: 0, duration: 60, 
         type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
-        isAllDay: false // <--- NOUVEAU CHAMP
+        isAllDay: false 
     });
 
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
@@ -106,7 +106,6 @@ export default function PlanningManager({ data, updateData }) {
             setConfirmMode('ask_update');
             setIsCreating(true);
         } else {
-            // Force is_all_day à false si on resize manuellement (car c'est forcément temporel)
             const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString(), is_all_day: false } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
         }
@@ -128,10 +127,7 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- LAYOUT ---
     const getLayoutForDay = (dayItems) => {
-        // IMPORTANT : On ne place dans la grille QUE les événements qui ont une heure
-        // Les "All Day" sont gérés séparément
         const timedItems = dayItems.filter(item => !item.data.is_all_day);
-
         const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
         sorted.forEach((item) => {
@@ -153,8 +149,7 @@ export default function PlanningManager({ data, updateData }) {
                     let evDuration = differenceInMinutes(evEnd, evStart);
                     if (resizingEvent && ev.data.id === resizingEvent.id) evDuration = resizingEvent.currentDuration;
                     
-                    const myTop = top;
-                    const myBottom = top + duration;
+                    const myTop = top; const myBottom = top + duration;
                     const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
                     const otherTop = Math.max(0, otherStartMin - (6 * 60));
                     const otherBottom = otherTop + evDuration;
@@ -184,13 +179,13 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     // --- ACTIONS ---
-    const openCreateModal = (dayOffset = 0, hour = 9) => {
+    const openCreateModal = (dayOffset = 0, hour = 9, isAllDay = false, title = '') => {
         const targetDate = addDays(currentWeekStart, dayOffset);
         setEventForm({
-            id: null, title: '', date: format(targetDate, 'yyyy-MM-dd'),
+            id: null, title: title, date: format(targetDate, 'yyyy-MM-dd'),
             startHour: hour, startMin: 0, duration: 60,
             type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
-            isAllDay: false
+            isAllDay: isAllDay
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -217,7 +212,6 @@ export default function PlanningManager({ data, updateData }) {
         
         let newStart, newEnd;
         if (eventForm.isAllDay) {
-            // On fixe à 00:00 - 23:59 pour la date choisie
             newStart = setMinutes(setHours(baseDate, 0), 0);
             newEnd = setMinutes(setHours(baseDate, 23), 59);
         } else {
@@ -255,7 +249,6 @@ export default function PlanningManager({ data, updateData }) {
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updatedEvents = [...eventsRef.current];
-
         if (mode === 'series' && formData.recurrenceGroupId) {
             const targetDayOfWeek = startObj.getDay();
             const targetHours = getHours(startObj);
@@ -274,7 +267,6 @@ export default function PlanningManager({ data, updateData }) {
                             evStart = addDays(evStart, daysDelta);
                         }
                     }
-                    
                     let newEvStart, newEvEnd;
                     if (formData.isAllDay) {
                         newEvStart = setMinutes(setHours(evStart, 0), 0);
@@ -283,7 +275,6 @@ export default function PlanningManager({ data, updateData }) {
                         newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
                         newEvEnd = addMinutes(newEvStart, targetDuration);
                     }
-
                     return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay };
                 }
                 return ev;
@@ -304,11 +295,8 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleDeleteRequest = (evt) => {
         if (!evt) return;
-        if (evt.recurrence_group_id) {
-            setSelectedEvent(evt); setConfirmMode('ask_delete');
-        } else {
-            if(window.confirm("Supprimer cet événement ?")) performDelete(evt, false);
-        }
+        if (evt.recurrence_group_id) { setSelectedEvent(evt); setConfirmMode('ask_delete'); } 
+        else { if(window.confirm("Supprimer cet événement ?")) performDelete(evt, false); }
     };
 
     const performDelete = (evt, series) => {
@@ -337,21 +325,15 @@ export default function PlanningManager({ data, updateData }) {
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         e.dataTransfer.setDragImage(img, 0, 0);
     };
-    const onDragOver = (e, dayIndex) => {
-        e.preventDefault();
-        const rect = e.currentTarget.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        let hour = Math.floor(y / 60) + 6; if (hour < 6) hour = 6; if (hour > 23) hour = 23;
-        let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
-        let duration = 60;
-        if (draggedItem?.type === 'event') duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
-        else if (draggedItem?.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
-        setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
-    };
-    const onDrop = (e, day) => {
+
+    const onDragOver = (e) => { e.preventDefault(); };
+
+    // Drop sur la grille (Heures)
+    const onDropGrid = (e, day) => {
         e.preventDefault();
         setPreviewSlot(null);
         if (!draggedItem || !previewSlot) return;
+        
         const [h, m] = previewSlot.timeLabel.split(':').map(Number);
         const newStart = setMinutes(setHours(day, h), m);
 
@@ -363,6 +345,8 @@ export default function PlanningManager({ data, updateData }) {
             const evt = draggedItem.data;
             const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
             const newEnd = addMinutes(newStart, duration);
+            
+            // Si on dépose sur la grille, on enlève le mode "All Day"
             if (evt.recurrence_group_id) {
                 setEventForm({
                     id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: duration, 
@@ -378,6 +362,52 @@ export default function PlanningManager({ data, updateData }) {
         }
         setDraggedItem(null);
     };
+
+    // NOUVEAU : Drop sur la zone "Toute la journée"
+    const onDropAllDay = (e, day) => {
+        e.preventDefault();
+        if (!draggedItem) return;
+
+        if (draggedItem.type === 'event') {
+            // Conversion en "Toute la journée"
+            const evt = draggedItem.data;
+            const start = setMinutes(setHours(day, 0), 0);
+            const end = setMinutes(setHours(day, 23), 59);
+            
+            if (evt.recurrence_group_id) {
+                // Pour une récurrence, on demande confirmation via la modal pré-remplie
+                setEventForm({
+                    id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, 
+                    date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true
+                });
+                setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
+                setConfirmMode('ask_update');
+                setIsCreating(true);
+            } else {
+                // Update direct pour event unique
+                const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: end.toISOString(), is_all_day: true } : ev);
+                updateData({ ...data, calendar_events: updatedEvents });
+            }
+        } 
+        else if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
+            // Drop d'une tâche -> On ouvre la création d'événement pré-remplie en mode All Day
+            // (Car une tâche "To-Do" standard ne peut pas être "All Day" sans heure dans notre système actuel)
+            openCreateModal(differenceInMinutes(day, currentWeekStart) / (24*60), 9, true, draggedItem.data.text);
+        }
+        setDraggedItem(null);
+    };
+
+    const updatePreviewSlot = (e, dayIndex) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        let hour = Math.floor(y / 60) + 6; if (hour < 6) hour = 6; if (hour > 23) hour = 23;
+        let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
+        let duration = 60;
+        if (draggedItem?.type === 'event') duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
+        else if (draggedItem?.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
+        setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
+    };
+
     const unscheduleTodo = (todo) => {
         updateData({ ...data, todos: data.todos.map(t => t.id === todo.id ? { ...t, scheduled_date: null } : t) });
         setSelectedEvent(null);
@@ -389,37 +419,24 @@ export default function PlanningManager({ data, updateData }) {
 
     const durationOptions = [];
     for (let m = 15; m <= 720; m += 15) {
-        const h = Math.floor(m / 60);
-        const min = m % 60;
-        let label = '';
-        if (h > 0) label += `${h}h`;
-        if (min > 0) label += ` ${min}`;
-        if (h === 0) label += ' min';
+        const h = Math.floor(m / 60); const min = m % 60;
+        let label = ''; if (h > 0) label += `${h}h`; if (min > 0) label += ` ${min}`; if (h === 0) label += ' min';
         durationOptions.push(<option key={m} value={m}>{label}</option>);
     }
 
     return (
         <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
-            {/* SIDEBAR (Rétractable) */}
             {showSidebar && (
                 <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none animate-in slide-in-from-left-5">
                     <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center">
-                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
-                            <CheckCircle2 size={20} className="text-blue-600"/> Tâches
-                        </h2>
-                        {/* BOUTON FERMER SIDEBAR */}
-                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-                            <PanelLeftClose size={18} />
-                        </button>
+                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches</h2>
+                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><PanelLeftClose size={18} /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                         {backlogTodos.map(todo => (
                             <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
-                                <div className="flex justify-between items-start pl-2">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span>
-                                    <GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/>
-                                </div>
+                                <div className="flex justify-between items-start pl-2"><span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span><GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/></div>
                             </div>
                         ))}
                         {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
@@ -431,26 +448,12 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* MAIN CONTENT AVEC CADRE ESTHÉTIQUE */}
             <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
-                
-                {/* CADRE DU CALENDRIER */}
                 <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
-                    
-                    {/* EN-TÊTE INTÉGRÉ */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
                         <div className="flex items-center gap-4 md:gap-6">
-                            {/* BOUTON OUVRIR SIDEBAR (Si fermée) */}
-                            {!showSidebar && (
-                                <button onClick={() => setShowSidebar(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Ouvrir la liste des tâches">
-                                    <PanelLeftOpen size={20} />
-                                </button>
-                            )}
-                            
-                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2">
-                                <Calendar className="text-blue-500" size={24}/>
-                                {format(currentWeekStart, 'MMMM yyyy', { locale: fr })}
-                            </h2>
+                            {!showSidebar && (<button onClick={() => setShowSidebar(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Ouvrir la liste des tâches"><PanelLeftOpen size={20} /></button>)}
+                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2"><Calendar className="text-blue-500" size={24}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
                             <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
                                 <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button>
                                 <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300 border-x border-transparent hover:border-gray-200 dark:hover:border-slate-600 mx-1">Aujourd'hui</button>
@@ -459,15 +462,14 @@ export default function PlanningManager({ data, updateData }) {
                         </div>
                     </div>
 
-                    {/* GRILLE SCROLLABLE */}
                     <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
                         <div className="flex w-full h-full min-h-[1140px]">
                             
-                            {/* COLONNE HEURES AVEC LABEL "TOUTE LA JRN" */}
+                            {/* COLONNE GAUCHE (Heures) */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                {/* Zone Header "All Day" */}
-                                <div className="h-28 border-b border-gray-200 dark:border-slate-800 flex items-end justify-center pb-2 text-[10px] font-bold text-slate-400">
-                                    TOUTE<br/>LA JRN
+                                {/* Zone Header "All Day" AGRANDIE */}
+                                <div className="min-h-[5rem] border-b border-gray-200 dark:border-slate-800 flex items-center justify-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900">
+                                    <span className="-rotate-90">TOUTE<br/>JRN</span>
                                 </div>
                                 {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">{h}:00</div>)}
                                 <div className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">00:00</div>
@@ -480,43 +482,46 @@ export default function PlanningManager({ data, updateData }) {
                                     const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
                                     const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
                                     
-                                    // SÉPARATION ALL-DAY / TIMED
                                     const allDayItems = rawEvents.filter(item => item.data.is_all_day === true);
                                     const timedItems = [...rawEvents.filter(item => !item.data.is_all_day), ...rawTodos];
-                                    
                                     const layoutItems = getLayoutForDay(timedItems);
 
                                     return (
-                                        <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
-                                            {/* EN-TÊTE JOUR */}
-                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
+                                        <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
+                                            
+                                            {/* EN-TÊTE JOUR (Date) */}
+                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
                                                 <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
                                             </div>
 
-                                            {/* ZONE "TOUTE LA JOURNÉE" */}
-                                            <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+                                            {/* ZONE "TOUTE LA JOURNÉE" (Drop Zone) */}
+                                            <div 
+                                                className={`min-h-[5rem] border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDrop={(e) => onDropAllDay(e, day)}
+                                            >
                                                 {allDayItems.map(item => (
                                                     <div 
                                                         key={item.data.id} 
+                                                        draggable
+                                                        onDragStart={(e) => onDragStart(e, item.data, 'event')}
                                                         onClick={(e) => handleEventClick(e, item.data, 'event')} 
-                                                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 border-l-emerald-500 text-emerald-800' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 border-l-slate-500 text-slate-700' : 'bg-blue-100 border-blue-200 border-l-blue-500 text-blue-800'}`}
+                                                        className={`text-[10px] font-bold px-2 py-1.5 rounded-md border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all shadow-sm ${item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 border-l-emerald-500 text-emerald-800' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 border-l-slate-500 text-slate-700' : 'bg-blue-100 border-blue-200 border-l-blue-500 text-blue-800'}`}
                                                     >
                                                         {item.data.title}
                                                     </div>
                                                 ))}
                                             </div>
                                             
-                                            <div className="relative h-[1140px]">
-                                                {/* LIGNES DE GRILLE */}
+                                            {/* GRILLE HEURES (Drop Zone) */}
+                                            <div 
+                                                className={`relative h-[1140px] transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
+                                                onDragOver={(e) => { e.preventDefault(); updatePreviewSlot(e, dayIndex); }} 
+                                                onDrop={(e) => onDropGrid(e, day)}
+                                            >
                                                 {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
-                                                
-                                                {isToday && currentTimeMin > 0 && (
-                                                    <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}>
-                                                        <div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div>
-                                                    </div>
-                                                )}
-
+                                                {isToday && currentTimeMin > 0 && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
                                                 
                                                 {layoutItems.map((item) => {
@@ -524,35 +529,14 @@ export default function PlanningManager({ data, updateData }) {
                                                     const dataItem = item.data;
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                     const isRecurrent = !!dataItem.recurrence_group_id;
-                                                    const colorClass = isTodo 
-                                                        ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
-                                                        : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100'
-                                                        : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300'
-                                                        : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
-                                                    
                                                     const isResizingAny = !!resizeRef.current;
+                                                    const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500' : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
 
                                                     return (
-                                                        <div key={`${item.type}-${dataItem.id}`} 
-                                                            style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
-                                                            draggable={!isResizingAny} 
-                                                            onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
-                                                            onClick={(e) => handleEventClick(e, dataItem, item.type)}
-                                                            className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}
-                                                        >
+                                                        <div key={`${item.type}-${dataItem.id}`} style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => handleEventClick(e, dataItem, item.type)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
-                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1">
-                                                                <span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>
-                                                                {isRecurrent && <Repeat size={10} />}
-                                                            </div>
-                                                            {!isTodo && (
-                                                                <div 
-                                                                    className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100"
-                                                                    onMouseDown={(e) => startResize(e, dataItem)}
-                                                                >
-                                                                    <div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div>
-                                                                </div>
-                                                            )}
+                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
+                                                            {!isTodo && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
                                                         </div>
                                                     );
                                                 })}
@@ -566,7 +550,6 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
@@ -587,7 +570,6 @@ export default function PlanningManager({ data, updateData }) {
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     
-                                    {/* CHECKBOX TOUTE LA JOURNÉE (AJOUT) */}
                                     <div className="flex items-center gap-2 py-2">
                                         <input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"/>
                                         <label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label>
