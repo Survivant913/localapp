@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar,
+  PanelLeftClose, PanelLeftOpen // <--- NOUVEAUX ICÔNES
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -17,6 +18,7 @@ export default function PlanningManager({ data, updateData }) {
     const [isCreating, setIsCreating] = useState(false);
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
+    const [showSidebar, setShowSidebar] = useState(true); // <--- NOUVEL ÉTAT POUR LA VISIBILITÉ SIDEBAR
     
     // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
@@ -25,8 +27,6 @@ export default function PlanningManager({ data, updateData }) {
     // Resize
     const [resizingEvent, setResizingEvent] = useState(null); 
     const resizeRef = useRef(null);
-    
-    // Sécurité Anti-Conflit
     const ignoreNextClick = useRef(false);
     
     const eventsRef = useRef(data.calendar_events || []);
@@ -48,20 +48,16 @@ export default function PlanningManager({ data, updateData }) {
             if (!resizeRef.current) return;
             const { startY, startDuration } = resizeRef.current;
             const deltaY = e.clientY - startY; 
-            
             let newDuration = startDuration + deltaY;
             newDuration = Math.round(newDuration / 15) * 15;
             if (newDuration < 15) newDuration = 15; 
-
             setResizingEvent(prev => prev ? ({ ...prev, currentDuration: newDuration }) : null);
         };
 
         const handleMouseUp = () => {
             if (!resizeRef.current) return;
-            
             ignoreNextClick.current = true;
             setTimeout(() => { ignoreNextClick.current = false; }, 200);
-
             finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
             setResizingEvent(null);
             resizeRef.current = null;
@@ -71,7 +67,6 @@ export default function PlanningManager({ data, updateData }) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
         }
-
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
@@ -87,7 +82,6 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); 
         e.preventDefault(); 
-
         const startDuration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
         const initData = { 
             id: evt.id, startY: e.clientY, startDuration: startDuration, 
@@ -167,7 +161,6 @@ export default function PlanningManager({ data, updateData }) {
             }
             if (!placed) columns.push([{ ...item, top, height: Math.max(15, duration) }]);
         });
-        
         const result = [];
         columns.forEach((col, colIndex) => {
             col.forEach(item => {
@@ -382,41 +375,54 @@ export default function PlanningManager({ data, updateData }) {
 
     return (
         <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
-            {/* SIDEBAR */}
-            <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none">
-                <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                    <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
-                        <CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire
-                    </h2>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                    {backlogTodos.map(todo => (
-                        <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
-                            <div className="flex justify-between items-start pl-2">
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span>
-                                <GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/>
+            {/* SIDEBAR (Rétractable) */}
+            {showSidebar && (
+                <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none animate-in slide-in-from-left-5">
+                    <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center">
+                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
+                            <CheckCircle2 size={20} className="text-blue-600"/> Tâches
+                        </h2>
+                        {/* BOUTON FERMER SIDEBAR */}
+                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+                            <PanelLeftClose size={18} />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                        {backlogTodos.map(todo => (
+                            <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
+                                <div className="flex justify-between items-start pl-2">
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span>
+                                    <GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                    {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
+                        ))}
+                        {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
+                    </div>
+                    <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                        <button onClick={() => openCreateModal()} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
+                        <button onClick={handleClearAll} className="w-full py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-2 border border-red-100"><RotateCcw size={14}/> Tout Effacer</button>
+                    </div>
                 </div>
-                <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
-                    <button onClick={() => openCreateModal()} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
-                    <button onClick={handleClearAll} className="w-full py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-2 border border-red-100"><RotateCcw size={14}/> Tout Effacer</button>
-                </div>
-            </div>
+            )}
 
             {/* MAIN CONTENT AVEC CADRE ESTHÉTIQUE */}
-            <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0">
+            <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
                 
-                {/* CADRE DU CALENDRIER (THE "CARD") */}
+                {/* CADRE DU CALENDRIER */}
                 <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
                     
                     {/* EN-TÊTE INTÉGRÉ */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
-                        <div className="flex items-center gap-6">
-                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2">
+                        <div className="flex items-center gap-4 md:gap-6">
+                            {/* BOUTON OUVRIR SIDEBAR (Si fermée) */}
+                            {!showSidebar && (
+                                <button onClick={() => setShowSidebar(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Ouvrir la liste des tâches">
+                                    <PanelLeftOpen size={20} />
+                                </button>
+                            )}
+                            
+                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2">
                                 <Calendar className="text-blue-500" size={24}/>
                                 {format(currentWeekStart, 'MMMM yyyy', { locale: fr })}
                             </h2>
@@ -455,32 +461,29 @@ export default function PlanningManager({ data, updateData }) {
                                             </div>
                                             
                                             <div className="relative h-[1140px]">
-                                                {/* LIGNES DE GRILLE RENFORCÉES */}
+                                                {/* LIGNES DE GRILLE */}
                                                 {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
                                                 
-                                                {/* LIGNE ROUGE (HEURE ACTUELLE) */}
                                                 {isToday && currentTimeMin > 0 && (
                                                     <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}>
                                                         <div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div>
                                                     </div>
                                                 )}
 
-                                                {/* PREVIEW SLOT (DRAG) */}
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
                                                 
-                                                {/* ÉVÉNEMENTS */}
                                                 {layoutItems.map((item) => {
                                                     const isTodo = item.type === 'todo';
                                                     const dataItem = item.data;
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                     const isRecurrent = !!dataItem.recurrence_group_id;
-                                                    const isResizingAny = !!resizeRef.current;
-
                                                     const colorClass = isTodo 
                                                         ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
-                                                        : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-100 border-l-4 border-l-emerald-500'
-                                                        : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-500 dark:text-slate-300 border-l-4 border-l-slate-500'
-                                                        : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-500 dark:text-blue-100 border-l-4 border-l-blue-600';
+                                                        : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100'
+                                                        : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300'
+                                                        : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
+                                                    
+                                                    const isResizingAny = !!resizeRef.current;
 
                                                     return (
                                                         <div key={`${item.type}-${dataItem.id}`} 
@@ -516,7 +519,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS (Reste inchangé en logique) */}
+            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
