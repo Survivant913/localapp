@@ -18,13 +18,13 @@ export default function PlanningManager({ data, updateData }) {
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
     
-    // Drag & Drop (Déplacement)
+    // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
     const [previewSlot, setPreviewSlot] = useState(null);
 
-    // Resize (Redimensionnement)
-    const [resizingEvent, setResizingEvent] = useState(null); // { id, startY, startDuration, currentDuration }
-    const resizeRef = useRef(null); // Pour suivre les valeurs dans les event listeners
+    // Resize
+    const [resizingEvent, setResizingEvent] = useState(null); 
+    const resizeRef = useRef(null);
 
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
@@ -47,7 +47,7 @@ export default function PlanningManager({ data, updateData }) {
             // Snap 15 min
             let newDuration = startDuration + deltaMinutes;
             newDuration = Math.round(newDuration / 15) * 15;
-            if (newDuration < 15) newDuration = 15; // Minimum 15 min
+            if (newDuration < 15) newDuration = 15; 
 
             setResizingEvent(prev => ({ ...prev, currentDuration: newDuration }));
         };
@@ -56,10 +56,12 @@ export default function PlanningManager({ data, updateData }) {
             if (!resizeRef.current) return;
             const { event, currentDuration } = resizeRef.current;
             
-            // Fin du resize -> Sauvegarde
-            finishResize(event, resizeRef.current.currentDuration || currentDuration);
-            
-            setResizingEvent(null);
+            // Appliquer le changement seulement si la durée a changé
+            if (currentDuration && currentDuration !== resizeRef.current.startDuration) {
+                finishResize(event, currentDuration);
+            } else {
+                setResizingEvent(null); // Annuler si pas de changement
+            }
             resizeRef.current = null;
         };
 
@@ -75,7 +77,10 @@ export default function PlanningManager({ data, updateData }) {
     }, [resizingEvent]);
 
     const startResize = (e, evt) => {
-        e.stopPropagation(); // Empêcher le drag & drop de démarrer
+        // STOPPER TOUTE PROPAGATION POUR ÉVITER LE DRAG
+        e.stopPropagation(); 
+        e.preventDefault(); 
+
         const startDuration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
         const initData = { 
             id: evt.id, 
@@ -92,7 +97,6 @@ export default function PlanningManager({ data, updateData }) {
         const start = parseISO(evt.start_time);
         const newEnd = addMinutes(start, newDuration);
 
-        // Si récurrent -> Demander confirmation
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
@@ -101,10 +105,11 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration });
             setConfirmMode('ask_update');
             setIsCreating(true);
+            setResizingEvent(null); // On ferme l'état resize car la modal prend le relais
         } else {
-            // Sinon update direct
             const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
+            setResizingEvent(null);
         }
     };
 
@@ -126,7 +131,7 @@ export default function PlanningManager({ data, updateData }) {
             const startMin = getHours(start) * 60 + getMinutes(start);
             let duration = differenceInMinutes(end, start);
             
-            // Si c'est l'élément en train d'être redimensionné, on utilise la durée temporaire
+            // Utiliser la durée temporaire si resize en cours
             if (resizingEvent && item.data.id === resizingEvent.id) {
                 duration = resizingEvent.currentDuration;
             }
@@ -138,12 +143,10 @@ export default function PlanningManager({ data, updateData }) {
                 if (!col.some(ev => {
                     const evStart = parseISO(ev.startStr);
                     const evEnd = parseISO(ev.endStr);
-                    // Collision logic
-                    // On doit aussi prendre en compte la durée visuelle si resize
+                    
                     let evDuration = differenceInMinutes(evEnd, evStart);
                     if (resizingEvent && ev.data.id === resizingEvent.id) evDuration = resizingEvent.currentDuration;
                     
-                    // Recalcul simple de collision basé sur les positions
                     const myTop = top;
                     const myBottom = top + duration;
                     
@@ -250,7 +253,6 @@ export default function PlanningManager({ data, updateData }) {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let evStart = parseISO(ev.start_time);
                     const currentDayOfWeek = evStart.getDay();
-                    
                     if (currentDayOfWeek !== targetDayOfWeek) {
                         const originalEvent = events.find(e => e.id === targetId);
                         if(originalEvent) {
@@ -259,10 +261,8 @@ export default function PlanningManager({ data, updateData }) {
                             evStart = addDays(evStart, daysDelta);
                         }
                     }
-                    
                     let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
                     let newEvEnd = addMinutes(newEvStart, targetDuration);
-
                     return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString() };
                 }
                 return ev;
@@ -310,6 +310,11 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG & DROP ---
     const onDragStart = (e, item, type) => {
+        // SI ON REDIMENSIONNE, ON BLOQUE LE DRAG
+        if (resizingEvent) {
+            e.preventDefault();
+            return;
+        }
         setDraggedItem({ type, data: item });
         e.dataTransfer.effectAllowed = "move";
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -365,6 +370,18 @@ export default function PlanningManager({ data, updateData }) {
     const hours = Array.from({ length: 18 }).map((_, i) => i + 6);
     const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date()) - (6 * 60);
 
+    // --- GÉNÉRATION DYNAMIQUE DES OPTIONS DE DURÉE (Jusqu'à 12h) ---
+    const durationOptions = [];
+    for (let m = 15; m <= 720; m += 15) { // 720 min = 12h
+        const h = Math.floor(m / 60);
+        const min = m % 60;
+        let label = '';
+        if (h > 0) label += `${h}h`;
+        if (min > 0) label += ` ${min}`;
+        if (h === 0) label += ' min';
+        durationOptions.push(<option key={m} value={m}>{label}</option>);
+    }
+
     return (
         <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-white dark:bg-slate-900 font-sans">
             {/* SIDEBAR */}
@@ -392,13 +409,11 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
                 <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
                     <div className="flex w-full h-full min-h-[1140px]">
-                        {/* COLONNE HEURES */}
                         <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
                             <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
                             {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">{h}:00</div>)}
                             <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">00:00</div>
                         </div>
-                        {/* GRILLE */}
                         <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
                             {weekDays.map((day, dayIndex) => {
                                 const isToday = isSameDay(day, new Date());
@@ -409,7 +424,6 @@ export default function PlanningManager({ data, updateData }) {
                                     <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
                                         <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
                                         <div className="relative h-[1140px]">
-                                            {/* LIGNES PLUS VISIBLES EN MODE CLAIR */}
                                             {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-200 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
                                             {isToday && currentTimeMin > 0 && <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none" style={{ top: `${currentTimeMin}px` }}></div>}
                                             {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
@@ -421,10 +435,13 @@ export default function PlanningManager({ data, updateData }) {
                                                 const isRecurrent = !!dataItem.recurrence_group_id;
                                                 const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100 border-l-4 border-l-orange-400' : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-100 border-l-4 border-l-emerald-500' : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 border-l-4 border-l-slate-400' : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100 border-l-4 border-l-blue-500';
                                                 
+                                                // CONDITION CRUCIALE : Si on redimensionne, on désactive le drag sur le parent
+                                                const isResizingAny = !!resizingEvent;
+
                                                 return (
                                                     <div key={`${item.type}-${dataItem.id}`} 
                                                         style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
-                                                        draggable 
+                                                        draggable={!isResizingAny} // <--- C'EST LE FIX MAGIQUE
                                                         onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
                                                         onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} 
                                                         className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}
@@ -434,12 +451,13 @@ export default function PlanningManager({ data, updateData }) {
                                                             <span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>
                                                             {isRecurrent && <Repeat size={10} />}
                                                         </div>
-                                                        {/* BARRE DE RESIZE (POIGNÉE) */}
                                                         {!isTodo && (
                                                             <div 
-                                                                className="absolute bottom-0 left-0 w-full h-2 cursor-s-resize hover:bg-black/10 dark:hover:bg-white/20 transition-colors z-40"
+                                                                className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/10 dark:hover:bg-white/20 transition-colors z-50 flex items-center justify-center"
                                                                 onMouseDown={(e) => startResize(e, dataItem)}
-                                                            ></div>
+                                                            >
+                                                                <div className="w-8 h-1 bg-black/10 dark:bg-white/10 rounded-full"></div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 );
@@ -475,7 +493,12 @@ export default function PlanningManager({ data, updateData }) {
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 19}).map((_, i) => <option key={i} value={i+6}>{i+6}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
-                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1h</option><option value={90}>1h 30</option><option value={120}>2h</option><option value={180}>3h</option><option value={240}>4h</option></select></div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label>
+                                            <select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">
+                                                {durationOptions}
+                                            </select>
+                                        </div>
                                     </div>
                                     {!eventForm.id && (
                                         <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
