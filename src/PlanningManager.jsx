@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -26,10 +26,9 @@ export default function PlanningManager({ data, updateData }) {
     const [resizingEvent, setResizingEvent] = useState(null); 
     const resizeRef = useRef(null);
     
-    // SÉCURITÉ ANTI-CONFLIT CLIC/RESIZE
+    // Sécurité Anti-Conflit
     const ignoreNextClick = useRef(false);
     
-    // Ref Données
     const eventsRef = useRef(data.calendar_events || []);
     useEffect(() => { eventsRef.current = data.calendar_events || []; }, [data.calendar_events]);
 
@@ -48,7 +47,7 @@ export default function PlanningManager({ data, updateData }) {
         const handleMouseMove = (e) => {
             if (!resizeRef.current) return;
             const { startY, startDuration } = resizeRef.current;
-            const deltaY = e.clientY - startY;
+            const deltaY = e.clientY - startY; 
             
             let newDuration = startDuration + deltaY;
             newDuration = Math.round(newDuration / 15) * 15;
@@ -60,9 +59,8 @@ export default function PlanningManager({ data, updateData }) {
         const handleMouseUp = () => {
             if (!resizeRef.current) return;
             
-            // ACTIVER LE BOUCLIER ANTI-CLIC
             ignoreNextClick.current = true;
-            setTimeout(() => { ignoreNextClick.current = false; }, 200); // 200ms de sécurité
+            setTimeout(() => { ignoreNextClick.current = false; }, 200);
 
             finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
             setResizingEvent(null);
@@ -118,10 +116,8 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- GESTION CLIC SÉCURISÉ ---
     const handleEventClick = (e, itemData, type) => {
         e.stopPropagation();
-        // SI LE BOUCLIER EST ACTIF (on vient de resize), ON NE FAIT RIEN
         if (ignoreNextClick.current) {
             ignoreNextClick.current = false;
             return;
@@ -316,7 +312,6 @@ export default function PlanningManager({ data, updateData }) {
         updateData({ ...data, calendar_events: [] }, { table: 'calendar_events', filter: { column: 'user_id', value: data.profile?.id } });
     };
 
-    // --- DRAG & DROP ---
     const onDragStart = (e, item, type) => {
         if (resizeRef.current) { e.preventDefault(); return; }
         setDraggedItem({ type, data: item });
@@ -386,100 +381,142 @@ export default function PlanningManager({ data, updateData }) {
     }
 
     return (
-        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-white dark:bg-slate-900 font-sans">
+        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
             {/* SIDEBAR */}
-            <div className="w-full md:w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none">
-                <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"><h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire</h2></div>
+            <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none">
+                <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                    <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
+                        <CheckCircle2 size={20} className="text-blue-600"/> Tâches à faire
+                    </h2>
+                </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                     {backlogTodos.map(todo => (
-                        <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
-                            <div className="flex justify-between items-start pl-2"><span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span><GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/></div>
+                        <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
+                            <div className="flex justify-between items-start pl-2">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span>
+                                <GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/>
+                            </div>
                         </div>
                     ))}
                     {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
                 </div>
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
                     <button onClick={() => openCreateModal()} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
                     <button onClick={handleClearAll} className="w-full py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-2 border border-red-100"><RotateCcw size={14}/> Tout Effacer</button>
                 </div>
             </div>
 
-            {/* CALENDRIER */}
-            <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-900 relative">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
-                    <div className="flex items-center gap-6"><h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight">{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2><div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner"><button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button><button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button><button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button></div></div>
-                </div>
-                <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
-                    <div className="flex w-full h-full min-h-[1140px]">
-                        <div className="w-16 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
-                            <div className="h-14 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
-                            {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">{h}:00</div>)}
-                            <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">00:00</div>
+            {/* MAIN CONTENT AVEC CADRE ESTHÉTIQUE */}
+            <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0">
+                
+                {/* CADRE DU CALENDRIER (THE "CARD") */}
+                <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
+                    
+                    {/* EN-TÊTE INTÉGRÉ */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
+                        <div className="flex items-center gap-6">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2">
+                                <Calendar className="text-blue-500" size={24}/>
+                                {format(currentWeekStart, 'MMMM yyyy', { locale: fr })}
+                            </h2>
+                            <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
+                                <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button>
+                                <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300 border-x border-transparent hover:border-gray-200 dark:hover:border-slate-600 mx-1">Aujourd'hui</button>
+                                <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button>
+                            </div>
                         </div>
-                        <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
-                            {weekDays.map((day, dayIndex) => {
-                                const isToday = isSameDay(day, new Date());
-                                const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
-                                const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
-                                const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
-                                return (
-                                    <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
-                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
-                                        <div className="relative h-[1140px]">
-                                            {/* GRILLE PLUS PRONONCÉE */}
-                                            {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-200 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
-                                            {isToday && currentTimeMin > 0 && <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none" style={{ top: `${currentTimeMin}px` }}></div>}
-                                            {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
-                                            
-                                            {layoutItems.map((item) => {
-                                                const isTodo = item.type === 'todo';
-                                                const dataItem = item.data;
-                                                const isDraggingThis = draggedItem?.data?.id === dataItem.id;
-                                                const isRecurrent = !!dataItem.recurrence_group_id;
-                                                // NOUVEAU DESIGN : CARD STYLE + BORDER LEFT
-                                                const colorClass = isTodo 
-                                                    ? 'bg-orange-50 border-orange-400 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
-                                                    : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100'
-                                                    : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300'
-                                                    : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
-                                                
-                                                const isResizingAny = !!resizeRef.current;
+                    </div>
 
-                                                return (
-                                                    <div key={`${item.type}-${dataItem.id}`} 
-                                                        style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
-                                                        draggable={!isResizingAny} 
-                                                        onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
-                                                        onClick={(e) => handleEventClick(e, dataItem, item.type)}
-                                                        className={`absolute rounded-r-md rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass}`}
-                                                    >
-                                                        <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
-                                                        <div className="flex items-center gap-1 mt-auto pt-1 opacity-70 mb-1">
-                                                            <span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')}</span>
-                                                            {isRecurrent && <Repeat size={10} />}
-                                                        </div>
-                                                        {!isTodo && (
-                                                            <div 
-                                                                className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center"
-                                                                onMouseDown={(e) => startResize(e, dataItem)}
-                                                            >
-                                                                <div className="w-6 h-1 bg-gray-300 dark:bg-slate-600 rounded-full"></div>
-                                                            </div>
-                                                        )}
+                    {/* GRILLE SCROLLABLE */}
+                    <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
+                        <div className="flex w-full h-full min-h-[1140px]">
+                            
+                            {/* COLONNE HEURES */}
+                            <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
+                                <div className="h-14 border-b border-gray-200 dark:border-slate-800"></div>
+                                {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">{h}:00</div>)}
+                                <div className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">00:00</div>
+                            </div>
+
+                            {/* GRILLE JOURS */}
+                            <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
+                                {weekDays.map((day, dayIndex) => {
+                                    const isToday = isSameDay(day, new Date());
+                                    const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
+                                    const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
+                                    const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
+                                    return (
+                                        <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
+                                            {/* EN-TÊTE JOUR */}
+                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
+                                                <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
+                                            </div>
+                                            
+                                            <div className="relative h-[1140px]">
+                                                {/* LIGNES DE GRILLE RENFORCÉES */}
+                                                {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
+                                                
+                                                {/* LIGNE ROUGE (HEURE ACTUELLE) */}
+                                                {isToday && currentTimeMin > 0 && (
+                                                    <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}>
+                                                        <div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div>
                                                     </div>
-                                                );
-                                            })}
+                                                )}
+
+                                                {/* PREVIEW SLOT (DRAG) */}
+                                                {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
+                                                
+                                                {/* ÉVÉNEMENTS */}
+                                                {layoutItems.map((item) => {
+                                                    const isTodo = item.type === 'todo';
+                                                    const dataItem = item.data;
+                                                    const isDraggingThis = draggedItem?.data?.id === dataItem.id;
+                                                    const isRecurrent = !!dataItem.recurrence_group_id;
+                                                    const isResizingAny = !!resizeRef.current;
+
+                                                    const colorClass = isTodo 
+                                                        ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
+                                                        : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-100 border-l-4 border-l-emerald-500'
+                                                        : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-500 dark:text-slate-300 border-l-4 border-l-slate-500'
+                                                        : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-500 dark:text-blue-100 border-l-4 border-l-blue-600';
+
+                                                    return (
+                                                        <div key={`${item.type}-${dataItem.id}`} 
+                                                            style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
+                                                            draggable={!isResizingAny} 
+                                                            onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
+                                                            onClick={(e) => handleEventClick(e, dataItem, item.type)}
+                                                            className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}
+                                                        >
+                                                            <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
+                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1">
+                                                                <span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>
+                                                                {isRecurrent && <Repeat size={10} />}
+                                                            </div>
+                                                            {!isTodo && (
+                                                                <div 
+                                                                    className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100"
+                                                                    onMouseDown={(e) => startResize(e, dataItem)}
+                                                                >
+                                                                    <div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* MODALS */}
+            {/* MODALS (Reste inchangé en logique) */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
