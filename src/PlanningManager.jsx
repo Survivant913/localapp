@@ -26,7 +26,10 @@ export default function PlanningManager({ data, updateData }) {
     const [resizingEvent, setResizingEvent] = useState(null); 
     const resizeRef = useRef(null);
     
-    // REF CRUCIALE POUR ÉVITER LE BUG DE RETOUR EN ARRIÈRE
+    // SÉCURITÉ ANTI-CONFLIT CLIC/RESIZE
+    const ignoreNextClick = useRef(false);
+    
+    // Ref Données
     const eventsRef = useRef(data.calendar_events || []);
     useEffect(() => { eventsRef.current = data.calendar_events || []; }, [data.calendar_events]);
 
@@ -45,39 +48,23 @@ export default function PlanningManager({ data, updateData }) {
         const handleMouseMove = (e) => {
             if (!resizeRef.current) return;
             const { startY, startDuration } = resizeRef.current;
-            const deltaY = e.clientY - startY; // 1px = 1min
+            const deltaY = e.clientY - startY;
             
-            // Calculer nouvelle durée (arrondie à 15min)
             let newDuration = startDuration + deltaY;
             newDuration = Math.round(newDuration / 15) * 15;
             if (newDuration < 15) newDuration = 15; 
 
-            // Mise à jour visuelle uniquement
             setResizingEvent(prev => prev ? ({ ...prev, currentDuration: newDuration }) : null);
         };
 
         const handleMouseUp = () => {
             if (!resizeRef.current) return;
             
-            // On récupère la durée finale calculée
-            const finalDuration = resizeRef.current.currentDuration || resizeRef.current.startDuration;
-            
-            // Si on a l'état state en sync, on l'utilise, sinon on recalcule (sécurité)
-            // Ici on va faire confiance au dernier render ou au recalcul si besoin
-            // Pour simplifier : on appelle finishResize avec ce qu'on a.
-            
-            // Note: resizingEvent state might be stale inside this closure if dependencies aren't perfect,
-            // but resizeRef is always fresh.
-            // On doit cependant récupérer la dernière valeur de "newDuration" stockée dans le state ou recalculer.
-            // Le plus simple : on déclenche finishResize avec la valeur stockée dans une variable locale si on pouvait,
-            // mais ici on va utiliser setResizingEvent pour déclencher la fin proprement ou lire le state.
-            
-            // Astuce : On va lire la durée depuis le state resizingEvent via un callback fonctionnel ou passer la main.
-            // MAIS comme on est dans un event listener window, le state est souvent stale.
-            // On va utiliser une ref pour stocker la "currentDuration" en temps réel.
-            
+            // ACTIVER LE BOUCLIER ANTI-CLIC
+            ignoreNextClick.current = true;
+            setTimeout(() => { ignoreNextClick.current = false; }, 200); // 200ms de sécurité
+
             finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
-            
             setResizingEvent(null);
             resizeRef.current = null;
         };
@@ -93,7 +80,6 @@ export default function PlanningManager({ data, updateData }) {
         };
     }, [resizingEvent]);
 
-    // On utilise un Ref pour stocker la durée pendant le drag pour que le mouseUp y accède sans délai
     useEffect(() => {
         if (resizingEvent && resizeRef.current) {
             resizeRef.current.currentDurationTemp = resizingEvent.currentDuration;
@@ -106,12 +92,8 @@ export default function PlanningManager({ data, updateData }) {
 
         const startDuration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
         const initData = { 
-            id: evt.id, 
-            startY: e.clientY, 
-            startDuration: startDuration, 
-            currentDuration: startDuration,
-            currentDurationTemp: startDuration,
-            event: evt 
+            id: evt.id, startY: e.clientY, startDuration: startDuration, 
+            currentDuration: startDuration, currentDurationTemp: startDuration, event: evt 
         };
         setResizingEvent(initData);
         resizeRef.current = initData;
@@ -119,11 +101,9 @@ export default function PlanningManager({ data, updateData }) {
 
     const finishResize = (evt, newDuration) => {
         if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
-
         const start = parseISO(evt.start_time);
         const newEnd = addMinutes(start, newDuration);
 
-        // Si récurrent -> Demander confirmation
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
@@ -133,10 +113,20 @@ export default function PlanningManager({ data, updateData }) {
             setConfirmMode('ask_update');
             setIsCreating(true);
         } else {
-            // FIX: Utiliser eventsRef.current pour être sûr d'avoir la liste à jour
             const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
         }
+    };
+
+    // --- GESTION CLIC SÉCURISÉ ---
+    const handleEventClick = (e, itemData, type) => {
+        e.stopPropagation();
+        // SI LE BOUCLIER EST ACTIF (on vient de resize), ON NE FAIT RIEN
+        if (ignoreNextClick.current) {
+            ignoreNextClick.current = false;
+            return;
+        }
+        setSelectedEvent({ type, data: itemData });
     };
 
     // --- NAVIGATION ---
@@ -156,20 +146,14 @@ export default function PlanningManager({ data, updateData }) {
 
             const startMin = getHours(start) * 60 + getMinutes(start);
             let duration = differenceInMinutes(end, start);
-            
-            // Utiliser la durée temporaire si resize en cours
-            if (resizingEvent && item.data.id === resizingEvent.id) {
-                duration = resizingEvent.currentDuration;
-            }
+            if (resizingEvent && item.data.id === resizingEvent.id) duration = resizingEvent.currentDuration;
 
             const top = Math.max(0, startMin - (6 * 60)); 
-            
             let placed = false;
             for(let col of columns) {
                 if (!col.some(ev => {
                     const evStart = parseISO(ev.startStr);
                     const evEnd = parseISO(ev.endStr);
-                    
                     let evDuration = differenceInMinutes(evEnd, evStart);
                     if (resizingEvent && ev.data.id === resizingEvent.id) evDuration = resizingEvent.currentDuration;
                     
@@ -178,7 +162,6 @@ export default function PlanningManager({ data, updateData }) {
                     const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
                     const otherTop = Math.max(0, otherStartMin - (6 * 60));
                     const otherBottom = otherTop + evDuration;
-
                     return (myTop < otherBottom && myBottom > otherTop);
                 })) {
                     col.push({ ...item, top, height: Math.max(15, duration) });
@@ -266,7 +249,7 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
-        let updatedEvents = [...eventsRef.current]; // Use Ref for fresh data
+        let updatedEvents = [...eventsRef.current];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
             const targetDayOfWeek = startObj.getDay();
@@ -316,7 +299,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const performDelete = (evt, series) => {
         if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
-        let updatedEvents = [...eventsRef.current]; // Use Ref
+        let updatedEvents = [...eventsRef.current];
         if (series && evt.recurrence_group_id) {
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
             updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } });
@@ -335,11 +318,7 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG & DROP ---
     const onDragStart = (e, item, type) => {
-        // FIX CRUCIAL : Si resizeRef est actif, on ne drag pas !
-        if (resizeRef.current) {
-            e.preventDefault();
-            return;
-        }
+        if (resizeRef.current) { e.preventDefault(); return; }
         setDraggedItem({ type, data: item });
         e.dataTransfer.effectAllowed = "move";
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -395,7 +374,6 @@ export default function PlanningManager({ data, updateData }) {
     const hours = Array.from({ length: 18 }).map((_, i) => i + 6);
     const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date()) - (6 * 60);
 
-    // --- GÉNÉRATION DURÉE JUSQU'À 12H ---
     const durationOptions = [];
     for (let m = 15; m <= 720; m += 15) {
         const h = Math.floor(m / 60);
@@ -434,8 +412,8 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
                 <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
                     <div className="flex w-full h-full min-h-[1140px]">
-                        <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
-                            <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
+                        <div className="w-16 flex-shrink-0 border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 sticky left-0 z-20">
+                            <div className="h-14 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
                             {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">{h}:00</div>)}
                             <div className="h-[60px] text-[11px] font-medium text-slate-400 text-right pr-2 pt-1 relative -top-2.5">00:00</div>
                         </div>
@@ -447,8 +425,9 @@ export default function PlanningManager({ data, updateData }) {
                                 const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
                                 return (
                                     <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
-                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
+                                        <div className={`h-14 flex flex-col items-center justify-center border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}><span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span><span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span></div>
                                         <div className="relative h-[1140px]">
+                                            {/* GRILLE PLUS PRONONCÉE */}
                                             {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-200 dark:border-slate-800/40 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
                                             {isToday && currentTimeMin > 0 && <div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none" style={{ top: `${currentTimeMin}px` }}></div>}
                                             {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
@@ -458,18 +437,22 @@ export default function PlanningManager({ data, updateData }) {
                                                 const dataItem = item.data;
                                                 const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                 const isRecurrent = !!dataItem.recurrence_group_id;
-                                                const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100 border-l-4 border-l-orange-400' : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-100 border-l-4 border-l-emerald-500' : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 border-l-4 border-l-slate-400' : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100 border-l-4 border-l-blue-500';
+                                                // NOUVEAU DESIGN : CARD STYLE + BORDER LEFT
+                                                const colorClass = isTodo 
+                                                    ? 'bg-orange-50 border-orange-400 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
+                                                    : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100'
+                                                    : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300'
+                                                    : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
                                                 
-                                                // FIX: On désactive le drag sur l'élément si un resize est en cours
                                                 const isResizingAny = !!resizeRef.current;
 
                                                 return (
                                                     <div key={`${item.type}-${dataItem.id}`} 
                                                         style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
-                                                        draggable={!isResizingAny} // <--- FIX DU DRAG VS RESIZE
+                                                        draggable={!isResizingAny} 
                                                         onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
-                                                        onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} 
-                                                        className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}
+                                                        onClick={(e) => handleEventClick(e, dataItem, item.type)}
+                                                        className={`absolute rounded-r-md rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass}`}
                                                     >
                                                         <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
                                                         <div className="flex items-center gap-1 mt-auto pt-1 opacity-70 mb-1">
@@ -478,10 +461,10 @@ export default function PlanningManager({ data, updateData }) {
                                                         </div>
                                                         {!isTodo && (
                                                             <div 
-                                                                className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/10 dark:hover:bg-white/20 transition-colors z-50 flex items-center justify-center"
+                                                                className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center"
                                                                 onMouseDown={(e) => startResize(e, dataItem)}
                                                             >
-                                                                <div className="w-8 h-1 bg-black/10 dark:bg-white/10 rounded-full"></div>
+                                                                <div className="w-6 h-1 bg-gray-300 dark:bg-slate-600 rounded-full"></div>
                                                             </div>
                                                         )}
                                                     </div>
