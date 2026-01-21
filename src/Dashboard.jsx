@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
-  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag
-} from 'lucide-react';
+  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock
+} from 'lucide-react'; // J'ai ajouté 'Clock' aux imports
 import FocusProjectModal from './FocusProjectModal';
 
 // --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
@@ -130,7 +130,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 2. CALCUL "À VENIR" ---
+    // --- 2. CALCUL "À VENIR" (FINANCIER) ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
@@ -157,6 +157,19 @@ export default function Dashboard({ data, updateData, setView }) {
         } catch (e) { return []; }
     };
     const upcomingList = getUpcomingEvents();
+
+    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER) ---
+    const getNextCalendarEvents = () => {
+        try {
+            const now = new Date();
+            const calEvents = Array.isArray(data.calendar_events) ? data.calendar_events : [];
+            return calEvents
+                .filter(e => new Date(e.start_time) > now) // Uniquement le futur
+                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time)) // Trier par date
+                .slice(0, 4); // Prendre les 4 premiers
+        } catch (e) { return []; }
+    };
+    const nextCalendarEvents = getNextCalendarEvents();
 
     // --- 3. ACTIONS & LOGIQUE PROJET ---
     const toggleTodo = (id) => {
@@ -261,11 +274,11 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                 </div>
 
-                {/* CARTE À VENIR */}
+                {/* CARTE À VENIR (FINANCE) */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-gray-200 dark:border-slate-700 flex flex-col">
                     <div className="flex items-center gap-2 mb-6 text-purple-600 dark:text-purple-400">
                         <Calendar size={20}/>
-                        <h3 className="font-bold text-gray-800 dark:text-white">À venir</h3>
+                        <h3 className="font-bold text-gray-800 dark:text-white">Opérations à venir</h3>
                     </div>
                     <div className="flex-1 flex flex-col gap-3">
                         {upcomingList.length === 0 ? (
@@ -323,7 +336,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                         isFunded = budgetAvailable >= cost;
                                     }
                                     
-                                    // Clamp des valeurs pour les jauges
                                     let safeProgress = Math.min(100, Math.max(0, p.progress || 0));
                                     let safeFunding = Math.min(100, Math.max(0, fundingPercentage));
                                     
@@ -334,18 +346,14 @@ export default function Dashboard({ data, updateData, setView }) {
                                         <div key={p.id} className="bg-gray-50 dark:bg-slate-800/50 p-4 md:p-5 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-slate-600 transition-colors cursor-pointer" onClick={() => setView('projects')}>
                                             <div className="flex items-center gap-4 md:gap-5">
                                                 
-                                                {/* --- CERCLE DE PROGRESSION CORRIGÉ (SVG VECTORIEL PRÉCIS) --- */}
                                                 <div className="relative inline-flex items-center justify-center w-12 h-12 md:w-14 md:h-14 shrink-0">
                                                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                                        {/* Fond du cercle */}
                                                         <path className="text-gray-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                                                        {/* Indicateur de progression */}
                                                         <path className={`transition-all duration-1000 ${globalScore >= 100 ? 'text-green-500' : 'text-blue-500'}`} strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                                     </svg>
                                                     <span className="absolute text-[10px] md:text-xs font-bold text-gray-700 dark:text-slate-200">{Math.round(globalScore)}%</span>
                                                 </div>
 
-                                                {/* DETAIL DROITE */}
                                                 <div className="flex-1 min-w-0 space-y-2">
                                                     <div className="flex justify-between items-start">
                                                         <div className="min-w-0 flex-1 pr-2">
@@ -364,12 +372,8 @@ export default function Dashboard({ data, updateData, setView }) {
                                                                 <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
                                                                 <span>{Math.round(safeProgress)}%</span>
                                                             </div>
-                                                            {/* BARRE LINÉAIRE CORRIGÉE (bornée 0-100) */}
                                                             <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                <div 
-                                                                    className="h-full bg-blue-500 rounded-full transition-all duration-500" 
-                                                                    style={{ width: `${safeProgress}%` }}
-                                                                ></div>
+                                                                <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
                                                             </div>
                                                         </div>
                                                         {cost > 0 && (
@@ -378,12 +382,8 @@ export default function Dashboard({ data, updateData, setView }) {
                                                                     <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
                                                                     <span className={isFunded ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}>{Math.round(safeFunding)}%</span>
                                                                 </div>
-                                                                {/* BARRE LINÉAIRE CORRIGÉE (bornée 0-100) */}
                                                                 <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                        <div 
-                                                                            className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} 
-                                                                            style={{ width: `${safeFunding}%` }}
-                                                                        ></div>
+                                                                    <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${safeFunding}%` }}></div>
                                                                 </div>
                                                             </div>
                                                         )}
@@ -397,7 +397,6 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     </div>
 
-                    {/* NOTES ÉPINGLÉES */}
                     {pinnedNotes.length > 0 && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {pinnedNotes.map(n => (
@@ -410,37 +409,73 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
                 </div>
 
-                {/* URGENCES (1/3) */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 h-fit shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2"><CheckSquare size={20} className="text-red-500"/> Urgences</h3>
-                        <span className="bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-1 rounded-full">{urgentTodos.length}</span>
+                {/* COLONNE DROITE : AGENDA + URGENCES */}
+                <div className="space-y-6">
+                    
+                    {/* WIDGET AGENDA (NOUVEAU) */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm" onClick={() => setView('planning')}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <Clock size={20} className="text-purple-500"/> Agenda
+                            </h3>
+                        </div>
+                        <div className="space-y-3">
+                            {nextCalendarEvents.length === 0 ? (
+                                <p className="text-gray-400 dark:text-slate-500 text-sm italic py-2">Rien de prévu prochainement.</p>
+                            ) : (
+                                nextCalendarEvents.map(evt => {
+                                    const d = new Date(evt.start_time);
+                                    return (
+                                        <div key={evt.id} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                                            {/* Badge Date */}
+                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 rounded-lg shrink-0 border border-purple-100 dark:border-purple-800/50">
+                                                <span className="text-[9px] font-bold uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                <span className="text-sm font-bold leading-none mt-0.5">{d.getDate()}</span>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{evt.title}</p>
+                                                <p className="text-xs text-gray-500 dark:text-slate-400">
+                                                    {d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
-                    <div className="space-y-3">
-                        {urgentTodos.length === 0 ? (
-                            <p className="text-gray-400 dark:text-slate-500 text-sm italic text-center py-4">Rien d'urgent.</p>
-                        ) : (
-                            urgentTodos.map(t => (
-                                <div 
-                                    key={t.id} 
-                                    className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-500 hover:shadow-sm transition-all cursor-pointer"
-                                    onClick={() => toggleTodo(t.id)}
-                                >
-                                    <button className="shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 dark:border-slate-500 flex items-center justify-center transition-colors group-hover:border-green-500 group-hover:text-green-500 text-transparent">
-                                        <CheckCircle2 size={12} />
-                                    </button>
-                                    
-                                    <div className="flex-1 min-w-0">
-                                        <span className="text-sm font-medium text-gray-800 dark:text-slate-100 line-clamp-1">{t.text}</span>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-[10px] font-bold text-red-500 flex items-center gap-1"><Flag size={8}/> Urgent</span>
+
+                    {/* URGENCES */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm h-fit">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2"><CheckSquare size={20} className="text-red-500"/> Urgences</h3>
+                            <span className="bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold px-2 py-1 rounded-full">{urgentTodos.length}</span>
+                        </div>
+                        <div className="space-y-3">
+                            {urgentTodos.length === 0 ? (
+                                <p className="text-gray-400 dark:text-slate-500 text-sm italic text-center py-4">Rien d'urgent.</p>
+                            ) : (
+                                urgentTodos.map(t => (
+                                    <div 
+                                        key={t.id} 
+                                        className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-500 hover:shadow-sm transition-all cursor-pointer"
+                                        onClick={() => toggleTodo(t.id)}
+                                    >
+                                        <button className="shrink-0 w-5 h-5 rounded-full border-2 border-gray-300 dark:border-slate-500 flex items-center justify-center transition-colors group-hover:border-green-500 group-hover:text-green-500 text-transparent">
+                                            <CheckCircle2 size={12} />
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm font-medium text-gray-800 dark:text-slate-100 line-clamp-1">{t.text}</span>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-[10px] font-bold text-red-500 flex items-center gap-1"><Flag size={8}/> Urgent</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
-                        )}
+                                ))
+                            )}
+                        </div>
+                        <button onClick={() => setView('todo')} className="w-full mt-6 py-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm font-bold rounded-xl transition-colors">Voir toutes les tâches</button>
                     </div>
-                    <button onClick={() => setView('todo')} className="w-full mt-6 py-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm font-bold rounded-xl transition-colors">Voir toutes les tâches</button>
                 </div>
             </div>
         </div>
