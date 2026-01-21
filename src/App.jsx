@@ -281,18 +281,17 @@ export default function App() {
     } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
   };
 
-  // --- MODIFICATION ICI : Gestion de la suppression de masse (filtre) ---
   const updateData = async (newData, deleteRequest = null) => {
     setData(newData);
     setUnsavedChanges(true);
     if (deleteRequest) {
-      const { table, id, filter } = deleteRequest; // <-- AJOUT "filter"
+      const { table, id, filter } = deleteRequest; 
       try {
         if (filter && filter.column && filter.value) {
-            // Suppression de masse (ex: toute une série via recurrence_group_id)
+            // Suppression de masse
             await supabase.from(table).delete().eq(filter.column, filter.value);
         } else if (table && id) {
-            // Suppression classique par ID unique
+            // Suppression classique
             await supabase.from(table).delete().eq('id', id);
         }
       } catch (e) { console.error("Erreur suppression", e); }
@@ -341,10 +340,12 @@ export default function App() {
       await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
       await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
 
+      // --- MODIFICATION ICI : Ajout du champ is_all_day ---
       await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
           id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
           end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
-          recurrence_group_id: e.recurrence_group_id 
+          recurrence_group_id: e.recurrence_group_id,
+          is_all_day: e.is_all_day 
       }));
 
       const bases = data.budget.planner.safetyBases;
@@ -379,7 +380,7 @@ export default function App() {
     }
   };
 
-  // --- MODIFICATION ICI : Layout Full Width pour Journal/Planning/Workspace ---
+  // Layout Full Width pour Journal/Planning/Workspace
   const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal';
 
   return (

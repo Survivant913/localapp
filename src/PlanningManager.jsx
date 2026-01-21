@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
   X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar,
-  PanelLeftClose, PanelLeftOpen // <--- NOUVEAUX ICÔNES
+  PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -18,7 +18,7 @@ export default function PlanningManager({ data, updateData }) {
     const [isCreating, setIsCreating] = useState(false);
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
-    const [showSidebar, setShowSidebar] = useState(true); // <--- NOUVEL ÉTAT POUR LA VISIBILITÉ SIDEBAR
+    const [showSidebar, setShowSidebar] = useState(true); 
     
     // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
@@ -35,7 +35,8 @@ export default function PlanningManager({ data, updateData }) {
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
         startHour: 9, startMin: 0, duration: 60, 
-        type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue' 
+        type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
+        isAllDay: false // <--- NOUVEAU CHAMP
     });
 
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
@@ -99,13 +100,14 @@ export default function PlanningManager({ data, updateData }) {
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
-                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event'
+                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
             });
-            setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration });
+            setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
             setConfirmMode('ask_update');
             setIsCreating(true);
         } else {
-            const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
+            // Force is_all_day à false si on resize manuellement (car c'est forcément temporel)
+            const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString(), is_all_day: false } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
         }
     };
@@ -126,7 +128,11 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- LAYOUT ---
     const getLayoutForDay = (dayItems) => {
-        const sorted = [...dayItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
+        // IMPORTANT : On ne place dans la grille QUE les événements qui ont une heure
+        // Les "All Day" sont gérés séparément
+        const timedItems = dayItems.filter(item => !item.data.is_all_day);
+
+        const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
         sorted.forEach((item) => {
             if(!item.startStr || !item.endStr) return;
@@ -183,7 +189,8 @@ export default function PlanningManager({ data, updateData }) {
         setEventForm({
             id: null, title: '', date: format(targetDate, 'yyyy-MM-dd'),
             startHour: hour, startMin: 0, duration: 60,
-            type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue'
+            type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
+            isAllDay: false
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -197,7 +204,8 @@ export default function PlanningManager({ data, updateData }) {
             startHour: getHours(start), startMin: getMinutes(start),
             duration: differenceInMinutes(end, start),
             type: 'event', recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
-            recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue'
+            recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue',
+            isAllDay: evt.is_all_day || false
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -206,12 +214,20 @@ export default function PlanningManager({ data, updateData }) {
     const handleSave = () => {
         if (!eventForm.title) return alert("Titre requis");
         const baseDate = parse(eventForm.date, 'yyyy-MM-dd', new Date());
-        const newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin);
-        const newEnd = addMinutes(newStart, eventForm.duration);
+        
+        let newStart, newEnd;
+        if (eventForm.isAllDay) {
+            // On fixe à 00:00 - 23:59 pour la date choisie
+            newStart = setMinutes(setHours(baseDate, 0), 0);
+            newEnd = setMinutes(setHours(baseDate, 23), 59);
+        } else {
+            newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin);
+            newEnd = addMinutes(newStart, eventForm.duration);
+        }
 
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
-            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null };
+            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay };
             let newEvents = [];
             if (eventForm.recurrence) {
                 const weeks = parseInt(eventForm.recurrenceWeeks) || 1;
@@ -258,9 +274,17 @@ export default function PlanningManager({ data, updateData }) {
                             evStart = addDays(evStart, daysDelta);
                         }
                     }
-                    let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
-                    let newEvEnd = addMinutes(newEvStart, targetDuration);
-                    return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString() };
+                    
+                    let newEvStart, newEvEnd;
+                    if (formData.isAllDay) {
+                        newEvStart = setMinutes(setHours(evStart, 0), 0);
+                        newEvEnd = setMinutes(setHours(evStart, 23), 59);
+                    } else {
+                        newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
+                        newEvEnd = addMinutes(newEvStart, targetDuration);
+                    }
+
+                    return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay };
                 }
                 return ev;
             });
@@ -268,7 +292,8 @@ export default function PlanningManager({ data, updateData }) {
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
                 ...ev, title: formData.title, color: formData.color,
                 start_time: startObj.toISOString(), end_time: endObj.toISOString(),
-                recurrence_group_id: null 
+                recurrence_group_id: null,
+                is_all_day: formData.isAllDay
             } : ev);
         }
         updateData({ ...data, calendar_events: updatedEvents });
@@ -341,13 +366,13 @@ export default function PlanningManager({ data, updateData }) {
             if (evt.recurrence_group_id) {
                 setEventForm({
                     id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: duration, 
-                    date: format(newStart, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true, recurrenceWeeks: 12, type: 'event'
+                    date: format(newStart, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
                 });
-                setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration });
+                setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
                 setConfirmMode('ask_update');
                 setIsCreating(true);
             } else {
-                const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString() } : ev);
+                const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev);
                 updateData({ ...data, calendar_events: updatedEvents });
             }
         }
@@ -438,9 +463,12 @@ export default function PlanningManager({ data, updateData }) {
                     <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
                         <div className="flex w-full h-full min-h-[1140px]">
                             
-                            {/* COLONNE HEURES */}
+                            {/* COLONNE HEURES AVEC LABEL "TOUTE LA JRN" */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                <div className="h-14 border-b border-gray-200 dark:border-slate-800"></div>
+                                {/* Zone Header "All Day" */}
+                                <div className="h-28 border-b border-gray-200 dark:border-slate-800 flex items-end justify-center pb-2 text-[10px] font-bold text-slate-400">
+                                    TOUTE<br/>LA JRN
+                                </div>
                                 {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">{h}:00</div>)}
                                 <div className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">00:00</div>
                             </div>
@@ -451,13 +479,32 @@ export default function PlanningManager({ data, updateData }) {
                                     const isToday = isSameDay(day, new Date());
                                     const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
                                     const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
-                                    const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]);
+                                    
+                                    // SÉPARATION ALL-DAY / TIMED
+                                    const allDayItems = rawEvents.filter(item => item.data.is_all_day === true);
+                                    const timedItems = [...rawEvents.filter(item => !item.data.is_all_day), ...rawTodos];
+                                    
+                                    const layoutItems = getLayoutForDay(timedItems);
+
                                     return (
                                         <div key={dayIndex} className={`relative min-w-0 bg-white dark:bg-slate-900 transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOver(e, dayIndex)} onDrop={(e) => onDrop(e, day)}>
                                             {/* EN-TÊTE JOUR */}
                                             <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-20 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
                                                 <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
+                                            </div>
+
+                                            {/* ZONE "TOUTE LA JOURNÉE" */}
+                                            <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+                                                {allDayItems.map(item => (
+                                                    <div 
+                                                        key={item.data.id} 
+                                                        onClick={(e) => handleEventClick(e, item.data, 'event')} 
+                                                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 border-l-emerald-500 text-emerald-800' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 border-l-slate-500 text-slate-700' : 'bg-blue-100 border-blue-200 border-l-blue-500 text-blue-800'}`}
+                                                    >
+                                                        {item.data.title}
+                                                    </div>
+                                                ))}
                                             </div>
                                             
                                             <div className="relative h-[1140px]">
@@ -539,15 +586,20 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 19}).map((_, i) => <option key={i} value={i+6}>{i+6}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label>
-                                            <select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">
-                                                {durationOptions}
-                                            </select>
-                                        </div>
+                                    
+                                    {/* CHECKBOX TOUTE LA JOURNÉE (AJOUT) */}
+                                    <div className="flex items-center gap-2 py-2">
+                                        <input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"/>
+                                        <label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label>
                                     </div>
+
+                                    {!eventForm.isAllDay && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 19}).map((_, i) => <option key={i} value={i+6}>{i+6}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">{durationOptions}</select></div>
+                                        </div>
+                                    )}
+
                                     {!eventForm.id && (
                                         <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
                                             <div className="flex items-center justify-between mb-2"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label></div>
@@ -578,7 +630,7 @@ export default function PlanningManager({ data, updateData }) {
                         ) : (
                             <>
                                 <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.type === 'event' ? selectedEvent.data.title : selectedEvent.data.text}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{format(parseISO(selectedEvent.data.start_time || selectedEvent.data.scheduled_date), 'EEEE d MMMM', { locale: fr })}<br/><span className="text-lg font-bold text-slate-900 dark:text-white">{format(parseISO(selectedEvent.data.start_time || selectedEvent.data.scheduled_date), 'HH:mm')}</span></p></div></div>
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time || selectedEvent.data.scheduled_date), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
                                 <div className="flex gap-3">{selectedEvent.type === 'todo' ? (<button onClick={() => unscheduleTodo(selectedEvent.data)} className="flex-1 py-3 border-2 border-orange-100 text-orange-600 rounded-xl font-bold text-sm hover:bg-orange-50 transition-colors">Retirer</button>) : (<><button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button><button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button></>)}</div>
                             </>
                         )}

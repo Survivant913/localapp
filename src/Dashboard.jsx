@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
   Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock
-} from 'lucide-react'; // J'ai ajouté 'Clock' aux imports
+} from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
 // --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
@@ -75,7 +75,7 @@ export default function Dashboard({ data, updateData, setView }) {
         return String(accId) === String(dashboardFilter);
     };
 
-    // Solde affiché (Arrondi strict pour éviter 1450.000004)
+    // Solde affiché
     const currentBalanceRaw = transactions
         .filter(t => isRelevantAccount(t.accountId || t.account_id))
         .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
@@ -96,7 +96,7 @@ export default function Dashboard({ data, updateData, setView }) {
         return formatted;
     };
 
-    // Graphique Performant (Hashmap O(N))
+    // Graphique Performant
     const getSparklineData = () => {
         try {
             const days = 30; 
@@ -158,15 +158,38 @@ export default function Dashboard({ data, updateData, setView }) {
     };
     const upcomingList = getUpcomingEvents();
 
-    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER) ---
+    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER + TÂCHES) ---
     const getNextCalendarEvents = () => {
         try {
             const now = new Date();
-            const calEvents = Array.isArray(data.calendar_events) ? data.calendar_events : [];
-            return calEvents
-                .filter(e => new Date(e.start_time) > now) // Uniquement le futur
-                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time)) // Trier par date
-                .slice(0, 4); // Prendre les 4 premiers
+            
+            // 1. Événements classiques de l'agenda
+            const calEvents = (data.calendar_events || []).map(e => ({
+                id: e.id, title: e.title, start_time: e.start_time, is_todo: false,
+                is_all_day: e.is_all_day
+            }));
+
+            // 2. Tâches planifiées (glisser-déposer)
+            const todoEvents = (data.todos || [])
+                .filter(t => t.scheduled_date && !t.completed)
+                .map(t => ({
+                    id: t.id, title: t.text, start_time: t.scheduled_date, is_todo: true,
+                    is_all_day: false
+                }));
+
+            // Fusionner, Filtrer (Futur) et Trier
+            return [...calEvents, ...todoEvents]
+                .filter(e => {
+                    const evtDate = new Date(e.start_time);
+                    if (e.is_all_day) {
+                        // Si c'est toute la journée, on garde si c'est aujourd'hui ou plus tard
+                        const today = new Date(); today.setHours(0,0,0,0);
+                        return evtDate >= today;
+                    }
+                    return evtDate > now;
+                })
+                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                .slice(0, 4); // Prendre les 4 prochains
         } catch (e) { return []; }
     };
     const nextCalendarEvents = getNextCalendarEvents();
@@ -426,16 +449,17 @@ export default function Dashboard({ data, updateData, setView }) {
                                 nextCalendarEvents.map(evt => {
                                     const d = new Date(evt.start_time);
                                     return (
-                                        <div key={evt.id} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
+                                        <div key={`${evt.type}-${evt.id}`} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                                             {/* Badge Date */}
-                                            <div className="flex flex-col items-center justify-center w-10 h-10 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 rounded-lg shrink-0 border border-purple-100 dark:border-purple-800/50">
+                                            <div className={`flex flex-col items-center justify-center w-10 h-10 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-lg shrink-0 border`}>
                                                 <span className="text-[9px] font-bold uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
                                                 <span className="text-sm font-bold leading-none mt-0.5">{d.getDate()}</span>
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{evt.title}</p>
-                                                <p className="text-xs text-gray-500 dark:text-slate-400">
-                                                    {d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
+                                                    {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                    {evt.is_todo && <CheckCircle2 size={10} className="text-orange-500"/>}
                                                 </p>
                                             </div>
                                         </div>
