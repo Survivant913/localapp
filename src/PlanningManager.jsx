@@ -25,6 +25,10 @@ export default function PlanningManager({ data, updateData }) {
     // Resize
     const [resizingEvent, setResizingEvent] = useState(null); 
     const resizeRef = useRef(null);
+    
+    // REF CRUCIALE POUR ÉVITER LE BUG DE RETOUR EN ARRIÈRE
+    const eventsRef = useRef(data.calendar_events || []);
+    useEffect(() => { eventsRef.current = data.calendar_events || []; }, [data.calendar_events]);
 
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
@@ -41,27 +45,40 @@ export default function PlanningManager({ data, updateData }) {
         const handleMouseMove = (e) => {
             if (!resizeRef.current) return;
             const { startY, startDuration } = resizeRef.current;
-            const deltaY = e.clientY - startY;
-            const deltaMinutes = Math.round(deltaY); // 1px = 1min
+            const deltaY = e.clientY - startY; // 1px = 1min
             
-            // Snap 15 min
-            let newDuration = startDuration + deltaMinutes;
+            // Calculer nouvelle durée (arrondie à 15min)
+            let newDuration = startDuration + deltaY;
             newDuration = Math.round(newDuration / 15) * 15;
             if (newDuration < 15) newDuration = 15; 
 
-            setResizingEvent(prev => ({ ...prev, currentDuration: newDuration }));
+            // Mise à jour visuelle uniquement
+            setResizingEvent(prev => prev ? ({ ...prev, currentDuration: newDuration }) : null);
         };
 
         const handleMouseUp = () => {
             if (!resizeRef.current) return;
-            const { event, currentDuration } = resizeRef.current;
             
-            // Appliquer le changement seulement si la durée a changé
-            if (currentDuration && currentDuration !== resizeRef.current.startDuration) {
-                finishResize(event, currentDuration);
-            } else {
-                setResizingEvent(null); // Annuler si pas de changement
-            }
+            // On récupère la durée finale calculée
+            const finalDuration = resizeRef.current.currentDuration || resizeRef.current.startDuration;
+            
+            // Si on a l'état state en sync, on l'utilise, sinon on recalcule (sécurité)
+            // Ici on va faire confiance au dernier render ou au recalcul si besoin
+            // Pour simplifier : on appelle finishResize avec ce qu'on a.
+            
+            // Note: resizingEvent state might be stale inside this closure if dependencies aren't perfect,
+            // but resizeRef is always fresh.
+            // On doit cependant récupérer la dernière valeur de "newDuration" stockée dans le state ou recalculer.
+            // Le plus simple : on déclenche finishResize avec la valeur stockée dans une variable locale si on pouvait,
+            // mais ici on va utiliser setResizingEvent pour déclencher la fin proprement ou lire le state.
+            
+            // Astuce : On va lire la durée depuis le state resizingEvent via un callback fonctionnel ou passer la main.
+            // MAIS comme on est dans un event listener window, le state est souvent stale.
+            // On va utiliser une ref pour stocker la "currentDuration" en temps réel.
+            
+            finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
+            
+            setResizingEvent(null);
             resizeRef.current = null;
         };
 
@@ -76,8 +93,14 @@ export default function PlanningManager({ data, updateData }) {
         };
     }, [resizingEvent]);
 
+    // On utilise un Ref pour stocker la durée pendant le drag pour que le mouseUp y accède sans délai
+    useEffect(() => {
+        if (resizingEvent && resizeRef.current) {
+            resizeRef.current.currentDurationTemp = resizingEvent.currentDuration;
+        }
+    }, [resizingEvent]);
+
     const startResize = (e, evt) => {
-        // STOPPER TOUTE PROPAGATION POUR ÉVITER LE DRAG
         e.stopPropagation(); 
         e.preventDefault(); 
 
@@ -87,6 +110,7 @@ export default function PlanningManager({ data, updateData }) {
             startY: e.clientY, 
             startDuration: startDuration, 
             currentDuration: startDuration,
+            currentDurationTemp: startDuration,
             event: evt 
         };
         setResizingEvent(initData);
@@ -94,9 +118,12 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const finishResize = (evt, newDuration) => {
+        if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
+
         const start = parseISO(evt.start_time);
         const newEnd = addMinutes(start, newDuration);
 
+        // Si récurrent -> Demander confirmation
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
@@ -105,11 +132,10 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration });
             setConfirmMode('ask_update');
             setIsCreating(true);
-            setResizingEvent(null); // On ferme l'état resize car la modal prend le relais
         } else {
-            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
+            // FIX: Utiliser eventsRef.current pour être sûr d'avoir la liste à jour
+            const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
-            setResizingEvent(null);
         }
     };
 
@@ -149,7 +175,6 @@ export default function PlanningManager({ data, updateData }) {
                     
                     const myTop = top;
                     const myBottom = top + duration;
-                    
                     const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
                     const otherTop = Math.max(0, otherStartMin - (6 * 60));
                     const otherBottom = otherTop + evDuration;
@@ -241,7 +266,7 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
-        let updatedEvents = [...events];
+        let updatedEvents = [...eventsRef.current]; // Use Ref for fresh data
 
         if (mode === 'series' && formData.recurrenceGroupId) {
             const targetDayOfWeek = startObj.getDay();
@@ -291,7 +316,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const performDelete = (evt, series) => {
         if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
-        let updatedEvents = [...events];
+        let updatedEvents = [...eventsRef.current]; // Use Ref
         if (series && evt.recurrence_group_id) {
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
             updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } });
@@ -310,8 +335,8 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG & DROP ---
     const onDragStart = (e, item, type) => {
-        // SI ON REDIMENSIONNE, ON BLOQUE LE DRAG
-        if (resizingEvent) {
+        // FIX CRUCIAL : Si resizeRef est actif, on ne drag pas !
+        if (resizeRef.current) {
             e.preventDefault();
             return;
         }
@@ -355,7 +380,7 @@ export default function PlanningManager({ data, updateData }) {
                 setConfirmMode('ask_update');
                 setIsCreating(true);
             } else {
-                const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString() } : ev);
+                const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString() } : ev);
                 updateData({ ...data, calendar_events: updatedEvents });
             }
         }
@@ -370,9 +395,9 @@ export default function PlanningManager({ data, updateData }) {
     const hours = Array.from({ length: 18 }).map((_, i) => i + 6);
     const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date()) - (6 * 60);
 
-    // --- GÉNÉRATION DYNAMIQUE DES OPTIONS DE DURÉE (Jusqu'à 12h) ---
+    // --- GÉNÉRATION DURÉE JUSQU'À 12H ---
     const durationOptions = [];
-    for (let m = 15; m <= 720; m += 15) { // 720 min = 12h
+    for (let m = 15; m <= 720; m += 15) {
         const h = Math.floor(m / 60);
         const min = m % 60;
         let label = '';
@@ -435,13 +460,13 @@ export default function PlanningManager({ data, updateData }) {
                                                 const isRecurrent = !!dataItem.recurrence_group_id;
                                                 const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100 border-l-4 border-l-orange-400' : dataItem.color === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-100 border-l-4 border-l-emerald-500' : dataItem.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 border-l-4 border-l-slate-400' : 'bg-blue-50 border-blue-200 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100 border-l-4 border-l-blue-500';
                                                 
-                                                // CONDITION CRUCIALE : Si on redimensionne, on désactive le drag sur le parent
-                                                const isResizingAny = !!resizingEvent;
+                                                // FIX: On désactive le drag sur l'élément si un resize est en cours
+                                                const isResizingAny = !!resizeRef.current;
 
                                                 return (
                                                     <div key={`${item.type}-${dataItem.id}`} 
                                                         style={{...item.style, opacity: isDraggingThis ? 0.5 : 1}} 
-                                                        draggable={!isResizingAny} // <--- C'EST LE FIX MAGIQUE
+                                                        draggable={!isResizingAny} // <--- FIX DU DRAG VS RESIZE
                                                         onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} 
                                                         onClick={(e) => { e.stopPropagation(); setSelectedEvent({ type: item.type, data: dataItem }); }} 
                                                         className={`absolute rounded-lg p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all shadow-sm border overflow-hidden flex flex-col group/item select-none ${colorClass}`}
