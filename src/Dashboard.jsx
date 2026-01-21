@@ -72,17 +72,22 @@ export default function Dashboard({ data, updateData, setView }) {
     // --- 1. FILTRES & CALCULS FINANCIERS ---
     const isRelevantAccount = (accId) => {
         if (dashboardFilter === 'total') return true;
-        // Comparaison souple pour gérer string/number (ex: "1" == 1)
         return String(accId) === String(dashboardFilter);
     };
 
     // Solde affiché (dépend du filtre)
-    const currentBalance = transactions
-        .filter(t => isRelevantAccount(t.accountId || t.account_id)) // Fallback si accountId manque
+    const currentBalanceRaw = transactions
+        .filter(t => isRelevantAccount(t.accountId || t.account_id))
         .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     
-    // NOUVEAU : Solde GLOBAL TOTAL (pour le calcul des projets non liés, indépendant du filtre)
-    const globalTotalBalance = transactions.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+    // CORRECTIF 1: Arrondi strict pour éviter les erreurs flottantes (ex: 1450.0000001)
+    const currentBalance = Math.round(currentBalanceRaw * 100) / 100;
+
+    // Solde GLOBAL TOTAL (pour projets)
+    const globalTotalBalance = Math.round(
+        transactions.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0) 
+        * 100
+    ) / 100;
 
     const renderAmount = (amount, withSign = false) => {
         if (isPrivacyMode) return '**** €';
@@ -92,42 +97,50 @@ export default function Dashboard({ data, updateData, setView }) {
         return formatted;
     };
 
+    // CORRECTIF 3: Optimisation Performance Sparkline (O(N) au lieu de O(N²))
     const getSparklineData = () => {
         try {
             const days = 30; 
             const history = [];
             let tempBalance = currentBalance;
             
-            const sortedTrans = [...transactions]
-                .filter(t => isRelevantAccount(t.accountId || t.account_id))
-                .sort((a,b) => new Date(b.date) - new Date(a.date));
+            // Étape 1 : Pré-calculer les mouvements par jour (Hash Map)
+            const dailyChanges = {};
+            const relevantTransactions = transactions.filter(t => isRelevantAccount(t.accountId || t.account_id));
             
-            history.push(tempBalance);
+            relevantTransactions.forEach(t => {
+                // On utilise une clé date simple "YYYY-MM-DD" ou locale string
+                const d = new Date(t.date);
+                // Astuce: setHours à 0 pour normaliser la clé
+                d.setHours(0,0,0,0);
+                const key = d.getTime(); // Timestamp du début de journée comme clé unique rapide
+                
+                const amount = parseFloat(t.amount || 0);
+                const delta = t.type === 'income' ? amount : -amount;
+                
+                dailyChanges[key] = (dailyChanges[key] || 0) + delta;
+            });
 
+            // Étape 2 : Boucle simple sur 30 jours
             let currentDateCursor = new Date();
             currentDateCursor.setHours(0,0,0,0); 
 
-            for (let i = 0; i < days - 1; i++) {
-                const endOfDay = new Date(currentDateCursor);
-                endOfDay.setHours(23, 59, 59, 999);
-                const startOfDay = new Date(currentDateCursor);
-                startOfDay.setHours(0, 0, 0, 0);
-
-                const transOfDay = sortedTrans.filter(t => {
-                    const tDate = new Date(t.date);
-                    return tDate >= startOfDay && tDate <= endOfDay;
-                });
-
-                transOfDay.forEach(t => {
-                    if(t.type === 'income') tempBalance -= parseFloat(t.amount || 0);
-                    else tempBalance += parseFloat(t.amount || 0);
-                });
+            for (let i = 0; i < days; i++) {
+                // On enregistre le solde (arrondi)
+                history.unshift(Number(tempBalance.toFixed(2)));
                 
-                history.unshift(tempBalance);
+                // Pour remonter dans le temps, on SOUSTRAIT ce qui s'est passé ce jour-là
+                // (Si j'ai gagné 10€ aujourd'hui, hier j'avais 10€ de moins)
+                const key = currentDateCursor.getTime();
+                const changeToday = dailyChanges[key] || 0;
+                
+                tempBalance -= changeToday;
+                
+                // Reculer d'un jour
                 currentDateCursor.setDate(currentDateCursor.getDate() - 1);
             }
             return history;
-        } catch (e) { return [0, 0]; }
+        } catch (e) { console.error(e); return [0, 0]; }
     };
     
     const sparkData = getSparklineData();
@@ -166,24 +179,29 @@ export default function Dashboard({ data, updateData, setView }) {
         updateData({ ...data, todos: newTodos });
     };
 
-    // CORRECTION : Comparaison String vs String pour éviter le bug des projets liés
     const getAccountBalanceForProject = (accId) => {
         return transactions
             .filter(t => String(t.accountId || t.account_id) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
+    // CORRECTIF 2: Tri par Priorité Complet (High > Medium > Low > None)
+    const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
+    
     const activeProjects = projects
         .filter(p => p.status !== 'done' && p.status !== 'on_hold')
-        .sort((a,b) => (b.priority === 'high' ? 1 : 0) - (a.priority === 'high' ? 1 : 0))
+        .sort((a, b) => {
+            const weightA = priorityWeight[a.priority] || 0;
+            const weightB = priorityWeight[b.priority] || 0;
+            return weightB - weightA; // Descendant (plus haute priorité en premier)
+        })
         .slice(0, 3);
 
     const handleAutoFocus = () => {
         const active = projects.filter(p => p.status !== 'done' && p.status !== 'on_hold');
         if (active.length === 0) return;
         const sorted = active.sort((a, b) => {
-            const pScore = { high: 3, medium: 2, low: 1, none: 0 };
-            const diffP = (pScore[b.priority || 'none'] || 0) - (pScore[a.priority || 'none'] || 0);
+            const diffP = (priorityWeight[b.priority || 'none'] || 0) - (priorityWeight[a.priority || 'none'] || 0);
             if (diffP !== 0) return diffP;
             if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
             if (a.deadline) return -1;
@@ -306,24 +324,21 @@ export default function Dashboard({ data, updateData, setView }) {
                                 <p className="text-gray-400 dark:text-slate-500 text-sm italic text-center py-4">Aucun projet en cours.</p>
                             ) : (
                                 activeProjects.map(p => {
-                                    // LOGIQUE CORRIGÉE : Même formule que ProjectsManager
                                     const cost = parseFloat(p.cost || 0);
                                     let fundingPercentage = 0;
                                     let isFunded = true;
                                     let budgetAvailable = 0;
                                     
                                     if (cost > 0) {
-                                        // Si lié à un compte, on regarde ce compte. Sinon, on regarde le GLOBAL TOTAL (pas le filtré)
                                         budgetAvailable = p.linkedAccountId 
                                             ? getAccountBalanceForProject(p.linkedAccountId) 
                                             : Math.max(0, globalTotalBalance);
-                                            
+                                        
                                         fundingPercentage = Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100);
                                         isFunded = budgetAvailable >= cost;
                                     }
                                     
                                     let globalScore = p.progress || 0;
-                                    // Mix tâches + argent
                                     if (cost > 0) globalScore = (globalScore + fundingPercentage) / 2;
 
                                     return (
@@ -358,7 +373,10 @@ export default function Dashboard({ data, updateData, setView }) {
                                                                 <span>{Math.round(p.progress || 0)}%</span>
                                                             </div>
                                                             <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${p.progress || 0}%` }}></div>
+                                                                <div 
+                                                                    className="h-full bg-blue-500 rounded-full" 
+                                                                    style={{ width: `${Math.min(100, Math.max(0, p.progress || 0))}%` }}
+                                                                ></div>
                                                             </div>
                                                         </div>
                                                         {cost > 0 && (
@@ -368,7 +386,10 @@ export default function Dashboard({ data, updateData, setView }) {
                                                                     <span className={isFunded ? "text-green-600 dark:text-green-400" : "text-orange-500 dark:text-orange-400"}>{Math.round(fundingPercentage)}%</span>
                                                                 </div>
                                                                 <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                    <div className={`h-full rounded-full ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${fundingPercentage}%` }}></div>
+                                                                        <div 
+                                                                            className={`h-full rounded-full ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} 
+                                                                            style={{ width: `${Math.min(100, Math.max(0, fundingPercentage))}%` }}
+                                                                        ></div>
                                                                 </div>
                                                             </div>
                                                         )}
