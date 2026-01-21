@@ -10,7 +10,7 @@ import {
   setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { supabase } from './supabaseClient';
+// On n'a plus besoin d'importer supabase ici, tout passe par updateData
 
 export default function PlanningManager({ data, updateData }) {
     const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -36,7 +36,7 @@ export default function PlanningManager({ data, updateData }) {
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // --- LOGIQUE LAYOUT ---
+    // --- LAYOUT ---
     const getLayoutForDay = (dayItems) => {
         const sorted = [...dayItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
@@ -194,28 +194,31 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- CORRECTION SUPPRESSION SÉRIE ---
-    const performDelete = async (evt, series) => {
+    // --- CORRECTION CRUCIALE DE LA SUPPRESSION ---
+    const performDelete = (evt, series) => {
         if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
 
         let updatedEvents = [...events];
         
+        // 1. SUPPRESSION SÉRIE
         if (series && evt.recurrence_group_id) {
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
-            try {
-                await supabase.from('calendar_events').delete().eq('recurrence_group_id', evt.recurrence_group_id);
-            } catch (err) {
-                console.error("Erreur suppression série:", err);
-            }
-        } else {
+            
+            // APPEL SPÉCIAL À APP.JSX AVEC FILTRE
+            updateData(
+                { ...data, calendar_events: updatedEvents }, 
+                { 
+                    table: 'calendar_events', 
+                    filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } 
+                }
+            );
+        } 
+        // 2. SUPPRESSION SIMPLE
+        else {
             updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
             updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
-            setSelectedEvent(null);
-            setConfirmMode(null);
-            return;
         }
         
-        updateData({ ...data, calendar_events: updatedEvents });
         setSelectedEvent(null);
         setConfirmMode(null);
     };
@@ -223,14 +226,15 @@ export default function PlanningManager({ data, updateData }) {
     // --- RÉINITIALISATION (CLEAR ALL) ---
     const handleClearAll = async () => {
         if(!window.confirm("ATTENTION : Cela va effacer TOUS les événements de l'agenda.\nÊtes-vous sûr ?")) return;
-        try {
-            await supabase.from('calendar_events').delete().neq('id', 0); // Hack pour tout supprimer
-            updateData({ ...data, calendar_events: [] });
-            alert("Agenda réinitialisé !");
-        } catch (err) {
-            console.error("Erreur reset:", err);
-            alert("Erreur lors de la réinitialisation.");
-        }
+        
+        // On vide tout localement
+        updateData(
+            { ...data, calendar_events: [] },
+            { 
+                table: 'calendar_events', 
+                filter: { column: 'user_id', value: data.profile?.id } // Hack pour tout supprimer via App.jsx
+            }
+        );
     };
 
     // --- DRAG & DROP ---
@@ -352,7 +356,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS (Identique précédent mais avec fix suppression) */}
+            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">

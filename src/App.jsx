@@ -14,7 +14,7 @@ import ZenMode from './ZenMode';
 import Workspace from './Workspace'; 
 import GoalsManager from './GoalsManager'; 
 import JournalManager from './JournalManager';
-import PlanningManager from './PlanningManager'; // <--- NOUVEAU IMPORT
+import PlanningManager from './PlanningManager'; 
 import { Loader2, Lock } from 'lucide-react';
 
 export default function App() {
@@ -35,7 +35,7 @@ export default function App() {
     todos: [], projects: [], 
     goals: [], goal_milestones: [], 
     journal_folders: [], journal_pages: [],
-    calendar_events: [], // <--- NOUVEL ÉTAT POUR LE PLANNING
+    calendar_events: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
     events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
@@ -128,7 +128,7 @@ export default function App() {
         supabase.from('goal_milestones').select('*'),
         supabase.from('journal_folders').select('*'),
         supabase.from('journal_pages').select('*'),
-        supabase.from('calendar_events').select('*') // <--- CHARGEMENT PLANNING
+        supabase.from('calendar_events').select('*') 
       ]);
 
       const [
@@ -138,7 +138,7 @@ export default function App() {
         { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
         { data: ventures }, { data: goals }, { data: goal_milestones },
         { data: journal_folders }, { data: journal_pages },
-        { data: calendar_events } // <--- RÉCUPÉRATION
+        { data: calendar_events } 
       ] = results;
 
       // --- CATCH-UP ENGINE ---
@@ -261,7 +261,7 @@ export default function App() {
         todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
         goals: goals || [], goal_milestones: goal_milestones || [], 
         journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-        calendar_events: calendar_events || [], // <--- INTÉGRATION DONNÉES PLANNING
+        calendar_events: calendar_events || [], 
         budget: {
           accounts: validAccounts, 
           transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -281,12 +281,21 @@ export default function App() {
     } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
   };
 
+  // --- MODIFICATION ICI : Gestion de la suppression de masse (filtre) ---
   const updateData = async (newData, deleteRequest = null) => {
     setData(newData);
     setUnsavedChanges(true);
     if (deleteRequest) {
-      const { table, id } = deleteRequest;
-      if (table && id) try { await supabase.from(table).delete().eq('id', id); } catch (e) { console.error("Erreur suppression", e); }
+      const { table, id, filter } = deleteRequest; // <-- AJOUT "filter"
+      try {
+        if (filter && filter.column && filter.value) {
+            // Suppression de masse (ex: toute une série via recurrence_group_id)
+            await supabase.from(table).delete().eq(filter.column, filter.value);
+        } else if (table && id) {
+            // Suppression classique par ID unique
+            await supabase.from(table).delete().eq('id', id);
+        }
+      } catch (e) { console.error("Erreur suppression", e); }
     }
   };
 
@@ -314,7 +323,7 @@ export default function App() {
       await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
       await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
       await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-      // TODOS : Ajout des champs pour le planning
+      
       await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes }));
       await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
       await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
@@ -332,7 +341,6 @@ export default function App() {
       await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
       await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
 
-      // PLANNING (SAUVEGARDE NOUVELLE)
       await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
           id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
           end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
@@ -366,13 +374,13 @@ export default function App() {
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
-      case 'planning': return <PlanningManager data={data} updateData={updateData} />; // <--- NOUVELLE ROUTE
+      case 'planning': return <PlanningManager data={data} updateData={updateData} />;
       default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
     }
   };
 
-  // MODIFICATION ICI POUR PLEINE LARGEUR
-  const isWorkspace = currentView === 'workspace' || currentView === 'planning';
+  // --- MODIFICATION ICI : Layout Full Width pour Journal/Planning/Workspace ---
+  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal';
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
@@ -404,7 +412,7 @@ export default function App() {
         </header>
         
         <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
-          <div className={`w-full ${isWorkspace ? 'h-full' : 'max-w-7xl mx-auto'}`}> 
+          <div className={`w-full ${isWorkspace ? 'h-full' : 'px-6'}`}> 
             {renderContent()} 
           </div>
         </main>
