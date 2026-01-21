@@ -7,7 +7,7 @@ import {
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
   isSameDay, parseISO, getHours, getMinutes, 
-  setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid
+  setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -31,7 +31,7 @@ export default function PlanningManager({ data, updateData }) {
         type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue' 
     });
 
-    // Données sécurisées
+    // Données
     const events = Array.isArray(data.calendar_events) ? data.calendar_events : [];
     const scheduledTodos = (data.todos || []).filter(t => t.scheduled_date && !t.completed);
     const backlogTodos = (data.todos || []).filter(t => !t.scheduled_date && !t.completed);
@@ -147,46 +147,50 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- CORRECTION MAJEURE DU BUG DE SYNCHRONISATION ---
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updatedEvents = [...events];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            // On récupère les infos cibles : HEURE et MINUTES précises
+            // LOGIQUE DE RESYNCHRONISATION TOTALE
+            // 1. On identifie le jour de la semaine cible (0 = Dimanche, 1 = Lundi...)
+            const targetDayOfWeek = startObj.getDay();
             const targetHours = getHours(startObj);
             const targetMinutes = getMinutes(startObj);
             const targetDuration = formData.duration;
-            
-            // On doit aussi savoir si on a changé de JOUR de la semaine
-            const originalEvent = events.find(e => e.id === targetId);
-            
-            // Sécurité crash si event introuvable
-            if (!originalEvent) {
-                setIsCreating(false);
-                setConfirmMode(null);
-                return; 
-            }
-
-            const originalStart = parseISO(originalEvent.start_time);
-            
-            // Calcul du décalage en jours (ex: Lundi -> Mardi = +1 jour)
-            // On utilise setHours(0,0,0,0) pour comparer les jours purs
-            const startDayZero = new Date(startObj); startDayZero.setHours(0,0,0,0);
-            const originalDayZero = new Date(originalStart); originalDayZero.setHours(0,0,0,0);
-            const dayDiff = Math.round((startDayZero - originalDayZero) / (1000 * 60 * 60 * 24));
 
             updatedEvents = updatedEvents.map(ev => {
-                // On applique à TOUT le groupe, même ceux déjà modifiés auparavant
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let evStart = parseISO(ev.start_time);
                     
-                    // 1. Appliquer le décalage de jours (si on a changé de jour)
-                    if (dayDiff !== 0) {
-                        evStart = addDays(evStart, dayDiff);
+                    // Si on a changé de jour de la semaine (ex: déplacé du Lundi au Mardi)
+                    // On doit ajuster la date de base de chaque événement
+                    const currentDayOfWeek = evStart.getDay();
+                    if (currentDayOfWeek !== targetDayOfWeek) {
+                        const diff = targetDayOfWeek - currentDayOfWeek;
+                        // Correction pour le passage de semaine (ex: Dimanche -> Lundi)
+                        // Mais pour faire simple, on va juste prendre la différence brute en jours
+                        // Attention: Cela suppose que la série est hebdomadaire simple.
+                        
+                        // Méthode plus sûre : Calculer le delta exact depuis l'événement ORIGINAL cliqué
+                        // Mais comme on veut tout forcer, on va simplement caler l'heure.
+                        
+                        // Si le jour change, on ajoute la différence de jours
+                        // Pour gérer le changement de jour correctement, il faut connaître le décalage de jours exact appliqué
+                        // entre "l'ancien événement cible" et le "nouvel événement cible"
+                        
+                        // On retrouve l'événement qu'on est en train de modifier dans la base (avant modif)
+                        const eventInDb = events.find(e => e.id === targetId);
+                        if (eventInDb) {
+                             const dbStart = parseISO(eventInDb.start_time);
+                             // Calcul de la différence de jours entre l'ancienne position et la nouvelle
+                             const daysDelta = differenceInMinutes(startOfDay(startObj), startOfDay(dbStart)) / 60 / 24;
+                             if (Math.abs(daysDelta) >= 1) {
+                                 evStart = addDays(evStart, Math.round(daysDelta));
+                             }
+                        }
                     }
 
-                    // 2. FORCER l'heure et les minutes (Synchronisation absolue)
-                    // C'est ça qui corrige le bug : on n'ajoute pas +1h, on DIT "C'est 11h00".
+                    // On FORCE l'heure et les minutes
                     let newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
                     let newEvEnd = addMinutes(newEvStart, targetDuration);
 
@@ -201,10 +205,16 @@ export default function PlanningManager({ data, updateData }) {
                 return ev;
             });
         } else {
-            // MODE SINGLE : On modifie juste l'événement, mais ON GARDE LE GROUPE (pour pouvoir le rattraper plus tard si besoin)
+            // MODE SINGLE : On modifie l'événement MAIS on enlève son lien de groupe pour éviter les bugs futurs
+            // C'est ça qui empêchait la suppression : un événement "mutant" restait lié au groupe.
+            // Maintenant, si tu modifies "Juste celui-là", il devient indépendant.
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
-                ...ev, title: formData.title, color: formData.color,
-                start_time: startObj.toISOString(), end_time: endObj.toISOString()
+                ...ev, 
+                title: formData.title, 
+                color: formData.color,
+                start_time: startObj.toISOString(), 
+                end_time: endObj.toISOString(),
+                recurrence_group_id: null // <-- ON LE DÉTACHE DU GROUPE
             } : ev);
         }
 
@@ -216,6 +226,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleDeleteRequest = (evt) => {
         if (!evt) return;
+        // Si l'événement a un groupe, on demande. Sinon delete direct.
         if (evt.recurrence_group_id) {
             setSelectedEvent(evt); setConfirmMode('ask_delete');
         } else {
@@ -223,29 +234,18 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- CORRECTION DU CRASH SUR SUPPRESSION ---
     const performDelete = (evt, series) => {
-        if (!evt) {
-             // Sécurité crash
-             setConfirmMode(null);
-             setSelectedEvent(null);
-             return;
-        }
+        if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
 
-        let updatedEvents = [...events]; // Copie propre
+        let updatedEvents = [...events];
         
         if (series && evt.recurrence_group_id) {
-            // Suppression par ID de groupe (Robuste)
             updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
         } else {
-            // Suppression par ID unique
             updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
         }
         
-        // On passe null comme ID pour forcer une sauvegarde globale de la table 'calendar_events'
-        // au lieu d'une suppression par ID unique côté serveur, ce qui évite les conflits
         updateData({ ...data, calendar_events: updatedEvents });
-        
         setSelectedEvent(null);
         setConfirmMode(null);
     };
@@ -377,8 +377,8 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="w-12 h-12 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-2"><Repeat size={24}/></div>
                                 <h3 className="font-bold text-lg dark:text-white">Modifier la récurrence ?</h3>
                                 <div className="grid gap-3">
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là</button>
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Toute la série</button>
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là (Détacher)</button>
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Toute la série (Écraser)</button>
                                     <button onClick={() => { setConfirmMode(null); setIsCreating(false); }} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
                                 </div>
                             </div>
