@@ -83,10 +83,8 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); 
         e.preventDefault(); 
-        
         let startDuration = 60;
         let startTime, endTime;
-
         if (evt.scheduled_date) { 
              startTime = parseISO(evt.scheduled_date);
              startDuration = evt.duration_minutes || 60;
@@ -95,11 +93,7 @@ export default function PlanningManager({ data, updateData }) {
              endTime = parseISO(evt.end_time);
              startDuration = differenceInMinutes(endTime, startTime);
         }
-
-        const initData = { 
-            id: evt.id, startY: e.clientY, startDuration: startDuration, 
-            currentDuration: startDuration, currentDurationTemp: startDuration, event: evt 
-        };
+        const initData = { id: evt.id, startY: e.clientY, startDuration: startDuration, currentDuration: startDuration, currentDurationTemp: startDuration, event: evt };
         setResizingEvent(initData);
         resizeRef.current = initData;
     };
@@ -132,10 +126,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleEventClick = (e, itemData, type) => {
         e.stopPropagation();
-        if (ignoreNextClick.current) {
-            ignoreNextClick.current = false;
-            return;
-        }
+        if (ignoreNextClick.current) { ignoreNextClick.current = false; return; }
         setSelectedEvent({ type, data: itemData });
     };
 
@@ -144,19 +135,14 @@ export default function PlanningManager({ data, updateData }) {
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // --- LAYOUT ---
+    // --- LAYOUT ENGINE ---
     const getLayoutForDay = (dayItems) => {
-        // Pour l'affichage "All Day", on considère :
-        // 1. Les événements avec is_all_day = true
-        // 2. Les tâches avec duration_minutes = 1440 (Convention interne pour "Toute la journée")
-        const isItemAllDay = (item) => {
-            if (item.type === 'event') return item.data.is_all_day;
-            if (item.type === 'todo') return item.data.duration_minutes === 1440;
-            return false;
-        };
-
-        // On filtre pour ne garder que ceux AVEC horaire dans la grille
-        const timedItems = dayItems.filter(item => !isItemAllDay(item));
+        // Filtrage strict : on vire tout ce qui est All Day
+        const timedItems = dayItems.filter(item => {
+            if (item.type === 'event') return !item.data.is_all_day;
+            if (item.type === 'todo') return item.data.duration_minutes !== 1440;
+            return true;
+        });
 
         const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
@@ -223,14 +209,13 @@ export default function PlanningManager({ data, updateData }) {
 
     const openEditModal = (evt, type = 'event') => {
         let start, end, duration, title, id, isAllDay;
-
         if (type === 'todo') {
             start = parseISO(evt.scheduled_date);
             duration = evt.duration_minutes || 60;
             end = addMinutes(start, duration);
             title = evt.text;
             id = evt.id;
-            isAllDay = duration === 1440; // Détection auto convention
+            isAllDay = duration === 1440; 
         } else {
             start = parseISO(evt.start_time);
             end = parseISO(evt.end_time);
@@ -239,16 +224,11 @@ export default function PlanningManager({ data, updateData }) {
             id = evt.id;
             isAllDay = evt.is_all_day || false;
         }
-
         setEventForm({
             id: id, title: title, date: format(start, 'yyyy-MM-dd'),
             startHour: getHours(start), startMin: getMinutes(start),
-            duration: duration,
-            type: type, 
-            recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
-            recurrenceGroupId: evt.recurrence_group_id, 
-            color: evt.color || 'blue',
-            isAllDay: isAllDay
+            duration: duration, type: type, recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
+            recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue', isAllDay: isAllDay
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -257,7 +237,6 @@ export default function PlanningManager({ data, updateData }) {
     const handleSave = () => {
         if (!eventForm.title) return alert("Titre requis");
         const baseDate = parse(eventForm.date, 'yyyy-MM-dd', new Date());
-        
         let newStart, newEnd;
         if (eventForm.isAllDay) {
             newStart = setMinutes(setHours(baseDate, 0), 0);
@@ -267,14 +246,13 @@ export default function PlanningManager({ data, updateData }) {
             newEnd = addMinutes(newStart, eventForm.duration);
         }
 
-        // --- SAUVEGARDE TÂCHE (TODO) ---
         if (eventForm.type === 'todo') {
             const updatedTodos = data.todos.map(t => 
                 t.id === eventForm.id ? { 
                     ...t, 
                     text: eventForm.title, 
                     scheduled_date: newStart.toISOString(), 
-                    duration_minutes: eventForm.isAllDay ? 1440 : eventForm.duration // Convention 1440 = All Day
+                    duration_minutes: eventForm.isAllDay ? 1440 : eventForm.duration
                 } : t
             );
             updateData({ ...data, todos: updatedTodos });
@@ -282,7 +260,6 @@ export default function PlanningManager({ data, updateData }) {
             return;
         }
 
-        // --- SAUVEGARDE ÉVÉNEMENT ---
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
             const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay };
@@ -304,8 +281,7 @@ export default function PlanningManager({ data, updateData }) {
 
         if (eventForm.recurrenceGroupId) {
             setPendingUpdate({ newStart, newEnd, ...eventForm }); 
-            setConfirmMode('ask_update'); 
-            setIsCreating(true); 
+            setConfirmMode('ask_update'); setIsCreating(true); 
         } else {
             applyUpdate(eventForm.id, newStart, newEnd, eventForm, 'single');
         }
@@ -318,7 +294,6 @@ export default function PlanningManager({ data, updateData }) {
             const targetHours = getHours(startObj);
             const targetMinutes = getMinutes(startObj);
             const targetDuration = formData.duration;
-
             updatedEvents = updatedEvents.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let evStart = parseISO(ev.start_time);
@@ -331,14 +306,8 @@ export default function PlanningManager({ data, updateData }) {
                             evStart = addDays(evStart, daysDelta);
                         }
                     }
-                    let newEvStart, newEvEnd;
-                    if (formData.isAllDay) {
-                        newEvStart = setMinutes(setHours(evStart, 0), 0);
-                        newEvEnd = setMinutes(setHours(evStart, 23), 59);
-                    } else {
-                        newEvStart = setMinutes(setHours(evStart, targetHours), targetMinutes);
-                        newEvEnd = addMinutes(newEvStart, targetDuration);
-                    }
+                    let newEvStart = formData.isAllDay ? setMinutes(setHours(evStart, 0), 0) : setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    let newEvEnd = formData.isAllDay ? setMinutes(setHours(evStart, 23), 59) : addMinutes(newEvStart, targetDuration);
                     return { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay };
                 }
                 return ev;
@@ -347,14 +316,11 @@ export default function PlanningManager({ data, updateData }) {
             updatedEvents = updatedEvents.map(ev => ev.id === targetId ? {
                 ...ev, title: formData.title, color: formData.color,
                 start_time: startObj.toISOString(), end_time: endObj.toISOString(),
-                recurrence_group_id: null,
-                is_all_day: formData.isAllDay
+                recurrence_group_id: null, is_all_day: formData.isAllDay
             } : ev);
         }
         updateData({ ...data, calendar_events: updatedEvents });
-        setConfirmMode(null);
-        setPendingUpdate(null);
-        setIsCreating(false);
+        setConfirmMode(null); setPendingUpdate(null); setIsCreating(false);
     };
 
     const handleDeleteRequest = (evt) => {
@@ -363,8 +329,7 @@ export default function PlanningManager({ data, updateData }) {
              if(window.confirm("Supprimer cette tâche définitivement ?")) {
                  const updatedTodos = data.todos.filter(t => t.id !== evt.id);
                  updateData({ ...data, todos: updatedTodos }, { table: 'todos', id: evt.id });
-                 setSelectedEvent(null);
-                 setConfirmMode(null);
+                 setSelectedEvent(null); setConfirmMode(null);
              }
              return;
         }
@@ -382,8 +347,7 @@ export default function PlanningManager({ data, updateData }) {
             updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
             updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
         }
-        setSelectedEvent(null);
-        setConfirmMode(null);
+        setSelectedEvent(null); setConfirmMode(null);
     };
 
     const handleClearAll = async () => {
@@ -400,7 +364,7 @@ export default function PlanningManager({ data, updateData }) {
     };
     const onDragOver = (e) => { e.preventDefault(); };
 
-    // --- DROP DANS LA GRILLE (HEURES) ---
+    // --- DROP GRILLE (HEURES) ---
     const onDropGrid = (e, day) => {
         e.preventDefault();
         setPreviewSlot(null);
@@ -410,7 +374,7 @@ export default function PlanningManager({ data, updateData }) {
         const newStart = setMinutes(setHours(day, h), m);
 
         if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
-            // Mise à jour de la tâche : Date définie + Durée standard (60min) = PAS All Day
+            // Drop sur la grille = PAS All Day (donc 60min par défaut)
             const updatedTodos = data.todos.map(t => t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: 60 } : t);
             updateData({ ...data, todos: updatedTodos });
         } 
@@ -424,8 +388,7 @@ export default function PlanningManager({ data, updateData }) {
                     date: format(newStart, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
                 });
                 setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
-                setConfirmMode('ask_update');
-                setIsCreating(true);
+                setConfirmMode('ask_update'); setIsCreating(true);
             } else {
                 const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev);
                 updateData({ ...data, calendar_events: updatedEvents });
@@ -434,7 +397,7 @@ export default function PlanningManager({ data, updateData }) {
         setDraggedItem(null);
     };
 
-    // --- DROP DANS LA ZONE "TOUTE LA JOURNÉE" ---
+    // --- DROP TOUTE LA JOURNÉE ---
     const onDropAllDay = (e, day) => {
         e.preventDefault();
         if (!draggedItem) return;
@@ -443,23 +406,18 @@ export default function PlanningManager({ data, updateData }) {
             const evt = draggedItem.data;
             const start = setMinutes(setHours(day, 0), 0);
             const end = setMinutes(setHours(day, 23), 59);
-            
             if (evt.recurrence_group_id) {
-                setEventForm({
-                    id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, 
-                    date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true
-                });
+                setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true });
                 setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
-                setConfirmMode('ask_update');
-                setIsCreating(true);
+                setConfirmMode('ask_update'); setIsCreating(true);
             } else {
                 const updatedEvents = eventsRef.current.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: end.toISOString(), is_all_day: true } : ev);
                 updateData({ ...data, calendar_events: updatedEvents });
             }
         } 
         else if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
-            // FIX: On ne crée PAS un nouvel événement. On met à jour la tâche avec la convention 1440 min = All Day
-            const newStart = setMinutes(setHours(day, 9), 0); // Heure par défaut (non affichée car All Day)
+            // Drop Todo en haut = 1440 min (Convention)
+            const newStart = setMinutes(setHours(day, 9), 0);
             const updatedTodos = data.todos.map(t => t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: 1440 } : t);
             updateData({ ...data, todos: updatedTodos });
         }
@@ -498,21 +456,14 @@ export default function PlanningManager({ data, updateData }) {
             {showSidebar && (
                 <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none animate-in slide-in-from-left-5">
                     <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center">
-                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
-                            <CheckCircle2 size={20} className="text-blue-600"/> Tâches
-                        </h2>
-                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-                            <PanelLeftClose size={18} />
-                        </button>
+                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg"><CheckCircle2 size={20} className="text-blue-600"/> Tâches</h2>
+                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><PanelLeftClose size={18} /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                         {backlogTodos.map(todo => (
                             <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
-                                <div className="flex justify-between items-start pl-2">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span>
-                                    <GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/>
-                                </div>
+                                <div className="flex justify-between items-start pl-2"><span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span><GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/></div>
                             </div>
                         ))}
                         {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
@@ -543,8 +494,8 @@ export default function PlanningManager({ data, updateData }) {
                             
                             {/* COLONNE GAUCHE (Heures) */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                <div className="min-h-[5rem] border-b border-gray-200 dark:border-slate-800 flex items-center justify-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900">
-                                    <span className="-rotate-90">TOUTE<br/>JRN</span>
+                                <div className="min-h-[5rem] border-b border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
+                                    <span>TOUTE</span><span>LA JRN</span>
                                 </div>
                                 {hours.map(h => <div key={h} className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">{h}:00</div>)}
                                 <div className="h-[60px] text-[11px] font-bold text-slate-400 text-right pr-3 pt-1 relative -top-2.5">00:00</div>
@@ -557,7 +508,7 @@ export default function PlanningManager({ data, updateData }) {
                                     const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
                                     const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
                                     
-                                    // SÉPARATION ALL-DAY / TIMED (Convention Todo 1440 min = All Day)
+                                    // LOGIQUE DE FILTRAGE STRICT
                                     const isItemAllDay = (item) => {
                                         if (item.type === 'event') return item.data.is_all_day === true;
                                         if (item.type === 'todo') return item.data.duration_minutes === 1440;
@@ -567,7 +518,7 @@ export default function PlanningManager({ data, updateData }) {
                                     const allDayItems = [...rawEvents, ...rawTodos].filter(item => isItemAllDay(item));
                                     const timedItems = [...rawEvents, ...rawTodos].filter(item => !isItemAllDay(item));
                                     
-                                    const layoutItems = getLayoutForDay([...rawEvents, ...rawTodos]); // Utilise déjà le filtre interne
+                                    const layoutItems = getLayoutForDay(timedItems);
 
                                     return (
                                         <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
@@ -580,15 +531,17 @@ export default function PlanningManager({ data, updateData }) {
 
                                             {/* ZONE "TOUTE LA JOURNÉE" */}
                                             <div 
-                                                className={`min-h-[5rem] border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
+                                                className={`min-h-[5rem] border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-2 flex flex-col gap-1.5 transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
                                                 onDragOver={(e) => e.preventDefault()}
                                                 onDrop={(e) => onDropAllDay(e, day)}
                                             >
                                                 {allDayItems.map(item => {
                                                     const isTodo = item.type === 'todo';
                                                     const colorClass = isTodo 
-                                                        ? 'bg-orange-50 border-orange-400 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500'
-                                                        : item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 border-l-emerald-500 text-emerald-800' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 border-l-slate-500 text-slate-700' : 'bg-blue-100 border-blue-200 border-l-blue-500 text-blue-800';
+                                                        ? 'bg-orange-100 border-orange-200 text-orange-900 border-l-orange-500'
+                                                        : item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' 
+                                                        : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' 
+                                                        : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
 
                                                     return (
                                                         <div 
@@ -596,7 +549,7 @@ export default function PlanningManager({ data, updateData }) {
                                                             draggable
                                                             onDragStart={(e) => onDragStart(e, item.data, isTodo ? 'planned_todo' : 'event')}
                                                             onClick={(e) => handleEventClick(e, item.data, item.type)} 
-                                                            className={`text-[10px] font-bold px-2 py-1.5 rounded-md border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all shadow-sm ${colorClass}`}
+                                                            className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border-l-4 shadow-sm truncate cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all border border-transparent ${colorClass}`}
                                                         >
                                                             {isTodo ? item.data.text : item.data.title}
                                                         </div>
@@ -676,7 +629,6 @@ export default function PlanningManager({ data, updateData }) {
                                         </div>
                                     )}
 
-                                    {/* FIX: Masquer la récurrence si c'est une Tâche (todo) */}
                                     {eventForm.type !== 'todo' && !eventForm.id && (
                                         <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
                                             <div className="flex items-center justify-between mb-2"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label></div>
