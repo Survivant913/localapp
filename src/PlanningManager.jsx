@@ -139,7 +139,8 @@ export default function PlanningManager({ data, updateData }) {
             let duration = differenceInMinutes(end, start);
             if (resizingEvent && item.data.id === resizingEvent.id) duration = resizingEvent.currentDuration;
 
-            const top = Math.max(0, startMin - (6 * 60)); 
+            // FIX 24H: On commence à 0, donc top = startMin direct
+            const top = Math.max(0, startMin); 
             let placed = false;
             for(let col of columns) {
                 if (!col.some(ev => {
@@ -150,7 +151,8 @@ export default function PlanningManager({ data, updateData }) {
                     
                     const myTop = top; const myBottom = top + duration;
                     const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
-                    const otherTop = Math.max(0, otherStartMin - (6 * 60));
+                    // FIX 24H: ici aussi on enlève le décalage
+                    const otherTop = Math.max(0, otherStartMin);
                     const otherBottom = otherTop + evDuration;
                     return (myTop < otherBottom && myBottom > otherTop);
                 })) {
@@ -304,11 +306,6 @@ export default function PlanningManager({ data, updateData }) {
         setSelectedEvent(null); setConfirmMode(null);
     };
 
-    const handleClearAll = async () => {
-        if(!window.confirm("ATTENTION : Cela va effacer TOUS les événements de l'agenda.\nÊtes-vous sûr ?")) return;
-        updateData({ ...data, calendar_events: [] }, { table: 'calendar_events', filter: { column: 'user_id', value: data.profile?.id } });
-    };
-
     // --- DRAG HANDLERS ---
     const onDragStart = (e, item) => {
         if (resizeRef.current) { e.preventDefault(); return; }
@@ -320,10 +317,10 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG SUR GRILLE ---
     const onDragOverGrid = (e, dayIndex) => {
-        // INTERDICTION STRICTE : Si l'event est All Day, on interdit le drop
+        // INTERDICTION STRICTE : Si l'event est All Day, on interdit le survol de la grille (pas de preview)
         if (draggedItem && draggedItem.data.is_all_day) {
             setPreviewSlot(null);
-            return;
+            return; // PAS de preventDefault = Curseur Interdit
         }
 
         e.preventDefault();
@@ -331,13 +328,14 @@ export default function PlanningManager({ data, updateData }) {
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         
-        let hour = Math.floor(y / 60) + 6; 
-        if (hour < 6) hour = 6; if (hour > 23) hour = 23;
+        // FIX 24H: On commence à 0h, donc pas de +6
+        let hour = Math.floor(y / 60); 
+        if (hour < 0) hour = 0; if (hour > 23) hour = 23;
         
         let rawMinutes = Math.floor(y % 60); 
         let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         
-        // FIX 10:60 -> 11:00
+        // FIX: 10:60 -> 11:00
         if (snappedMinutes === 60) {
             snappedMinutes = 0;
             hour += 1;
@@ -345,7 +343,8 @@ export default function PlanningManager({ data, updateData }) {
         
         let duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
         
-        setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
+        // FIX 24H: Top est direct, pas de -6
+        setPreviewSlot({ dayIndex, top: hour * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
     };
 
     const onDrop = (e) => { e.preventDefault(); setPreviewSlot(null); };
@@ -359,10 +358,11 @@ export default function PlanningManager({ data, updateData }) {
 
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
-        let hour = Math.floor(y / 60) + 6; if (hour < 6) hour = 6; if (hour > 23) hour = 23;
+        // FIX 24H: On commence à 0h
+        let hour = Math.floor(y / 60); if (hour < 0) hour = 0; if (hour > 23) hour = 23;
         let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         
-        // FIX 10:60 au drop
+        // FIX: 10:60 -> 11:00 au drop
         if (snappedMinutes === 60) {
             snappedMinutes = 0;
             hour += 1;
@@ -384,10 +384,9 @@ export default function PlanningManager({ data, updateData }) {
         setDraggedItem(null);
     };
 
-    // --- DRAG SUR ALL DAY ---
     const onDragOverAllDay = (e) => {
         // INTERDICTION STRICTE : Si l'event n'est PAS All Day, interdit.
-        if (draggedItem && !draggedItem.data.is_all_day) return;
+        if (draggedItem && !draggedItem.data.is_all_day) return; // Pas de preventDefault
         e.preventDefault();
     };
 
@@ -412,8 +411,10 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
-    const hours = Array.from({ length: 18 }).map((_, i) => i + 6);
-    const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date()) - (6 * 60);
+    // FIX 24H: 0 à 23h
+    const hours = Array.from({ length: 24 }).map((_, i) => i);
+    // FIX 24H: Pas de décalage de -6h
+    const currentTimeMin = getHours(new Date()) * 60 + getMinutes(new Date());
 
     const durationOptions = [];
     for (let m = 15; m <= 720; m += 15) {
@@ -439,13 +440,15 @@ export default function PlanningManager({ data, updateData }) {
                     </div>
 
                     <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
-                        <div className="flex w-full h-full min-h-[1140px]">
+                        {/* FIX 24H: Hauteur totale 1440px */}
+                        <div className="flex w-full h-full min-h-[1440px]">
                             
                             {/* COLONNE GAUCHE (Heures) */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
                                 <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
-                                <div className="h-24 border-b border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
-                                    <span>TOUTE</span><span>JRN</span>
+                                {/* FIX: BORDURE EPAISSE */}
+                                <div className="h-24 border-b-4 border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
+                                    <span>ALL</span><span>DAY</span>
                                 </div>
                                 {hours.map(h => (
                                     <div key={h} className="h-[60px] relative w-full border-b border-transparent">
@@ -474,8 +477,9 @@ export default function PlanningManager({ data, updateData }) {
                                             </div>
 
                                             {/* ZONE "TOUTE LA JOURNÉE" - h-24 */}
+                                            {/* FIX: BORDURE EPAISSE */}
                                             <div 
-                                                className={`h-24 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
+                                                className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
                                                 onDragOver={onDragOverAllDay}
                                                 onDrop={(e) => onDropAllDay(e, day)}
                                             >
@@ -492,14 +496,14 @@ export default function PlanningManager({ data, updateData }) {
                                                 })}
                                             </div>
                                             
-                                            {/* GRILLE HEURES */}
+                                            {/* GRILLE HEURES (0h-24h) */}
                                             <div 
-                                                className={`relative h-[1140px] transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
+                                                className={`relative h-[1440px] transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
                                                 onDragOver={(e) => onDragOverGrid(e, dayIndex)}
                                                 onDrop={(e) => onDropGrid(e, day)}
                                             >
-                                                {Array.from({length: 19}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
-                                                {isToday && currentTimeMin > 0 && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
+                                                {Array.from({length: 24}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
+                                                {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${currentTimeMin}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
                                                 
                                                 {layoutItems.map((item) => {
@@ -559,7 +563,7 @@ export default function PlanningManager({ data, updateData }) {
 
                                     {!eventForm.isAllDay && (
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 19}).map((_, i) => <option key={i} value={i+6}>{i+6}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 24}).map((_, i) => <option key={i} value={i}>{i}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
                                             <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">{durationOptions}</select></div>
                                         </div>
                                     )}
