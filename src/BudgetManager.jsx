@@ -85,11 +85,15 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
-    // --- AUTOMATISATION : VÉRIFICATION DES PLANIFIÉS (CORRECTIF BUG COMPTE) ---
+    // --- AUTOMATISATION : VÉRIFICATION DES PLANIFIÉS (CORRECTIF BUG COMPTE + BUG DATE) ---
     useEffect(() => {
         const checkScheduled = () => {
             const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            // FIX DATE : On compare les chaînes "YYYY-MM-DD" locales pour éviter les soucis de Timezone
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
             
             let hasUpdates = false;
             let newScheduled = [...scheduledList];
@@ -97,8 +101,16 @@ export default function BudgetManager({ data, updateData }) {
 
             newScheduled.forEach((s, index) => {
                 if (s.status === 'pending') {
-                    const sDate = parseLocalDate(s.date);
-                    if (sDate <= today) {
+                    // Récupération "brute" de la date planifiée (YYYY-MM-DD)
+                    let scheduledDateStr = '';
+                    if (typeof s.date === 'string') {
+                        scheduledDateStr = s.date.split('T')[0];
+                    } else if (s.date instanceof Date) {
+                        scheduledDateStr = s.date.toISOString().split('T')[0];
+                    }
+
+                    // Comparaison alphabétique des chaines ISO (ex: "2023-10-24" <= "2023-10-23")
+                    if (scheduledDateStr && scheduledDateStr <= todayStr) {
                         // C'EST L'HEURE ! ON TRANSFORME EN TRANSACTION
                         hasUpdates = true;
                         newScheduled[index] = { ...s, status: 'completed' };
@@ -120,7 +132,7 @@ export default function BudgetManager({ data, updateData }) {
                                 id: baseTrans.id + '_out',
                                 type: 'expense',
                                 description: `Virement planifié vers ${targetName} : ${s.description}`,
-                                accountId: s.accountId // <-- ICI : On force bien le compte source
+                                accountId: s.accountId // FIX COMPTE
                             });
                             // Entrée
                             newTransactions.unshift({
@@ -128,7 +140,7 @@ export default function BudgetManager({ data, updateData }) {
                                 id: baseTrans.id + '_in',
                                 type: 'income',
                                 description: `Virement planifié reçu de ${sourceName} : ${s.description}`,
-                                accountId: s.targetAccountId // <-- ICI : On force bien le compte cible
+                                accountId: s.targetAccountId // FIX COMPTE
                             });
                         } else {
                             // Transaction normale
@@ -136,7 +148,7 @@ export default function BudgetManager({ data, updateData }) {
                                 ...baseTrans,
                                 type: s.type,
                                 description: `Planifié : ${s.description}`,
-                                accountId: s.accountId // <-- ICI : On force bien le compte
+                                accountId: s.accountId // FIX COMPTE
                             });
                         }
                     }
@@ -158,9 +170,8 @@ export default function BudgetManager({ data, updateData }) {
         if (scheduledList.length > 0) {
             checkScheduled();
         }
-        // On ne met pas updateData dans les dépendances pour éviter la boucle infinie
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scheduledList.length]); // On vérifie si la liste change
+    }, [scheduledList.length]); 
 
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
