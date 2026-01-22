@@ -85,6 +85,83 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
+    // --- AUTOMATISATION : VÉRIFICATION DES PLANIFIÉS (CORRECTIF BUG COMPTE) ---
+    useEffect(() => {
+        const checkScheduled = () => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            let hasUpdates = false;
+            let newScheduled = [...scheduledList];
+            let newTransactions = [...transactionsList];
+
+            newScheduled.forEach((s, index) => {
+                if (s.status === 'pending') {
+                    const sDate = parseLocalDate(s.date);
+                    if (sDate <= today) {
+                        // C'EST L'HEURE ! ON TRANSFORME EN TRANSACTION
+                        hasUpdates = true;
+                        newScheduled[index] = { ...s, status: 'completed' };
+
+                        const baseTrans = {
+                            id: Date.now() + index, // ID unique
+                            date: new Date().toISOString(),
+                            amount: s.amount,
+                            archived: false
+                        };
+
+                        if (s.type === 'transfer') {
+                            const sourceName = accounts.find(a => a.id === s.accountId)?.name;
+                            const targetName = accounts.find(a => a.id === s.targetAccountId)?.name;
+                            
+                            // Sortie
+                            newTransactions.unshift({
+                                ...baseTrans,
+                                id: baseTrans.id + '_out',
+                                type: 'expense',
+                                description: `Virement planifié vers ${targetName} : ${s.description}`,
+                                accountId: s.accountId // <-- ICI : On force bien le compte source
+                            });
+                            // Entrée
+                            newTransactions.unshift({
+                                ...baseTrans,
+                                id: baseTrans.id + '_in',
+                                type: 'income',
+                                description: `Virement planifié reçu de ${sourceName} : ${s.description}`,
+                                accountId: s.targetAccountId // <-- ICI : On force bien le compte cible
+                            });
+                        } else {
+                            // Transaction normale
+                            newTransactions.unshift({
+                                ...baseTrans,
+                                type: s.type,
+                                description: `Planifié : ${s.description}`,
+                                accountId: s.accountId // <-- ICI : On force bien le compte
+                            });
+                        }
+                    }
+                }
+            });
+
+            if (hasUpdates) {
+                updateData({
+                    ...data,
+                    budget: {
+                        ...budgetData,
+                        scheduled: newScheduled,
+                        transactions: newTransactions
+                    }
+                });
+            }
+        };
+
+        if (scheduledList.length > 0) {
+            checkScheduled();
+        }
+        // On ne met pas updateData dans les dépendances pour éviter la boucle infinie
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scheduledList.length]); // On vérifie si la liste change
+
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
         const bal = transactionsList
@@ -94,23 +171,6 @@ export default function BudgetManager({ data, updateData }) {
     };
 
     const currentTotalBalance = round2(transactionsList.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0));
-
-    const getMonthlySavingsForAccount = (accId) => {
-        let monthlyIn = 0;
-        let monthlyOut = 0;
-        recurringList.forEach(r => {
-            const amt = parseFloat(r.amount || 0);
-            if (r.type === 'income') {
-                if (String(r.accountId) === String(accId) || (!r.accountId && String(accId) === String(accounts[0].id))) monthlyIn += amt;
-            } else if (r.type === 'expense') {
-                if (String(r.accountId) === String(accId)) monthlyOut += amt;
-            } else if (r.type === 'transfer') {
-                if (String(r.accountId) === String(accId)) monthlyOut += amt;
-                if (String(r.targetAccountId) === String(accId)) monthlyIn += amt;
-            }
-        });
-        return round2(monthlyIn - monthlyOut);
-    };
 
     // Prévision fin de mois
     const endOfMonthForecast = useMemo(() => {
