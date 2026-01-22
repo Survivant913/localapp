@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar,
-  PanelLeftClose, PanelLeftOpen, ArrowLeftFromLine
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -18,7 +17,6 @@ export default function PlanningManager({ data, updateData }) {
     const [isCreating, setIsCreating] = useState(false);
     const [confirmMode, setConfirmMode] = useState(null); 
     const [pendingUpdate, setPendingUpdate] = useState(null); 
-    const [showSidebar, setShowSidebar] = useState(true); 
     
     // Drag & Drop
     const [draggedItem, setDraggedItem] = useState(null);
@@ -29,11 +27,8 @@ export default function PlanningManager({ data, updateData }) {
     const resizeRef = useRef(null);
     const ignoreNextClick = useRef(false);
     
+    // ON NE PREND QUE LES ÉVÉNEMENTS (Pas de todos)
     const events = useMemo(() => Array.isArray(data.calendar_events) ? data.calendar_events : [], [data.calendar_events]);
-    const todos = useMemo(() => Array.isArray(data.todos) ? data.todos : [], [data.todos]);
-    
-    const scheduledTodos = useMemo(() => todos.filter(t => t.scheduled_date && !t.completed), [todos]);
-    const backlogTodos = useMemo(() => todos.filter(t => !t.scheduled_date && !t.completed), [todos]);
 
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
@@ -44,9 +39,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const isItemAllDay = (item) => {
         if (!item || !item.data) return false;
-        if (item.type === 'event' && item.data.is_all_day === true) return true;
-        if ((item.type === 'todo' || item.type === 'planned_todo') && item.data.duration_minutes === 1440) return true;
-        return false;
+        return item.data.is_all_day === true;
     };
 
     // --- GESTION RESIZE ---
@@ -89,18 +82,13 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); 
         e.preventDefault(); 
-        if (evt.is_all_day || evt.duration_minutes === 1440) return;
+        if (evt.is_all_day) return;
 
         let startDuration = 60;
-        let startTime, endTime;
-        if (evt.scheduled_date) { 
-             startTime = parseISO(evt.scheduled_date);
-             startDuration = evt.duration_minutes || 60;
-        } else { 
-             startTime = parseISO(evt.start_time);
-             endTime = parseISO(evt.end_time);
-             startDuration = differenceInMinutes(endTime, startTime);
-        }
+        let startTime = parseISO(evt.start_time);
+        let endTime = parseISO(evt.end_time);
+        startDuration = differenceInMinutes(endTime, startTime);
+        
         const initData = { id: evt.id, startY: e.clientY, startDuration: startDuration, currentDuration: startDuration, currentDurationTemp: startDuration, event: evt };
         setResizingEvent(initData);
         resizeRef.current = initData;
@@ -108,13 +96,6 @@ export default function PlanningManager({ data, updateData }) {
 
     const finishResize = (evt, newDuration) => {
         if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
-        
-        if (evt.scheduled_date) {
-            const updatedTodos = todos.map(t => t.id === evt.id ? { ...t, duration_minutes: newDuration } : t);
-            updateData({ ...data, todos: updatedTodos });
-            return;
-        }
-
         const start = parseISO(evt.start_time);
         const newEnd = addMinutes(start, newDuration);
 
@@ -132,10 +113,10 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    const handleEventClick = (e, itemData, type) => {
+    const handleEventClick = (e, itemData) => {
         e.stopPropagation();
         if (ignoreNextClick.current) { ignoreNextClick.current = false; return; }
-        setSelectedEvent({ type, data: itemData });
+        setSelectedEvent({ type: 'event', data: itemData });
     };
 
     // --- NAVIGATION ---
@@ -209,28 +190,14 @@ export default function PlanningManager({ data, updateData }) {
         setSelectedEvent(null);
     };
 
-    const openEditModal = (evt, type = 'event') => {
-        let start, end, duration, title, id, isAllDay;
-        
-        if (type === 'todo') {
-            start = parseISO(evt.scheduled_date);
-            const isTodoAllDay = evt.duration_minutes === 1440;
-            duration = isTodoAllDay ? 60 : (evt.duration_minutes || 60);
-            end = addMinutes(start, duration);
-            title = evt.text;
-            id = evt.id;
-            isAllDay = isTodoAllDay; 
-        } else {
-            start = parseISO(evt.start_time);
-            end = parseISO(evt.end_time);
-            isAllDay = evt.is_all_day || false;
-            duration = isAllDay ? 60 : differenceInMinutes(end, start);
-            title = evt.title;
-            id = evt.id;
-        }
+    const openEditModal = (evt) => {
+        const start = parseISO(evt.start_time);
+        const end = parseISO(evt.end_time);
+        const isAllDay = evt.is_all_day || false;
+        const duration = isAllDay ? 60 : differenceInMinutes(end, start);
 
         setEventForm({
-            id: id, title: title, date: format(start, 'yyyy-MM-dd'),
+            id: evt.id, title: evt.title, date: format(start, 'yyyy-MM-dd'),
             startHour: getHours(start), startMin: getMinutes(start),
             duration: duration, 
             type: 'event', 
@@ -253,20 +220,6 @@ export default function PlanningManager({ data, updateData }) {
         } else {
             newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin);
             newEnd = addMinutes(newStart, eventForm.duration);
-        }
-
-        if (eventForm.type === 'todo') {
-            const updatedTodos = todos.map(t => 
-                t.id === eventForm.id ? { 
-                    ...t, 
-                    text: eventForm.title, 
-                    scheduled_date: newStart.toISOString(), 
-                    duration_minutes: eventForm.isAllDay ? 1440 : eventForm.duration
-                } : t
-            );
-            updateData({ ...data, todos: updatedTodos });
-            setIsCreating(false);
-            return;
         }
 
         if (!eventForm.id) {
@@ -334,14 +287,6 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleDeleteRequest = (evt) => {
         if (!evt) return;
-        if (selectedEvent?.type === 'todo' || evt.scheduled_date) {
-             if(window.confirm("Supprimer cette tâche définitivement ?")) {
-                 const updatedTodos = todos.filter(t => t.id !== evt.id);
-                 updateData({ ...data, todos: updatedTodos }, { table: 'todos', id: evt.id });
-                 setSelectedEvent(null); setConfirmMode(null);
-             }
-             return;
-        }
         if (evt.recurrence_group_id) { setSelectedEvent({type: 'event', data: evt}); setConfirmMode('ask_delete'); } 
         else { if(window.confirm("Supprimer cet événement ?")) performDelete(evt, false); }
     };
@@ -364,9 +309,10 @@ export default function PlanningManager({ data, updateData }) {
         updateData({ ...data, calendar_events: [] }, { table: 'calendar_events', filter: { column: 'user_id', value: data.profile?.id } });
     };
 
-    const onDragStart = (e, item, type) => {
+    // --- DRAG HANDLERS ---
+    const onDragStart = (e, item) => {
         if (resizeRef.current) { e.preventDefault(); return; }
-        setDraggedItem({ type, data: item });
+        setDraggedItem({ type: 'event', data: item });
         e.dataTransfer.effectAllowed = "move";
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         e.dataTransfer.setDragImage(img, 0, 0);
@@ -374,10 +320,10 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG SUR GRILLE ---
     const onDragOverGrid = (e, dayIndex) => {
-        // INTERDICTION STRICTE : Si l'item est All-Day, on ne montre pas de preview et on interdit le drop
-        if (draggedItem && isItemAllDay(draggedItem)) {
+        // INTERDICTION STRICTE : Si l'event est All Day, on interdit le drop
+        if (draggedItem && draggedItem.data.is_all_day) {
             setPreviewSlot(null);
-            return; // PAS DE preventDefault = CURSEUR INTERDIT
+            return;
         }
 
         e.preventDefault();
@@ -397,12 +343,8 @@ export default function PlanningManager({ data, updateData }) {
             hour += 1;
         }
         
-        let duration = 60;
-        if (draggedItem) {
-             if (draggedItem.type === 'event') duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
-             else if (draggedItem.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
-        }
-
+        let duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
+        
         setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
     };
 
@@ -412,15 +354,15 @@ export default function PlanningManager({ data, updateData }) {
         e.preventDefault();
         setPreviewSlot(null);
         if (!draggedItem) return;
-        // Sécurité supplémentaire
-        if (isItemAllDay(draggedItem)) return;
+        // BLOQUAGE : Impossible de déposer un All Day ici
+        if (draggedItem.data.is_all_day) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
         let hour = Math.floor(y / 60) + 6; if (hour < 6) hour = 6; if (hour > 23) hour = 23;
         let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         
-        // FIX 10:60 -> 11:00
+        // FIX 10:60 au drop
         if (snappedMinutes === 60) {
             snappedMinutes = 0;
             hour += 1;
@@ -428,76 +370,45 @@ export default function PlanningManager({ data, updateData }) {
 
         const newStart = setMinutes(setHours(day, hour), snappedMinutes);
 
-        if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
-            const updatedTodos = todos.map(t => 
-                t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: draggedItem.data.duration_minutes || 60 } : t
-            );
-            updateData({ ...data, todos: updatedTodos });
-        } 
-        else if (draggedItem.type === 'event') {
-            const evt = draggedItem.data;
-            const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
-            const newEnd = addMinutes(newStart, duration);
-            if (evt.recurrence_group_id) {
-                setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, date: format(newStart, 'yyyy-MM-dd'), startHour: hour, startMin: snappedMinutes, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false });
-                setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
-                setConfirmMode('ask_update'); setIsCreating(true);
-            } else {
-                const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev);
-                updateData({ ...data, calendar_events: updatedEvents });
-            }
+        const evt = draggedItem.data;
+        const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
+        const newEnd = addMinutes(newStart, duration);
+        if (evt.recurrence_group_id) {
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, date: format(newStart, 'yyyy-MM-dd'), startHour: hour, startMin: snappedMinutes, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false });
+            setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
+            setConfirmMode('ask_update'); setIsCreating(true);
+        } else {
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev);
+            updateData({ ...data, calendar_events: updatedEvents });
         }
         setDraggedItem(null);
     };
 
     // --- DRAG SUR ALL DAY ---
-    const onDragOverAllDay = (e) => { 
-        // INTERDICTION STRICTE : Si l'item n'est PAS "All Day" (et pas une tâche de sidebar), on interdit.
-        const isScheduledTimedEvent = (draggedItem?.type === 'event' && !draggedItem.data.is_all_day);
-        const isScheduledTimedTodo = (draggedItem?.type === 'planned_todo' && draggedItem.data.duration_minutes !== 1440);
-        
-        if (isScheduledTimedEvent || isScheduledTimedTodo) {
-            return; // PAS DE preventDefault = CURSEUR INTERDIT
-        }
-        
-        e.preventDefault(); 
+    const onDragOverAllDay = (e) => {
+        // INTERDICTION STRICTE : Si l'event n'est PAS All Day, interdit.
+        if (draggedItem && !draggedItem.data.is_all_day) return;
+        e.preventDefault();
     };
 
     const onDropAllDay = (e, day) => {
         e.preventDefault();
         if (!draggedItem) return;
+        // BLOQUAGE
+        if (!draggedItem.data.is_all_day) return;
 
-        // Double check sécurité
-        const isScheduledTimedEvent = (draggedItem.type === 'event' && !draggedItem.data.is_all_day);
-        const isScheduledTimedTodo = (draggedItem.type === 'planned_todo' && draggedItem.data.duration_minutes !== 1440);
-        if (isScheduledTimedEvent || isScheduledTimedTodo) return;
-
-        if (draggedItem.type === 'event') {
-            const evt = draggedItem.data;
-            const start = setMinutes(setHours(day, 0), 0);
-            const end = setMinutes(setHours(day, 23), 59);
-            if (evt.recurrence_group_id) {
-                setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true });
-                setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
-                setConfirmMode('ask_update'); setIsCreating(true);
-            } else {
-                const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: end.toISOString(), is_all_day: true } : ev);
-                updateData({ ...data, calendar_events: updatedEvents });
-            }
-        } 
-        else if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
-            const newStart = setMinutes(setHours(day, 9), 0);
-            const updatedTodos = todos.map(t => 
-                t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: 1440 } : t
-            );
-            updateData({ ...data, todos: updatedTodos });
+        const evt = draggedItem.data;
+        const start = setMinutes(setHours(day, 0), 0);
+        const end = setMinutes(setHours(day, 23), 59);
+        if (evt.recurrence_group_id) {
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true });
+            setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
+            setConfirmMode('ask_update'); setIsCreating(true);
+        } else {
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: end.toISOString(), is_all_day: true } : ev);
+            updateData({ ...data, calendar_events: updatedEvents });
         }
         setDraggedItem(null);
-    };
-
-    const unscheduleTodo = (todo) => {
-        updateData({ ...data, todos: todos.map(t => t.id === todo.id ? { ...t, scheduled_date: null } : t) });
-        setSelectedEvent(null);
     };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
@@ -513,35 +424,10 @@ export default function PlanningManager({ data, updateData }) {
 
     return (
         <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
-            {showSidebar && (
-                <div className="w-full md:w-80 border-r border-gray-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 z-20 shadow-xl shadow-slate-200/50 dark:shadow-none animate-in slide-in-from-left-5">
-                    <div className="p-5 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-between items-center">
-                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 text-lg">
-                            <CheckCircle2 size={20} className="text-blue-600"/> Tâches
-                        </h2>
-                        <button onClick={() => setShowSidebar(false)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><PanelLeftClose size={18} /></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                        {backlogTodos.map(todo => (
-                            <div key={todo.id} draggable onDragStart={(e) => onDragStart(e, todo, 'todo')} className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-blue-400 cursor-grab active:cursor-grabbing transition-all group relative overflow-hidden">
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gray-200 dark:bg-slate-700 group-hover:bg-blue-500 transition-colors"></div>
-                                <div className="flex justify-between items-start pl-2"><span className="text-sm font-medium text-slate-700 dark:text-slate-200 line-clamp-2 leading-relaxed">{todo.text}</span><GripVertical size={16} className="text-slate-300 dark:text-slate-600 shrink-0"/></div>
-                            </div>
-                        ))}
-                        {backlogTodos.length === 0 && <div className="text-center py-10 text-slate-400 italic text-sm">Rien à planifier !</div>}
-                    </div>
-                    <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
-                        <button onClick={() => openCreateModal()} className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={18}/> Nouvel Événement</button>
-                        <button onClick={handleClearAll} className="w-full py-2 bg-red-50 text-red-600 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-2 border border-red-100"><RotateCcw size={14}/> Tout Effacer</button>
-                    </div>
-                </div>
-            )}
-
             <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
                 <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
                         <div className="flex items-center gap-4 md:gap-6">
-                            {!showSidebar && (<button onClick={() => setShowSidebar(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Ouvrir la liste des tâches"><PanelLeftOpen size={20} /></button>)}
                             <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2"><Calendar className="text-blue-500" size={24}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
                             <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
                                 <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button>
@@ -549,6 +435,7 @@ export default function PlanningManager({ data, updateData }) {
                                 <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button>
                             </div>
                         </div>
+                        <button onClick={() => openCreateModal()} className="py-2 px-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={16}/> Planifier</button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
@@ -572,10 +459,9 @@ export default function PlanningManager({ data, updateData }) {
                                 {weekDays.map((day, dayIndex) => {
                                     const isToday = isSameDay(day, new Date());
                                     const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
-                                    const rawTodos = scheduledTodos.filter(t => isSameDay(parseISO(t.scheduled_date), day)).map(t => ({ type: 'todo', data: t, startStr: t.scheduled_date, endStr: addMinutes(parseISO(t.scheduled_date), t.duration_minutes || 60).toISOString() }));
                                     
-                                    const allDayItems = [...rawEvents, ...rawTodos].filter(item => isItemAllDay(item));
-                                    const timedItems = [...rawEvents, ...rawTodos].filter(item => !isItemAllDay(item));
+                                    const allDayItems = rawEvents.filter(item => isItemAllDay(item));
+                                    const timedItems = rawEvents.filter(item => !isItemAllDay(item));
                                     const layoutItems = getLayoutForDay(timedItems);
 
                                     return (
@@ -596,24 +482,11 @@ export default function PlanningManager({ data, updateData }) {
                                                 {allDayItems.map(item => {
                                                     const isDraggingThis = draggedItem?.data?.id === item.data.id;
                                                     const style = isDraggingThis ? { opacity: 0.5 } : {};
-
-                                                    const isTodo = item.type === 'todo';
-                                                    const colorClass = isTodo 
-                                                        ? 'bg-orange-100 border-orange-200 text-orange-900 border-l-orange-500'
-                                                        : item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' 
-                                                        : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' 
-                                                        : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
+                                                    const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
 
                                                     return (
-                                                        <div 
-                                                            key={item.data.id} 
-                                                            draggable
-                                                            onDragStart={(e) => onDragStart(e, item.data, isTodo ? 'planned_todo' : 'event')}
-                                                            onClick={(e) => handleEventClick(e, item.data, item.type)} 
-                                                            style={style}
-                                                            className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass}`}
-                                                        >
-                                                            {isTodo ? item.data.text : item.data.title}
+                                                        <div key={item.data.id} draggable onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} style={style} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass}`}>
+                                                            {item.data.title}
                                                         </div>
                                                     );
                                                 })}
@@ -630,20 +503,18 @@ export default function PlanningManager({ data, updateData }) {
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
                                                 
                                                 {layoutItems.map((item) => {
-                                                    const isTodo = item.type === 'todo';
                                                     const dataItem = item.data;
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                     const style = { ...item.style, opacity: isDraggingThis ? 0.5 : 1 };
-
                                                     const isRecurrent = !!dataItem.recurrence_group_id;
                                                     const isResizingAny = !!resizeRef.current;
-                                                    const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500' : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
+                                                    const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
 
                                                     return (
-                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => handleEventClick(e, dataItem, item.type)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
-                                                            <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
+                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
+                                                            <span className="font-bold truncate leading-tight text-[11px]">{dataItem.title}</span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
-                                                            {!isTodo && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
+                                                            <div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>
                                                         </div>
                                                     );
                                                 })}
@@ -674,7 +545,7 @@ export default function PlanningManager({ data, updateData }) {
                         ) : (
                             <>
                                 <h3 className="text-xl font-bold mb-6 text-slate-800 dark:text-white font-serif flex items-center gap-2">
-                                    {eventForm.type === 'todo' ? <CheckCircle2 className="text-orange-500" /> : <Calendar className="text-blue-500"/>}
+                                    <Calendar className="text-blue-500"/>
                                     {eventForm.id ? 'Modifier' : 'Planifier'}
                                 </h3>
                                 <div className="space-y-4">
@@ -693,15 +564,13 @@ export default function PlanningManager({ data, updateData }) {
                                         </div>
                                     )}
 
-                                    {eventForm.type !== 'todo' && !eventForm.id && (
+                                    {!eventForm.id && (
                                         <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
                                             <div className="flex items-center justify-between mb-2"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label></div>
                                             {eventForm.recurrence && (<div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-500">Pendant</span><input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm"/><span className="text-xs text-slate-500">semaines</span></div>)}
                                         </div>
                                     )}
-                                    {eventForm.type !== 'todo' && (
-                                        <div className="flex gap-3 pt-2">{['blue', 'green', 'gray'].map(c => (<button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`flex-1 h-8 rounded-lg border-2 transition-all ${eventForm.color === c ? 'border-slate-800 dark:border-white opacity-100' : 'border-transparent opacity-40'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></button>))}</div>
-                                    )}
+                                    <div className="flex gap-3 pt-2">{['blue', 'green', 'gray'].map(c => (<button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`flex-1 h-8 rounded-lg border-2 transition-all ${eventForm.color === c ? 'border-slate-800 dark:border-white opacity-100' : 'border-transparent opacity-40'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></button>))}</div>
                                     <div className="flex gap-3 pt-4"><button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm">{eventForm.id ? 'Modifier' : 'Créer'}</button></div>
                                 </div>
                             </>
@@ -724,18 +593,11 @@ export default function PlanningManager({ data, updateData }) {
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.type === 'event' ? selectedEvent.data.title : selectedEvent.data.text}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day || (selectedEvent.type === 'todo' && selectedEvent.data.duration_minutes === 1440) ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time || selectedEvent.data.scheduled_date), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
                                 <div className="flex gap-3">
-                                    <button onClick={() => openEditModal(selectedEvent.data, selectedEvent.type)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
-                                    {selectedEvent.type === 'todo' ? (
-                                        <>
-                                            <button onClick={() => unscheduleTodo(selectedEvent.data)} className="flex-1 py-3 border-2 border-orange-100 text-orange-600 rounded-xl font-bold text-sm hover:bg-orange-50 transition-colors flex items-center justify-center gap-2"><ArrowLeftFromLine size={16}/> Retirer</button>
-                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
-                                        </>
-                                    ) : (
-                                        <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
-                                    )}
+                                    <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
+                                    <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
                                 </div>
                             </>
                         )}
