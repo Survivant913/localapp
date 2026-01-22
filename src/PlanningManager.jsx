@@ -45,8 +45,8 @@ export default function PlanningManager({ data, updateData }) {
     const isItemAllDay = (item) => {
         if (!item || !item.data) return false;
         if (item.type === 'event' && item.data.is_all_day === true) return true;
-        if (item.type === 'todo' && item.data.duration_minutes === 1440) return true;
-        if (item.type === 'planned_todo' && item.data.duration_minutes === 1440) return true;
+        // Convention : 1440 min = 24h = All Day pour les tâches
+        if ((item.type === 'todo' || item.type === 'planned_todo') && item.data.duration_minutes === 1440) return true;
         return false;
     };
 
@@ -90,8 +90,8 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); 
         e.preventDefault(); 
-        // Interdit le resize sur les éléments All Day (car hauteur fixe)
-        if (evt.is_all_day || (evt.duration_minutes === 1440)) return;
+        // Interdit resize sur All Day
+        if (evt.is_all_day || evt.duration_minutes === 1440) return;
 
         let startDuration = 60;
         let startTime, endTime;
@@ -213,26 +213,35 @@ export default function PlanningManager({ data, updateData }) {
 
     const openEditModal = (evt, type = 'event') => {
         let start, end, duration, title, id, isAllDay;
+        
         if (type === 'todo') {
             start = parseISO(evt.scheduled_date);
-            duration = evt.duration_minutes || 60;
+            // FIX : Si c'est 1440 (24h), on considère All Day, mais on prépare 60min pour l'UI si on décoche
+            const isTodoAllDay = evt.duration_minutes === 1440;
+            duration = isTodoAllDay ? 60 : (evt.duration_minutes || 60);
             end = addMinutes(start, duration);
             title = evt.text;
             id = evt.id;
-            isAllDay = duration === 1440; 
+            isAllDay = isTodoAllDay; 
         } else {
             start = parseISO(evt.start_time);
             end = parseISO(evt.end_time);
-            duration = differenceInMinutes(end, start);
+            // FIX : Pareil pour les events, si All Day, on met 60min par défaut dans le formulaire
+            isAllDay = evt.is_all_day || false;
+            duration = isAllDay ? 60 : differenceInMinutes(end, start);
             title = evt.title;
             id = evt.id;
-            isAllDay = evt.is_all_day || false;
         }
+
         setEventForm({
             id: id, title: title, date: format(start, 'yyyy-MM-dd'),
             startHour: getHours(start), startMin: getMinutes(start),
-            duration: duration, type: type, recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
-            recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue', isAllDay: isAllDay
+            duration: duration, 
+            type: type, 
+            recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
+            recurrenceGroupId: evt.recurrence_group_id, 
+            color: evt.color || 'blue', 
+            isAllDay: isAllDay
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -367,15 +376,11 @@ export default function PlanningManager({ data, updateData }) {
         e.dataTransfer.setDragImage(img, 0, 0);
     };
 
-    // --- DRAG SUR GRILLE (Strictement Interdit aux All-Day) ---
+    // --- DRAG SUR GRILLE ---
     const onDragOverGrid = (e, dayIndex) => {
         e.preventDefault();
-        
-        // INTERDICTION STRICTE : Si l'item est All-Day, on ne montre pas de preview ici
-        if (draggedItem && isItemAllDay(draggedItem)) {
-            setPreviewSlot(null);
-            return;
-        }
+        // INTERDICTION STRICTE : Pas de All-Day sur la grille
+        if (draggedItem && isItemAllDay(draggedItem)) { setPreviewSlot(null); return; }
 
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
@@ -387,10 +392,9 @@ export default function PlanningManager({ data, updateData }) {
         let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         
         let duration = 60;
-        if (draggedItem && draggedItem.type === 'event') {
-             duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
-        } else if (draggedItem && draggedItem.type === 'planned_todo') {
-             duration = draggedItem.data.duration_minutes || 60;
+        if (draggedItem) {
+             if (draggedItem.type === 'event') duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
+             else if (draggedItem.type === 'planned_todo') duration = draggedItem.data.duration_minutes || 60;
         }
 
         setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
@@ -402,8 +406,6 @@ export default function PlanningManager({ data, updateData }) {
         e.preventDefault();
         setPreviewSlot(null);
         if (!draggedItem) return;
-
-        // INTERDICTION STRICTE : Impossible de déposer un All-Day ici
         if (isItemAllDay(draggedItem)) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
@@ -412,7 +414,6 @@ export default function PlanningManager({ data, updateData }) {
         let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         const newStart = setMinutes(setHours(day, hour), snappedMinutes);
 
-        // Si c'est une tâche de la sidebar (type 'todo'), on l'autorise (car elle n'est pas encore "All Day")
         if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
             const updatedTodos = todos.map(t => 
                 t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: draggedItem.data.duration_minutes || 60 } : t
@@ -435,24 +436,19 @@ export default function PlanningManager({ data, updateData }) {
         setDraggedItem(null);
     };
 
-    // --- DRAG SUR ALL DAY (Strictement Interdit aux Events Timed) ---
-    const onDragOverAllDay = (e) => {
-        e.preventDefault();
-        // Optionnel : Ajouter un feedback visuel si interdit, mais ici on laisse faire le drop logic
-    };
+    // --- DRAG SUR ALL DAY ---
+    const onDragOverAllDay = (e) => { e.preventDefault(); };
 
     const onDropAllDay = (e, day) => {
         e.preventDefault();
         if (!draggedItem) return;
 
-        // INTERDICTION STRICTE : Si l'élément est déjà planifié avec une heure (et n'est pas une tâche de sidebar), on interdit.
+        // INTERDICTION : Pas d'events "Heure" ici, sauf s'ils viennent de la sidebar
         const isScheduledTimedEvent = (draggedItem.type === 'event' && !draggedItem.data.is_all_day);
         const isScheduledTimedTodo = (draggedItem.type === 'planned_todo' && draggedItem.data.duration_minutes !== 1440);
-        
         if (isScheduledTimedEvent || isScheduledTimedTodo) return;
 
         if (draggedItem.type === 'event') {
-            // Déplacement All-Day vers All-Day (date change)
             const evt = draggedItem.data;
             const start = setMinutes(setHours(day, 0), 0);
             const end = setMinutes(setHours(day, 23), 59);
@@ -465,16 +461,9 @@ export default function PlanningManager({ data, updateData }) {
                 updateData({ ...data, calendar_events: updatedEvents });
             }
         } 
-        else if (draggedItem.type === 'todo') { // Tâche venant de la sidebar (non planifiée)
+        else if (draggedItem.type === 'todo' || draggedItem.type === 'planned_todo') {
             const newStart = setMinutes(setHours(day, 9), 0);
             const updatedTodos = todos.map(t => 
-                t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: 1440 } : t
-            );
-            updateData({ ...data, todos: updatedTodos });
-        }
-        else if (draggedItem.type === 'planned_todo') { // Tâche déjà All-Day vers autre jour
-             const newStart = setMinutes(setHours(day, 9), 0);
-             const updatedTodos = todos.map(t => 
                 t.id === draggedItem.data.id ? { ...t, scheduled_date: newStart.toISOString(), duration_minutes: 1440 } : t
             );
             updateData({ ...data, todos: updatedTodos });
@@ -543,13 +532,17 @@ export default function PlanningManager({ data, updateData }) {
                             
                             {/* COLONNE GAUCHE (Heures) */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                {/* Zone Header "All Day" */}
-                                <div className="h-20 border-b border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
+                                {/* Spacer En-tête Date (Identique à droite: h-14) */}
+                                <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
+                                
+                                {/* Zone Header "All Day" (Identique à droite: h-24) */}
+                                <div className="h-24 border-b border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
                                     <span>TOUTE</span><span>JRN</span>
                                 </div>
+                                
+                                {/* Heures */}
                                 {hours.map(h => (
                                     <div key={h} className="h-[60px] relative w-full border-b border-transparent">
-                                        {/* ALIGNEMENT ABSOLU PIXEL PERFECT */}
                                         <span className="absolute top-0 right-2 -translate-y-1/2 text-[11px] font-bold text-slate-400">
                                             {h}:00
                                         </span>
@@ -571,21 +564,20 @@ export default function PlanningManager({ data, updateData }) {
                                     return (
                                         <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
                                             
-                                            {/* EN-TÊTE JOUR (Date) */}
+                                            {/* EN-TÊTE JOUR (Date) - h-14 */}
                                             <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
                                                 <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
                                             </div>
 
-                                            {/* ZONE "TOUTE LA JOURNÉE" */}
+                                            {/* ZONE "TOUTE LA JOURNÉE" - h-24 (Alignée avec gauche) */}
                                             <div 
-                                                className={`h-20 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
+                                                className={`h-24 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
                                                 onDragOver={onDragOverAllDay}
                                                 onDrop={(e) => onDropAllDay(e, day)}
                                             >
                                                 {allDayItems.map(item => {
                                                     const isDraggingThis = draggedItem?.data?.id === item.data.id;
-                                                    // FIX : Opacité 0.5 pour voir l'élément qui part
                                                     const style = isDraggingThis ? { opacity: 0.5 } : {};
 
                                                     const isTodo = item.type === 'todo';
@@ -623,8 +615,6 @@ export default function PlanningManager({ data, updateData }) {
                                                 {layoutItems.map((item) => {
                                                     const isTodo = item.type === 'todo';
                                                     const dataItem = item.data;
-                                                    
-                                                    // FIX : Opacité 0.5 aussi ici
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
                                                     const style = { ...item.style, opacity: isDraggingThis ? 0.5 : 1 };
 
@@ -650,7 +640,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS (Identiques à la version précédente) */}
+            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
