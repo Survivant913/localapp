@@ -42,12 +42,9 @@ export default function PlanningManager({ data, updateData }) {
         isAllDay: false
     });
 
-    // --- HELPER CENTRALISÉ : EST-CE UN ALL DAY ? ---
     const isItemAllDay = (item) => {
         if (!item || !item.data) return false;
-        // 1. C'est un événement marqué explicitly is_all_day
         if (item.type === 'event' && item.data.is_all_day === true) return true;
-        // 2. C'est une tâche avec la convention 1440 minutes (24h)
         if (item.type === 'todo' && item.data.duration_minutes === 1440) return true;
         return false;
     };
@@ -109,24 +106,20 @@ export default function PlanningManager({ data, updateData }) {
 
     const finishResize = (evt, newDuration) => {
         if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
-        
         if (evt.scheduled_date) {
             const updatedTodos = todos.map(t => t.id === evt.id ? { ...t, duration_minutes: newDuration } : t);
             updateData({ ...data, todos: updatedTodos });
             return;
         }
-
         const start = parseISO(evt.start_time);
         const newEnd = addMinutes(start, newDuration);
-
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
                 date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
             });
             setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
-            setConfirmMode('ask_update');
-            setIsCreating(true);
+            setConfirmMode('ask_update'); setIsCreating(true);
         } else {
             const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString(), is_all_day: false } : ev);
             updateData({ ...data, calendar_events: updatedEvents });
@@ -146,11 +139,8 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- LAYOUT ENGINE ---
     const getLayoutForDay = (dayItems) => {
-        // FILTER STRICT : On enlève tout ce qui est All Day ou qui est en train d'être déplacé
         const timedItems = dayItems.filter(item => {
             if (isItemAllDay(item)) return false;
-            // SI c'est l'élément qu'on drag, on ne l'affiche PAS dans le layout statique (évite le fantôme)
-            if (draggedItem && draggedItem.data.id === item.data.id) return false;
             return true;
         });
 
@@ -365,12 +355,10 @@ export default function PlanningManager({ data, updateData }) {
         updateData({ ...data, calendar_events: [] }, { table: 'calendar_events', filter: { column: 'user_id', value: data.profile?.id } });
     };
 
-    // --- DRAG HANDLERS ---
     const onDragStart = (e, item, type) => {
         if (resizeRef.current) { e.preventDefault(); return; }
         setDraggedItem({ type, data: item });
         e.dataTransfer.effectAllowed = "move";
-        // Image fantôme vide
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         e.dataTransfer.setDragImage(img, 0, 0);
     };
@@ -386,13 +374,18 @@ export default function PlanningManager({ data, updateData }) {
         let rawMinutes = Math.floor(y % 60); 
         let snappedMinutes = Math.round(rawMinutes / 15) * 15;
         
-        let duration = 60; // Force 60min pour l'aperçu si on vient du All Day
-        if (draggedItem && !isItemAllDay(draggedItem)) {
-             if (draggedItem.type === 'event') {
-                 duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
-             } else {
-                 duration = draggedItem.data.duration_minutes || 60;
-             }
+        let duration = 60;
+        if (draggedItem) {
+            const isOriginAllDay = (draggedItem.type === 'event' && draggedItem.data.is_all_day) || 
+                                   (draggedItem.type === 'planned_todo' && draggedItem.data.duration_minutes === 1440);
+            
+            if (isOriginAllDay) {
+                duration = 60; 
+            } else if (draggedItem.type === 'event') {
+                duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
+            } else if (draggedItem.type === 'planned_todo') {
+                duration = draggedItem.data.duration_minutes || 60;
+            }
         }
 
         setPreviewSlot({ dayIndex, top: (hour - 6) * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
@@ -408,7 +401,6 @@ export default function PlanningManager({ data, updateData }) {
         const [h, m] = previewSlot.timeLabel.split(':').map(Number);
         const newStart = setMinutes(setHours(day, h), m);
 
-        // Si on vient de "All Day", on force 60min
         const wasAllDay = isItemAllDay(draggedItem);
         let newDuration = wasAllDay ? 60 : 60;
         if (!wasAllDay) {
@@ -527,13 +519,15 @@ export default function PlanningManager({ data, updateData }) {
                             
                             {/* COLONNE GAUCHE (Heures) */}
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                {/* FIX: Hauteur fixe 80px (h-20) pour s'aligner parfaitement avec la grille */}
+                                {/* FIX : Spacer pour l'en-tête de date (h-14) */}
+                                <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
+                                {/* FIX : Zone All-Day (h-20) pour matcher la grille */}
                                 <div className="h-20 border-b border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
                                     <span>TOUTE</span><span>JRN</span>
                                 </div>
                                 {hours.map(h => (
                                     <div key={h} className="h-[60px] relative w-full border-b border-transparent">
-                                        {/* FIX: Centrage vertical absolu du texte sur la ligne (-translate-y-1/2) */}
+                                        {/* FIX : Centrage vertical absolu pour aligner le texte "6:00" sur la ligne */}
                                         <span className="absolute top-0 right-2 -translate-y-1/2 text-[11px] font-bold text-slate-400">
                                             {h}:00
                                         </span>
@@ -562,16 +556,15 @@ export default function PlanningManager({ data, updateData }) {
                                             </div>
 
                                             {/* ZONE "TOUTE LA JOURNÉE" */}
-                                            {/* FIX: Hauteur fixe h-20 pour correspondre à la colonne de gauche */}
                                             <div 
                                                 className={`h-20 border-b border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
                                                 onDragOver={(e) => e.preventDefault()}
                                                 onDrop={(e) => onDropAllDay(e, day)}
                                             >
                                                 {allDayItems.map(item => {
-                                                    // FIX : Ne pas afficher l'élément s'il est en cours de déplacement
                                                     const isDraggingThis = draggedItem?.data?.id === item.data.id;
-                                                    if(isDraggingThis) return null;
+                                                    // FIX : Opacité 0.5 pour voir l'élément qui part, pas de return null
+                                                    const style = isDraggingThis ? { opacity: 0.5 } : {};
 
                                                     const isTodo = item.type === 'todo';
                                                     const colorClass = isTodo 
@@ -586,6 +579,7 @@ export default function PlanningManager({ data, updateData }) {
                                                             draggable
                                                             onDragStart={(e) => onDragStart(e, item.data, isTodo ? 'planned_todo' : 'event')}
                                                             onClick={(e) => handleEventClick(e, item.data, item.type)} 
+                                                            style={style}
                                                             className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass}`}
                                                         >
                                                             {isTodo ? item.data.text : item.data.title}
@@ -607,16 +601,17 @@ export default function PlanningManager({ data, updateData }) {
                                                 {layoutItems.map((item) => {
                                                     const isTodo = item.type === 'todo';
                                                     const dataItem = item.data;
-                                                    // FIX : Ne pas afficher l'élément s'il est en cours de déplacement (Stop au fantôme)
+                                                    
+                                                    // FIX : Opacité 0.5 aussi ici
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
-                                                    if(isDraggingThis) return null;
+                                                    const style = { ...item.style, opacity: isDraggingThis ? 0.5 : 1 };
 
                                                     const isRecurrent = !!dataItem.recurrence_group_id;
                                                     const isResizingAny = !!resizeRef.current;
                                                     const colorClass = isTodo ? 'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/20 dark:border-orange-500 dark:text-orange-100 border-l-4 border-l-orange-500' : dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
 
                                                     return (
-                                                        <div key={`${item.type}-${dataItem.id}`} style={{...item.style}} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => handleEventClick(e, dataItem, item.type)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
+                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem, isTodo ? 'planned_todo' : 'event')} onClick={(e) => handleEventClick(e, dataItem, item.type)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px]">{isTodo ? dataItem.text : dataItem.title}</span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
                                                             {!isTodo && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
@@ -633,7 +628,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* MODALS (Identiques à la version précédente) */}
+            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
