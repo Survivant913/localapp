@@ -158,10 +158,13 @@ export default function Dashboard({ data, updateData, setView }) {
     };
     const upcomingList = getUpcomingEvents();
 
-    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER + TÂCHES) ---
+    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER UNIQUEMENT) ---
+    // Correction : On retire la fusion avec les todos.
     const getNextCalendarEvents = () => {
         try {
             const now = new Date();
+            const today = new Date();
+            today.setHours(0,0,0,0);
             
             // 1. Événements classiques de l'agenda
             const calEvents = (data.calendar_events || []).map(e => ({
@@ -169,21 +172,11 @@ export default function Dashboard({ data, updateData, setView }) {
                 is_all_day: e.is_all_day
             }));
 
-            // 2. Tâches planifiées (glisser-déposer)
-            const todoEvents = (data.todos || [])
-                .filter(t => t.scheduled_date && !t.completed)
-                .map(t => ({
-                    id: t.id, title: t.text, start_time: t.scheduled_date, is_todo: true,
-                    is_all_day: false
-                }));
-
-            // Fusionner, Filtrer (Futur) et Trier
-            return [...calEvents, ...todoEvents]
+            // Filtrer (Futur) et Trier
+            return calEvents
                 .filter(e => {
                     const evtDate = new Date(e.start_time);
                     if (e.is_all_day) {
-                        // Si c'est toute la journée, on garde si c'est aujourd'hui ou plus tard
-                        const today = new Date(); today.setHours(0,0,0,0);
                         return evtDate >= today;
                     }
                     return evtDate > now;
