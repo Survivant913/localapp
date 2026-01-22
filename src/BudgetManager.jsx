@@ -85,11 +85,10 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
-    // --- AUTOMATISATION : VÉRIFICATION DES PLANIFIÉS (CORRECTIF BUG COMPTE + BUG DATE) ---
+    // --- AUTOMATISATION : PLANIFIÉS + RÉCURRENTS ---
     useEffect(() => {
-        const checkScheduled = () => {
+        const checkAutomations = () => {
             const today = new Date();
-            // FIX DATE : On compare les chaînes "YYYY-MM-DD" locales pour éviter les soucis de Timezone
             const year = today.getFullYear();
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const day = String(today.getDate()).padStart(2, '0');
@@ -97,61 +96,68 @@ export default function BudgetManager({ data, updateData }) {
             
             let hasUpdates = false;
             let newScheduled = [...scheduledList];
+            let newRecurring = [...recurringList];
             let newTransactions = [...transactionsList];
 
+            // 1. VÉRIFICATION DES PLANIFIÉS
             newScheduled.forEach((s, index) => {
                 if (s.status === 'pending') {
-                    // Récupération "brute" de la date planifiée (YYYY-MM-DD)
                     let scheduledDateStr = '';
-                    if (typeof s.date === 'string') {
-                        scheduledDateStr = s.date.split('T')[0];
-                    } else if (s.date instanceof Date) {
-                        scheduledDateStr = s.date.toISOString().split('T')[0];
-                    }
+                    if (typeof s.date === 'string') scheduledDateStr = s.date.split('T')[0];
+                    else if (s.date instanceof Date) scheduledDateStr = s.date.toISOString().split('T')[0];
 
-                    // Comparaison alphabétique des chaines ISO (ex: "2023-10-24" <= "2023-10-23")
                     if (scheduledDateStr && scheduledDateStr <= todayStr) {
-                        // C'EST L'HEURE ! ON TRANSFORME EN TRANSACTION
                         hasUpdates = true;
                         newScheduled[index] = { ...s, status: 'completed' };
-
-                        const baseTrans = {
-                            id: Date.now() + index, // ID unique
-                            date: new Date().toISOString(),
-                            amount: s.amount,
-                            archived: false
-                        };
-
+                        const baseTrans = { id: Date.now() + index, date: new Date().toISOString(), amount: s.amount, archived: false };
                         if (s.type === 'transfer') {
                             const sourceName = accounts.find(a => a.id === s.accountId)?.name;
                             const targetName = accounts.find(a => a.id === s.targetAccountId)?.name;
-                            
-                            // Sortie
-                            newTransactions.unshift({
-                                ...baseTrans,
-                                id: baseTrans.id + '_out',
-                                type: 'expense',
-                                description: `Virement planifié vers ${targetName} : ${s.description}`,
-                                accountId: s.accountId // FIX COMPTE
-                            });
-                            // Entrée
-                            newTransactions.unshift({
-                                ...baseTrans,
-                                id: baseTrans.id + '_in',
-                                type: 'income',
-                                description: `Virement planifié reçu de ${sourceName} : ${s.description}`,
-                                accountId: s.targetAccountId // FIX COMPTE
-                            });
+                            newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_out', type: 'expense', description: `Virement planifié vers ${targetName} : ${s.description}`, accountId: s.accountId });
+                            newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_in', type: 'income', description: `Virement planifié reçu de ${sourceName} : ${s.description}`, accountId: s.targetAccountId });
                         } else {
-                            // Transaction normale
-                            newTransactions.unshift({
-                                ...baseTrans,
-                                type: s.type,
-                                description: `Planifié : ${s.description}`,
-                                accountId: s.accountId // FIX COMPTE
-                            });
+                            newTransactions.unshift({ ...baseTrans, type: s.type, description: `Planifié : ${s.description}`, accountId: s.accountId });
                         }
                     }
+                }
+            });
+
+            // 2. VÉRIFICATION DES RÉCURRENTS (NOUVEAU)
+            newRecurring.forEach((r, index) => {
+                let nextDueStr = '';
+                if (typeof r.nextDueDate === 'string') nextDueStr = r.nextDueDate.split('T')[0];
+                else if (r.nextDueDate instanceof Date) nextDueStr = r.nextDueDate.toISOString().split('T')[0];
+
+                if (nextDueStr && nextDueStr <= todayStr) {
+                    // C'est l'heure de la récurrence !
+                    hasUpdates = true;
+                    
+                    // a. Créer la transaction
+                    const baseTrans = { id: Date.now() + index + 1000, date: new Date().toISOString(), amount: r.amount, archived: false };
+                    if (r.type === 'transfer') {
+                        const sourceName = accounts.find(a => a.id === r.accountId)?.name;
+                        const targetName = accounts.find(a => a.id === r.targetAccountId)?.name;
+                        newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_out', type: 'expense', description: `Virement récurrent vers ${targetName} : ${r.description}`, accountId: r.accountId });
+                        newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_in', type: 'income', description: `Virement récurrent reçu de ${sourceName} : ${r.description}`, accountId: r.targetAccountId });
+                    } else {
+                        newTransactions.unshift({ ...baseTrans, type: r.type, description: `Récurrent : ${r.description}`, accountId: r.accountId });
+                    }
+
+                    // b. Calculer la prochaine date (Mois suivant)
+                    const currentDueDate = parseLocalDate(r.nextDueDate);
+                    let nextMonthDate = new Date(currentDueDate);
+                    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1); // +1 Mois
+                    
+                    // GESTION DU 28/31 : On remet le jour voulu par l'utilisateur, puis on clamp
+                    const targetYear = nextMonthDate.getFullYear();
+                    const targetMonth = nextMonthDate.getMonth();
+                    const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+                    const dayToSet = Math.min(r.dayOfMonth, daysInTargetMonth); // Clamping (ex: 31 devient 28 fév)
+                    nextMonthDate.setDate(dayToSet);
+
+                    // c. Mettre à jour la récurrence
+                    // Si une date de fin existe et est dépassée, on supprime ou on laisse (ici on laisse mais on update la date)
+                    newRecurring[index] = { ...r, nextDueDate: nextMonthDate.toISOString() };
                 }
             });
 
@@ -161,17 +167,18 @@ export default function BudgetManager({ data, updateData }) {
                     budget: {
                         ...budgetData,
                         scheduled: newScheduled,
+                        recurring: newRecurring,
                         transactions: newTransactions
                     }
                 });
             }
         };
 
-        if (scheduledList.length > 0) {
-            checkScheduled();
+        if (scheduledList.length > 0 || recurringList.length > 0) {
+            checkAutomations();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scheduledList.length]); 
+    }, [scheduledList.length, recurringList.length]); // On vérifie si la liste change
 
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
@@ -403,7 +410,47 @@ export default function BudgetManager({ data, updateData }) {
     };
 
     const addScheduled = () => { if(!amount || !desc || !scheduleDate) return; const newSch = { id: Date.now(), type, amount: parseAmount(amount), description: desc, date: scheduleDate, status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null }; updateData({ ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } }); setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); };
-    const addRecurring = () => { if(!amount || !desc) return; const newRec = { id: Date.now(), type, amount: parseAmount(amount), description: desc, dayOfMonth: parseInt(recurDay), endDate: recurEndDate || null, accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null, nextDueDate: new Date().toISOString() }; updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); setAmount(''); setDesc(''); setRecurEndDate(''); setActiveTab('dashboard'); };
+    
+    // --- FIX RECURRING : Calcul intelligent de la 1ère date ---
+    const addRecurring = () => { 
+        if(!amount || !desc) return;
+        
+        const today = new Date();
+        const currentDay = today.getDate();
+        const targetDay = parseInt(recurDay);
+        
+        let initialNextDate = new Date(today);
+        initialNextDate.setDate(targetDay); // On tente de mettre le jour voulu sur le mois en cours
+
+        // Si le jour voulu (26) est plus grand que aujourd'hui (23) -> C'est bon pour ce mois-ci.
+        // Si le jour voulu (15) est plus petit que aujourd'hui (23) -> C'est passé, on passe au mois prochain.
+        if (targetDay < currentDay) {
+            initialNextDate.setMonth(initialNextDate.getMonth() + 1);
+        }
+        
+        // Sécurité pour les mois courts (Février)
+        const year = initialNextDate.getFullYear();
+        const month = initialNextDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const clampedDay = Math.min(targetDay, daysInMonth);
+        initialNextDate.setDate(clampedDay);
+
+        const newRec = { 
+            id: Date.now(), 
+            type, 
+            amount: parseAmount(amount), 
+            description: desc, 
+            dayOfMonth: targetDay, 
+            endDate: recurEndDate || null, 
+            accountId: selectedAccountId, 
+            targetAccountId: type === 'transfer' ? targetAccountId : null, 
+            nextDueDate: initialNextDate.toISOString() // <-- DATE CORRIGÉE
+        }; 
+        
+        updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); 
+        setAmount(''); setDesc(''); setRecurEndDate(''); setActiveTab('dashboard'); 
+    };
+
     const deleteItem = (collection, id) => { 
         const map = { 'transactions': 'transactions', 'recurring': 'recurring', 'scheduled': 'scheduled' };
         const targetList = Array.isArray(budgetData[collection]) ? budgetData[collection] : [];
