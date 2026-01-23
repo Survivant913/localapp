@@ -393,7 +393,30 @@ export default function BudgetManager({ data, updateData }) {
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
     // --- 4. ACTIONS ---
-    const addAccount = () => { if(!newAccountName.trim()) return; updateData({ ...data, budget: { ...budgetData, accounts: [...accounts, { id: Date.now().toString(), name: newAccountName }] } }); setNewAccountName(''); };
+    // --- CORRECTION: Ajout du paramètre "table" pour forcer l'insertion dans Supabase ---
+    const addAccount = () => { 
+        if(!newAccountName.trim()) return;
+        
+        const newAcc = { 
+            id: Date.now().toString(), 
+            name: newAccountName 
+        };
+
+        updateData({ 
+            ...data, 
+            budget: { 
+                ...budgetData, 
+                accounts: [...accounts, newAcc] 
+            } 
+        }, { 
+            table: 'accounts', 
+            data: newAcc,
+            action: 'insert'
+        }); 
+        
+        setNewAccountName(''); 
+    };
+
     const deleteAccount = (id) => { if (accounts.length <= 1) return; updateData({ ...data, budget: { ...budgetData, accounts: accounts.filter(a => a.id !== id) } }, { table: 'accounts', id: id }); setDeletingAccountId(null); };
     const startEditAccount = (acc) => { setEditingAccountId(acc.id); setEditingAccountName(acc.name); };
     const saveEditAccount = () => { updateData({ ...data, budget: { ...budgetData, accounts: accounts.map(a => a.id === editingAccountId ? { ...a, name: editingAccountName } : a) } }); setEditingAccountId(null); };
