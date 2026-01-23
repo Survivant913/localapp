@@ -243,7 +243,7 @@ export default function BudgetManager({ data, updateData }) {
             }
         });
         return round2(projected);
-    }, [budgetData, forecastAccount, currentTotalBalance]);
+    }, [budgetData, forecastAccount, endOfMonthForecast]);
 
     // Planner logic (CORRECTION : Prise en compte des Planifiés + Récurrents)
     const processedPlannerItems = useMemo(() => {
@@ -393,7 +393,6 @@ export default function BudgetManager({ data, updateData }) {
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
     // --- 4. ACTIONS ---
-    // --- CORRECTION: Ajout du paramètre "table" pour forcer l'insertion dans Supabase ---
     const addAccount = () => { 
         if(!newAccountName.trim()) return;
         
@@ -417,9 +416,40 @@ export default function BudgetManager({ data, updateData }) {
         setNewAccountName(''); 
     };
 
-    const deleteAccount = (id) => { if (accounts.length <= 1) return; updateData({ ...data, budget: { ...budgetData, accounts: accounts.filter(a => a.id !== id) } }, { table: 'accounts', id: id }); setDeletingAccountId(null); };
+    const deleteAccount = (id) => { 
+        if (accounts.length <= 1) return; 
+        updateData({ 
+            ...data, 
+            budget: { 
+                ...budgetData, 
+                accounts: accounts.filter(a => a.id !== id) 
+            } 
+        }, { 
+            table: 'accounts', 
+            id: id,
+            action: 'delete' // ON EXPLICITE L'ACTION DELETE
+        }); 
+        setDeletingAccountId(null); 
+    };
+
     const startEditAccount = (acc) => { setEditingAccountId(acc.id); setEditingAccountName(acc.name); };
-    const saveEditAccount = () => { updateData({ ...data, budget: { ...budgetData, accounts: accounts.map(a => a.id === editingAccountId ? { ...a, name: editingAccountName } : a) } }); setEditingAccountId(null); };
+    
+    // --- CORRECTION : AJOUT DU PARAMÈTRE DB POUR saveEditAccount ---
+    const saveEditAccount = () => { 
+        updateData({ 
+            ...data, 
+            budget: { 
+                ...budgetData, 
+                accounts: accounts.map(a => a.id === editingAccountId ? { ...a, name: editingAccountName } : a) 
+            } 
+        }, {
+            table: 'accounts',
+            id: editingAccountId,
+            data: { name: editingAccountName }, // On envoie juste ce qui change
+            action: 'update' // On précise que c'est une mise à jour
+        }); 
+        setEditingAccountId(null); 
+    };
 
     const addTransaction = () => {
         if(!amount || !desc) return;
