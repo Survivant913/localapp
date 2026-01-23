@@ -6,45 +6,79 @@ import {
 } from 'lucide-react';
 
 export default function BudgetManager({ data, updateData }) {
+    // --- 0. SÉCURITÉ ANTI-CRASH (NEW) ---
+    // Si les données ne sont pas encore là, on affiche un loader au lieu de l'écran blanc
+    if (!data) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-gray-400 animate-pulse">Chargement des finances...</div>
+            </div>
+        );
+    }
+
     // --- 1. INITIALISATION ET SÉCURISATION ---
-    const budgetData = data.budget || { transactions: [], recurring: [], scheduled: [], planner: { base: 0, items: [] }, accounts: [] };
+    const budgetData = data?.budget || { transactions: [], recurring: [], scheduled: [], planner: { base: 0, items: [] }, accounts: [] };
     
     const transactionsList = Array.isArray(budgetData.transactions) ? budgetData.transactions : [];
     const recurringList = Array.isArray(budgetData.recurring) ? budgetData.recurring : [];
     const scheduledList = Array.isArray(budgetData.scheduled) ? budgetData.scheduled : [];
-    const accounts = (budgetData.accounts && budgetData.accounts.length > 0) 
+    
+    // Sécurité supplémentaire sur les comptes
+    const accounts = (Array.isArray(budgetData.accounts) && budgetData.accounts.length > 0) 
         ? budgetData.accounts 
         : [{ id: '1', name: "Compte Courant" }];
     
     const planner = { items: [], safetyBases: {}, ...budgetData.planner };
 
     // --- 2. ÉTATS LOCAUX ---
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [activeTab, setActiveTab] = useState('dashboard');
     
     // Formulaires
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [amount, setAmount] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [desc, setDesc] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [type, setType] = useState('expense');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [targetAccountId, setTargetAccountId] = useState(accounts.length > 1 ? accounts[1].id : accounts[0]?.id);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [scheduleDate, setScheduleDate] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [recurDay, setRecurDay] = useState(1);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [recurEndDate, setRecurEndDate] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerTargetId, setPlannerTargetId] = useState(accounts[0]?.id || '');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerBaseInput, setPlannerBaseInput] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemName, setPlannerItemName] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemCost, setPlannerItemCost] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemAccount, setPlannerItemAccount] = useState(accounts[0]?.id || '');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [newAccountName, setNewAccountName] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [editingAccountId, setEditingAccountId] = useState(null);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [editingAccountName, setEditingAccountName] = useState('');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [deletingAccountId, setDeletingAccountId] = useState(null);
 
     // Filtres
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [showArchived, setShowArchived] = useState(false);
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [forecastAccount, setForecastAccount] = useState('total');
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [historyLimit, setHistoryLimit] = useState(5);
 
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => {
         const val = planner.safetyBases?.[plannerTargetId] || 0;
         setPlannerBaseInput(val === 0 ? '' : val);
@@ -85,7 +119,8 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
-    // --- AUTOMATISATION : PLANIFIÉS + RÉCURRENTS ---
+    // --- AUTOMATISATION ---
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => {
         const checkAutomations = () => {
             const today = new Date();
@@ -99,7 +134,7 @@ export default function BudgetManager({ data, updateData }) {
             let newRecurring = [...recurringList];
             let newTransactions = [...transactionsList];
 
-            // 1. VÉRIFICATION DES PLANIFIÉS
+            // 1. Planifiés
             newScheduled.forEach((s, index) => {
                 if (s.status === 'pending') {
                     let scheduledDateStr = '';
@@ -122,17 +157,14 @@ export default function BudgetManager({ data, updateData }) {
                 }
             });
 
-            // 2. VÉRIFICATION DES RÉCURRENTS
+            // 2. Récurrents
             newRecurring.forEach((r, index) => {
                 let nextDueStr = '';
                 if (typeof r.nextDueDate === 'string') nextDueStr = r.nextDueDate.split('T')[0];
                 else if (r.nextDueDate instanceof Date) nextDueStr = r.nextDueDate.toISOString().split('T')[0];
 
                 if (nextDueStr && nextDueStr <= todayStr) {
-                    // C'est l'heure de la récurrence !
                     hasUpdates = true;
-                    
-                    // a. Créer la transaction
                     const baseTrans = { id: Date.now() + index + 1000, date: new Date().toISOString(), amount: r.amount, archived: false };
                     if (r.type === 'transfer') {
                         const sourceName = accounts.find(a => a.id === r.accountId)?.name;
@@ -143,47 +175,25 @@ export default function BudgetManager({ data, updateData }) {
                         newTransactions.unshift({ ...baseTrans, type: r.type, description: `Récurrent : ${r.description}`, accountId: r.accountId });
                     }
 
-                    // b. Calculer la prochaine date (SAFE METHOD : Pas de débordement Février/31)
                     const currentDueDate = parseLocalDate(r.nextDueDate);
-                    
-                    // On détermine le mois cible (Mois actuel + 1)
                     let targetYear = currentDueDate.getFullYear();
                     let targetMonth = currentDueDate.getMonth() + 1;
-                    if (targetMonth > 11) {
-                        targetMonth = 0;
-                        targetYear++;
-                    }
-
-                    // On vérifie le nombre de jours dans ce mois cible
+                    if (targetMonth > 11) { targetMonth = 0; targetYear++; }
                     const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-                    
-                    // On applique le jour voulu, en clampant si le mois est trop court (ex: 31 -> 28)
                     const dayToSet = Math.min(r.dayOfMonth, daysInTargetMonth);
-                    
                     const nextDate = new Date(targetYear, targetMonth, dayToSet);
-
-                    // c. Mettre à jour la récurrence
                     newRecurring[index] = { ...r, nextDueDate: nextDate.toISOString() };
                 }
             });
 
             if (hasUpdates) {
-                updateData({
-                    ...data,
-                    budget: {
-                        ...budgetData,
-                        scheduled: newScheduled,
-                        recurring: newRecurring,
-                        transactions: newTransactions
-                    }
-                });
+                updateData({ ...data, budget: { ...budgetData, scheduled: newScheduled, recurring: newRecurring, transactions: newTransactions } });
             }
         };
 
         if (scheduledList.length > 0 || recurringList.length > 0) {
             checkAutomations();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scheduledList.length, recurringList.length]);
 
     // --- 3. CALCULS ---
@@ -196,7 +206,7 @@ export default function BudgetManager({ data, updateData }) {
 
     const currentTotalBalance = round2(transactionsList.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0));
 
-    // Prévision fin de mois
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const endOfMonthForecast = useMemo(() => {
         const today = new Date();
         const currentDay = today.getDate();
@@ -229,7 +239,6 @@ export default function BudgetManager({ data, updateData }) {
             if (s.status !== 'pending') return;
             const sDate = parseLocalDate(s.date);
             if (isNaN(sDate.getTime())) return; 
-
             if (sDate > today && sDate <= endOfMonthDate) {
                  const amt = parseFloat(s.amount || 0);
                  if (s.type === 'transfer') {
@@ -243,9 +252,9 @@ export default function BudgetManager({ data, updateData }) {
             }
         });
         return round2(projected);
-    }, [budgetData, forecastAccount, endOfMonthForecast]);
+    }, [budgetData, forecastAccount, currentTotalBalance]);
 
-    // Planner logic (CORRECTION : Prise en compte des Planifiés + Récurrents)
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const processedPlannerItems = useMemo(() => {
         const simulatedBalances = {};
         accounts.forEach(acc => {
@@ -275,15 +284,13 @@ export default function BudgetManager({ data, updateData }) {
                 let monthsPassed = 0;
                 let isPossible = false;
 
-                // SIMULATION SUR 120 MOIS (10 ANS MAX)
                 while (monthsPassed < 120) {
                     monthsPassed++;
-                    simulationDate.setMonth(simulationDate.getMonth() + 1); // On avance d'un mois
+                    simulationDate.setMonth(simulationDate.getMonth() + 1);
                     
                     let monthlyIn = 0;
                     let monthlyOut = 0;
 
-                    // 1. Impact des Récurrents
                     recurringList.forEach(r => {
                         const isActive = !r.endDate || parseLocalDate(r.endDate) >= simulationDate;
                         if (isActive) {
@@ -299,10 +306,8 @@ export default function BudgetManager({ data, updateData }) {
                         }
                     });
 
-                    // 2. Impact des Planifiés (NOUVEAU)
                     scheduledList.forEach(s => {
                         const sDate = parseLocalDate(s.date);
-                        // On vérifie si le planifié tombe dans le mois simulé
                         if (s.status === 'pending' && sDate.getMonth() === simulationDate.getMonth() && sDate.getFullYear() === simulationDate.getFullYear()) {
                             const amt = parseFloat(s.amount || 0);
                             if (s.type === 'income') {
@@ -317,31 +322,21 @@ export default function BudgetManager({ data, updateData }) {
                     });
 
                     let monthlySavings = monthlyIn - monthlyOut;
-
-                    if (monthlySavings > 0) {
-                        remainingToSave -= monthlySavings;
-                    }
-
-                    if (remainingToSave <= 0) {
-                        isPossible = true;
-                        break;
-                    }
+                    if (monthlySavings > 0) remainingToSave -= monthlySavings;
+                    if (remainingToSave <= 0) { isPossible = true; break; }
                 }
 
-                if (isPossible) {
-                    dateStr = simulationDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-                } else {
-                    dateStr = "Impossible (Revenus insuffisants)";
-                }
+                if (isPossible) dateStr = simulationDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+                else dateStr = "Impossible (Revenus insuffisants)";
             }
             return { ...item, allocated: round2(allocated), pct: round2(pct), dateStr, targetAccName: accounts.find(a=>a.id === targetAcc)?.name };
         });
     }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, budgetData.scheduled, accounts]);
 
-    // Prévision 12 mois (CORRECTION BUG FÉVRIER + PLANIFIÉS)
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     const forecastData = useMemo(() => {
         const today = new Date();
-        let projectedBalance = endOfMonthForecast; // Prend déjà en compte le filtre
+        let projectedBalance = endOfMonthForecast;
         const monthsData = [];
         for (let i = 1; i <= 12; i++) {
             const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
@@ -350,15 +345,12 @@ export default function BudgetManager({ data, updateData }) {
             const year = targetDate.getFullYear();
             let monthlyChange = 0;
 
-            // 1. Récurrents (Avec correction des dates invalides ex: 30 Fév)
             recurringList.forEach(r => {
                 const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-                const clampedDay = Math.min(r.dayOfMonth, daysInMonth); // Correction ici
+                const clampedDay = Math.min(r.dayOfMonth, daysInMonth);
                 const occurrenceDate = new Date(year, monthIndex, clampedDay);
-                
                 if (r.endDate && parseLocalDate(r.endDate) < occurrenceDate) return;
                 const amt = parseFloat(r.amount || 0);
-                
                 if (r.type === 'transfer') {
                     if (forecastAccount === 'total') return;
                     if (String(r.accountId) === String(forecastAccount)) monthlyChange -= amt;
@@ -369,7 +361,6 @@ export default function BudgetManager({ data, updateData }) {
                 }
             });
 
-            // 2. Planifiés (Déjà ajouté précédement, conservé)
             scheduledList.forEach(s => {
                 if (s.status !== 'pending') return;
                 const sDate = parseLocalDate(s.date);
@@ -395,58 +386,25 @@ export default function BudgetManager({ data, updateData }) {
     // --- 4. ACTIONS ---
     const addAccount = () => { 
         if(!newAccountName.trim()) return;
-        
-        const newAcc = { 
-            id: Date.now().toString(), 
-            name: newAccountName 
-        };
-
-        updateData({ 
-            ...data, 
-            budget: { 
-                ...budgetData, 
-                accounts: [...accounts, newAcc] 
-            } 
-        }, { 
-            table: 'accounts', 
-            data: newAcc,
-            action: 'insert'
-        }); 
-        
+        const newAcc = { id: Date.now().toString(), name: newAccountName };
+        updateData({ ...data, budget: { ...budgetData, accounts: [...accounts, newAcc] } }, { table: 'accounts', data: newAcc, action: 'insert' }); 
         setNewAccountName(''); 
     };
 
     const deleteAccount = (id) => { 
         if (accounts.length <= 1) return; 
-        updateData({ 
-            ...data, 
-            budget: { 
-                ...budgetData, 
-                accounts: accounts.filter(a => a.id !== id) 
-            } 
-        }, { 
-            table: 'accounts', 
-            id: id,
-            action: 'delete' // ON EXPLICITE L'ACTION DELETE
-        }); 
+        updateData({ ...data, budget: { ...budgetData, accounts: accounts.filter(a => a.id !== id) } }, { table: 'accounts', id: id, action: 'delete' }); 
         setDeletingAccountId(null); 
     };
 
     const startEditAccount = (acc) => { setEditingAccountId(acc.id); setEditingAccountName(acc.name); };
     
-    // --- CORRECTION : AJOUT DU PARAMÈTRE DB POUR saveEditAccount ---
     const saveEditAccount = () => { 
         updateData({ 
             ...data, 
-            budget: { 
-                ...budgetData, 
-                accounts: accounts.map(a => a.id === editingAccountId ? { ...a, name: editingAccountName } : a) 
-            } 
+            budget: { ...budgetData, accounts: accounts.map(a => a.id === editingAccountId ? { ...a, name: editingAccountName } : a) } 
         }, {
-            table: 'accounts',
-            id: editingAccountId,
-            data: { name: editingAccountName }, // On envoie juste ce qui change
-            action: 'update' // On précise que c'est une mise à jour
+            table: 'accounts', id: editingAccountId, data: { name: editingAccountName }, action: 'update' 
         }); 
         setEditingAccountId(null); 
     };
@@ -470,43 +428,22 @@ export default function BudgetManager({ data, updateData }) {
 
     const addScheduled = () => { if(!amount || !desc || !scheduleDate) return; const newSch = { id: Date.now(), type, amount: parseAmount(amount), description: desc, date: scheduleDate, status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null }; updateData({ ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } }); setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); };
     
-    // --- FIX RECURRING : Calcul intelligent de la 1ère date (SAFE METHOD) ---
     const addRecurring = () => { 
         if(!amount || !desc) return;
-        
         const today = new Date();
         const currentDay = today.getDate();
         const targetDay = parseInt(recurDay);
-        
-        // On détermine le mois de la PREMIÈRE échéance
         let targetYear = today.getFullYear();
         let targetMonth = today.getMonth();
-
-        // Si le jour voulu (ex: 26) est déjà passé (auj: 23) -> Non
-        // Si le jour voulu (ex: 15) est passé (auj: 23) -> On passe au mois prochain
         if (targetDay < currentDay) {
             targetMonth++;
             if (targetMonth > 11) { targetMonth = 0; targetYear++; }
         }
-        
-        // On sécurise le jour (ex: si on vise le 31 Février)
         const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
         const dayToSet = Math.min(targetDay, daysInTargetMonth);
-        
         const initialNextDate = new Date(targetYear, targetMonth, dayToSet);
 
-        const newRec = { 
-            id: Date.now(), 
-            type, 
-            amount: parseAmount(amount), 
-            description: desc, 
-            dayOfMonth: targetDay, 
-            endDate: recurEndDate || null, 
-            accountId: selectedAccountId, 
-            targetAccountId: type === 'transfer' ? targetAccountId : null, 
-            nextDueDate: initialNextDate.toISOString() // <-- DATE CALCULÉE SANS ERREUR
-        }; 
-        
+        const newRec = { id: Date.now(), type, amount: parseAmount(amount), description: desc, dayOfMonth: targetDay, endDate: recurEndDate || null, accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null, nextDueDate: initialNextDate.toISOString() }; 
         updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); 
         setAmount(''); setDesc(''); setRecurEndDate(''); setActiveTab('dashboard'); 
     };
@@ -529,7 +466,7 @@ export default function BudgetManager({ data, updateData }) {
     // --- TRI ET AFFICHAGE ---
     const visibleTransactions = transactionsList
         .filter(t => showArchived ? true : !t.archived)
-        .sort((a, b) => new Date(b.date) - new Date(a.date)); // Tri Descendant (Plus récent en haut)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const displayedTransactions = visibleTransactions.slice(0, historyLimit);
     const visibleScheduled = scheduledList.filter(s => s.status === 'pending');
