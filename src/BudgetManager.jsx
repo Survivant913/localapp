@@ -122,7 +122,7 @@ export default function BudgetManager({ data, updateData }) {
                 }
             });
 
-            // 2. VÉRIFICATION DES RÉCURRENTS (NOUVEAU)
+            // 2. VÉRIFICATION DES RÉCURRENTS
             newRecurring.forEach((r, index) => {
                 let nextDueStr = '';
                 if (typeof r.nextDueDate === 'string') nextDueStr = r.nextDueDate.split('T')[0];
@@ -143,21 +143,27 @@ export default function BudgetManager({ data, updateData }) {
                         newTransactions.unshift({ ...baseTrans, type: r.type, description: `Récurrent : ${r.description}`, accountId: r.accountId });
                     }
 
-                    // b. Calculer la prochaine date (Mois suivant)
+                    // b. Calculer la prochaine date (SAFE METHOD : Pas de débordement Février/31)
                     const currentDueDate = parseLocalDate(r.nextDueDate);
-                    let nextMonthDate = new Date(currentDueDate);
-                    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1); // +1 Mois
                     
-                    // GESTION DU 28/31 : On remet le jour voulu par l'utilisateur, puis on clamp
-                    const targetYear = nextMonthDate.getFullYear();
-                    const targetMonth = nextMonthDate.getMonth();
+                    // On détermine le mois cible (Mois actuel + 1)
+                    let targetYear = currentDueDate.getFullYear();
+                    let targetMonth = currentDueDate.getMonth() + 1;
+                    if (targetMonth > 11) {
+                        targetMonth = 0;
+                        targetYear++;
+                    }
+
+                    // On vérifie le nombre de jours dans ce mois cible
                     const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-                    const dayToSet = Math.min(r.dayOfMonth, daysInTargetMonth); // Clamping (ex: 31 devient 28 fév)
-                    nextMonthDate.setDate(dayToSet);
+                    
+                    // On applique le jour voulu, en clampant si le mois est trop court (ex: 31 -> 28)
+                    const dayToSet = Math.min(r.dayOfMonth, daysInTargetMonth);
+                    
+                    const nextDate = new Date(targetYear, targetMonth, dayToSet);
 
                     // c. Mettre à jour la récurrence
-                    // Si une date de fin existe et est dépassée, on supprime ou on laisse (ici on laisse mais on update la date)
-                    newRecurring[index] = { ...r, nextDueDate: nextMonthDate.toISOString() };
+                    newRecurring[index] = { ...r, nextDueDate: nextDate.toISOString() };
                 }
             });
 
@@ -178,7 +184,7 @@ export default function BudgetManager({ data, updateData }) {
             checkAutomations();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scheduledList.length, recurringList.length]); // On vérifie si la liste change
+    }, [scheduledList.length, recurringList.length]);
 
     // --- 3. CALCULS ---
     const getBalanceForAccount = (accId) => {
@@ -411,7 +417,7 @@ export default function BudgetManager({ data, updateData }) {
 
     const addScheduled = () => { if(!amount || !desc || !scheduleDate) return; const newSch = { id: Date.now(), type, amount: parseAmount(amount), description: desc, date: scheduleDate, status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null }; updateData({ ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } }); setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); };
     
-    // --- FIX RECURRING : Calcul intelligent de la 1ère date ---
+    // --- FIX RECURRING : Calcul intelligent de la 1ère date (SAFE METHOD) ---
     const addRecurring = () => { 
         if(!amount || !desc) return;
         
@@ -419,21 +425,22 @@ export default function BudgetManager({ data, updateData }) {
         const currentDay = today.getDate();
         const targetDay = parseInt(recurDay);
         
-        let initialNextDate = new Date(today);
-        initialNextDate.setDate(targetDay); // On tente de mettre le jour voulu sur le mois en cours
+        // On détermine le mois de la PREMIÈRE échéance
+        let targetYear = today.getFullYear();
+        let targetMonth = today.getMonth();
 
-        // Si le jour voulu (26) est plus grand que aujourd'hui (23) -> C'est bon pour ce mois-ci.
-        // Si le jour voulu (15) est plus petit que aujourd'hui (23) -> C'est passé, on passe au mois prochain.
+        // Si le jour voulu (ex: 26) est déjà passé (auj: 23) -> Non
+        // Si le jour voulu (ex: 15) est passé (auj: 23) -> On passe au mois prochain
         if (targetDay < currentDay) {
-            initialNextDate.setMonth(initialNextDate.getMonth() + 1);
+            targetMonth++;
+            if (targetMonth > 11) { targetMonth = 0; targetYear++; }
         }
         
-        // Sécurité pour les mois courts (Février)
-        const year = initialNextDate.getFullYear();
-        const month = initialNextDate.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const clampedDay = Math.min(targetDay, daysInMonth);
-        initialNextDate.setDate(clampedDay);
+        // On sécurise le jour (ex: si on vise le 31 Février)
+        const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+        const dayToSet = Math.min(targetDay, daysInTargetMonth);
+        
+        const initialNextDate = new Date(targetYear, targetMonth, dayToSet);
 
         const newRec = { 
             id: Date.now(), 
@@ -444,7 +451,7 @@ export default function BudgetManager({ data, updateData }) {
             endDate: recurEndDate || null, 
             accountId: selectedAccountId, 
             targetAccountId: type === 'transfer' ? targetAccountId : null, 
-            nextDueDate: initialNextDate.toISOString() // <-- DATE CORRIGÉE
+            nextDueDate: initialNextDate.toISOString() // <-- DATE CALCULÉE SANS ERREUR
         }; 
         
         updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); 
