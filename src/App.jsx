@@ -281,20 +281,33 @@ export default function App() {
     } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
   };
 
-  const updateData = async (newData, deleteRequest = null) => {
+  // --- CORRECTION CRITIQUE DE LA FONCTION UPDATE DATA ---
+  const updateData = async (newData, dbRequest = null) => {
     setData(newData);
-    setUnsavedChanges(true);
-    if (deleteRequest) {
-      const { table, id, filter } = deleteRequest; 
+    setUnsavedChanges(true); // Lance toujours le timer pour la synchro globale (backup)
+
+    // Gestion des requêtes IMMÉDIATES (Création/Modif/Suppression)
+    if (dbRequest) {
+      const { table, id, data, action, filter } = dbRequest; 
       try {
-        if (filter && filter.column && filter.value) {
-            // Suppression de masse
-            await supabase.from(table).delete().eq(filter.column, filter.value);
-        } else if (table && id) {
-            // Suppression classique
-            await supabase.from(table).delete().eq('id', id);
+        if (action === 'insert' && table && data) {
+            // Création immédiate avec ID utilisateur explicite
+            const { data: { session } } = await supabase.auth.getSession();
+            await supabase.from(table).insert({ ...data, user_id: session?.user?.id });
+        } 
+        else if (action === 'update' && table && id && data) {
+            // Mise à jour immédiate
+            await supabase.from(table).update(data).eq('id', id);
         }
-      } catch (e) { console.error("Erreur suppression", e); }
+        else if ((action === 'delete' || (!action && table && id)) || (filter)) {
+            // Suppression (Ancienne logique conservée + nouvelle)
+            if (filter && filter.column && filter.value) {
+                await supabase.from(table).delete().eq(filter.column, filter.value);
+            } else if (table && id) {
+                await supabase.from(table).delete().eq('id', id);
+            }
+        }
+      } catch (e) { console.error("Erreur action DB immédiate", e); }
     }
   };
 
@@ -340,7 +353,6 @@ export default function App() {
       await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
       await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
 
-      // --- MODIFICATION ICI : Ajout du champ is_all_day ---
       await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
           id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
           end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
@@ -380,7 +392,6 @@ export default function App() {
     }
   };
 
-  // Layout Full Width pour Journal/Planning/Workspace
   const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal';
 
   return (
