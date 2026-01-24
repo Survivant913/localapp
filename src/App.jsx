@@ -54,12 +54,20 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
+  // --- CORRECTION DU BUG DE DATE (Timezone Buffer) ---
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
       today.setHours(0,0,0,0);
-      const checkDate = parseLocalDate(dateStr); 
+      
+      const d = new Date(dateStr);
+      // AJOUT CRITIQUE : On ajoute 12h pour éviter que "23h00 la veille" (UTC) 
+      // ne soit compté comme le jour précédent. Cela force la date au milieu du jour visé.
+      d.setHours(d.getHours() + 12);
+
+      const checkDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       checkDate.setHours(0,0,0,0);
+      
       return checkDate <= today;
   };
 
@@ -281,26 +289,21 @@ export default function App() {
     } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
   };
 
-  // --- CORRECTION CRITIQUE DE LA FONCTION UPDATE DATA ---
   const updateData = async (newData, dbRequest = null) => {
     setData(newData);
-    setUnsavedChanges(true); // Lance toujours le timer pour la synchro globale (backup)
+    setUnsavedChanges(true); 
 
-    // Gestion des requêtes IMMÉDIATES (Création/Modif/Suppression)
     if (dbRequest) {
       const { table, id, data, action, filter } = dbRequest; 
       try {
         if (action === 'insert' && table && data) {
-            // Création immédiate avec ID utilisateur explicite
             const { data: { session } } = await supabase.auth.getSession();
             await supabase.from(table).insert({ ...data, user_id: session?.user?.id });
         } 
         else if (action === 'update' && table && id && data) {
-            // Mise à jour immédiate
             await supabase.from(table).update(data).eq('id', id);
         }
         else if ((action === 'delete' || (!action && table && id)) || (filter)) {
-            // Suppression (Ancienne logique conservée + nouvelle)
             if (filter && filter.column && filter.value) {
                 await supabase.from(table).delete().eq(filter.column, filter.value);
             } else if (table && id) {
