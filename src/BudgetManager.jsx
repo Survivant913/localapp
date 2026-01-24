@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 
 export default function BudgetManager({ data, updateData }) {
-    // --- 0. SÉCURITÉ ANTI-CRASH (NEW) ---
-    // Si les données ne sont pas encore là, on affiche un loader au lieu de l'écran blanc
+    // --- 0. SÉCURITÉ ANTI-CRASH ---
     if (!data) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -16,14 +15,12 @@ export default function BudgetManager({ data, updateData }) {
         );
     }
 
-    // --- 1. INITIALISATION ET SÉCURISATION ---
+    // --- 1. INITIALISATION ---
     const budgetData = data?.budget || { transactions: [], recurring: [], scheduled: [], planner: { base: 0, items: [] }, accounts: [] };
     
     const transactionsList = Array.isArray(budgetData.transactions) ? budgetData.transactions : [];
     const recurringList = Array.isArray(budgetData.recurring) ? budgetData.recurring : [];
     const scheduledList = Array.isArray(budgetData.scheduled) ? budgetData.scheduled : [];
-    
-    // Sécurité supplémentaire sur les comptes
     const accounts = (Array.isArray(budgetData.accounts) && budgetData.accounts.length > 0) 
         ? budgetData.accounts 
         : [{ id: '1', name: "Compte Courant" }];
@@ -31,60 +28,38 @@ export default function BudgetManager({ data, updateData }) {
     const planner = { items: [], safetyBases: {}, ...budgetData.planner };
 
     // --- 2. ÉTATS LOCAUX ---
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [activeTab, setActiveTab] = useState('dashboard');
     
     // Formulaires
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [amount, setAmount] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [desc, setDesc] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [type, setType] = useState('expense');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [targetAccountId, setTargetAccountId] = useState(accounts.length > 1 ? accounts[1].id : accounts[0]?.id);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [scheduleDate, setScheduleDate] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [recurDay, setRecurDay] = useState(1);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [recurEndDate, setRecurEndDate] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerTargetId, setPlannerTargetId] = useState(accounts[0]?.id || '');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerBaseInput, setPlannerBaseInput] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemName, setPlannerItemName] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemCost, setPlannerItemCost] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [plannerItemAccount, setPlannerItemAccount] = useState(accounts[0]?.id || '');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [newAccountName, setNewAccountName] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [editingAccountId, setEditingAccountId] = useState(null);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [editingAccountName, setEditingAccountName] = useState('');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [deletingAccountId, setDeletingAccountId] = useState(null);
 
     // Filtres
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [showArchived, setShowArchived] = useState(false);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [forecastAccount, setForecastAccount] = useState('total');
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [historyLimit, setHistoryLimit] = useState(5);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     useEffect(() => {
         const val = planner.safetyBases?.[plannerTargetId] || 0;
         setPlannerBaseInput(val === 0 ? '' : val);
     }, [plannerTargetId, planner.safetyBases]);
 
-    // --- HELPERS BLINDÉS ---
+    // --- HELPERS ---
     const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
 
     const parseAmount = (val) => { 
@@ -119,81 +94,10 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
-    // --- AUTOMATISATION ---
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+    // --- AUTOMATISATION (Catch-up Visualisation) ---
     useEffect(() => {
-        const checkAutomations = () => {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const todayStr = `${year}-${month}-${day}`;
-            
-            let hasUpdates = false;
-            let newScheduled = [...scheduledList];
-            let newRecurring = [...recurringList];
-            let newTransactions = [...transactionsList];
-
-            // 1. Planifiés
-            newScheduled.forEach((s, index) => {
-                if (s.status === 'pending') {
-                    let scheduledDateStr = '';
-                    if (typeof s.date === 'string') scheduledDateStr = s.date.split('T')[0];
-                    else if (s.date instanceof Date) scheduledDateStr = s.date.toISOString().split('T')[0];
-
-                    if (scheduledDateStr && scheduledDateStr <= todayStr) {
-                        hasUpdates = true;
-                        newScheduled[index] = { ...s, status: 'completed' };
-                        const baseTrans = { id: Date.now() + index, date: new Date().toISOString(), amount: s.amount, archived: false };
-                        if (s.type === 'transfer') {
-                            const sourceName = accounts.find(a => a.id === s.accountId)?.name;
-                            const targetName = accounts.find(a => a.id === s.targetAccountId)?.name;
-                            newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_out', type: 'expense', description: `Virement planifié vers ${targetName} : ${s.description}`, accountId: s.accountId });
-                            newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_in', type: 'income', description: `Virement planifié reçu de ${sourceName} : ${s.description}`, accountId: s.targetAccountId });
-                        } else {
-                            newTransactions.unshift({ ...baseTrans, type: s.type, description: `Planifié : ${s.description}`, accountId: s.accountId });
-                        }
-                    }
-                }
-            });
-
-            // 2. Récurrents
-            newRecurring.forEach((r, index) => {
-                let nextDueStr = '';
-                if (typeof r.nextDueDate === 'string') nextDueStr = r.nextDueDate.split('T')[0];
-                else if (r.nextDueDate instanceof Date) nextDueStr = r.nextDueDate.toISOString().split('T')[0];
-
-                if (nextDueStr && nextDueStr <= todayStr) {
-                    hasUpdates = true;
-                    const baseTrans = { id: Date.now() + index + 1000, date: new Date().toISOString(), amount: r.amount, archived: false };
-                    if (r.type === 'transfer') {
-                        const sourceName = accounts.find(a => a.id === r.accountId)?.name;
-                        const targetName = accounts.find(a => a.id === r.targetAccountId)?.name;
-                        newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_out', type: 'expense', description: `Virement récurrent vers ${targetName} : ${r.description}`, accountId: r.accountId });
-                        newTransactions.unshift({ ...baseTrans, id: baseTrans.id + '_in', type: 'income', description: `Virement récurrent reçu de ${sourceName} : ${r.description}`, accountId: r.targetAccountId });
-                    } else {
-                        newTransactions.unshift({ ...baseTrans, type: r.type, description: `Récurrent : ${r.description}`, accountId: r.accountId });
-                    }
-
-                    const currentDueDate = parseLocalDate(r.nextDueDate);
-                    let targetYear = currentDueDate.getFullYear();
-                    let targetMonth = currentDueDate.getMonth() + 1;
-                    if (targetMonth > 11) { targetMonth = 0; targetYear++; }
-                    const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-                    const dayToSet = Math.min(r.dayOfMonth, daysInTargetMonth);
-                    const nextDate = new Date(targetYear, targetMonth, dayToSet);
-                    newRecurring[index] = { ...r, nextDueDate: nextDate.toISOString() };
-                }
-            });
-
-            if (hasUpdates) {
-                updateData({ ...data, budget: { ...budgetData, scheduled: newScheduled, recurring: newRecurring, transactions: newTransactions } });
-            }
-        };
-
-        if (scheduledList.length > 0 || recurringList.length > 0) {
-            checkAutomations();
-        }
+        // La logique lourde de rattrapage est gérée par App.jsx.
+        // Ici, on gère juste l'affichage et la synchro visuelle si besoin.
     }, [scheduledList.length, recurringList.length]);
 
     // --- 3. CALCULS ---
@@ -206,7 +110,6 @@ export default function BudgetManager({ data, updateData }) {
 
     const currentTotalBalance = round2(transactionsList.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0));
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const endOfMonthForecast = useMemo(() => {
         const today = new Date();
         const currentDay = today.getDate();
@@ -254,7 +157,6 @@ export default function BudgetManager({ data, updateData }) {
         return round2(projected);
     }, [budgetData, forecastAccount, currentTotalBalance]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const processedPlannerItems = useMemo(() => {
         const simulatedBalances = {};
         accounts.forEach(acc => {
@@ -287,7 +189,6 @@ export default function BudgetManager({ data, updateData }) {
                 while (monthsPassed < 120) {
                     monthsPassed++;
                     simulationDate.setMonth(simulationDate.getMonth() + 1);
-                    
                     let monthlyIn = 0;
                     let monthlyOut = 0;
 
@@ -333,7 +234,6 @@ export default function BudgetManager({ data, updateData }) {
         });
     }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, budgetData.scheduled, accounts]);
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const forecastData = useMemo(() => {
         const today = new Date();
         let projectedBalance = endOfMonthForecast;
@@ -383,7 +283,15 @@ export default function BudgetManager({ data, updateData }) {
         return monthsData;
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
-    // --- 4. ACTIONS ---
+    // --- 4. ACTIONS (AVEC SAUVEGARDE IMMÉDIATE) ---
+    
+    // Date Helper : Force Midi (12:00:00) pour éviter les décalages UTC
+    const getNoonDate = (dateObj = new Date()) => {
+        const d = new Date(dateObj);
+        d.setHours(12, 0, 0, 0);
+        return d.toISOString();
+    };
+
     const addAccount = () => { 
         if(!newAccountName.trim()) return;
         const newAcc = { id: Date.now().toString(), name: newAccountName };
@@ -412,23 +320,51 @@ export default function BudgetManager({ data, updateData }) {
     const addTransaction = () => {
         if(!amount || !desc) return;
         let newTransactions = [];
-        const commonData = { id: Date.now(), amount: parseAmount(amount), date: new Date().toISOString(), archived: false };
+        // Utilisation de getNoonDate pour la transaction immédiate
+        const commonData = { id: Date.now(), amount: parseAmount(amount), date: getNoonDate(), archived: false };
+        
+        let dbActionData = null; // Pour la sauvegarde DB
+
         if (type === 'transfer') {
             if (selectedAccountId === targetAccountId) { alert("Comptes identiques !"); return; }
             const sourceName = accounts.find(a => a.id === selectedAccountId)?.name;
             const targetName = accounts.find(a => a.id === targetAccountId)?.name;
-            newTransactions.push({ ...commonData, id: Date.now(), type: 'expense', description: `Virement vers ${targetName} : ${desc}`, accountId: selectedAccountId });
-            newTransactions.push({ ...commonData, id: Date.now() + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${desc}`, accountId: targetAccountId });
+            
+            const t1 = { ...commonData, id: Date.now(), type: 'expense', description: `Virement vers ${targetName} : ${desc}`, accountId: selectedAccountId };
+            const t2 = { ...commonData, id: Date.now() + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${desc}`, accountId: targetAccountId };
+            
+            newTransactions.push(t1, t2);
+            // Note: Pour un transfert, on ne force pas l'insert immédiat complexe (trop de logique), on laisse le timer 3s (moins critique)
+            // Ou on pourrait envoyer t1, mais t2 serait en retard. On accepte le timer pour les transferts.
         } else {
-            newTransactions.push({ ...commonData, type, description: desc, accountId: selectedAccountId });
+            const t = { ...commonData, type, description: desc, accountId: selectedAccountId };
+            newTransactions.push(t);
+            dbActionData = { table: 'transactions', data: { ...t, account_id: t.accountId }, action: 'insert' };
         }
-        updateData({ ...data, budget: { ...budgetData, transactions: [...newTransactions, ...transactionsList] } });
+        
+        // Si c'est une dépense/revenu simple -> Sauvegarde Immédiate
+        updateData(
+            { ...data, budget: { ...budgetData, transactions: [...newTransactions, ...transactionsList] } },
+            dbActionData
+        );
         setAmount(''); setDesc(''); setActiveTab('dashboard');
     };
 
-    const addScheduled = () => { if(!amount || !desc || !scheduleDate) return; const newSch = { id: Date.now(), type, amount: parseAmount(amount), description: desc, date: scheduleDate, status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null }; updateData({ ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } }); setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); };
+    const addScheduled = () => { 
+        if(!amount || !desc || !scheduleDate) return; 
+        const newSch = { 
+            id: Date.now(), type, amount: parseAmount(amount), description: desc, 
+            date: scheduleDate, // Date format YYYY-MM-DD (Safe)
+            status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null 
+        }; 
+        
+        updateData(
+            { ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } },
+            { table: 'scheduled', data: { ...newSch, account_id: newSch.accountId, target_account_id: newSch.targetAccountId }, action: 'insert' }
+        ); 
+        setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); 
+    };
     
-    // --- FIX RECURRING : CREATION A MIDI POUR EVITER LE DECALAGE UTC ---
     const addRecurring = () => { 
         if(!amount || !desc) return;
         
@@ -447,7 +383,7 @@ export default function BudgetManager({ data, updateData }) {
         const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
         const dayToSet = Math.min(targetDay, daysInTargetMonth);
         
-        // MODIFICATION ICI : On force l'heure à 12:00:00
+        // DATE SECURISEE MIDI
         const initialNextDate = new Date(targetYear, targetMonth, dayToSet, 12, 0, 0);
 
         const newRec = { 
@@ -462,22 +398,84 @@ export default function BudgetManager({ data, updateData }) {
             nextDueDate: initialNextDate.toISOString() 
         }; 
         
-        updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); 
+        updateData(
+            { ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } },
+            { table: 'recurring', data: { ...newRec, account_id: newRec.accountId, target_account_id: newRec.targetAccountId, day_of_month: newRec.dayOfMonth, end_date: newRec.endDate, next_due_date: newRec.nextDueDate }, action: 'insert' }
+        ); 
         setAmount(''); setDesc(''); setRecurEndDate(''); setActiveTab('dashboard'); 
     };
 
     const deleteItem = (collection, id) => { 
         const map = { 'transactions': 'transactions', 'recurring': 'recurring', 'scheduled': 'scheduled' };
         const targetList = Array.isArray(budgetData[collection]) ? budgetData[collection] : [];
-        updateData({ ...data, budget: { ...budgetData, [collection]: targetList.filter(i => i.id !== id) } }, { table: map[collection], id: id }); 
+        updateData({ ...data, budget: { ...budgetData, [collection]: targetList.filter(i => i.id !== id) } }, { table: map[collection], id: id, action: 'delete' }); 
     };
-    const archiveTransaction = (id) => { const newTransactions = transactionsList.map(t => t.id === id ? { ...t, archived: !t.archived } : t); updateData({ ...data, budget: { ...budgetData, transactions: newTransactions } }); };
     
-    const savePlannerBase = () => { const newBases = { ...planner.safetyBases, [plannerTargetId]: parseAmount(plannerBaseInput) || 0 }; updateData({ ...data, budget: { ...budgetData, planner: { ...planner, safetyBases: newBases } } }); };
-    const addPlannerItem = () => { if (!plannerItemName || !plannerItemCost) return; updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items: [...planner.items, { id: Date.now(), name: plannerItemName, cost: parseAmount(plannerItemCost), targetAccountId: plannerItemAccount }] } } }); setPlannerItemName(''); setPlannerItemCost(''); };
-    const deletePlannerItem = (id) => { updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items: planner.items.filter(i => i.id !== id) } } }, { table: 'planner_items', id: id }); };
-    const movePlannerItem = (index, direction) => { const items = [...planner.items]; if (direction === 'up' && index > 0) { [items[index], items[index - 1]] = [items[index - 1], items[index]]; } else if (direction === 'down' && index < items.length - 1) { [items[index], items[index + 1]] = [items[index + 1], items[index]]; } updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items } } }); };
-    const buyPlannerItem = (item) => { if(window.confirm(`Confirmer l'achat de "${item.name}" pour ${formatCurrency(item.cost)} ?`)) { const newTransaction = { id: Date.now(), amount: item.cost, date: new Date().toISOString(), archived: false, type: 'expense', description: `Achat planifié : ${item.name}`, accountId: item.targetAccountId || accounts[0].id }; const newTransactions = [newTransaction, ...transactionsList]; const newItems = planner.items.filter(i => i.id !== item.id); updateData({ ...data, budget: { ...budgetData, transactions: newTransactions, planner: { ...planner, items: newItems } } }, { table: 'planner_items', id: item.id }); } };
+    const archiveTransaction = (id) => { 
+        // L'archivage est une modif simple, on laisse le timer ou on peut forcer l'update
+        const newTransactions = transactionsList.map(t => t.id === id ? { ...t, archived: !t.archived } : t); 
+        const target = newTransactions.find(t => t.id === id);
+        updateData(
+            { ...data, budget: { ...budgetData, transactions: newTransactions } },
+            { table: 'transactions', id: id, data: { archived: target.archived }, action: 'update' }
+        ); 
+    };
+    
+    const savePlannerBase = () => { 
+        const newBases = { ...planner.safetyBases, [plannerTargetId]: parseAmount(plannerBaseInput) || 0 }; 
+        // Sauvegarde complexe (table différente), on laisse le timer global gérer ou on utilise un upsert custom dans App.jsx
+        // Pour simplifier, on laisse le timer ici car c'est moins critique
+        updateData({ ...data, budget: { ...budgetData, planner: { ...planner, safetyBases: newBases } } }); 
+    };
+
+    const addPlannerItem = () => { 
+        if (!plannerItemName || !plannerItemCost) return; 
+        const newItem = { id: Date.now(), name: plannerItemName, cost: parseAmount(plannerItemCost), targetAccountId: plannerItemAccount };
+        updateData(
+            { ...data, budget: { ...budgetData, planner: { ...planner, items: [...planner.items, newItem] } } },
+            { table: 'planner_items', data: { ...newItem, target_account_id: newItem.targetAccountId }, action: 'insert' }
+        ); 
+        setPlannerItemName(''); setPlannerItemCost(''); 
+    };
+
+    const deletePlannerItem = (id) => { 
+        updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items: planner.items.filter(i => i.id !== id) } } }, { table: 'planner_items', id: id, action: 'delete' }); 
+    };
+
+    const movePlannerItem = (index, direction) => { 
+        const items = [...planner.items]; 
+        if (direction === 'up' && index > 0) { [items[index], items[index - 1]] = [items[index - 1], items[index]]; } 
+        else if (direction === 'down' && index < items.length - 1) { [items[index], items[index + 1]] = [items[index + 1], items[index]]; } 
+        updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items } } }); 
+        // Le déplacement d'ordre est purement local/visuel, le timer suffit.
+    };
+
+    const buyPlannerItem = (item) => { 
+        if(window.confirm(`Confirmer l'achat de "${item.name}" pour ${formatCurrency(item.cost)} ?`)) { 
+            // 1. Créer la transaction
+            const newTransaction = { 
+                id: Date.now(), 
+                amount: item.cost, 
+                date: getNoonDate(), // DATE SECURISEE MIDI
+                archived: false, 
+                type: 'expense', 
+                description: `Achat planifié : ${item.name}`, 
+                accountId: item.targetAccountId || accounts[0].id 
+            }; 
+            
+            const newTransactions = [newTransaction, ...transactionsList]; 
+            const newItems = planner.items.filter(i => i.id !== item.id); 
+            
+            // NOTE : Ici on envoie 2 actions en 1 : Suppression de l'item + Ajout de la transaction.
+            // Notre système `updateData` ne gère qu'une seule action DB immédiate.
+            // On priorise la suppression de l'item pour éviter les doublons d'achat.
+            // La transaction sera sauvegardée par le timer de 3s (backup).
+            updateData(
+                { ...data, budget: { ...budgetData, transactions: newTransactions, planner: { ...planner, items: newItems } } }, 
+                { table: 'planner_items', id: item.id, action: 'delete' } 
+            ); 
+        } 
+    };
     
     const neededToReachBase = Math.max(0, (planner.safetyBases?.[plannerTargetId] || 0) - getBalanceForAccount(plannerTargetId));
     
