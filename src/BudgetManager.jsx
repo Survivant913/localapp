@@ -428,22 +428,40 @@ export default function BudgetManager({ data, updateData }) {
 
     const addScheduled = () => { if(!amount || !desc || !scheduleDate) return; const newSch = { id: Date.now(), type, amount: parseAmount(amount), description: desc, date: scheduleDate, status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null }; updateData({ ...data, budget: { ...budgetData, scheduled: [...scheduledList, newSch].sort((a,b) => new Date(a.date) - new Date(b.date)) } }); setAmount(''); setDesc(''); setScheduleDate(''); setActiveTab('dashboard'); };
     
+    // --- FIX RECURRING : CREATION A MIDI POUR EVITER LE DECALAGE UTC ---
     const addRecurring = () => { 
         if(!amount || !desc) return;
+        
         const today = new Date();
         const currentDay = today.getDate();
         const targetDay = parseInt(recurDay);
+        
         let targetYear = today.getFullYear();
         let targetMonth = today.getMonth();
+
         if (targetDay < currentDay) {
             targetMonth++;
             if (targetMonth > 11) { targetMonth = 0; targetYear++; }
         }
+        
         const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
         const dayToSet = Math.min(targetDay, daysInTargetMonth);
-        const initialNextDate = new Date(targetYear, targetMonth, dayToSet);
+        
+        // MODIFICATION ICI : On force l'heure à 12:00:00
+        const initialNextDate = new Date(targetYear, targetMonth, dayToSet, 12, 0, 0);
 
-        const newRec = { id: Date.now(), type, amount: parseAmount(amount), description: desc, dayOfMonth: targetDay, endDate: recurEndDate || null, accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null, nextDueDate: initialNextDate.toISOString() }; 
+        const newRec = { 
+            id: Date.now(), 
+            type, 
+            amount: parseAmount(amount), 
+            description: desc, 
+            dayOfMonth: targetDay, 
+            endDate: recurEndDate || null, 
+            accountId: selectedAccountId, 
+            targetAccountId: type === 'transfer' ? targetAccountId : null, 
+            nextDueDate: initialNextDate.toISOString() 
+        }; 
+        
         updateData({ ...data, budget: { ...budgetData, recurring: [...recurringList, newRec].sort((a,b) => a.dayOfMonth - b.dayOfMonth) } }); 
         setAmount(''); setDesc(''); setRecurEndDate(''); setActiveTab('dashboard'); 
     };
