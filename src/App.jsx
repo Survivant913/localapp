@@ -54,16 +54,17 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
-  // --- CORRECTION DU BUG DE DATE (Timezone Buffer) ---
+  // --- CORRECTION DU BUG DE DATE (Timezone Buffer AJUSTÉ) ---
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
       today.setHours(0,0,0,0);
       
       const d = new Date(dateStr);
-      // AJOUT CRITIQUE : On ajoute 12h pour éviter que "23h00 la veille" (UTC) 
-      // ne soit compté comme le jour précédent. Cela force la date au milieu du jour visé.
-      d.setHours(d.getHours() + 12);
+      // MODIFICATION ICI : +6h au lieu de +12h.
+      // 12h (Midi) + 6h = 18h (Reste aujourd'hui) -> OK
+      // 23h (Veille) + 6h = 05h (Devient aujourd'hui) -> OK
+      d.setHours(d.getHours() + 6);
 
       const checkDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       checkDate.setHours(0,0,0,0);
