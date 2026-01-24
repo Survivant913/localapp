@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
-  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock
+  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
@@ -69,34 +69,65 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const labels = data.customLabels || {};
 
-    // --- 1. FILTRES & CALCULS FINANCIERS ---
-    const isRelevantAccount = (accId) => {
+    // --- 1. FILTRES INTELLIGENTS (CORRIGÉS) ---
+    
+    // Vérifie si un élément concerne le compte sélectionné (Source OU Cible)
+    const isRelevantItem = (item) => {
         if (dashboardFilter === 'total') return true;
-        return String(accId) === String(dashboardFilter);
+        const accId = String(item.accountId || item.account_id);
+        const targetId = String(item.targetAccountId || item.target_account_id);
+        return accId === String(dashboardFilter) || targetId === String(dashboardFilter);
     };
 
-    // Solde affiché
+    // Calcul de l'impact financier (+, -, ou 0) selon le contexte
+    const getFinancialImpact = (item) => {
+        const amount = parseFloat(item.amount || 0);
+        const type = item.type;
+        const accId = String(item.accountId || item.account_id);
+        const targetId = String(item.targetAccountId || item.target_account_id);
+
+        // Cas 1 : Vue Globale
+        if (dashboardFilter === 'total') {
+            if (type === 'income') return amount;
+            if (type === 'expense') return -amount;
+            if (type === 'transfer') return 0; // Neutre en global
+            return -amount;
+        }
+
+        // Cas 2 : Vue Compte Spécifique
+        // Si c'est un transfert
+        if (type === 'transfer') {
+            if (targetId === String(dashboardFilter)) return amount; // On reçoit l'argent (+)
+            if (accId === String(dashboardFilter)) return -amount;   // On envoie l'argent (-)
+            return 0;
+        }
+
+        // Si c'est normal
+        if (type === 'income') return amount;
+        return -amount;
+    };
+
+    // --- 2. CALCULS DE SOLDE ---
+
+    // Solde affiché (Prend en compte les virements dans l'historique transactionnel si présents)
     const currentBalanceRaw = transactions
-        .filter(t => isRelevantAccount(t.accountId || t.account_id))
-        .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+        .filter(t => isRelevantItem(t))
+        .reduce((acc, t) => acc + getFinancialImpact(t), 0);
     
     const currentBalance = Math.round(currentBalanceRaw * 100) / 100;
 
-    // Solde GLOBAL (pour projets)
-    const globalTotalBalance = Math.round(
-        transactions.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0) 
-        * 100
-    ) / 100;
-
-    const renderAmount = (amount, withSign = false) => {
+    const renderAmount = (val, withSign = false) => {
         if (isPrivacyMode) return '**** €';
-        const val = parseFloat(amount || 0);
         const formatted = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(Math.abs(val));
-        if (withSign) return (val >= 0 ? '+' : '-') + formatted;
-        return formatted;
+        if (withSign) {
+            if (val > 0) return '+' + formatted;
+            if (val < 0) return '-' + formatted;
+            return formatted;
+        }
+        return (val < 0 ? '-' : '') + formatted;
     };
 
-    // Graphique Performant
+    // Graphique Performant (Corrigé avec getFinancialImpact)
     const getSparklineData = () => {
         try {
             const days = 30; 
@@ -104,15 +135,14 @@ export default function Dashboard({ data, updateData, setView }) {
             let tempBalance = currentBalance;
             
             const dailyChanges = {};
-            const relevantTransactions = transactions.filter(t => isRelevantAccount(t.accountId || t.account_id));
+            const relevantTransactions = transactions.filter(t => isRelevantItem(t));
             
             relevantTransactions.forEach(t => {
                 const d = new Date(t.date);
                 d.setHours(0,0,0,0);
                 const key = d.getTime();
-                const amount = parseFloat(t.amount || 0);
-                const delta = t.type === 'income' ? amount : -amount;
-                dailyChanges[key] = (dailyChanges[key] || 0) + delta;
+                const impact = getFinancialImpact(t);
+                dailyChanges[key] = (dailyChanges[key] || 0) + impact;
             });
 
             let currentDateCursor = new Date();
@@ -121,6 +151,7 @@ export default function Dashboard({ data, updateData, setView }) {
             for (let i = 0; i < days; i++) {
                 history.unshift(Number(tempBalance.toFixed(2)));
                 const key = currentDateCursor.getTime();
+                // On remonte le temps : Solde Veille = Solde Aujourd'hui - Changement Aujourd'hui
                 tempBalance -= (dailyChanges[key] || 0);
                 currentDateCursor.setDate(currentDateCursor.getDate() - 1);
             }
@@ -130,7 +161,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 2. CALCUL "À VENIR" (FINANCIER) ---
+    // --- 3. CALCUL "À VENIR" (CORRIGÉ) ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
@@ -139,13 +170,13 @@ export default function Dashboard({ data, updateData, setView }) {
 
             scheduled.forEach(s => {
                 if(s.status === 'pending') {
-                    if (!isRelevantAccount(s.accountId || s.account_id)) return;
+                    if (!isRelevantItem(s)) return;
                     events.push({ type: 'scheduled', date: new Date(s.date), data: s, id: `s-${s.id}` });
                 }
             });
 
             recurring.forEach(r => {
-                if (!isRelevantAccount(r.accountId || r.account_id)) return;
+                if (!isRelevantItem(r)) return;
                 let nextDate = r.nextDueDate ? new Date(r.nextDueDate) : new Date();
                 events.push({ type: 'recurring', date: nextDate, data: r, id: `r-${r.id}` });
             });
@@ -158,42 +189,37 @@ export default function Dashboard({ data, updateData, setView }) {
     };
     const upcomingList = getUpcomingEvents();
 
-    // --- NOUVEAU : CALCUL "AGENDA" (CALENDRIER UNIQUEMENT) ---
-    // Correction : On retire la fusion avec les todos.
+    // --- 4. AUTRES HELPERS ---
     const getNextCalendarEvents = () => {
         try {
             const now = new Date();
             const today = new Date();
             today.setHours(0,0,0,0);
             
-            // 1. Événements classiques de l'agenda
             const calEvents = (data.calendar_events || []).map(e => ({
                 id: e.id, title: e.title, start_time: e.start_time, is_todo: false,
                 is_all_day: e.is_all_day
             }));
 
-            // Filtrer (Futur) et Trier
             return calEvents
                 .filter(e => {
                     const evtDate = new Date(e.start_time);
-                    if (e.is_all_day) {
-                        return evtDate >= today;
-                    }
+                    if (e.is_all_day) return evtDate >= today;
                     return evtDate > now;
                 })
                 .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-                .slice(0, 4); // Prendre les 4 prochains
+                .slice(0, 4);
         } catch (e) { return []; }
     };
     const nextCalendarEvents = getNextCalendarEvents();
 
-    // --- 3. ACTIONS & LOGIQUE PROJET ---
     const toggleTodo = (id) => {
         const newTodos = todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
         updateData({ ...data, todos: newTodos });
     };
 
     const getAccountBalanceForProject = (accId) => {
+        // Pour les projets, on regarde juste le solde brut du compte lié
         return transactions
             .filter(t => String(t.accountId || t.account_id) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
@@ -283,7 +309,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                     <div className="relative z-10 mt-4 mb-4">
                         <h3 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{renderAmount(currentBalance)}</h3>
-                        <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Solde Total</p>
+                        <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Solde {dashboardFilter === 'total' ? 'Total' : 'du Compte'}</p>
                     </div>
                     <div className="h-16 w-full mt-auto bg-gray-50 dark:bg-slate-800/50 rounded-xl p-2 border border-gray-100 dark:border-slate-700/50">
                         <SparkLine data={sparkData} height={50} />
@@ -300,23 +326,31 @@ export default function Dashboard({ data, updateData, setView }) {
                         {upcomingList.length === 0 ? (
                             <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm py-4">Rien à signaler</div>
                         ) : (
-                            upcomingList.map((e, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                                    <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                                        <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-300 shadow-sm shrink-0">{e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}</div>
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-gray-800 dark:text-white text-sm truncate">{e.data.description}</p>
-                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
-                                                <span>{e.date.toLocaleDateString()}</span>
-                                                {e.type === 'recurring' && <span className="flex items-center gap-1"><TrendingUp size={10}/> <span className="hidden sm:inline">Récurrent</span></span>}
+                            upcomingList.map((e, idx) => {
+                                const impact = getFinancialImpact(e.data);
+                                const isNeutral = impact === 0;
+                                const isPositive = impact > 0;
+                                
+                                return (
+                                    <div key={idx} className="flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
+                                        <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+                                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-300 shadow-sm shrink-0">
+                                                {e.data.type === 'transfer' ? <ArrowRightLeft size={18} className="text-blue-500"/> : e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-gray-800 dark:text-white text-sm truncate">{e.data.description}</p>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                                    <span>{e.date.toLocaleDateString()}</span>
+                                                    {e.type === 'recurring' && <span className="flex items-center gap-1"><TrendingUp size={10}/> <span className="hidden sm:inline">Récurrent</span></span>}
+                                                </div>
                                             </div>
                                         </div>
+                                        <span className={`font-bold text-sm shrink-0 pl-2 ${isNeutral ? 'text-blue-600 dark:text-blue-400' : isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            {isNeutral ? 'Transfert' : renderAmount(impact, true)}
+                                        </span>
                                     </div>
-                                    <span className={`font-bold text-sm shrink-0 pl-2 ${e.data.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                        {renderAmount(e.data.type === 'income' ? parseFloat(e.data.amount) : -parseFloat(e.data.amount), true)}
-                                    </span>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -346,7 +380,7 @@ export default function Dashboard({ data, updateData, setView }) {
                                     if (cost > 0) {
                                         budgetAvailable = p.linkedAccountId 
                                             ? getAccountBalanceForProject(p.linkedAccountId) 
-                                            : Math.max(0, globalTotalBalance);
+                                            : Math.max(0, currentBalance); // Use calculated currentBalance
                                         
                                         fundingPercentage = Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100);
                                         isFunded = budgetAvailable >= cost;
