@@ -5,7 +5,7 @@ import {
   Heading, Quote, Save, FolderPlus, FilePlus,
   ArrowLeft, Underline, Strikethrough, Type,
   X, CornerDownRight, Highlighter, PanelLeft,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify // <--- NOUVEAUX IMPORTS
+  AlignLeft, AlignCenter, AlignRight, AlignJustify
 } from 'lucide-react';
 
 export default function JournalManager({ data, updateData }) {
@@ -57,20 +57,23 @@ export default function JournalManager({ data, updateData }) {
         if (activePageId && editorRef.current) {
             const page = pages.find(p => String(p.id) === String(activePageId));
             if (page) {
+                // On ne met à jour le HTML que si l'ID de page a changé pour ne pas écraser la frappe en cours
                 if (editorRef.current.dataset.pageId !== String(activePageId)) {
                     editorRef.current.innerHTML = page.content || '<p><br/></p>';
                     editorRef.current.dataset.pageId = String(activePageId);
                 }
+                // Mise à jour du titre
                 if (titleRef.current && titleRef.current.value !== page.title) {
                     titleRef.current.value = page.title || '';
                 }
             }
         }
+        // Reset des états d'outils
         setActiveFormats({});
         setShowColorPalette(false);
     }, [activePageId, pages]);
 
-    // --- ACTIONS ---
+    // --- ACTIONS DE GESTION (Dossiers/Pages) ---
     const createContainer = () => {
         if (!newName.trim()) return;
         const newId = Date.now();
@@ -116,33 +119,74 @@ export default function JournalManager({ data, updateData }) {
         setTimeout(() => setIsSaving(false), 800);
     };
 
-    // --- ÉDITEUR & FORMATAGE ---
+    // --- MOTEUR ÉDITEUR (CŒUR DU SYSTÈME) ---
+    
+    // Vérifie quels formats sont actifs à l'endroit du curseur
     const checkFormats = () => {
         if (!document) return;
-        setActiveFormats({
-            bold: document.queryCommandState('bold'),
-            italic: document.queryCommandState('italic'),
-            underline: document.queryCommandState('underline'),
-            strikethrough: document.queryCommandState('strikethrough'),
-            insertUnorderedList: document.queryCommandState('insertUnorderedList'),
-            insertOrderedList: document.queryCommandState('insertOrderedList'),
-            // Alignements
-            justifyLeft: document.queryCommandState('justifyLeft'),
-            justifyCenter: document.queryCommandState('justifyCenter'),
-            justifyRight: document.queryCommandState('justifyRight'),
-            justifyFull: document.queryCommandState('justifyFull'),
-            
-            blockquote: document.queryCommandValue('formatBlock') === 'blockquote',
-            h2: document.queryCommandValue('formatBlock') === 'h2',
-            h3: document.queryCommandValue('formatBlock') === 'h3',
-        });
+        try {
+            setActiveFormats({
+                bold: document.queryCommandState('bold'),
+                italic: document.queryCommandState('italic'),
+                underline: document.queryCommandState('underline'),
+                strikethrough: document.queryCommandState('strikethrough'),
+                insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+                insertOrderedList: document.queryCommandState('insertOrderedList'),
+                justifyLeft: document.queryCommandState('justifyLeft'),
+                justifyCenter: document.queryCommandState('justifyCenter'),
+                justifyRight: document.queryCommandState('justifyRight'),
+                justifyFull: document.queryCommandState('justifyFull'),
+                // Détection avancée des blocs
+                blockquote: document.queryCommandValue('formatBlock')?.toLowerCase() === 'blockquote',
+                h2: document.queryCommandValue('formatBlock')?.toLowerCase() === 'h2',
+                h3: document.queryCommandValue('formatBlock')?.toLowerCase() === 'h3',
+            });
+        } catch(e) { console.error(e); }
     };
 
+    // Exécute une commande avec logique de nettoyage préventif
     const execCmd = (e, command, value = null) => {
         if(e) e.preventDefault(); 
+        
+        // SCENARIO 1 : CONFLIT LISTE vs TITRE
+        // Si on insère une liste, on vérifie qu'on n'est pas sur un Titre
+        if (command === 'insertUnorderedList' || command === 'insertOrderedList') {
+            const currentBlock = document.queryCommandValue('formatBlock');
+            if (['h1', 'h2', 'h3'].includes(currentBlock.toLowerCase())) {
+                // On reset le bloc en Paragraphe 'P' d'abord pour éviter l'imbrication H2 > UL (invalide)
+                document.execCommand('formatBlock', false, 'P');
+            }
+        }
+
+        // SCENARIO 2 : CONFLIT TITRE vs LISTE
+        // Si on applique un Titre, on sort d'abord de la liste
+        if (command === 'formatBlock' && ['H2', 'H3'].includes(value)) {
+            if (document.queryCommandState('insertUnorderedList') || document.queryCommandState('insertOrderedList')) {
+                // On désactive les listes
+                document.execCommand('insertUnorderedList', false, null); 
+                document.execCommand('insertOrderedList', false, null);   
+            }
+        }
+
+        // SCENARIO 3 : TOGGLE INTELLIGENT (ON/OFF)
+        // Si on est déjà en Citation/Titre et qu'on reclique, on revient en texte normal
+        if (command === 'formatBlock') {
+            const currentBlock = document.queryCommandValue('formatBlock');
+            if (currentBlock && currentBlock.toLowerCase() === value.toLowerCase()) {
+                value = 'P'; // Reset vers paragraphe standard
+            }
+        }
+
+        // Exécution de la commande
         document.execCommand(command, false, value);
+        
+        // SCENARIO 4 : PERSISTANCE DU FOCUS
+        // On remet le focus dans l'éditeur immédiatement
         if(editorRef.current) editorRef.current.focus();
+        
         checkFormats();
+        
+        // Fermer la palette si on a choisi une couleur
         if (command === 'hiliteColor') setShowColorPalette(false);
     };
 
@@ -153,13 +197,16 @@ export default function JournalManager({ data, updateData }) {
         setShowColorPalette(false);
     };
 
+    // SCENARIO 5 : GESTION DE LA TOUCHE ENTRÉE
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
-            const selection = window.getSelection();
-            if (!selection.rangeCount) return;
-            const parentBlock = selection.anchorNode.nodeType === 1 ? selection.anchorNode : selection.anchorNode.parentElement;
-            if (['H1', 'H2', 'H3', 'BLOCKQUOTE'].includes(parentBlock.tagName)) {
+            // Vérifie dans quel type de bloc on se trouve
+            const format = document.queryCommandValue('formatBlock');
+            // Si on est dans un Titre ou une Citation
+            if (['h1', 'h2', 'h3', 'blockquote'].includes(format.toLowerCase())) {
+                // On empêche le comportement par défaut (qui prolonge le titre/citation)
                 e.preventDefault();
+                // On force la création d'un nouveau paragraphe vierge en dessous
                 document.execCommand('insertParagraph');
             }
         }
@@ -178,7 +225,7 @@ export default function JournalManager({ data, updateData }) {
         );
     };
 
-    // --- ARBRE ---
+    // --- RENDU ARBORESCENCE (Tree) ---
     const renderTree = (nodes, depth = 0) => {
         return nodes.map(node => {
             if (searchQuery && node.type === 'page' && !node.title.toLowerCase().includes(searchQuery.toLowerCase())) return null;
