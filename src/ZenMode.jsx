@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
     Coffee, Palette, Eye, EyeOff, LogOut, Save, 
-    Play, Pause, RotateCcw, Target, Sparkles 
+    Play, Pause, RotateCcw, Target 
 } from 'lucide-react';
 
 export default function ZenMode({ data, updateData, close }) {
@@ -20,7 +20,7 @@ export default function ZenMode({ data, updateData, close }) {
     const scrollRef = useRef(null);
     const textareaRef = useRef(null);
 
-    // --- CONFIGURATION THEMES ---
+    // --- CONFIGURATION THEMES (CORRIGÉ : TOUS EN FONT-MONO POUR L'ALIGNEMENT) ---
     const themes = {
         minimal: { 
             name: 'Focus', 
@@ -28,7 +28,7 @@ export default function ZenMode({ data, updateData, close }) {
             text: 'text-slate-300', 
             caret: 'caret-slate-500', 
             border: 'border-slate-700',
-            font: 'font-sans'
+            font: 'font-mono' // Changé de sans à mono pour l'alignement
         },
         paper: { 
             name: 'Papier', 
@@ -36,7 +36,7 @@ export default function ZenMode({ data, updateData, close }) {
             text: 'text-stone-800', 
             caret: 'caret-stone-800', 
             border: 'border-stone-400',
-            font: 'font-serif'
+            font: 'font-mono' // Changé de serif à mono (Style Machine à écrire)
         },
         hacker: { 
             name: 'Matrix', 
@@ -52,7 +52,7 @@ export default function ZenMode({ data, updateData, close }) {
             text: 'text-indigo-200', 
             caret: 'caret-indigo-400', 
             border: 'border-indigo-900',
-            font: 'font-sans' 
+            font: 'font-mono' // Changé de sans à mono
         }
     };
 
@@ -96,17 +96,16 @@ export default function ZenMode({ data, updateData, close }) {
         setThemeKey(keys[(keys.indexOf(themeKey) + 1) % keys.length]); 
     };
 
-    // --- MOTEUR DE CRYPTAGE (ALIGNE PARFAITEMENT) ---
+    // --- MOTEUR DE CRYPTAGE ---
     const scramble = (str) => {
         return str.split('').map(char => {
             if (char === '\n') return '\n';
             if (char === ' ') return ' ';
-            // On décale le code ASCII pour l'effet visuel
             return String.fromCharCode(char.charCodeAt(0) + 3);
         }).join('');
     };
 
-    // Synchronisation du scroll entre les deux calques
+    // Synchronisation du scroll
     const handleScroll = (e) => {
         if (scrollRef.current) scrollRef.current.scrollTop = e.target.scrollTop;
     };
@@ -114,13 +113,13 @@ export default function ZenMode({ data, updateData, close }) {
     return (
         <div className={`fixed inset-0 z-[100] flex flex-col transition-colors duration-700 animate-in fade-in zoom-in-95 ${currentTheme.bg} ${currentTheme.text}`}>
             
-            {/* CSS INJECTÉ : Cache la scrollbar tout en permettant le scroll */}
+            {/* CSS INJECTÉ : Cache la scrollbar tout en permettant le scroll (Évite le décalage de largeur) */}
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
 
-            {/* --- EN-TÊTE FLOTTANT (Auto-hide) --- */}
+            {/* --- EN-TÊTE FLOTTANT --- */}
             <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start opacity-0 hover:opacity-100 transition-opacity duration-500 z-50 bg-gradient-to-b from-black/20 to-transparent">
                 
                 {/* Timer & Objectif */}
@@ -179,7 +178,6 @@ export default function ZenMode({ data, updateData, close }) {
                 <div className="relative w-full h-full max-w-5xl">
                     
                     {/* CALQUE 1 : TEXTE CRYPTÉ (Arrière-plan) */}
-                    {/* Note: pointer-events-none permet de cliquer au travers */}
                     <div 
                         ref={scrollRef}
                         className={`
@@ -214,13 +212,13 @@ export default function ZenMode({ data, updateData, close }) {
                         `} 
                     />
                     
-                    {/* Barre latérale décorative (Focus line) */}
+                    {/* Ligne de focus (Barre latérale décorative) */}
                     <div className={`absolute left-0 top-12 bottom-12 w-1 rounded-full opacity-20 ${currentTheme.text.replace('text', 'bg')}`}></div>
                 </div>
 
             </div>
 
-            {/* Compteur de mots discret en bas */}
+            {/* Compteur de mots discret */}
             {text.length > 0 && (
                 <div className="absolute bottom-4 right-6 text-xs opacity-20 font-mono">
                     {text.length} car. | {text.split(/\s+/).filter(w => w.length > 0).length} mots
