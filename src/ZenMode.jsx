@@ -1,102 +1,231 @@
 import { useState, useRef, useEffect } from 'react';
-import { Coffee, Palette, Eye, EyeOff, LogOut, Save } from 'lucide-react';
+import { 
+    Coffee, Palette, Eye, EyeOff, LogOut, Save, 
+    Play, Pause, RotateCcw, Target, Sparkles 
+} from 'lucide-react';
 
 export default function ZenMode({ data, updateData, close }) {
-    // On récupère le texte sauvegardé dans les settings, ou vide
+    // --- ETATS ---
     const [text, setText] = useState(data.settings?.zenNote || "");
-    const [reveal, setReveal] = useState(false);
+    const [reveal, setReveal] = useState(true); 
     const [themeKey, setThemeKey] = useState('minimal');
     const [isSaving, setIsSaving] = useState(false);
-    const scrollRef = useRef(null);
+    
+    // Timer Pomodoro
+    const [timeLeft, setTimeLeft] = useState(25 * 60);
+    const [isTimerActive, setIsTimerActive] = useState(false);
+    const [goal, setGoal] = useState("");
 
-    // Thèmes visuels
+    // Refs
+    const scrollRef = useRef(null);
+    const textareaRef = useRef(null);
+
+    // --- CONFIGURATION THEMES ---
     const themes = {
-        minimal: { name: 'Focus', bg: 'bg-slate-900', text: 'text-slate-300', font: 'font-sans', caret: 'caret-slate-500', border: 'border-slate-700' },
-        light: { name: 'Page', bg: 'bg-stone-50', text: 'text-stone-800', font: 'font-serif', caret: 'caret-stone-500', border: 'border-stone-300' },
-        hacker: { name: 'Matrix', bg: 'bg-black', text: 'text-green-500', font: 'font-mono', caret: 'caret-green-500', border: 'border-green-900' },
-        ocean: { name: 'Océan', bg: 'bg-slate-950', text: 'text-cyan-100/80', font: 'font-sans', caret: 'caret-cyan-500', border: 'border-cyan-900' }
+        minimal: { 
+            name: 'Focus', 
+            bg: 'bg-slate-900', 
+            text: 'text-slate-300', 
+            caret: 'caret-slate-500', 
+            border: 'border-slate-700',
+            font: 'font-sans'
+        },
+        paper: { 
+            name: 'Papier', 
+            bg: 'bg-[#f4ecd8]', 
+            text: 'text-stone-800', 
+            caret: 'caret-stone-800', 
+            border: 'border-stone-400',
+            font: 'font-serif'
+        },
+        hacker: { 
+            name: 'Matrix', 
+            bg: 'bg-black', 
+            text: 'text-green-500', 
+            caret: 'caret-green-500', 
+            border: 'border-green-800',
+            font: 'font-mono' 
+        },
+        midnight: { 
+            name: 'Minuit', 
+            bg: 'bg-[#0f172a]', 
+            text: 'text-indigo-200', 
+            caret: 'caret-indigo-400', 
+            border: 'border-indigo-900',
+            font: 'font-sans' 
+        }
     };
 
     const currentTheme = themes[themeKey];
 
-    // Sauvegarde Automatique Intelligente (Debounce 1.5s)
+    // --- LOGIQUE TIMER ---
+    useEffect(() => {
+        let interval = null;
+        if (isTimerActive && timeLeft > 0) {
+            interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
+        } else if (timeLeft === 0) {
+            setIsTimerActive(false);
+        }
+        return () => clearInterval(interval);
+    }, [isTimerActive, timeLeft]);
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const toggleTimer = () => setIsTimerActive(!isTimerActive);
+    const resetTimer = () => { setIsTimerActive(false); setTimeLeft(25 * 60); };
+
+    // --- SAUVEGARDE INTELLIGENTE ---
     useEffect(() => {
         const timer = setTimeout(() => {
-            // On ne sauvegarde que si le texte a changé par rapport à la base de données
             if (text !== (data.settings?.zenNote || "")) {
                 setIsSaving(true);
-                updateData({ 
-                    ...data, 
-                    settings: { ...data.settings, zenNote: text } 
-                });
+                updateData({ ...data, settings: { ...data.settings, zenNote: text } });
                 setTimeout(() => setIsSaving(false), 1000);
             }
-        }, 1500); // Attend 1.5s après la dernière frappe
-
+        }, 1500);
         return () => clearTimeout(timer);
     }, [text]);
 
-    // Actions
+    // --- ACTIONS ---
     const cycleTheme = () => { 
         const keys = Object.keys(themes); 
         setThemeKey(keys[(keys.indexOf(themeKey) + 1) % keys.length]); 
     };
 
-    // Petit algo de cryptage visuel (Décalage de caractères +13)
+    // --- MOTEUR DE CRYPTAGE (ALIGNE PARFAITEMENT) ---
     const scramble = (str) => {
         return str.split('').map(char => {
-            if (char === '\n' || char === ' ') return char;
-            return String.fromCharCode(char.charCodeAt(0) + 13);
+            if (char === '\n') return '\n';
+            if (char === ' ') return ' ';
+            // On décale le code ASCII pour l'effet visuel
+            return String.fromCharCode(char.charCodeAt(0) + 3);
         }).join('');
     };
 
+    // Synchronisation du scroll entre les deux calques
+    const handleScroll = (e) => {
+        if (scrollRef.current) scrollRef.current.scrollTop = e.target.scrollTop;
+    };
+
     return (
-        <div className={`fixed inset-0 z-[100] flex flex-col p-6 md:p-16 animate-in fade-in duration-700 transition-colors ${currentTheme.bg} ${currentTheme.text} ${currentTheme.font}`}>
+        <div className={`fixed inset-0 z-[100] flex flex-col transition-colors duration-700 animate-in fade-in zoom-in-95 ${currentTheme.bg} ${currentTheme.text}`}>
             
-            {/* BARRE D'OUTILS (Visible au survol) */}
-            <div className="flex justify-between items-center mb-8 opacity-40 hover:opacity-100 transition-opacity duration-500">
-                <div className="flex items-center gap-3">
-                    <Coffee size={24} />
-                    <span className="text-xs tracking-[0.2em] uppercase font-bold">Mode Zen</span>
-                    {isSaving && <span className="ml-4 flex items-center gap-1 text-[10px] animate-pulse"><Save size={10}/> Sauvegarde...</span>}
-                </div>
+            {/* CSS INJECTÉ : Cache la scrollbar tout en permettant le scroll */}
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+
+            {/* --- EN-TÊTE FLOTTANT (Auto-hide) --- */}
+            <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start opacity-0 hover:opacity-100 transition-opacity duration-500 z-50 bg-gradient-to-b from-black/20 to-transparent">
                 
-                <div className="flex gap-3 items-center">
-                    <button onClick={cycleTheme} title="Changer de thème" className={`p-2 border rounded-lg hover:bg-white/10 transition-colors ${currentTheme.border}`}>
-                        <Palette size={18}/>
-                    </button>
-                    <button onClick={() => setReveal(!reveal)} title={reveal ? "Crypter" : "Décrypter"} className={`p-2 border rounded-lg hover:bg-white/10 transition-colors ${currentTheme.border}`}>
-                        {reveal ? <Eye size={18}/> : <EyeOff size={18}/>}
-                    </button>
-                    <div className={`h-6 w-px ${currentTheme.border.replace('border', 'bg')}`}></div>
-                    <button onClick={close} title="Quitter" className="p-2 border border-red-500/30 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
-                        <LogOut size={18}/>
-                    </button>
+                {/* Timer & Objectif */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className={`text-4xl font-mono font-bold tracking-tighter tabular-nums ${isTimerActive ? 'opacity-100' : 'opacity-60'}`}>
+                            {formatTime(timeLeft)}
+                        </div>
+                        <div className="flex gap-1">
+                            <button onClick={toggleTimer} className={`p-2 rounded-full border ${currentTheme.border} hover:bg-white/10 transition-colors`}>
+                                {isTimerActive ? <Pause size={16}/> : <Play size={16}/>}
+                            </button>
+                            <button onClick={resetTimer} className={`p-2 rounded-full border ${currentTheme.border} hover:bg-white/10 transition-colors`}>
+                                <RotateCcw size={16}/>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm opacity-70 group">
+                        <Target size={14}/>
+                        <input 
+                            type="text" 
+                            value={goal}
+                            onChange={(e) => setGoal(e.target.value)}
+                            placeholder="Mon objectif unique..." 
+                            className="bg-transparent outline-none w-64 placeholder:text-current/30"
+                        />
+                    </div>
+                </div>
+
+                {/* Outils Droite */}
+                <div className="flex flex-col items-end gap-2">
+                    <div className="flex gap-2">
+                        {isSaving && <span className="text-xs animate-pulse mr-2 my-auto">Sauvegarde...</span>}
+                        
+                        <button onClick={cycleTheme} title="Thème" className={`p-3 rounded-xl border ${currentTheme.border} hover:bg-white/10 transition-all`}>
+                            <Palette size={20}/>
+                        </button>
+                        
+                        <button onClick={() => setReveal(!reveal)} title="Mode Discret" className={`p-3 rounded-xl border ${currentTheme.border} hover:bg-white/10 transition-all`}>
+                            {reveal ? <Eye size={20}/> : <EyeOff size={20}/>}
+                        </button>
+                        
+                        <button onClick={close} title="Quitter" className="p-3 rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-all">
+                            <LogOut size={20}/>
+                        </button>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-widest opacity-30 font-bold flex items-center gap-2">
+                        <Coffee size={12}/> Zen Mode
+                    </div>
                 </div>
             </div>
 
-            {/* ZONE D'ÉCRITURE */}
-            <div className={`relative flex-1 w-full max-w-4xl mx-auto border-l-2 pl-4 md:pl-8 ${currentTheme.border}`}>
+            {/* --- ZONE D'ÉCRITURE PRINCIPALE --- */}
+            <div className="flex-1 relative flex justify-center items-center overflow-hidden pt-20 pb-10 px-4 md:px-20">
                 
-                {/* CALQUE CRYPTÉ (Arrière-plan) */}
-                <div 
-                    ref={scrollRef} 
-                    className={`absolute inset-0 w-full h-full whitespace-pre-wrap break-words text-lg md:text-2xl leading-relaxed pointer-events-none overflow-hidden transition-opacity duration-500 ${reveal ? 'opacity-0' : 'opacity-100 blur-[0.5px]'}`}
-                >
-                    {scramble(text)}
+                <div className="relative w-full h-full max-w-5xl">
+                    
+                    {/* CALQUE 1 : TEXTE CRYPTÉ (Arrière-plan) */}
+                    {/* Note: pointer-events-none permet de cliquer au travers */}
+                    <div 
+                        ref={scrollRef}
+                        className={`
+                            absolute inset-0 w-full h-full p-8 md:p-12
+                            whitespace-pre-wrap break-words 
+                            text-lg md:text-2xl leading-loose
+                            pointer-events-none overflow-hidden
+                            ${currentTheme.font}
+                            transition-opacity duration-500
+                            ${reveal ? 'opacity-0' : 'opacity-50 blur-[1px]'}
+                        `}
+                    >
+                        {scramble(text)}
+                    </div>
+
+                    {/* CALQUE 2 : VRAIE ZONE DE SAISIE (Premier plan) */}
+                    <textarea 
+                        ref={textareaRef}
+                        value={text} 
+                        onChange={(e) => setText(e.target.value)} 
+                        onScroll={handleScroll}
+                        autoFocus 
+                        spellCheck="false"
+                        placeholder="Qu'avez-vous en tête ?"
+                        className={`
+                            absolute inset-0 z-10 w-full h-full p-8 md:p-12
+                            bg-transparent resize-none outline-none 
+                            text-lg md:text-2xl leading-loose
+                            ${currentTheme.font} ${currentTheme.caret}
+                            transition-colors duration-300 no-scrollbar
+                            ${reveal ? 'text-current' : 'text-transparent selection:bg-white/10 selection:text-transparent'}
+                        `} 
+                    />
+                    
+                    {/* Barre latérale décorative (Focus line) */}
+                    <div className={`absolute left-0 top-12 bottom-12 w-1 rounded-full opacity-20 ${currentTheme.text.replace('text', 'bg')}`}></div>
                 </div>
 
-                {/* VRAIE ZONE DE SAISIE (Transparente si crypté) */}
-                <textarea 
-                    value={text} 
-                    onChange={(e) => setText(e.target.value)} 
-                    onScroll={(e) => { if(scrollRef.current) scrollRef.current.scrollTop = e.target.scrollTop; }} 
-                    autoFocus 
-                    className={`relative z-10 w-full h-full bg-transparent resize-none outline-none text-lg md:text-2xl leading-relaxed transition-all duration-300 ${currentTheme.caret} ${reveal ? 'text-current' : 'text-transparent selection:bg-white/10 selection:text-transparent'}`} 
-                    spellCheck="false" 
-                    placeholder="Écrivez librement..." 
-                />
             </div>
+
+            {/* Compteur de mots discret en bas */}
+            {text.length > 0 && (
+                <div className="absolute bottom-4 right-6 text-xs opacity-20 font-mono">
+                    {text.length} car. | {text.split(/\s+/).filter(w => w.length > 0).length} mots
+                </div>
+            )}
         </div>
     );
 }
