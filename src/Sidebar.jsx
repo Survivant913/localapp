@@ -32,7 +32,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'workspace', label: 'Workspace', icon: Box }, 
     { id: 'planning', label: 'Agenda', icon: CalendarRange },
-    { id: 'calendar', label: 'Calendrier Financier', icon: Calendar }, // Changement de nom ici
+    { id: 'calendar', label: 'Calendrier Financier', icon: Calendar }, 
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
@@ -65,7 +65,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60`}>
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              {/* MODIF : bg-blue-500 -> bg-blue-600 (réactif au thème) */}
+              <div className="w-2 h-2 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
               {labels?.appName || 'Freelance Cockpit'}
             </h1>
           )}
@@ -97,12 +98,14 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   w-full flex items-center gap-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group relative
                   ${isCollapsed ? 'justify-center px-0' : 'px-3'}
                   ${isActive 
-                    ? 'bg-blue-600/10 text-blue-400' 
+                    // MODIF : Utilisation de classes standards 'bg-blue-X' pour que le CSS global de App.jsx puisse les écraser
+                    ? 'bg-blue-600/10 text-blue-500' 
                     : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
                   }
                 `}
               >
-                <Icon size={20} className={`shrink-0 transition-colors ${isActive ? 'text-blue-500' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                {/* MODIF : text-blue-500 -> text-blue-600 (réactif) */}
+                <Icon size={20} className={`shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 
                 {!isCollapsed && (
                   <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
@@ -120,7 +123,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 
                 {/* Indicateur actif discret */}
                 {!isCollapsed && isActive && (
-                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                 )}
               </button>
             );

@@ -17,6 +17,16 @@ import JournalManager from './JournalManager';
 import PlanningManager from './PlanningManager'; 
 import { Loader2, Lock } from 'lucide-react';
 
+// --- NOUVEAU : PALETTE DE COULEURS ---
+const THEME_COLORS = {
+  blue:    { primary: '#2563eb', hover: '#1d4ed8', light: '#eff6ff', text: '#2563eb', textLight: '#3b82f6', border: '#bfdbfe', badge: '#dbeafe' },
+  violet:  { primary: '#7c3aed', hover: '#6d28d9', light: '#f5f3ff', text: '#7c3aed', textLight: '#8b5cf6', border: '#ddd6fe', badge: '#ede9fe' },
+  emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10b981', border: '#a7f3d0', badge: '#d1fae5' },
+  amber:   { primary: '#d97706', hover: '#b45309', light: '#fffbeb', text: '#d97706', textLight: '#f59e0b', border: '#fde68a', badge: '#fef3c7' },
+  rose:    { primary: '#e11d48', hover: '#be123c', light: '#fff1f2', text: '#e11d48', textLight: '#f43f5e', border: '#fecdd3', badge: '#ffe4e6' },
+  indigo:  { primary: '#4f46e5', hover: '#4338ca', light: '#eef2ff', text: '#4f46e5', textLight: '#6366f1', border: '#c7d2fe', badge: '#e0e7ff' },
+};
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,13 +47,51 @@ export default function App() {
     journal_folders: [], journal_pages: [],
     calendar_events: [], 
     budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
-    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme() }, customLabels: {},
+    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'blue' }, customLabels: {},
     clients: [], quotes: [], invoices: [], catalog: [], profile: {},
     ventures: [] 
   });
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE ---
+  useEffect(() => {
+    const colorKey = data.settings?.accentColor || 'blue';
+    
+    // Si c'est bleu (défaut), on nettoie le style custom
+    if (colorKey === 'blue') {
+        const existingStyle = document.getElementById('dynamic-theme-style');
+        if (existingStyle) existingStyle.remove();
+        return;
+    }
+
+    const theme = THEME_COLORS[colorKey];
+    if (!theme) return;
+
+    // On écrase les classes Tailwind "blue" par nos couleurs choisies
+    const css = `
+      .bg-blue-600 { background-color: ${theme.primary} !important; }
+      .hover\\:bg-blue-700:hover { background-color: ${theme.hover} !important; }
+      .text-blue-600 { color: ${theme.text} !important; }
+      .text-blue-500 { color: ${theme.textLight} !important; }
+      .bg-blue-50 { background-color: ${theme.light} !important; }
+      .border-blue-200 { border-color: ${theme.border} !important; }
+      .bg-blue-100 { background-color: ${theme.badge} !important; }
+      .text-blue-700 { color: ${theme.hover} !important; }
+      .focus\\:border-blue-500:focus { border-color: ${theme.textLight} !important; }
+      .ring-blue-500 { --tw-ring-color: ${theme.textLight} !important; }
+    `;
+
+    let style = document.getElementById('dynamic-theme-style');
+    if (!style) {
+        style = document.createElement('style');
+        style.id = 'dynamic-theme-style';
+        document.head.appendChild(style);
+    }
+    style.innerHTML = css;
+
+  }, [data.settings?.accentColor]);
 
   // --- UTILS ---
   const parseLocalDate = (dateStr) => {
@@ -54,7 +102,7 @@ export default function App() {
     } catch(e) { return new Date(); }
   };
 
-  // --- CORRECTION DU BUG DE DATE (Timezone Buffer AJUSTÉ) ---
+  // --- CORRECTION DU BUG DE DATE (Timezone Buffer AJUSTÉ - PRESERVÉ) ---
   const isDatePastOrToday = (dateStr) => {
       if (!dateStr) return false;
       const today = new Date();
