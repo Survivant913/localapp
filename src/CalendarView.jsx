@@ -225,12 +225,14 @@ export default function CalendarView({ data }) {
                                 s.description === r.description
                             );
 
-                            // CHECK 2 (CRITIQUE) : Existe-t-il déjà en "transaction" aujourd'hui ?
-                            // Si le paiement a été généré ce matin, on ne doit plus afficher le récurrent prévisionnel
+                            // CHECK 2 (CRITIQUE - CORRIGÉ) : Filtre Anti-Doublon Intelligent
+                            // Si le paiement a été généré ce matin, on masque le récurrent.
+                            // Modification : On accepte que la description transactionnelle contienne la description de base
+                            // (Ex: "Virement (Rec.) : Loyer" contient "Loyer")
                             const alreadyPaidToday = budget.transactions.some(t => 
                                 isSameDay(parseLocalDate(t.date), date) && 
                                 Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 &&
-                                t.description === r.description
+                                (t.description === r.description || t.description.includes(r.description))
                             );
                             
                             if (!alreadyScheduled && !alreadyPaidToday) {
