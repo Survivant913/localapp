@@ -1,43 +1,53 @@
 import { useState, useEffect } from 'react';
 import { 
-  Settings, Moon, Sun, Type, Upload, 
+  Settings, Moon, Sun, Upload, 
   RefreshCw, CheckCircle2, Building2, Image as ImageIcon, Trash2,
-  Palette, Smartphone
+  Palette
 } from 'lucide-react';
 
 export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
     // --- ETATS LOCAUX ---
     const [appName, setAppName] = useState(data.customLabels?.appName || 'Freelance Cockpit');
     
-    // NOUVEAU : Gestion des couleurs
-    // On stocke ça dans data.settings.accentColor et data.settings.grayShade
     const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'blue');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
 
-    // Données combinées (Profil + Entreprise)
+    // On utilise des noms de variables génériques pour le formulaire
     const [companyData, setCompanyData] = useState({
         user_name: '', 
-        company_name: '', siret: '', tva_number: '',
-        address: '', email_contact: '', iban: '', bic: '', logo: ''
+        company_name: '', 
+        siret: '', 
+        tva_number: '',
+        address: '', 
+        email: '', // On utilise 'email' ici pour l'affichage
+        phone: '', // On utilise 'phone' ici pour l'affichage
+        iban: '', 
+        bic: '', 
+        logo: ''
     });
 
     const [isSaved, setIsSaved] = useState(false);
 
-    // Synchronisation initiale
+    // --- SYNCHRONISATION INITIALE (Lecture Polyglotte) ---
     useEffect(() => {
         if (data.customLabels) setAppName(data.customLabels.appName || 'Freelance Cockpit');
         if (data.settings) {
             setAccentColor(data.settings.accentColor || 'blue');
             setGrayShade(data.settings.grayShade || 'slate');
         }
+        
         if (data.profile) {
+            // Ici, on est "intelligent" : on cherche la donnée peu importe comment elle est nommée
             setCompanyData({
                 user_name: data.customLabels?.userName || '', 
-                company_name: data.profile.company_name || '',
+                company_name: data.profile.company_name || data.profile.companyName || '',
                 siret: data.profile.siret || '',
                 tva_number: data.profile.tva_number || '',
                 address: data.profile.address || '',
-                email_contact: data.profile.email_contact || '',
+                // On cherche email_contact OU email
+                email: data.profile.email_contact || data.profile.email || '',
+                // On cherche phone_contact OU phone
+                phone: data.profile.phone_contact || data.profile.phone || '',
                 iban: data.profile.iban || '',
                 bic: data.profile.bic || '',
                 logo: data.profile.logo || ''
@@ -57,28 +67,39 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
 
     const removeLogo = () => setCompanyData(prev => ({ ...prev, logo: '' }));
 
-    // --- SAUVEGARDE ---
+    // --- SAUVEGARDE (Écriture Polyglotte) ---
     const handleSaveProfile = () => {
         const newSettings = {
             ...data,
             customLabels: { ...data.customLabels, appName, userName: companyData.user_name },
             settings: { 
                 ...data.settings, 
-                accentColor, // Sauvegarde de la couleur
-                grayShade    // Sauvegarde de la nuance
+                accentColor, 
+                grayShade    
             },
             profile: { 
                 ...data.profile, 
+                // 1. Format Base de Données (Snake Case) - Pour App.jsx et Supabase
                 company_name: companyData.company_name,
+                email_contact: companyData.email,
+                phone_contact: companyData.phone,
+                
+                // 2. Format ClientHub (Camel Case / Simple) - Pour l'affichage immédiat
+                companyName: companyData.company_name, // ClientHub cherche parfois ça
+                name: companyData.company_name,        // Ou ça
+                email: companyData.email,
+                phone: companyData.phone,
+
+                // Champs communs
                 siret: companyData.siret,
                 tva_number: companyData.tva_number,
                 address: companyData.address,
-                email_contact: companyData.email_contact,
                 iban: companyData.iban,
                 bic: companyData.bic,
                 logo: companyData.logo
             }
         };
+        
         loadExternalData(newSettings); 
         setIsSaved(true);
         setTimeout(() => setIsSaved(false), 2000);
@@ -88,14 +109,14 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         if ((theme === 'dark' && !darkMode) || (theme === 'light' && darkMode)) toggleTheme();
     };
 
-    // --- OPTIONS DE COULEURS ---
+    // --- OPTIONS DE COULEURS (FIXÉES EN HEXADÉCIMAL) ---
     const accents = [
-        { id: 'blue', color: 'bg-blue-600', label: 'Océan' },
-        { id: 'violet', color: 'bg-violet-600', label: 'Cosmic' },
-        { id: 'emerald', color: 'bg-emerald-600', label: 'Finance' },
-        { id: 'amber', color: 'bg-amber-500', label: 'Energy' },
-        { id: 'rose', color: 'bg-rose-600', label: 'Passion' },
-        { id: 'indigo', color: 'bg-indigo-600', label: 'Royal' },
+        { id: 'blue',    hex: '#2563eb', label: 'Océan' },
+        { id: 'violet',  hex: '#7c3aed', label: 'Cosmic' },
+        { id: 'emerald', hex: '#059669', label: 'Finance' },
+        { id: 'amber',   hex: '#f59e0b', label: 'Energy' },
+        { id: 'rose',    hex: '#e11d48', label: 'Passion' },
+        { id: 'indigo',  hex: '#4f46e5', label: 'Royal' },
     ];
 
     return (
@@ -118,7 +139,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 </button>
             </div>
 
-            {/* --- SECTION APPARENCE & THÈMES (NOUVEAU) --- */}
+            {/* --- SECTION APPARENCE & THÈMES --- */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
@@ -164,7 +185,11 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                         }
                                     `}
                                 >
-                                    <div className={`w-8 h-8 rounded-full shadow-sm ${acc.color} ${accentColor === acc.id ? 'scale-110 ring-2 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}`}></div>
+                                    {/* CORRECTION COULEUR : Style inline pour éviter l'override du thème */}
+                                    <div 
+                                        className={`w-8 h-8 rounded-full shadow-sm ${accentColor === acc.id ? 'scale-110 ring-2 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}`}
+                                        style={{ backgroundColor: acc.hex }}
+                                    ></div>
                                     <span className={`text-xs font-medium ${accentColor === acc.id ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{acc.label}</span>
                                     {accentColor === acc.id && <div className="absolute top-2 right-2 text-green-500"><CheckCircle2 size={12}/></div>}
                                 </button>
@@ -180,7 +205,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 </div>
             </div>
 
-            {/* --- SECTION ENTREPRISE (RESTE INCHANGÉE MAIS NETTOYÉE) --- */}
+            {/* --- SECTION ENTREPRISE --- */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
@@ -210,6 +235,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Complet (Vous)</label><input type="text" value={companyData.user_name} onChange={e => setCompanyData({...companyData, user_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" placeholder="Jean Dupont" /></div>
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Entreprise</label><input type="text" value={companyData.company_name} onChange={e => setCompanyData({...companyData, company_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" placeholder="JD Studio" /></div>
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">SIRET</label><input type="text" value={companyData.siret} onChange={e => setCompanyData({...companyData, siret: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">N° TVA</label><input type="text" value={companyData.tva_number} onChange={e => setCompanyData({...companyData, tva_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
                         </div>
                     </div>
 
@@ -218,7 +244,11 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                         <h4 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-4">Coordonnées</h4>
                         <div className="space-y-4">
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Adresse</label><textarea value={companyData.address} onChange={e => setCompanyData({...companyData, address: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white min-h-[100px] resize-none" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Email</label><input type="email" value={companyData.email_contact} onChange={e => setCompanyData({...companyData, email_contact: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" /></div>
+                            
+                            {/* CORRECTION VARIABLES : on lie à 'email' et 'phone' */}
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Email</label><input type="email" value={companyData.email} onChange={e => setCompanyData({...companyData, email: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Téléphone</label><input type="text" value={companyData.phone} onChange={e => setCompanyData({...companyData, phone: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" /></div>
+                            
                             <hr className="border-slate-100 dark:border-slate-700 my-6"/>
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">IBAN</label><input type="text" value={companyData.iban} onChange={e => setCompanyData({...companyData, iban: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
                             <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">BIC</label><input type="text" value={companyData.bic} onChange={e => setCompanyData({...companyData, bic: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
