@@ -7,7 +7,7 @@ import {
 
 // --- UTILITAIRES ---
 
-// Mapping explicite pour que Tailwind ne purge pas les classes dynamiques
+// Fix Tailwind : Mapping explicite pour éviter la purge CSS des couleurs dynamiques
 const COLOR_MAP = {
     'bg-blue-500': 'text-blue-500',
     'bg-green-500': 'text-green-500',
@@ -56,10 +56,10 @@ export default function HabitTracker({ data, updateData }) {
         try {
             setLoading(true);
             
-            // 1. Catégories triées par nom (plus propre)
+            // 1. Catégories triées par nom
             const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
             
-            // 2. Habitudes (On charge TOUT, même les archivées, pour que l'historique reste juste)
+            // 2. Habitudes (On charge TOUT, même les archivées, pour la cohérence historique)
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
             // 3. Historique étendu (1 an en arrière + Limite augmentée à 10 000)
@@ -114,7 +114,7 @@ export default function HabitTracker({ data, updateData }) {
             }
         } catch (error) {
             console.error("Erreur toggle:", error);
-            loadHabitData(); // En cas d'erreur, on recharge tout pour être sûr
+            loadHabitData(); // En cas d'erreur, on recharge tout
         } finally {
             // Libération du bouton
             setProcessingHabits(prev => {
@@ -155,7 +155,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES (Logique "Intelligente") ---
+    // --- MOTEUR DE STATISTIQUES (Mode "Rattrapage Actif") ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -179,25 +179,21 @@ export default function HabitTracker({ data, updateData }) {
             let totalDone = 0;
 
             catHabits.forEach(h => {
-                const creationDateStr = h.created_at ? getLocalYYYYMMDD(h.created_at) : '2000-01-01';
-
                 dates.forEach(d => {
                     const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
                     const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
                     const isScheduled = scheduledDays.includes(d.dayIndex);
 
-                    // LOGIQUE "JUSTE" :
-                    // 1. C'est fait ? -> 100% (Même si c'était avant la création = Bonus Rattrapage)
+                    // LOGIQUE RÉTROACTIVE :
+                    // On affiche les stats MÊME avant la création de l'habitude.
+                    // Cela permet de voir des barres vides (0%) et d'encourager le rattrapage.
+                    
                     if (isDone) {
                         totalDone++;
                         totalPossible++;
-                    } 
-                    // 2. C'est pas fait... mais est-ce que ça compte ?
-                    // On compte l'échec SEULEMENT si la date est APRÈS la création ET que c'était prévu.
-                    else if (d.str >= creationDateStr && isScheduled) {
+                    } else if (isScheduled) {
                         totalPossible++;
                     }
-                    // 3. Sinon (Avant création ou jour de repos) -> On ignore (Pas de pénalité).
                 });
             });
 
@@ -212,7 +208,6 @@ export default function HabitTracker({ data, updateData }) {
             let doneCount = 0;
 
             habits.forEach(h => {
-                const creationDateStr = h.created_at ? getLocalYYYYMMDD(h.created_at) : '2000-01-01';
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === dObj.str);
                 const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
                 const isScheduled = scheduledDays.includes(dObj.dayIndex);
@@ -220,7 +215,7 @@ export default function HabitTracker({ data, updateData }) {
                 if (isDone) {
                     doneCount++;
                     activeHabitsCount++;
-                } else if (dObj.str >= creationDateStr && isScheduled) {
+                } else if (isScheduled) {
                     activeHabitsCount++;
                 }
             });
@@ -247,10 +242,8 @@ export default function HabitTracker({ data, updateData }) {
     const visibleHabits = habits.filter(h => {
         if (h.is_archived) return false;
         
-        // Note : On NE FILTRE PAS par date de création ici.
-        // Cela permet le "Rattrapage" : l'utilisateur peut revenir en arrière 
-        // pour cocher une case d'une date antérieure à la création.
-        
+        // Pas de filtre sur la date de création ici.
+        // On permet de voir les habitudes dans le passé pour le rattrapage.
         const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
         return scheduledDays.includes(currentDayIndex);
     });
