@@ -7,7 +7,6 @@ import {
 
 // --- UTILITAIRES ---
 
-// Fix Tailwind : Mapping explicite pour éviter la purge CSS des couleurs dynamiques
 const COLOR_MAP = {
     'bg-blue-500': 'text-blue-500',
     'bg-green-500': 'text-green-500',
@@ -23,7 +22,6 @@ const Badge = ({ color, text }) => (
     </span>
 );
 
-// Fonction critique : Garantit que les dates sont gérées en local (pas de décalage UTC)
 const getLocalYYYYMMDD = (dateObj) => {
     if (!dateObj) return null;
     const d = new Date(dateObj);
@@ -38,16 +36,12 @@ export default function HabitTracker({ data, updateData }) {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [statRange, setStatRange] = useState(7); 
     
-    // Données locales
     const [categories, setCategories] = useState([]);
     const [habits, setHabits] = useState([]);
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    // Sécurité : Empêche le double-clic (spam) pendant la requête
     const [processingHabits, setProcessingHabits] = useState(new Set());
 
-    // --- CHARGEMENT DES DONNÉES ---
     useEffect(() => {
         loadHabitData();
     }, []);
@@ -55,14 +49,9 @@ export default function HabitTracker({ data, updateData }) {
     const loadHabitData = async () => {
         try {
             setLoading(true);
-            
-            // 1. Catégories triées par nom
             const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
-            
-            // 2. Habitudes (On charge TOUT, même les archivées, pour la cohérence historique)
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
-            // 3. Historique étendu (1 an en arrière + Limite augmentée à 10 000)
             const d = new Date(); d.setDate(d.getDate() - 365);
             const { data: lgs } = await supabase
                 .from('habit_logs')
@@ -80,7 +69,6 @@ export default function HabitTracker({ data, updateData }) {
         }
     };
 
-    // --- ACTIONS (Logique Cœur - INTACTE) ---
     const toggleHabit = async (habitId) => {
         if (processingHabits.has(habitId)) return;
         setProcessingHabits(prev => new Set(prev).add(habitId));
@@ -147,7 +135,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES (Logique Cœur - INTACTE) ---
+    // --- MOTEUR DE STATISTIQUES (CORRIGÉ : Exclusion des archives non faites) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -178,7 +166,8 @@ export default function HabitTracker({ data, updateData }) {
                     if (isDone) {
                         totalDone++;
                         totalPossible++;
-                    } else if (isScheduled) {
+                    } else if (isScheduled && !h.is_archived) {
+                        // FIX 1 : On ne compte l'échec que si l'habitude N'EST PAS archivée
                         totalPossible++;
                     }
                 });
@@ -202,7 +191,8 @@ export default function HabitTracker({ data, updateData }) {
                 if (isDone) {
                     doneCount++;
                     activeHabitsCount++;
-                } else if (isScheduled) {
+                } else if (isScheduled && !h.is_archived) {
+                    // FIX 2 : Idem ici pour le graphique global
                     activeHabitsCount++;
                 }
             });
@@ -233,7 +223,7 @@ export default function HabitTracker({ data, updateData }) {
     
     const activeHabitsForManagement = habits.filter(h => !h.is_archived);
 
-    // --- RENDER (NOUVEAU DESIGN PRO) ---
+    // --- RENDER (DESIGN PRO INTACT) ---
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 transition-colors">
             {/* HEADER PRO */}
@@ -264,10 +254,9 @@ export default function HabitTracker({ data, updateData }) {
             {/* CONTENU FLUIDE */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
                 
-                {/* VUE QUOTIDIENNE (MODE DASHBOARD) */}
+                {/* VUE QUOTIDIENNE */}
                 {activeTab === 'daily' && (
                     <div className="max-w-7xl mx-auto space-y-8">
-                        {/* SELECTEUR DATE LARGE */}
                         <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 sticky top-0 z-20 backdrop-blur-md bg-white/90 dark:bg-slate-800/90 supports-[backdrop-filter]:bg-white/60">
                             <button onClick={() => changeDate(-1)} className="p-3 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl text-gray-500 transition-colors"><ChevronLeft/></button>
                             <div className="flex flex-col items-center">
@@ -283,7 +272,6 @@ export default function HabitTracker({ data, updateData }) {
                             <button onClick={() => changeDate(1)} className={`p-3 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl text-gray-500 transition-colors ${isToday ? 'opacity-30 cursor-not-allowed' : ''}`} disabled={isToday}><ChevronRight/></button>
                         </div>
 
-                        {/* GRILLE DES HABITUDES */}
                         {loading ? (
                             <div className="flex justify-center py-20"><Loader2 className="animate-spin text-blue-500 w-10 h-10"/></div>
                         ) : categories.length === 0 ? (
@@ -362,10 +350,9 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE ANALYSE (GRANDE TAILLE) */}
+                {/* VUE ANALYSE */}
                 {activeTab === 'stats' && (
                     <div className="max-w-7xl mx-auto space-y-8">
-                        {/* Barre d'outils Stats */}
                         <div className="flex justify-center md:justify-end">
                             <div className="bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex gap-1">
                                 {[7, 30, 90].map(d => (
@@ -380,7 +367,6 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GRAPHIQUE CONSTANCE (LARGEUR MAX & HAUTEUR PRO) */}
                         <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700">
                             <h3 className="font-bold text-xl text-gray-800 dark:text-white mb-8 flex items-center gap-3">
                                 <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600">
@@ -389,7 +375,6 @@ export default function HabitTracker({ data, updateData }) {
                                 Constance Globale
                             </h3>
                             
-                            {/* Container Graphique HAUTEUR PRO (h-80) */}
                             <div className="h-80 w-full flex items-end justify-between gap-1 md:gap-2">
                                 {stats.consistencyData.length > 0 ? stats.consistencyData.map((val, i) => (
                                     <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
@@ -402,8 +387,6 @@ export default function HabitTracker({ data, updateData }) {
                                             `}
                                             style={{ height: `${Math.max(val, 5)}%` }}
                                         ></div>
-                                        
-                                        {/* Tooltip Amélioré */}
                                         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
                                             <div className="bg-slate-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl whitespace-nowrap font-medium">
                                                 {new Date(stats.dates[i]).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})} : <span className="font-bold text-emerald-400">{val}%</span>
@@ -415,7 +398,6 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* JAUGES (GRID RESPONSIVE) */}
                         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
                             {stats.domainStats.map(cat => {
                                 const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
@@ -423,9 +405,7 @@ export default function HabitTracker({ data, updateData }) {
                                 return (
                                     <div key={cat.id} className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col items-center hover:translate-y-[-2px] transition-transform duration-300">
                                         <h4 className="font-bold text-gray-700 dark:text-slate-200 mb-4 text-center line-clamp-1">{cat.name}</h4>
-                                        
                                         <div className="relative w-28 h-28 flex items-center justify-center">
-                                            {/* Cercle Fond */}
                                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                 <path className="text-gray-100 dark:text-slate-700/50" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                                                 <path 
@@ -449,12 +429,10 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE REGLAGES (SPLIT VIEW) */}
+                {/* VUE REGLAGES */}
                 {activeTab === 'settings' && (
                     <div className="max-w-7xl mx-auto">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            
-                            {/* COLONNE GAUCHE : CATEGORIES */}
                             <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700 h-fit">
                                 <h3 className="font-bold text-xl mb-6 text-gray-800 dark:text-white flex items-center gap-2">
                                     <List size={20}/> Domaines
@@ -491,7 +469,6 @@ export default function HabitTracker({ data, updateData }) {
                                 </form>
                             </div>
 
-                            {/* COLONNE DROITE : HABITUDES */}
                             <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700 h-fit">
                                 <h3 className="font-bold text-xl mb-6 text-gray-800 dark:text-white flex items-center gap-2">
                                     <Target size={20}/> Habitudes
@@ -526,7 +503,6 @@ export default function HabitTracker({ data, updateData }) {
     );
 }
 
-// --- SOUS-COMPOSANT CRÉATION (DESIGN PRO) ---
 function HabitCreator({ categories, onAdd }) {
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
 
