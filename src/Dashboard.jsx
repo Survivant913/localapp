@@ -1,10 +1,85 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
-  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft
+  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
+  Activity, AlertCircle
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
+
+// --- NOUVEAU COMPOSANT : GRAPHIQUE À BARRES MENSUEL (SVG PUR) ---
+const MonthlyBarChart = ({ transactions, currentFilter }) => {
+    // 1. Préparation des données (Derniers 6 mois)
+    const data = useMemo(() => {
+        const months = [];
+        const today = new Date();
+        
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            months.push({ 
+                label: d.toLocaleDateString('fr-FR', { month: 'short' }), 
+                income: 0, 
+                expense: 0,
+                monthKey: `${d.getFullYear()}-${d.getMonth()}`
+            });
+        }
+
+        transactions.forEach(t => {
+            // Filtrage selon le compte sélectionné
+            const isRelevant = currentFilter === 'total' || 
+                String(t.accountId) === String(currentFilter) || 
+                String(t.targetAccountId) === String(currentFilter);
+            
+            if (!isRelevant) return;
+
+            const tDate = new Date(t.date);
+            const key = `${tDate.getFullYear()}-${tDate.getMonth()}`;
+            const monthData = months.find(m => m.monthKey === key);
+            
+            if (monthData) {
+                const amt = parseFloat(t.amount || 0);
+                if (t.type === 'income') monthData.income += amt;
+                if (t.type === 'expense') monthData.expense += amt;
+                // On ignore les transferts pour le graphique "Profits" global
+            }
+        });
+        return months;
+    }, [transactions, currentFilter]);
+
+    // 2. Calcul d'échelle
+    const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)), 100); // Min 100 pour éviter div/0
+    const height = 120;
+    const barWidth = 12;
+    const gap = 30; // Espace entre les mois
+
+    return (
+        <div className="w-full h-40 flex items-end justify-between gap-2 pt-4 px-2 select-none">
+            {data.map((d, i) => (
+                <div key={i} className="flex flex-col items-center gap-2 flex-1 group relative">
+                    {/* Tooltip au survol */}
+                    <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] p-2 rounded pointer-events-none whitespace-nowrap z-10">
+                        <div>Entrée: +{Math.round(d.income)}€</div>
+                        <div>Sortie: -{Math.round(d.expense)}€</div>
+                    </div>
+
+                    <div className="flex gap-1 items-end h-[120px] w-full justify-center">
+                        {/* Barre Revenus (Verte) */}
+                        <div 
+                            className="w-2 md:w-3 bg-emerald-400 rounded-t-sm transition-all duration-500 hover:bg-emerald-300"
+                            style={{ height: `${(d.income / maxVal) * 100}%` }}
+                        ></div>
+                        {/* Barre Dépenses (Rouge) */}
+                        <div 
+                            className="w-2 md:w-3 bg-rose-400 rounded-t-sm transition-all duration-500 hover:bg-rose-300"
+                            style={{ height: `${(d.expense / maxVal) * 100}%` }}
+                        ></div>
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">{d.label}</span>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 // --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
 const SparkLine = ({ data, height = 50 }) => {
@@ -12,10 +87,7 @@ const SparkLine = ({ data, height = 50 }) => {
     
     let min = Math.min(...data);
     let max = Math.max(...data);
-    
-    if (min > 0) min = 0; 
-    if (max < 0) max = 0;
-    
+    if (min > 0) min = 0; if (max < 0) max = 0;
     const range = max - min || 1;
     const width = 100;
     
@@ -60,18 +132,18 @@ export default function Dashboard({ data, updateData, setView }) {
     const todos = Array.isArray(data.todos) ? data.todos : [];
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const notes = Array.isArray(data.notes) ? data.notes : [];
+    const goals = Array.isArray(data.goals) ? data.goals : []; // Ajout Goals
     
     const budget = data.budget || {};
     const transactions = Array.isArray(budget.transactions) ? budget.transactions : [];
     const scheduled = Array.isArray(budget.scheduled) ? budget.scheduled : [];
     const recurring = Array.isArray(budget.recurring) ? budget.recurring : [];
     const accounts = Array.isArray(budget.accounts) ? budget.accounts : [];
+    const invoices = Array.isArray(data.invoices) ? data.invoices : []; // Ajout Invoices
     
     const labels = data.customLabels || {};
 
-    // --- 1. FILTRES INTELLIGENTS (CORRIGÉS) ---
-    
-    // Vérifie si un élément concerne le compte sélectionné (Source OU Cible)
+    // --- 1. FILTRES INTELLIGENTS ---
     const isRelevantItem = (item) => {
         if (dashboardFilter === 'total') return true;
         const accId = String(item.accountId || item.account_id);
@@ -79,37 +151,30 @@ export default function Dashboard({ data, updateData, setView }) {
         return accId === String(dashboardFilter) || targetId === String(dashboardFilter);
     };
 
-    // Calcul de l'impact financier (+, -, ou 0) selon le contexte
     const getFinancialImpact = (item) => {
         const amount = parseFloat(item.amount || 0);
         const type = item.type;
         const accId = String(item.accountId || item.account_id);
         const targetId = String(item.targetAccountId || item.target_account_id);
 
-        // Cas 1 : Vue Globale
         if (dashboardFilter === 'total') {
             if (type === 'income') return amount;
             if (type === 'expense') return -amount;
-            if (type === 'transfer') return 0; // Neutre en global
+            if (type === 'transfer') return 0;
             return -amount;
         }
 
-        // Cas 2 : Vue Compte Spécifique
-        // Si c'est un transfert
         if (type === 'transfer') {
-            if (targetId === String(dashboardFilter)) return amount; // On reçoit l'argent (+)
-            if (accId === String(dashboardFilter)) return -amount;   // On envoie l'argent (-)
+            if (targetId === String(dashboardFilter)) return amount;
+            if (accId === String(dashboardFilter)) return -amount;
             return 0;
         }
 
-        // Si c'est normal
         if (type === 'income') return amount;
         return -amount;
     };
 
     // --- 2. CALCULS DE SOLDE ---
-
-    // Solde affiché (Prend en compte les virements dans l'historique transactionnel si présents)
     const currentBalanceRaw = transactions
         .filter(t => isRelevantItem(t))
         .reduce((acc, t) => acc + getFinancialImpact(t), 0);
@@ -127,31 +192,24 @@ export default function Dashboard({ data, updateData, setView }) {
         return (val < 0 ? '-' : '') + formatted;
     };
 
-    // Graphique Performant (Corrigé avec getFinancialImpact)
     const getSparklineData = () => {
         try {
             const days = 30; 
             const history = [];
             let tempBalance = currentBalance;
-            
             const dailyChanges = {};
             const relevantTransactions = transactions.filter(t => isRelevantItem(t));
-            
             relevantTransactions.forEach(t => {
                 const d = new Date(t.date);
                 d.setHours(0,0,0,0);
                 const key = d.getTime();
-                const impact = getFinancialImpact(t);
-                dailyChanges[key] = (dailyChanges[key] || 0) + impact;
+                dailyChanges[key] = (dailyChanges[key] || 0) + getFinancialImpact(t);
             });
-
             let currentDateCursor = new Date();
             currentDateCursor.setHours(0,0,0,0); 
-
             for (let i = 0; i < days; i++) {
                 history.unshift(Number(tempBalance.toFixed(2)));
                 const key = currentDateCursor.getTime();
-                // On remonte le temps : Solde Veille = Solde Aujourd'hui - Changement Aujourd'hui
                 tempBalance -= (dailyChanges[key] || 0);
                 currentDateCursor.setDate(currentDateCursor.getDate() - 1);
             }
@@ -161,26 +219,23 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 3. CALCUL "À VENIR" (CORRIGÉ) ---
+    // --- 3. CALCUL "À VENIR" ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
             today.setHours(0,0,0,0);
             let events = [];
-
             scheduled.forEach(s => {
                 if(s.status === 'pending') {
                     if (!isRelevantItem(s)) return;
                     events.push({ type: 'scheduled', date: new Date(s.date), data: s, id: `s-${s.id}` });
                 }
             });
-
             recurring.forEach(r => {
                 if (!isRelevantItem(r)) return;
                 let nextDate = r.nextDueDate ? new Date(r.nextDueDate) : new Date();
                 events.push({ type: 'recurring', date: nextDate, data: r, id: `r-${r.id}` });
             });
-
             return events
                 .filter(e => !isNaN(e.date.getTime()) && e.date >= today)
                 .sort((a, b) => a.date - b.date)
@@ -195,12 +250,10 @@ export default function Dashboard({ data, updateData, setView }) {
             const now = new Date();
             const today = new Date();
             today.setHours(0,0,0,0);
-            
             const calEvents = (data.calendar_events || []).map(e => ({
                 id: e.id, title: e.title, start_time: e.start_time, is_todo: false,
                 is_all_day: e.is_all_day
             }));
-
             return calEvents
                 .filter(e => {
                     const evtDate = new Date(e.start_time);
@@ -219,13 +272,11 @@ export default function Dashboard({ data, updateData, setView }) {
     };
 
     const getAccountBalanceForProject = (accId) => {
-        // Pour les projets, on regarde juste le solde brut du compte lié
         return transactions
             .filter(t => String(t.accountId || t.account_id) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
-    // Tri intelligent (High > Medium > Low > None)
     const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
     
     const activeProjects = projects
@@ -261,6 +312,10 @@ export default function Dashboard({ data, updateData, setView }) {
     const urgentTodos = todos.filter(t => !t.completed && (t.priority === 'high' || t.priority === 'warm')).slice(0, 5);
     const todayDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+    // --- NOUVEAU : ALERTS INTELLIGENTES ---
+    const pendingInvoices = invoices.filter(i => i.status === 'Sent');
+    const totalPending = pendingInvoices.reduce((acc, i) => acc + (parseFloat(i.total) || 0), 0);
+
     return (
         <div className="space-y-6 fade-in p-4 pb-24 md:pb-20 max-w-7xl mx-auto">
             {focusedProject && (
@@ -280,7 +335,10 @@ export default function Dashboard({ data, updateData, setView }) {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                         <div>
                             <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-1 md:mb-2">{labels.userName || 'Bonjour,'}</h2>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm md:text-lg capitalize">{todayDate}</p>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm md:text-lg capitalize flex items-center gap-2">
+                                {todayDate}
+                                {urgentTodos.length > 0 && <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold ml-2 animate-pulse">{urgentTodos.length} urgences</span>}
+                            </p>
                         </div>
                         <select 
                             value={dashboardFilter} 
@@ -291,6 +349,8 @@ export default function Dashboard({ data, updateData, setView }) {
                             {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                         </select>
                     </div>
+                    
+                    {/* WIDGET ACTIONS RAPIDES */}
                     <div className="flex gap-2 md:gap-4 mt-auto">
                         <button onClick={() => setView('budget')} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 md:px-6 md:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl md:rounded-2xl text-sm md:text-base font-bold shadow-lg shadow-blue-900/20 transition-transform hover:scale-[1.02]"><Plus size={18}/> <span className="hidden sm:inline">Dépense</span><span className="sm:hidden">Ajout</span></button>
                         <button onClick={() => setView('todo')} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 md:px-6 md:py-4 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-800 dark:text-white rounded-xl md:rounded-2xl text-sm md:text-base font-bold transition-transform hover:scale-[1.02]"><CheckSquare size={18} className="text-orange-500"/> <span className="hidden sm:inline">Tâche</span><span className="sm:hidden">Tâche</span></button>
@@ -299,9 +359,10 @@ export default function Dashboard({ data, updateData, setView }) {
                 </div>
             </div>
 
-            {/* METRICS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* CARTE SOLDE */}
+            {/* METRICS ROW (GRAPHIQUES & KPI) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                
+                {/* CARTE SOLDE + SPARKLINE (1/4 ou 1/3) */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-gray-200 dark:border-slate-700 relative overflow-hidden flex flex-col justify-between min-h-[220px]">
                     <div className="relative z-10 flex justify-between items-start">
                         <div className="p-3 bg-green-50 dark:bg-slate-800 rounded-2xl text-green-600 dark:text-green-400"><Wallet size={24}/></div>
@@ -316,43 +377,31 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                 </div>
 
-                {/* CARTE À VENIR (FINANCE) */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-gray-200 dark:border-slate-700 flex flex-col">
-                    <div className="flex items-center gap-2 mb-6 text-purple-600 dark:text-purple-400">
-                        <Calendar size={20}/>
-                        <h3 className="font-bold text-gray-800 dark:text-white">Opérations à venir</h3>
+                {/* CARTE EVOLUTION MENSUELLE (NOUVEAU - 2/4 ou 1/3) */}
+                <div className="md:col-span-2 lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-gray-200 dark:border-slate-700 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                            <Activity size={20}/>
+                            <h3 className="font-bold text-gray-800 dark:text-white">Flux de Trésorerie (6 mois)</h3>
+                        </div>
                     </div>
-                    <div className="flex-1 flex flex-col gap-3">
-                        {upcomingList.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm py-4">Rien à signaler</div>
-                        ) : (
-                            upcomingList.map((e, idx) => {
-                                const impact = getFinancialImpact(e.data);
-                                const isNeutral = impact === 0;
-                                const isPositive = impact > 0;
-                                
-                                return (
-                                    <div key={idx} className="flex items-center justify-between p-3 md:p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                                        <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
-                                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-300 shadow-sm shrink-0">
-                                                {e.data.type === 'transfer' ? <ArrowRightLeft size={18} className="text-blue-500"/> : e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="font-bold text-gray-800 dark:text-white text-sm truncate">{e.data.description}</p>
-                                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
-                                                    <span>{e.date.toLocaleDateString()}</span>
-                                                    {e.type === 'recurring' && <span className="flex items-center gap-1"><TrendingUp size={10}/> <span className="hidden sm:inline">Récurrent</span></span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <span className={`font-bold text-sm shrink-0 pl-2 ${isNeutral ? 'text-blue-600 dark:text-blue-400' : isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {isNeutral ? 'Transfert' : renderAmount(impact, true)}
-                                        </span>
-                                    </div>
-                                );
-                            })
-                        )}
+                    <MonthlyBarChart transactions={transactions} currentFilter={dashboardFilter} />
+                </div>
+
+                {/* CARTE ALERTE FACTURATION (NOUVEAU - 1/4 ou 1/3) */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-gray-200 dark:border-slate-700 flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center gap-2 mb-4 text-orange-500">
+                            <AlertCircle size={20}/>
+                            <h3 className="font-bold text-gray-800 dark:text-white">Facturation</h3>
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">En attente de paiement</p>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{renderAmount(totalPending)}</h3>
+                        <p className="text-xs text-gray-400 mt-1">{pendingInvoices.length} factures envoyées</p>
                     </div>
+                    <button onClick={() => setView('clients')} className="mt-4 w-full py-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-xl text-xs font-bold hover:bg-orange-100 transition-colors">
+                        Gérer les factures
+                    </button>
                 </div>
             </div>
 
@@ -361,6 +410,7 @@ export default function Dashboard({ data, updateData, setView }) {
                 
                 {/* PROJETS ACTIFS (2/3) */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* ... LISTE PROJETS (IDENTIQUE À AVANT) ... */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2"><FolderKanban size={20} className="text-blue-500"/> Projets Actifs</h3>
@@ -380,22 +430,19 @@ export default function Dashboard({ data, updateData, setView }) {
                                     if (cost > 0) {
                                         budgetAvailable = p.linkedAccountId 
                                             ? getAccountBalanceForProject(p.linkedAccountId) 
-                                            : Math.max(0, currentBalance); // Use calculated currentBalance
-                                        
+                                            : Math.max(0, currentBalance);
                                         fundingPercentage = Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100);
                                         isFunded = budgetAvailable >= cost;
                                     }
                                     
                                     let safeProgress = Math.min(100, Math.max(0, p.progress || 0));
                                     let safeFunding = Math.min(100, Math.max(0, fundingPercentage));
-                                    
                                     let globalScore = safeProgress;
                                     if (cost > 0) globalScore = (safeProgress + safeFunding) / 2;
 
                                     return (
                                         <div key={p.id} className="bg-gray-50 dark:bg-slate-800/50 p-4 md:p-5 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-slate-600 transition-colors cursor-pointer" onClick={() => setView('projects')}>
                                             <div className="flex items-center gap-4 md:gap-5">
-                                                
                                                 <div className="relative inline-flex items-center justify-center w-12 h-12 md:w-14 md:h-14 shrink-0">
                                                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                         <path className="text-gray-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
@@ -403,7 +450,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                                     </svg>
                                                     <span className="absolute text-[10px] md:text-xs font-bold text-gray-700 dark:text-slate-200">{Math.round(globalScore)}%</span>
                                                 </div>
-
                                                 <div className="flex-1 min-w-0 space-y-2">
                                                     <div className="flex justify-between items-start">
                                                         <div className="min-w-0 flex-1 pr-2">
@@ -415,7 +461,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                                         </div>
                                                         {p.status === 'in_progress' && <span className="hidden sm:inline-block text-[9px] font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded uppercase shrink-0">En cours</span>}
                                                     </div>
-
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                                                         <div className="space-y-1">
                                                             <div className="flex justify-between text-[10px] text-gray-500 dark:text-slate-400">
@@ -459,10 +504,37 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
                 </div>
 
-                {/* COLONNE DROITE : AGENDA + URGENCES */}
+                {/* COLONNE DROITE : AGENDA + URGENCES + OBJECTIFS */}
                 <div className="space-y-6">
                     
-                    {/* WIDGET AGENDA (NOUVEAU) */}
+                    {/* WIDGET OBJECTIFS (NOUVEAU) */}
+                    {goals.length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                    <Target size={20} className="text-red-500"/> Objectifs
+                                </h3>
+                            </div>
+                            <div className="space-y-4">
+                                {goals.slice(0, 3).map(g => (
+                                    <div key={g.id} className="group cursor-pointer" onClick={() => setView('goals')}>
+                                        <div className="flex justify-between text-xs font-bold text-gray-700 dark:text-slate-300 mb-1">
+                                            <span>{g.title}</span>
+                                            <span>{g.progress || 0}%</span>
+                                        </div>
+                                        <div className="h-2 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div 
+                                                className={`h-full rounded-full transition-all duration-1000 ${g.progress >= 100 ? 'bg-green-500' : 'bg-red-500'}`} 
+                                                style={{ width: `${g.progress || 0}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* WIDGET AGENDA */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -477,7 +549,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                     const d = new Date(evt.start_time);
                                     return (
                                         <div key={`${evt.type}-${evt.id}`} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                                            {/* Badge Date */}
                                             <div className={`flex flex-col items-center justify-center w-10 h-10 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-lg shrink-0 border`}>
                                                 <span className="text-[9px] font-bold uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
                                                 <span className="text-sm font-bold leading-none mt-0.5">{d.getDate()}</span>
