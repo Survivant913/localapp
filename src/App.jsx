@@ -168,7 +168,9 @@ export default function App() {
         supabase.from('notes').select('*'),
         supabase.from('projects').select('*'),
         supabase.from('accounts').select('*'),
-        supabase.from('transactions').select('*'),
+        // --- MODIFICATION ICI : AUGMENTATION DE LA LIMITE À 10 000 ---
+        supabase.from('transactions').select('*').limit(10000), 
+        // -----------------------------------------------------------
         supabase.from('recurring').select('*'),
         supabase.from('scheduled').select('*'),
         supabase.from('events').select('*'),
