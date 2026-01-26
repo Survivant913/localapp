@@ -9,25 +9,29 @@ import { supabase } from './supabaseClient';
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
-  // --- NOUVEAU : LOGIQUE CHRONO SESSION (Trés léger) ---
-  const [sessionTime, setSessionTime] = useState(0); // En minutes
+  // --- NOUVEAU : CHRONO SECONDES ---
+  const [sessionSeconds, setSessionSeconds] = useState(0);
 
   useEffect(() => {
-    // Incrémente le compteur toutes les minutes (60000ms)
+    // Incrémente le compteur toutes les secondes (1000ms)
     const timer = setInterval(() => {
-      setSessionTime(prev => prev + 1);
-    }, 60000);
+      setSessionSeconds(prev => prev + 1);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   const formatSessionTime = () => {
-    const h = Math.floor(sessionTime / 60);
-    const m = sessionTime % 60;
-    // Format ultra court : "1h 24m" ou "24m"
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
+    const h = Math.floor(sessionSeconds / 3600);
+    const m = Math.floor((sessionSeconds % 3600) / 60);
+    const s = sessionSeconds % 60;
+
+    // Ajout du zéro devant si < 10 pour un affichage stable (ex: 04s)
+    const fmt = (n) => n.toString().padStart(2, '0');
+
+    if (h > 0) return `${h}h ${fmt(m)}m ${fmt(s)}s`;
+    return `${fmt(m)}m ${fmt(s)}s`;
   };
-  // ----------------------------------------------------
+  // ---------------------------------
 
   const handleLogout = async () => {
     try {
@@ -176,8 +180,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
           {!isCollapsed && (
             <div className="text-center pb-1 space-y-1">
-              {/* --- NOUVEAU : CHRONO DISCRET --- */}
-              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-600 select-none opacity-60 hover:opacity-100 transition-opacity" title="Temps de session">
+              {/* CHRONO AVEC SECONDES (Format: 00m 00s) */}
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-600 select-none opacity-60 hover:opacity-100 transition-opacity font-mono" title="Temps de session">
                   <Clock size={10}/>
                   <span>{formatSessionTime()}</span>
               </div>
