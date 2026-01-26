@@ -70,8 +70,6 @@ export default function Dashboard({ data, updateData, setView }) {
     const labels = data.customLabels || {};
 
     // --- 1. FILTRES INTELLIGENTS (CORRIGÉS) ---
-    
-    // Vérifie si un élément concerne le compte sélectionné (Source OU Cible)
     const isRelevantItem = (item) => {
         if (dashboardFilter === 'total') return true;
         const accId = String(item.accountId || item.account_id);
@@ -79,37 +77,30 @@ export default function Dashboard({ data, updateData, setView }) {
         return accId === String(dashboardFilter) || targetId === String(dashboardFilter);
     };
 
-    // Calcul de l'impact financier (+, -, ou 0) selon le contexte
     const getFinancialImpact = (item) => {
         const amount = parseFloat(item.amount || 0);
         const type = item.type;
         const accId = String(item.accountId || item.account_id);
         const targetId = String(item.targetAccountId || item.target_account_id);
 
-        // Cas 1 : Vue Globale
         if (dashboardFilter === 'total') {
             if (type === 'income') return amount;
             if (type === 'expense') return -amount;
-            if (type === 'transfer') return 0; // Neutre en global
+            if (type === 'transfer') return 0; 
             return -amount;
         }
 
-        // Cas 2 : Vue Compte Spécifique
-        // Si c'est un transfert
         if (type === 'transfer') {
-            if (targetId === String(dashboardFilter)) return amount; // On reçoit l'argent (+)
-            if (accId === String(dashboardFilter)) return -amount;   // On envoie l'argent (-)
+            if (targetId === String(dashboardFilter)) return amount; 
+            if (accId === String(dashboardFilter)) return -amount;   
             return 0;
         }
 
-        // Si c'est normal
         if (type === 'income') return amount;
         return -amount;
     };
 
     // --- 2. CALCULS DE SOLDE ---
-
-    // Solde affiché (Prend en compte les virements dans l'historique transactionnel si présents)
     const currentBalanceRaw = transactions
         .filter(t => isRelevantItem(t))
         .reduce((acc, t) => acc + getFinancialImpact(t), 0);
@@ -127,7 +118,38 @@ export default function Dashboard({ data, updateData, setView }) {
         return (val < 0 ? '-' : '') + formatted;
     };
 
-    // Graphique Performant (Corrigé avec getFinancialImpact)
+    // --- NOUVEAU : CALCUL PRÉVISION FIN DE MOIS ---
+    const getProjectedEndOfMonth = () => {
+        const today = new Date();
+        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Dernier jour du mois
+        let projected = currentBalance;
+
+        // 1. Ajouter les opérations planifiées (Scheduled) d'ici la fin du mois
+        scheduled.forEach(s => {
+            if (s.status === 'pending' && isRelevantItem(s)) {
+                const sDate = new Date(s.date);
+                if (sDate >= today && sDate <= lastDayOfMonth) {
+                    projected += getFinancialImpact(s);
+                }
+            }
+        });
+
+        // 2. Ajouter les récurrentes (Recurring) d'ici la fin du mois
+        recurring.forEach(r => {
+            if (isRelevantItem(r) && r.nextDueDate) {
+                const rDate = new Date(r.nextDueDate);
+                if (rDate >= today && rDate <= lastDayOfMonth) {
+                    projected += getFinancialImpact(r);
+                }
+            }
+        });
+
+        return projected;
+    };
+    const projectedBalance = getProjectedEndOfMonth();
+    const balanceDiff = projectedBalance - currentBalance; // Différence pour savoir si ça monte ou descend
+
+    // Graphique Performant
     const getSparklineData = () => {
         try {
             const days = 30; 
@@ -151,7 +173,6 @@ export default function Dashboard({ data, updateData, setView }) {
             for (let i = 0; i < days; i++) {
                 history.unshift(Number(tempBalance.toFixed(2)));
                 const key = currentDateCursor.getTime();
-                // On remonte le temps : Solde Veille = Solde Aujourd'hui - Changement Aujourd'hui
                 tempBalance -= (dailyChanges[key] || 0);
                 currentDateCursor.setDate(currentDateCursor.getDate() - 1);
             }
@@ -161,7 +182,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const sparkData = getSparklineData();
 
-    // --- 3. CALCUL "À VENIR" (CORRIGÉ) ---
+    // --- 3. CALCUL "À VENIR" ---
     const getUpcomingEvents = () => {
         try {
             const today = new Date();
@@ -213,19 +234,30 @@ export default function Dashboard({ data, updateData, setView }) {
     };
     const nextCalendarEvents = getNextCalendarEvents();
 
+    // --- NOUVEAU : FONCTION COMPTEUR JOURS (AGENDA) ---
+    const getDayCounterLabel = (dateStr) => {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const target = new Date(dateStr); target.setHours(0,0,0,0);
+        const diffTime = target - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100' };
+        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100' };
+        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
+        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100' };
+    };
+
     const toggleTodo = (id) => {
         const newTodos = todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
         updateData({ ...data, todos: newTodos });
     };
 
     const getAccountBalanceForProject = (accId) => {
-        // Pour les projets, on regarde juste le solde brut du compte lié
         return transactions
             .filter(t => String(t.accountId || t.account_id) === String(accId))
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
-    // Tri intelligent (High > Medium > Low > None)
     const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
     
     const activeProjects = projects
@@ -310,6 +342,16 @@ export default function Dashboard({ data, updateData, setView }) {
                     <div className="relative z-10 mt-4 mb-4">
                         <h3 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-1">{renderAmount(currentBalance)}</h3>
                         <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Solde {dashboardFilter === 'total' ? 'Total' : 'du Compte'}</p>
+                        
+                        {/* --- NOUVEAU : AFFICHAGE DISCRET ESTIMATION FIN DE MOIS --- */}
+                        {!isPrivacyMode && (
+                            <div className="mt-2 text-xs font-medium flex items-center gap-1 opacity-80">
+                                <span className="text-gray-400 dark:text-slate-500">Est. fin de mois :</span>
+                                <span className={balanceDiff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500"}>
+                                    {renderAmount(projectedBalance)}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="h-16 w-full mt-auto bg-gray-50 dark:bg-slate-800/50 rounded-xl p-2 border border-gray-100 dark:border-slate-700/50">
                         <SparkLine data={sparkData} height={50} />
@@ -462,7 +504,7 @@ export default function Dashboard({ data, updateData, setView }) {
                 {/* COLONNE DROITE : AGENDA + URGENCES */}
                 <div className="space-y-6">
                     
-                    {/* WIDGET AGENDA (NOUVEAU) */}
+                    {/* WIDGET AGENDA */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-200 dark:border-slate-700 shadow-sm" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -475,6 +517,10 @@ export default function Dashboard({ data, updateData, setView }) {
                             ) : (
                                 nextCalendarEvents.map(evt => {
                                     const d = new Date(evt.start_time);
+                                    
+                                    // --- NOUVEAU : CALCULATEUR DE JOURS ---
+                                    const dayLabel = getDayCounterLabel(evt.start_time);
+
                                     return (
                                         <div key={`${evt.type}-${evt.id}`} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
                                             {/* Badge Date */}
@@ -482,8 +528,15 @@ export default function Dashboard({ data, updateData, setView }) {
                                                 <span className="text-[9px] font-bold uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
                                                 <span className="text-sm font-bold leading-none mt-0.5">{d.getDate()}</span>
                                             </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{evt.title}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm font-bold text-gray-800 dark:text-white truncate">{evt.title}</p>
+                                                    
+                                                    {/* --- NOUVEAU : AFFICHAGE DU COMPTEUR (J-3) --- */}
+                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${dayLabel.color} dark:bg-opacity-20`}>
+                                                        {dayLabel.text}
+                                                    </span>
+                                                </div>
                                                 <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1">
                                                     {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                                                     {evt.is_todo && <CheckCircle2 size={10} className="text-orange-500"/>}
