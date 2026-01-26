@@ -14,7 +14,8 @@ import ZenMode from './ZenMode';
 import Workspace from './Workspace'; 
 import GoalsManager from './GoalsManager'; 
 import JournalManager from './JournalManager';
-import PlanningManager from './PlanningManager'; 
+import PlanningManager from './PlanningManager';
+import HabitTracker from './HabitTracker'; // --- IMPORT NOUVEAU COMPOSANT ---
 import { Loader2, Lock } from 'lucide-react';
 
 // --- NOUVEAU : PALETTE DE COULEURS ---
@@ -109,9 +110,6 @@ export default function App() {
       today.setHours(0,0,0,0);
       
       const d = new Date(dateStr);
-      // MODIFICATION ICI : +6h au lieu de +12h.
-      // 12h (Midi) + 6h = 18h (Reste aujourd'hui) -> OK
-      // 23h (Veille) + 6h = 05h (Devient aujourd'hui) -> OK
       d.setHours(d.getHours() + 6);
 
       const checkDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -436,6 +434,7 @@ export default function App() {
       case 'todo': return <TodoList data={data} updateData={updateData} />;
       case 'goals': return <GoalsManager data={data} updateData={updateData} />;
       case 'journal': return <JournalManager data={data} updateData={updateData} />;
+      case 'habits': return <HabitTracker data={data} updateData={updateData} />; // --- NOUVEAU CAS ---
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
@@ -444,7 +443,7 @@ export default function App() {
     }
   };
 
-  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal';
+  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits'; // --- AJOUT HABITS AU STYLE FULL WIDTH (Optionnel, à ton choix) ---
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
