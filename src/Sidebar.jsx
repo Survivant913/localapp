@@ -1,14 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users, Box, Target, Book, CalendarRange
+  Users, Box, Target, Book, CalendarRange, Clock
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
+  // --- NOUVEAU : LOGIQUE CHRONO SESSION (Trés léger) ---
+  const [sessionTime, setSessionTime] = useState(0); // En minutes
+
+  useEffect(() => {
+    // Incrémente le compteur toutes les minutes (60000ms)
+    const timer = setInterval(() => {
+      setSessionTime(prev => prev + 1);
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatSessionTime = () => {
+    const h = Math.floor(sessionTime / 60);
+    const m = sessionTime % 60;
+    // Format ultra court : "1h 24m" ou "24m"
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+  // ----------------------------------------------------
+
   const handleLogout = async () => {
     try {
       const currentTheme = localStorage.getItem('freelanceCockpitTheme'); 
@@ -65,7 +85,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60`}>
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-2">
-              {/* MODIF : bg-blue-500 -> bg-blue-600 (réactif au thème) */}
               <div className="w-2 h-2 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
               {labels?.appName || 'Freelance Cockpit'}
             </h1>
@@ -98,13 +117,11 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   w-full flex items-center gap-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group relative
                   ${isCollapsed ? 'justify-center px-0' : 'px-3'}
                   ${isActive 
-                    // MODIF : Utilisation de classes standards 'bg-blue-X' pour que le CSS global de App.jsx puisse les écraser
                     ? 'bg-blue-600/10 text-blue-500' 
                     : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
                   }
                 `}
               >
-                {/* MODIF : text-blue-500 -> text-blue-600 (réactif) */}
                 <Icon size={20} className={`shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-300'}`} />
                 
                 {!isCollapsed && (
@@ -113,7 +130,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   </span>
                 )}
 
-                {/* Tooltip en mode réduit */}
                 {isCollapsed && (
                   <div className="absolute left-16 ml-2 bg-slate-900 text-white text-xs px-3 py-2 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap border border-slate-700 shadow-xl font-medium tracking-wide">
                     {item.label}
@@ -121,7 +137,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   </div>
                 )}
                 
-                {/* Indicateur actif discret */}
                 {!isCollapsed && isActive && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                 )}
@@ -160,7 +175,13 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           </div>
 
           {!isCollapsed && (
-            <div className="text-center pb-1">
+            <div className="text-center pb-1 space-y-1">
+              {/* --- NOUVEAU : CHRONO DISCRET --- */}
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-600 select-none opacity-60 hover:opacity-100 transition-opacity" title="Temps de session">
+                  <Clock size={10}/>
+                  <span>{formatSessionTime()}</span>
+              </div>
+              
               <p className="text-[10px] text-slate-600 font-medium hover:text-slate-500 transition-colors cursor-default select-none">
                 Created by Henni Mohammed Al Amine
               </p>
