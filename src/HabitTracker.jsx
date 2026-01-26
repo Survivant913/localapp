@@ -90,8 +90,12 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.filter(h => h.category_id !== id));
     };
 
-    const addHabit = async (name, categoryId) => {
-        const { data: newHab } = await supabase.from('habits').insert({ name, category_id: categoryId }).select().single();
+    const addHabit = async (name, categoryId, daysOfWeek) => {
+        const { data: newHab } = await supabase.from('habits').insert({ 
+            name, 
+            category_id: categoryId,
+            days_of_week: daysOfWeek // Ex: [1, 3, 5] pour Lundi, Mercredi, Vendredi
+        }).select().single();
         if (newHab) setHabits([...habits, newHab]);
     };
 
@@ -101,7 +105,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.filter(h => h.id !== id));
     };
 
-    // --- CALCULS STATISTIQUES ---
+    // --- CALCULS STATISTIQUES (INTELLIGENTS) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -111,7 +115,10 @@ export default function HabitTracker({ data, updateData }) {
         for(let i = statRange - 1; i >= 0; i--) {
             const d = new Date(today);
             d.setDate(d.getDate() - i);
-            dates.push(d.toISOString().split('T')[0]);
+            dates.push({
+                str: d.toISOString().split('T')[0],
+                dayIndex: d.getDay() // 0 = Dimanche, 1 = Lundi...
+            });
         }
 
         // 2. Calcul par Domaine (Catégorie)
@@ -119,12 +126,20 @@ export default function HabitTracker({ data, updateData }) {
             const catHabits = habits.filter(h => h.category_id === cat.id);
             if (catHabits.length === 0) return null;
 
-            let totalPossible = catHabits.length * statRange;
+            let totalPossible = 0;
             let totalDone = 0;
 
             catHabits.forEach(h => {
-                const doneCount = logs.filter(l => l.habit_id === h.id && dates.includes(l.date)).length;
-                totalDone += doneCount;
+                // On vérifie jour par jour si l'habitude ÉTAIT prévue ce jour-là
+                dates.forEach(d => {
+                    const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6]; // Par défaut tous les jours
+                    if (scheduledDays.includes(d.dayIndex)) {
+                        totalPossible++;
+                        if (logs.some(l => l.habit_id === h.id && l.date === d.str)) {
+                            totalDone++;
+                        }
+                    }
+                });
             });
 
             return {
@@ -134,14 +149,21 @@ export default function HabitTracker({ data, updateData }) {
         }).filter(Boolean);
 
         // 3. Calcul Courbe de Constance (Global)
-        const consistencyData = dates.map(dateStr => {
-            if (habits.length === 0) return 0;
-            const logsForDay = logs.filter(l => l.date === dateStr && habits.some(h => h.id === l.habit_id)).length;
-            const percent = Math.round((logsForDay / habits.length) * 100);
+        const consistencyData = dates.map(dObj => {
+            // Trouver combien d'habitudes étaient prévues ce jour précis
+            const habitsForToday = habits.filter(h => {
+                const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+                return scheduledDays.includes(dObj.dayIndex);
+            });
+
+            if (habitsForToday.length === 0) return 0; // Rien de prévu = Pas de note (ou 100% ? on met 0 neutre)
+
+            const logsForDay = logs.filter(l => l.date === dObj.str && habitsForToday.some(h => h.id === l.habit_id)).length;
+            const percent = Math.round((logsForDay / habitsForToday.length) * 100);
             return percent;
         });
 
-        return { domainStats, consistencyData, dates };
+        return { domainStats, consistencyData, dates: dates.map(d => d.str) };
     }, [statRange, categories, habits, logs]);
 
     // --- NAVIGATION DATES ---
@@ -153,6 +175,13 @@ export default function HabitTracker({ data, updateData }) {
 
     const isToday = selectedDate.toDateString() === new Date().toDateString();
     const dateStr = selectedDate.toISOString().split('T')[0];
+    const currentDayIndex = selectedDate.getDay(); // 0-6
+
+    // Filtrage des habitudes pour la vue quotidienne
+    const visibleHabits = habits.filter(h => {
+        const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+        return scheduledDays.includes(currentDayIndex);
+    });
 
     return (
         <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900 transition-colors">
@@ -205,15 +234,21 @@ export default function HabitTracker({ data, updateData }) {
                             <button onClick={() => changeDate(1)} className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full ${isToday ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isToday}><ChevronRight/></button>
                         </div>
 
-                        {/* LISTE PAR CATEGORIE */}
+                        {/* LISTE PAR CATEGORIE (FILTRÉE) */}
                         {categories.length === 0 ? (
                             <div className="text-center py-10 text-gray-400">
                                 <p>Aucune catégorie définie.</p>
                                 <button onClick={() => setActiveTab('settings')} className="mt-2 text-blue-500 font-bold hover:underline">Créer ma première catégorie</button>
                             </div>
+                        ) : visibleHabits.length === 0 ? (
+                            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-gray-300 dark:border-slate-700">
+                                <Zap className="mx-auto text-gray-300 dark:text-slate-600 mb-2" size={48}/>
+                                <p className="text-gray-500 dark:text-slate-400">Rien de prévu pour ce jour.</p>
+                                <p className="text-xs text-gray-400">Profitez-en pour vous reposer !</p>
+                            </div>
                         ) : (
                             categories.map(cat => {
-                                const catHabits = habits.filter(h => h.category_id === cat.id);
+                                const catHabits = visibleHabits.filter(h => h.category_id === cat.id);
                                 if (catHabits.length === 0) return null;
 
                                 return (
@@ -271,7 +306,7 @@ export default function HabitTracker({ data, updateData }) {
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700">
                             <h3 className="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><Trophy className="text-yellow-500"/> Constance Globale</h3>
                             <div className="h-40 flex items-end justify-between gap-1">
-                                {stats.consistencyData.map((val, i) => (
+                                {stats.consistencyData.length > 0 ? stats.consistencyData.map((val, i) => (
                                     <div key={i} className="flex-1 flex flex-col justify-end group relative">
                                         <div 
                                             className={`w-full rounded-t-sm transition-all duration-500 ${val >= 80 ? 'bg-green-400' : val >= 50 ? 'bg-blue-400' : 'bg-gray-300 dark:bg-slate-600'}`} 
@@ -282,7 +317,7 @@ export default function HabitTracker({ data, updateData }) {
                                             {stats.dates[i].split('-').slice(1).join('/')} : {val}%
                                         </div>
                                     </div>
-                                ))}
+                                )) : <div className="w-full text-center text-gray-400 flex items-center justify-center">Pas assez de données</div>}
                             </div>
                         </div>
 
@@ -346,41 +381,89 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GESTION HABITUDES */}
+                        {/* GESTION HABITUDES (AVEC JOURS) */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700">
                             <h3 className="font-bold text-lg mb-4 text-gray-800 dark:text-white">Mes Habitudes</h3>
                             <div className="space-y-3">
                                 {habits.map(h => (
                                     <div key={h.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-700/50 rounded-xl">
-                                        <span className="font-medium text-gray-700 dark:text-slate-200">{h.name}</span>
+                                        <div>
+                                            <div className="font-medium text-gray-700 dark:text-slate-200">{h.name}</div>
+                                            <div className="flex gap-1 mt-1">
+                                                {/* Affichage des jours actifs */}
+                                                {['D','L','M','M','J','V','S'].map((d, i) => (
+                                                    <span key={i} className={`text-[9px] w-4 h-4 flex items-center justify-center rounded-full ${h.days_of_week?.includes(i) ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 font-bold' : 'text-gray-300 dark:text-slate-600'}`}>
+                                                        {d}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
                                         <div className="flex items-center gap-3">
                                             <Badge text={categories.find(c => c.id === h.category_id)?.name || 'Sans cat.'} />
                                             <button onClick={() => deleteHabit(h.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
                                         </div>
                                     </div>
                                 ))}
+                                
                                 {/* Ajouter Habitude */}
-                                <form 
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        const name = e.target.habName.value;
-                                        const catId = e.target.habCat.value;
-                                        if(name && catId) { addHabit(name, catId); e.target.reset(); }
-                                    }}
-                                    className="flex gap-2 pt-2"
-                                >
-                                    <input name="habName" placeholder="Nouvelle habitude (ex: 50 pompes)" className="flex-1 p-2 bg-gray-50 dark:bg-slate-700 rounded-lg outline-none border focus:border-blue-500 dark:border-slate-600 dark:text-white" required/>
-                                    <select name="habCat" className="p-2 bg-gray-50 dark:bg-slate-700 rounded-lg outline-none border dark:border-slate-600 dark:text-white" required>
-                                        <option value="">Choisir Domaine...</option>
-                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
-                                    <button type="submit" className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><Plus/></button>
-                                </form>
+                                <HabitCreator categories={categories} onAdd={addHabit} />
                             </div>
                         </div>
                     </div>
                 )}
             </div>
         </div>
+    );
+}
+
+// --- SOUS-COMPOSANT CRÉATION (POUR GÉRER LES JOURS) ---
+function HabitCreator({ categories, onAdd }) {
+    const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); // Tout coché par défaut
+
+    const toggleDay = (dayIndex) => {
+        if (selectedDays.includes(dayIndex)) {
+            setSelectedDays(selectedDays.filter(d => d !== dayIndex));
+        } else {
+            setSelectedDays([...selectedDays, dayIndex].sort());
+        }
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const name = e.target.habName.value;
+        const catId = e.target.habCat.value;
+        if(name && catId) { 
+            onAdd(name, catId, selectedDays); 
+            e.target.reset(); 
+            setSelectedDays([0,1,2,3,4,5,6]); // Reset
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="pt-4 border-t border-gray-100 dark:border-slate-700 mt-2">
+            <div className="flex gap-2 mb-2">
+                <input name="habName" placeholder="Nouvelle habitude..." className="flex-1 p-2 bg-gray-50 dark:bg-slate-700 rounded-lg outline-none border focus:border-blue-500 dark:border-slate-600 dark:text-white" required/>
+                <select name="habCat" className="p-2 bg-gray-50 dark:bg-slate-700 rounded-lg outline-none border dark:border-slate-600 dark:text-white" required>
+                    <option value="">Domaine...</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <button type="submit" className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><Plus/></button>
+            </div>
+            
+            {/* SÉLECTEUR DE JOURS */}
+            <div className="flex gap-2 items-center">
+                <span className="text-xs text-gray-400">Jours :</span>
+                {['D','L','M','M','J','V','S'].map((d, i) => (
+                    <button 
+                        key={i}
+                        type="button"
+                        onClick={() => toggleDay(i)}
+                        className={`w-6 h-6 rounded text-[10px] font-bold transition-all ${selectedDays.includes(i) ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-400'}`}
+                    >
+                        {d}
+                    </button>
+                ))}
+            </div>
+        </form>
     );
 }
