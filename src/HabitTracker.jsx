@@ -357,11 +357,12 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
+                        {/* CORRECTION GRAPHIQUE : Ajout de h-full pour voir les barres */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-sm border border-gray-200 dark:border-slate-700">
                             <h3 className="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><Trophy className="text-yellow-500"/> Constance Globale</h3>
                             <div className="h-40 flex items-end justify-between gap-1">
                                 {stats.consistencyData.length > 0 ? stats.consistencyData.map((val, i) => (
-                                    <div key={i} className="flex-1 flex flex-col justify-end group relative">
+                                    <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
                                         <div 
                                             className={`w-full rounded-t-sm transition-all duration-500 ${val >= 80 ? 'bg-green-400' : val >= 50 ? 'bg-blue-400' : 'bg-gray-300 dark:bg-slate-600'}`} 
                                             style={{ height: `${Math.max(val, 5)}%` }}
@@ -370,7 +371,7 @@ export default function HabitTracker({ data, updateData }) {
                                             {stats.dates[i].split('-').slice(1).join('/')} : {val}%
                                         </div>
                                     </div>
-                                )) : <div className="w-full text-center text-gray-400 flex items-center justify-center">Pas assez de données</div>}
+                                )) : <div className="w-full text-center text-gray-400 flex items-center justify-center h-full">Pas assez de données</div>}
                             </div>
                         </div>
 
