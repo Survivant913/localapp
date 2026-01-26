@@ -7,14 +7,14 @@ import {
 
 // --- UTILITAIRES ---
 
-// Fix 1 : Mapping explicite pour que Tailwind génère bien les classes CSS
+// Fix Tailwind : Mapping explicite
 const COLOR_MAP = {
     'bg-blue-500': 'text-blue-500',
     'bg-green-500': 'text-green-500',
     'bg-purple-500': 'text-purple-500',
     'bg-orange-500': 'text-orange-500',
     'bg-red-500': 'text-red-500',
-    'bg-gray-400': 'text-gray-400' // Fallback
+    'bg-gray-400': 'text-gray-400'
 };
 
 const Badge = ({ color, text }) => (
@@ -23,7 +23,9 @@ const Badge = ({ color, text }) => (
     </span>
 );
 
+// Fonction critique pour date locale stricte
 const getLocalYYYYMMDD = (dateObj) => {
+    if (!dateObj) return null;
     const d = new Date(dateObj);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -53,14 +55,19 @@ export default function HabitTracker({ data, updateData }) {
     const loadHabitData = async () => {
         try {
             setLoading(true);
-            const { data: cats } = await supabase.from('habit_categories').select('*').order('created_at');
+            // Tri alphabétique catégories
+            const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
             
-            // Fix 2 (Archives) : On charge TOUT (même archivé) pour que les stats du passé restent justes
+            // Chargement de TOUTES les habitudes (actives + archives)
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
-            // Historique sur 1 an
+            // Historique long (1 an) avec limite augmentée
             const d = new Date(); d.setDate(d.getDate() - 365);
-            const { data: lgs } = await supabase.from('habit_logs').select('*').gte('date', getLocalYYYYMMDD(d));
+            const { data: lgs } = await supabase
+                .from('habit_logs')
+                .select('*')
+                .gte('date', getLocalYYYYMMDD(d))
+                .limit(10000); // Fix "Mur des 1000"
 
             setCategories(cats || []);
             setHabits(habs || []);
@@ -102,7 +109,7 @@ export default function HabitTracker({ data, updateData }) {
             }
         } catch (error) {
             console.error("Erreur toggle:", error);
-            loadHabitData();
+            loadHabitData(); // Reload de sécurité
         } finally {
             setProcessingHabits(prev => {
                 const next = new Set(prev);
@@ -114,7 +121,7 @@ export default function HabitTracker({ data, updateData }) {
 
     const addCategory = async (name, color) => {
         const { data: newCat } = await supabase.from('habit_categories').insert({ name, color }).select().single();
-        if (newCat) setCategories([...categories, newCat]);
+        if (newCat) setCategories([...categories, newCat].sort((a,b) => a.name.localeCompare(b.name)));
     };
 
     const deleteCategory = async (id) => {
@@ -136,11 +143,10 @@ export default function HabitTracker({ data, updateData }) {
     const deleteHabit = async (id) => {
         if (!window.confirm("Archiver cette habitude ? Elle disparaîtra du quotidien mais restera dans l'historique.")) return;
         await supabase.from('habits').update({ is_archived: true }).eq('id', id);
-        // On met à jour l'état local pour refléter l'archivage sans supprimer l'objet (pour les stats)
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- CALCULS STATISTIQUES ---
+    // --- CALCULS STATISTIQUES BLINDÉS (Rattrapage supporté) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -163,15 +169,22 @@ export default function HabitTracker({ data, updateData }) {
             let totalDone = 0;
 
             catHabits.forEach(h => {
+                const creationDateStr = h.created_at ? getLocalYYYYMMDD(h.created_at) : '2000-01-01';
+
                 dates.forEach(d => {
                     const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
                     const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
                     const isScheduled = scheduledDays.includes(d.dayIndex);
 
+                    // LOGIQUE FINAL :
+                    // 1. Si fait -> Bravo (100%), même si c'était avant la création (Rattrapage).
+                    // 2. Si pas fait ET que la date est après la création ET que c'était prévu -> Échec (0%).
+                    // 3. Sinon (Pas fait, mais avant création OU pas prévu) -> Ignoré.
+                    
                     if (isDone) {
                         totalDone++;
                         totalPossible++;
-                    } else if (isScheduled) {
+                    } else if (d.str >= creationDateStr && isScheduled) {
                         totalPossible++;
                     }
                 });
@@ -188,6 +201,7 @@ export default function HabitTracker({ data, updateData }) {
             let doneCount = 0;
 
             habits.forEach(h => {
+                const creationDateStr = h.created_at ? getLocalYYYYMMDD(h.created_at) : '2000-01-01';
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === dObj.str);
                 const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
                 const isScheduled = scheduledDays.includes(dObj.dayIndex);
@@ -195,7 +209,7 @@ export default function HabitTracker({ data, updateData }) {
                 if (isDone) {
                     doneCount++;
                     activeHabitsCount++;
-                } else if (isScheduled) {
+                } else if (dObj.str >= creationDateStr && isScheduled) {
                     activeHabitsCount++;
                 }
             });
@@ -218,15 +232,18 @@ export default function HabitTracker({ data, updateData }) {
     const dateStr = getLocalYYYYMMDD(selectedDate);
     const currentDayIndex = selectedDate.getDay();
 
-    // Fix 2 (Archives) : On filtre ici pour le Quotidien, mais pas pour les stats
+    // Filtre Vue Quotidienne
     const visibleHabits = habits.filter(h => {
-        if (h.is_archived) return false; // Masquer les archives
+        if (h.is_archived) return false;
+        
+        // MODIFICATION FINALE : On retire le filtre de date de création ici.
+        // Cela permet à l'utilisateur de revenir en arrière pour cocher une case "oubliée" (Rattrapage).
+        
         const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
         return scheduledDays.includes(currentDayIndex);
     });
     
-    // Pour la gestion (Settings), on montre aussi les archives ou non ? 
-    // Choix : On montre uniquement les actives pour simplifier la gestion.
+    // Filtre Gestion
     const activeHabitsForManagement = habits.filter(h => !h.is_archived);
 
     return (
@@ -354,7 +371,6 @@ export default function HabitTracker({ data, updateData }) {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {stats.domainStats.map(cat => {
-                                // Fix 1 : Utilisation du mapping sécurisé
                                 const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
                                 
                                 return (
