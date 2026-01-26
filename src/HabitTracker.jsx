@@ -7,7 +7,7 @@ import {
 
 // --- UTILITAIRES ---
 
-// Fix Tailwind : Mapping explicite
+// Mapping explicite pour que Tailwind ne purge pas les classes dynamiques
 const COLOR_MAP = {
     'bg-blue-500': 'text-blue-500',
     'bg-green-500': 'text-green-500',
@@ -23,7 +23,7 @@ const Badge = ({ color, text }) => (
     </span>
 );
 
-// Fonction critique pour date locale stricte
+// Fonction critique : Garantit que les dates sont gérées en local (pas de décalage UTC)
 const getLocalYYYYMMDD = (dateObj) => {
     if (!dateObj) return null;
     const d = new Date(dateObj);
@@ -44,10 +44,10 @@ export default function HabitTracker({ data, updateData }) {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Sécurité anti-spam clic
+    // Sécurité : Empêche le double-clic (spam) pendant la requête
     const [processingHabits, setProcessingHabits] = useState(new Set());
 
-    // --- CHARGEMENT ---
+    // --- CHARGEMENT DES DONNÉES ---
     useEffect(() => {
         loadHabitData();
     }, []);
@@ -55,19 +55,20 @@ export default function HabitTracker({ data, updateData }) {
     const loadHabitData = async () => {
         try {
             setLoading(true);
-            // Tri alphabétique catégories
+            
+            // 1. Catégories triées par nom (plus propre)
             const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
             
-            // Chargement de TOUTES les habitudes (actives + archives)
+            // 2. Habitudes (On charge TOUT, même les archivées, pour que l'historique reste juste)
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
-            // Historique long (1 an) avec limite augmentée
+            // 3. Historique étendu (1 an en arrière + Limite augmentée à 10 000)
             const d = new Date(); d.setDate(d.getDate() - 365);
             const { data: lgs } = await supabase
                 .from('habit_logs')
                 .select('*')
                 .gte('date', getLocalYYYYMMDD(d))
-                .limit(10000); // Fix "Mur des 1000"
+                .limit(10000); 
 
             setCategories(cats || []);
             setHabits(habs || []);
@@ -79,8 +80,9 @@ export default function HabitTracker({ data, updateData }) {
         }
     };
 
-    // --- ACTIONS ---
+    // --- ACTIONS (Logique Cœur) ---
     const toggleHabit = async (habitId) => {
+        // Protection anti-spam
         if (processingHabits.has(habitId)) return;
         setProcessingHabits(prev => new Set(prev).add(habitId));
 
@@ -90,10 +92,12 @@ export default function HabitTracker({ data, updateData }) {
             let newLogs = [...logs];
             
             if (existingLog) {
+                // Décocher : Supprimer le log
                 newLogs = newLogs.filter(l => l.id !== existingLog.id);
                 setLogs(newLogs); 
                 await supabase.from('habit_logs').delete().eq('id', existingLog.id);
             } else {
+                // Cocher : Ajouter le log
                 const tempId = Date.now(); 
                 const newEntry = { id: tempId, habit_id: habitId, date: dateStr, completed: true };
                 newLogs.push(newEntry);
@@ -103,14 +107,16 @@ export default function HabitTracker({ data, updateData }) {
                     habit_id: habitId, date: dateStr, completed: true 
                 }).select().single();
                 
+                // Mise à jour avec le véritable ID une fois confirmé par la DB
                 if (inserted) {
                     setLogs(prev => prev.map(l => l.id === tempId ? inserted : l));
                 }
             }
         } catch (error) {
             console.error("Erreur toggle:", error);
-            loadHabitData(); // Reload de sécurité
+            loadHabitData(); // En cas d'erreur, on recharge tout pour être sûr
         } finally {
+            // Libération du bouton
             setProcessingHabits(prev => {
                 const next = new Set(prev);
                 next.delete(habitId);
@@ -126,7 +132,9 @@ export default function HabitTracker({ data, updateData }) {
 
     const deleteCategory = async (id) => {
         if (!window.confirm("⚠️ ATTENTION : Supprimer cette catégorie effacera DÉFINITIVEMENT toutes les habitudes et l'historique associés. Continuer ?")) return;
+        // La suppression en cascade SQL fera le reste du travail en base
         await supabase.from('habit_categories').delete().eq('id', id);
+        // Mise à jour locale
         setCategories(categories.filter(c => c.id !== id));
         setHabits(habits.filter(h => h.category_id !== id));
     };
@@ -143,14 +151,16 @@ export default function HabitTracker({ data, updateData }) {
     const deleteHabit = async (id) => {
         if (!window.confirm("Archiver cette habitude ? Elle disparaîtra du quotidien mais restera dans l'historique.")) return;
         await supabase.from('habits').update({ is_archived: true }).eq('id', id);
+        // On marque comme archivé localement pour mise à jour immédiate
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- CALCULS STATISTIQUES BLINDÉS (Rattrapage supporté) ---
+    // --- MOTEUR DE STATISTIQUES (Logique "Intelligente") ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
         
+        // Génération des dates passées
         const dates = [];
         for(let i = statRange - 1; i >= 0; i--) {
             const d = new Date(today);
@@ -176,17 +186,18 @@ export default function HabitTracker({ data, updateData }) {
                     const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
                     const isScheduled = scheduledDays.includes(d.dayIndex);
 
-                    // LOGIQUE FINAL :
-                    // 1. Si fait -> Bravo (100%), même si c'était avant la création (Rattrapage).
-                    // 2. Si pas fait ET que la date est après la création ET que c'était prévu -> Échec (0%).
-                    // 3. Sinon (Pas fait, mais avant création OU pas prévu) -> Ignoré.
-                    
+                    // LOGIQUE "JUSTE" :
+                    // 1. C'est fait ? -> 100% (Même si c'était avant la création = Bonus Rattrapage)
                     if (isDone) {
                         totalDone++;
                         totalPossible++;
-                    } else if (d.str >= creationDateStr && isScheduled) {
+                    } 
+                    // 2. C'est pas fait... mais est-ce que ça compte ?
+                    // On compte l'échec SEULEMENT si la date est APRÈS la création ET que c'était prévu.
+                    else if (d.str >= creationDateStr && isScheduled) {
                         totalPossible++;
                     }
+                    // 3. Sinon (Avant création ou jour de repos) -> On ignore (Pas de pénalité).
                 });
             });
 
@@ -236,8 +247,9 @@ export default function HabitTracker({ data, updateData }) {
     const visibleHabits = habits.filter(h => {
         if (h.is_archived) return false;
         
-        // MODIFICATION FINALE : On retire le filtre de date de création ici.
-        // Cela permet à l'utilisateur de revenir en arrière pour cocher une case "oubliée" (Rattrapage).
+        // Note : On NE FILTRE PAS par date de création ici.
+        // Cela permet le "Rattrapage" : l'utilisateur peut revenir en arrière 
+        // pour cocher une case d'une date antérieure à la création.
         
         const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
         return scheduledDays.includes(currentDayIndex);
