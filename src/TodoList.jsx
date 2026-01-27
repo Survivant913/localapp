@@ -22,6 +22,11 @@ export default function TodoList({ data, updateData }) {
         return { total, completed, percentage };
     }, [todos]);
 
+    // --- CONFIGURATION JAUGE (CORRECTION BUG) ---
+    const radius = 40; // Rayon fixe pour le calcul
+    const circumference = 2 * Math.PI * radius; // Périmètre exact
+    const strokeDashoffset = circumference - (stats.percentage / 100) * circumference; // Décalage précis
+
     // --- ACTIONS ---
     const addTask = (e) => {
         e.preventDefault();
@@ -89,12 +94,26 @@ export default function TodoList({ data, updateData }) {
             {/* 1. EN-TÊTE & PROGRESSION */}
             <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
                 
-                {/* Carte Résumé (Cercle de progression) */}
+                {/* Carte Résumé (Cercle de progression CORRIGÉ) */}
                 <div className="bg-white dark:bg-slate-800 p-4 md:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 flex items-center gap-4 md:gap-6 lg:w-1/3">
                     <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0">
-                        <svg className="w-full h-full transform -rotate-90">
-                            <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="8" fill="none" className="text-gray-100 dark:text-slate-700" />
-                            <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="8" fill="none" strokeDasharray={2 * Math.PI * 45} strokeDashoffset={2 * Math.PI * 45 * (1 - stats.percentage / 100)} className="text-blue-600 dark:text-blue-500 transition-all duration-1000 ease-out" strokeLinecap="round" />
+                        {/* Utilisation d'un viewBox pour garantir les proportions mathématiques */}
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                            {/* Cercle de fond (Gris) */}
+                            <circle 
+                                cx="50" cy="50" r={radius} 
+                                stroke="currentColor" strokeWidth="8" fill="none" 
+                                className="text-gray-100 dark:text-slate-700" 
+                            />
+                            {/* Cercle de progression (Bleu) */}
+                            <circle 
+                                cx="50" cy="50" r={radius} 
+                                stroke="currentColor" strokeWidth="8" fill="none" 
+                                strokeDasharray={circumference} 
+                                strokeDashoffset={strokeDashoffset} 
+                                className="text-blue-600 dark:text-blue-500 transition-all duration-1000 ease-out" 
+                                strokeLinecap="round" 
+                            />
                         </svg>
                         <span className="absolute text-sm font-bold text-gray-700 dark:text-white">{stats.percentage}%</span>
                     </div>
