@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
-  Search, Trash2, Bold, Italic, List, CheckSquare, 
-  Underline, Strikethrough,
+  Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
+  Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
-  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home
+  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow, Eraser
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -28,10 +28,9 @@ export default function JournalManager({ data, updateData }) {
     const [isSaving, setIsSaving] = useState(false);
     const [showColorPalette, setShowColorPalette] = useState(false);
     
-    // Editor State
+    // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
     const [pageTitle, setPageTitle] = useState('');
-    const [currentBlockType, setCurrentBlockType] = useState('P'); // Pour le sélecteur
     
     // Refs
     const editorRef = useRef(null);
@@ -215,26 +214,35 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- ÉDITEUR : COMMANDES ---
+    // --- ÉDITEUR : COMMANDES AMÉLIORÉES ---
     const execCmd = (cmd, val = null) => {
-        document.execCommand(cmd, false, val);
+        // Force le focus avant d'appliquer
         if (editorRef.current) editorRef.current.focus();
-        if (cmd === 'hiliteColor') setShowColorPalette(false);
         
-        // Mise à jour visuelle du type de bloc
-        if (cmd === 'formatBlock') setCurrentBlockType(val);
+        // Active le mode CSS pour les navigateurs récents (meilleure compatibilité couleurs/alignement)
+        document.execCommand('styleWithCSS', false, true);
+        
+        // Exécute la commande
+        document.execCommand(cmd, false, val);
+        
+        // Gestion UI
+        if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
-    const ToolbarButton = ({ icon: Icon, cmd, val }) => (
+    const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
         <button 
-            onMouseDown={(e) => { e.preventDefault(); execCmd(cmd, val); }}
+            onMouseDown={(e) => { 
+                e.preventDefault(); // Empêche le bouton de voler le focus
+                execCmd(cmd, val); 
+            }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 rounded transition-colors"
+            title={title}
         >
             <Icon size={18}/>
         </button>
     );
 
-    // --- IMPRESSION (CSS PRINT FIX) ---
+    // --- IMPRESSION ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -252,9 +260,14 @@ export default function JournalManager({ data, updateData }) {
                     /* FIX COULEURS IMPRESSION */
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     h1 { font-size: 2.5em; font-weight: 700; margin: 0; color: #000; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 40px; }
+                    h2 { font-size: 1.8em; margin-top: 30px; font-weight: 700; }
+                    h3 { font-size: 1.4em; margin-top: 20px; font-weight: 600; color: #444; }
                     .meta { color: #666; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
                     .content { font-size: 1.1em; text-align: justify; }
-                    blockquote { border-left: 4px solid #ddd; padding-left: 15px; font-style: italic; color: #555; }
+                    blockquote { border-left: 4px solid #ddd; padding-left: 15px; font-style: italic; color: #555; background: #f9f9f9; padding: 10px 15px; }
+                    ul { list-style-type: disc; padding-left: 20px; }
+                    ol { list-style-type: decimal; padding-left: 20px; }
+                    li { margin-bottom: 5px; }
                 </style>
             </head>
             <body>
@@ -371,30 +384,27 @@ export default function JournalManager({ data, updateData }) {
                             
                             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
 
-                            {/* SELECTEUR DE TITRE CLAIR */}
-                            <select 
-                                onChange={(e) => execCmd('formatBlock', e.target.value)} 
-                                value={currentBlockType}
-                                className="bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                            >
-                                <option value="P">¶ Normal</option>
-                                <option value="H2">Grand Titre</option>
-                                <option value="H3">Sous-titre</option>
-                                <option value="BLOCKQUOTE">Citation</option>
-                            </select>
+                            {/* BOUTON RESET (TEXTE NORMAL) */}
+                            <ToolbarButton cmd="formatBlock" val="P" icon={Pilcrow} title="Texte Normal (Reset)" />
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            <ToolbarButton cmd="bold" icon={Bold} />
-                            <ToolbarButton cmd="italic" icon={Italic} />
-                            <ToolbarButton cmd="underline" icon={Underline} />
-                            <ToolbarButton cmd="strikeThrough" icon={Strikethrough} />
+                            <ToolbarButton cmd="formatBlock" val="H2" icon={Heading} title="Grand Titre" />
+                            <ToolbarButton cmd="formatBlock" val="H3" icon={Type} title="Sous-titre" />
+                            <ToolbarButton cmd="formatBlock" val="BLOCKQUOTE" icon={Quote} title="Citation" />
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            {/* SURLIGNEUR VISIBLE (POPUP ABSOLUTE) */}
+                            <ToolbarButton cmd="bold" icon={Bold} title="Gras" />
+                            <ToolbarButton cmd="italic" icon={Italic} title="Italique" />
+                            <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
+                            <ToolbarButton cmd="strikeThrough" icon={Strikethrough} title="Barré" />
+
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            {/* SURLIGNEUR */}
                             <div className="relative">
-                                <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Highlighter size={18}/></button>
+                                <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                 {showColorPalette && (
                                     <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-[60] min-w-max animate-in fade-in zoom-in-95">
                                         {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', 'transparent'].map((color, i) => (
@@ -408,15 +418,15 @@ export default function JournalManager({ data, updateData }) {
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            <ToolbarButton cmd="insertUnorderedList" icon={List} />
-                            <ToolbarButton cmd="insertOrderedList" icon={CheckSquare} />
+                            <ToolbarButton cmd="insertUnorderedList" icon={List} title="Liste à puces" />
+                            <ToolbarButton cmd="insertOrderedList" icon={CheckSquare} title="Liste numérotée" />
                             
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            <ToolbarButton cmd="justifyLeft" icon={AlignLeft}/>
-                            <ToolbarButton cmd="justifyCenter" icon={AlignCenter}/>
-                            <ToolbarButton cmd="justifyRight" icon={AlignRight}/>
-                            <ToolbarButton cmd="justifyFull" icon={AlignJustify}/>
+                            <ToolbarButton cmd="justifyLeft" icon={AlignLeft} title="Gauche" />
+                            <ToolbarButton cmd="justifyCenter" icon={AlignCenter} title="Centrer" />
+                            <ToolbarButton cmd="justifyRight" icon={AlignRight} title="Droite" />
+                            <ToolbarButton cmd="justifyFull" icon={AlignJustify} title="Justifier" />
 
                             <div className="flex-1"></div>
                             
@@ -437,7 +447,16 @@ export default function JournalManager({ data, updateData }) {
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><Book size={48} className="opacity-20"/></div><p className="text-xl font-medium">Sélectionnez une page</p><p className="text-sm opacity-60 mt-2">ou créez-en une nouvelle pour commencer</p></div>
                 )}
             </div>
-            <style>{` .prose blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; margin-left: 0; color: #64748b; font-style: italic; } .prose ul { list-style-type: disc; padding-left: 1.5em; } .no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } `}</style>
+            
+            <style>{`
+                .prose blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; margin-left: 0; color: #64748b; font-style: italic; background: #f9f9f9; padding: 10px 1em; border-radius: 4px; }
+                .dark .prose blockquote { background: #1e293b; border-color: #334155; color: #94a3b8; }
+                .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
+                .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
+                .prose li { margin-bottom: 0.25em; }
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
         </div>
     );
 }
