@@ -4,7 +4,7 @@ import {
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
-  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow, Eraser
+  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -214,25 +214,25 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- ÉDITEUR : COMMANDES AMÉLIORÉES ---
+    // --- ÉDITEUR : COMMANDES RÉPARÉES ---
     const execCmd = (cmd, val = null) => {
-        // Force le focus avant d'appliquer
+        // 1. Force le focus sur l'éditeur pour ne pas perdre la sélection
         if (editorRef.current) editorRef.current.focus();
         
-        // Active le mode CSS pour les navigateurs récents (meilleure compatibilité couleurs/alignement)
+        // 2. Active le mode CSS (indispensable pour les couleurs et alignements modernes)
         document.execCommand('styleWithCSS', false, true);
         
-        // Exécute la commande
+        // 3. Exécute la commande avec la valeur correcte
         document.execCommand(cmd, false, val);
         
-        // Gestion UI
         if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
+    // Bouton de barre d'outils optimisé
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
         <button 
             onMouseDown={(e) => { 
-                e.preventDefault(); // Empêche le bouton de voler le focus
+                e.preventDefault(); // CRUCIAL : Empêche le bouton de voler le focus au texte
                 execCmd(cmd, val); 
             }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 rounded transition-colors"
@@ -264,7 +264,7 @@ export default function JournalManager({ data, updateData }) {
                     h3 { font-size: 1.4em; margin-top: 20px; font-weight: 600; color: #444; }
                     .meta { color: #666; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
                     .content { font-size: 1.1em; text-align: justify; }
-                    blockquote { border-left: 4px solid #ddd; padding-left: 15px; font-style: italic; color: #555; background: #f9f9f9; padding: 10px 15px; }
+                    blockquote { border-left: 4px solid #ddd; padding-left: 15px; font-style: italic; color: #555; background: #f9f9f9; padding: 10px 15px; margin: 20px 0; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
@@ -385,13 +385,14 @@ export default function JournalManager({ data, updateData }) {
                             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
 
                             {/* BOUTON RESET (TEXTE NORMAL) */}
-                            <ToolbarButton cmd="formatBlock" val="P" icon={Pilcrow} title="Texte Normal (Reset)" />
+                            <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal (Reset)" />
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            <ToolbarButton cmd="formatBlock" val="H2" icon={Heading} title="Grand Titre" />
-                            <ToolbarButton cmd="formatBlock" val="H3" icon={Type} title="Sous-titre" />
-                            <ToolbarButton cmd="formatBlock" val="BLOCKQUOTE" icon={Quote} title="Citation" />
+                            {/* TITRES CORRIGÉS (Avec chevrons) */}
+                            <ToolbarButton cmd="formatBlock" val="<h2>" icon={Heading} title="Grand Titre" />
+                            <ToolbarButton cmd="formatBlock" val="<h3>" icon={Type} title="Sous-titre" />
+                            <ToolbarButton cmd="formatBlock" val="<blockquote>" icon={Quote} title="Citation" />
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
@@ -454,6 +455,9 @@ export default function JournalManager({ data, updateData }) {
                 .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose li { margin-bottom: 0.25em; }
+                /* Fix pour les Titres dans Tailwind Typography */
+                .prose h2 { font-size: 1.8em !important; font-weight: 800 !important; margin-top: 1.5em !important; }
+                .prose h3 { font-size: 1.4em !important; font-weight: 700 !important; margin-top: 1.2em !important; }
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
