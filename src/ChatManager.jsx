@@ -18,7 +18,7 @@ export default function ChatManager({ user }) {
     const [isCreating, setIsCreating] = useState(false);
     const [participants, setParticipants] = useState([]); 
     
-    // NOUVEAU : État pour stocker les compteurs non lus { room_id: 5 }
+    // État pour stocker les compteurs non lus { room_id: 5 }
     const [unreadCounts, setUnreadCounts] = useState({});
 
     // États Action
@@ -49,17 +49,14 @@ export default function ChatManager({ user }) {
     useEffect(() => {
         fetchRooms();
         
-        // On écoute les changements sur les participants (pour les invits)
         const roomSubscription = supabase
             .channel('room-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participants' }, () => { fetchRooms(); })
             .subscribe();
 
-        // NOUVEAU : On écoute TOUS les messages pour mettre à jour les badges rouges de la sidebar en temps réel
         const globalMessageSubscription = supabase
             .channel('sidebar-badges')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
-                // Si le message n'est pas de moi, on recharge les compteurs
                 if (payload.new.sender_id !== user.id) {
                     fetchRooms(); 
                 }
@@ -74,7 +71,6 @@ export default function ChatManager({ user }) {
 
     const fetchRooms = async () => {
         if (!user) return;
-        // MODIFIÉ : On récupère aussi 'last_read_at'
         const { data: myParticipations } = await supabase
             .from('chat_participants')
             .select('room_id, status, last_read_at, chat_rooms(name, created_by)')
@@ -88,11 +84,10 @@ export default function ChatManager({ user }) {
                     name: p.chat_rooms.name || "Discussion sans titre",
                     status: p.status,
                     isOwner: p.chat_rooms.created_by === user.id,
-                    lastRead: p.last_read_at // On garde la date en mémoire
+                    lastRead: p.last_read_at
                 }));
             setRooms(validRooms);
 
-            // NOUVEAU : Calcul des messages non lus pour chaque room
             const counts = {};
             for (const room of validRooms) {
                 if (room.status === 'accepted') {
@@ -100,7 +95,7 @@ export default function ChatManager({ user }) {
                         .from('chat_messages')
                         .select('*', { count: 'exact', head: true })
                         .eq('room_id', room.id)
-                        .gt('created_at', room.lastRead || '1970-01-01'); // Messages plus récents que ma lecture
+                        .gt('created_at', room.lastRead || '1970-01-01');
                     counts[room.id] = count || 0;
                 }
             }
@@ -108,14 +103,9 @@ export default function ChatManager({ user }) {
         }
     };
 
-    // Fonctions pour marquer comme lu
     const markRoomAsRead = async (roomId) => {
         if (!user || !roomId) return;
-        
-        // 1. Mise à jour visuelle immédiate (Optimiste)
         setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }));
-
-        // 2. Mise à jour base de données
         await supabase.from('chat_participants')
             .update({ last_read_at: new Date().toISOString() })
             .match({ room_id: roomId, user_email: user.email });
@@ -125,12 +115,10 @@ export default function ChatManager({ user }) {
     useEffect(() => {
         if (!activeRoom) return;
         
-        // NOUVEAU : On marque comme lu dès qu'on entre
         if (activeRoom.status === 'accepted') {
             markRoomAsRead(activeRoom.id);
         }
 
-        // Reset
         fetchParticipants(activeRoom.id);
         setShowGroupDetails(false); 
         setNewMemberEmail('');
@@ -166,7 +154,6 @@ export default function ChatManager({ user }) {
                         return [...current, payload.new];
                     });
                     scrollToBottom();
-                    // NOUVEAU : Si je suis dans la salle et qu'un message arrive, je le marque lu tout de suite
                     markRoomAsRead(activeRoom.id);
                 } 
                 else if (payload.eventType === 'DELETE') {
@@ -256,7 +243,7 @@ export default function ChatManager({ user }) {
             const { error } = await supabase.from('chat_messages').insert([payload]);
             if (error) { alert("Erreur envoi"); setNewMessage(text); } else { 
                 fetchMessages(activeRoom.id);
-                markRoomAsRead(activeRoom.id); // On marque lu quand on écrit aussi
+                markRoomAsRead(activeRoom.id);
             }
         }
     };
@@ -283,15 +270,55 @@ export default function ChatManager({ user }) {
     const startReplying = (msg) => { setEditingMessageId(null); setReplyingTo(msg); };
     const cancelAction = () => { setEditingMessageId(null); setReplyingTo(null); setNewMessage(''); };
     
-    // Group management helpers
+    // --- GESTION DE GROUPE (MODIFIÉ POUR SUPPRESSION MESSAGES) ---
+    
     const createChat = async () => { if (!inviteEmails || !newChatName) return alert("Champs requis"); const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0); if (emailList.length === 0) return alert("Aucun email valide"); try { const { data: roomData, error: roomError } = await supabase.from('chat_rooms').insert([{ name: newChatName, created_by: user.id }]).select().single(); if (roomError) throw roomError; const participantsToAdd = [{ room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' }]; emailList.forEach(email => participantsToAdd.push({ room_id: roomData.id, user_email: email, status: 'pending' })); await supabase.from('chat_participants').insert(participantsToAdd); setIsCreating(false); setInviteEmails(''); setNewChatName(''); fetchRooms(); } catch (err) { alert("Erreur: " + err.message); } };
+    
     const handleAddMember = async () => { if (!newMemberEmail.trim()) return; if (participants.some(p => p.user_email === newMemberEmail.trim())) return alert("Déjà membre"); try { await supabase.from('chat_participants').insert([{ room_id: activeRoom.id, user_email: newMemberEmail.trim(), status: 'pending' }]); setNewMemberEmail(''); } catch (err) { alert("Erreur: " + err.message); } };
+    
     const handleInvitation = async (roomId, accept) => { if (accept) { await supabase.from('chat_participants').update({ status: 'accepted', user_id: user.id }).match({ room_id: roomId, user_email: user.email }); const updatedRoom = { ...activeRoom, status: 'accepted' }; setActiveRoom(updatedRoom); fetchRooms(); } else { await supabase.from('chat_participants').delete().match({ room_id: roomId, user_email: user.email }); fetchRooms(); setActiveRoom(null); } };
+    
     const handleDeleteRoom = async (roomId) => { if (!window.confirm("Supprimer ?")) return; await supabase.from('chat_rooms').delete().eq('id', roomId); setActiveRoom(null); fetchRooms(); };
-    const handleLeaveRoom = async () => { if (!window.confirm("Quitter ?")) return; await supabase.from('chat_participants').delete().match({ room_id: activeRoom.id, user_email: user.email }); setActiveRoom(null); fetchRooms(); };
-    const handleKickParticipant = async (pId) => { if (!window.confirm("Retirer ?")) return; await supabase.from('chat_participants').delete().eq('id', pId); };
+    
+    // --- MODIFIÉ : Quitter supprime aussi MES messages ---
+    const handleLeaveRoom = async () => { 
+        if (!window.confirm("Quitter et supprimer tous vos messages ?")) return; 
+        
+        // 1. Supprimer mes messages
+        await supabase.from('chat_messages')
+            .delete()
+            .match({ room_id: activeRoom.id, sender_id: user.id });
 
-    // --- CAROUSEL NAVIGATION ---
+        // 2. Supprimer ma participation
+        await supabase.from('chat_participants')
+            .delete()
+            .match({ room_id: activeRoom.id, user_email: user.email }); 
+            
+        setActiveRoom(null); 
+        fetchRooms();
+    };
+
+    // --- MODIFIÉ : Virer quelqu'un supprime SES messages ---
+    const handleKickParticipant = async (participant) => { 
+        if (!window.confirm("Retirer ce membre et supprimer tous ses messages ?")) return; 
+        
+        // 1. Supprimer ses messages (si l'utilisateur a déjà un ID)
+        if (participant.user_id) {
+            await supabase.from('chat_messages')
+                .delete()
+                .match({ room_id: activeRoom.id, sender_id: participant.user_id });
+        }
+
+        // 2. Supprimer le participant
+        await supabase.from('chat_participants').delete().eq('id', participant.id);
+        
+        // Rafraîchir la liste des participants
+        fetchParticipants(activeRoom.id);
+        // Rafraîchir les messages pour voir qu'ils ont disparu
+        fetchMessages(activeRoom.id);
+    };
+
+    // --- RENDER ---
     const pinnedMessages = messages.filter(m => m.is_pinned);
     const displayedPin = pinnedMessages.length > 0 ? pinnedMessages[currentPinIndex >= pinnedMessages.length ? 0 : currentPinIndex] : null;
 
@@ -312,7 +339,6 @@ export default function ChatManager({ user }) {
                             <div className="flex justify-between items-start mb-1 pr-6">
                                 <span className={`font-bold truncate ${activeRoom?.id === room.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>{room.name}</span>
                                 {room.status === 'pending' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Invité</span>}
-                                {/* NOUVEAU : BADGE NON LU PAR SALLE */}
                                 {unreadCounts[room.id] > 0 && room.id !== activeRoom?.id && (
                                     <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
                                         {unreadCounts[room.id]}
@@ -359,7 +385,7 @@ export default function ChatManager({ user }) {
                             </div>
                         </div>
 
-                        {/* CAROUSEL MESSAGES ÉPINGLÉS (CORRIGÉ) */}
+                        {/* CAROUSEL MESSAGES ÉPINGLÉS */}
                         {displayedPin && activeRoom.status === 'accepted' && (
                             <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-900/30 px-4 py-2 flex items-center gap-3 shrink-0">
                                 <Pin size={16} className="text-amber-600 dark:text-amber-500 shrink-0 fill-amber-600 dark:fill-amber-500"/>
@@ -375,7 +401,6 @@ export default function ChatManager({ user }) {
                                     </p>
                                 </div>
 
-                                {/* FLÈCHES DE NAVIGATION */}
                                 {pinnedMessages.length > 1 && (
                                     <div className="flex items-center gap-1">
                                         <button onClick={prevPin} className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded text-amber-700 dark:text-amber-300"><ChevronLeft size={14}/></button>
@@ -486,7 +511,8 @@ export default function ChatManager({ user }) {
                     </div>
                 )}
             </div>
-            {/* MODALS SONT IDENTIQUES AUX PRÉCÉDENTS */}
+            
+            {/* MODALS */}
             {showGroupDetails && activeRoom && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -510,7 +536,8 @@ export default function ChatManager({ user }) {
                                             </div>
                                             <div><p className="text-sm font-medium dark:text-white">{p.user_email} {isMe && "(Moi)"}</p><p className={`text-[10px] ${statusColor}`}>{statusText}</p></div>
                                         </div>
-                                        {activeRoom.isOwner && p.user_email !== user.email && <button onClick={() => handleKickParticipant(p.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Ban size={16}/></button>}
+                                        {/* BOUTON VIRER MODIFIÉ : on passe tout l'objet p */}
+                                        {activeRoom.isOwner && p.user_email !== user.email && <button onClick={() => handleKickParticipant(p)} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Ban size={16}/></button>}
                                     </div>
                                 );
                             })}
