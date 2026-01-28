@@ -18,11 +18,14 @@ export default function ChatManager({ user }) {
     const [isCreating, setIsCreating] = useState(false);
     const [participants, setParticipants] = useState([]); 
     
+    // NOUVEAU : État pour stocker les compteurs non lus { room_id: 5 }
+    const [unreadCounts, setUnreadCounts] = useState({});
+
     // États Action
     const [editingMessageId, setEditingMessageId] = useState(null); 
     const [replyingTo, setReplyingTo] = useState(null);
     
-    // NOUVEAU : État Carousel Épinglé
+    // État Carousel Épinglé
     const [currentPinIndex, setCurrentPinIndex] = useState(0);
 
     // État Présence & Frappe
@@ -42,21 +45,39 @@ export default function ChatManager({ user }) {
     const messagesEndRef = useRef(null);
     const channelRef = useRef(null);
 
-    // --- 1. CHARGEMENT DES DISCUSSIONS ---
+    // --- 1. CHARGEMENT DES DISCUSSIONS ET DES COMPTEURS ---
     useEffect(() => {
         fetchRooms();
+        
+        // On écoute les changements sur les participants (pour les invits)
         const roomSubscription = supabase
             .channel('room-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participants' }, () => { fetchRooms(); })
             .subscribe();
-        return () => { supabase.removeChannel(roomSubscription); };
+
+        // NOUVEAU : On écoute TOUS les messages pour mettre à jour les badges rouges de la sidebar en temps réel
+        const globalMessageSubscription = supabase
+            .channel('sidebar-badges')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+                // Si le message n'est pas de moi, on recharge les compteurs
+                if (payload.new.sender_id !== user.id) {
+                    fetchRooms(); 
+                }
+            })
+            .subscribe();
+
+        return () => { 
+            supabase.removeChannel(roomSubscription); 
+            supabase.removeChannel(globalMessageSubscription);
+        };
     }, [user]);
 
     const fetchRooms = async () => {
         if (!user) return;
+        // MODIFIÉ : On récupère aussi 'last_read_at'
         const { data: myParticipations } = await supabase
             .from('chat_participants')
-            .select('room_id, status, chat_rooms(name, created_by)')
+            .select('room_id, status, last_read_at, chat_rooms(name, created_by)')
             .eq('user_email', user.email);
         
         if (myParticipations) {
@@ -66,16 +87,49 @@ export default function ChatManager({ user }) {
                     id: p.room_id,
                     name: p.chat_rooms.name || "Discussion sans titre",
                     status: p.status,
-                    isOwner: p.chat_rooms.created_by === user.id
+                    isOwner: p.chat_rooms.created_by === user.id,
+                    lastRead: p.last_read_at // On garde la date en mémoire
                 }));
             setRooms(validRooms);
+
+            // NOUVEAU : Calcul des messages non lus pour chaque room
+            const counts = {};
+            for (const room of validRooms) {
+                if (room.status === 'accepted') {
+                    const { count } = await supabase
+                        .from('chat_messages')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('room_id', room.id)
+                        .gt('created_at', room.lastRead || '1970-01-01'); // Messages plus récents que ma lecture
+                    counts[room.id] = count || 0;
+                }
+            }
+            setUnreadCounts(counts);
         }
+    };
+
+    // Fonctions pour marquer comme lu
+    const markRoomAsRead = async (roomId) => {
+        if (!user || !roomId) return;
+        
+        // 1. Mise à jour visuelle immédiate (Optimiste)
+        setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }));
+
+        // 2. Mise à jour base de données
+        await supabase.from('chat_participants')
+            .update({ last_read_at: new Date().toISOString() })
+            .match({ room_id: roomId, user_email: user.email });
     };
 
     // --- 2. LOGIQUE ACTIVE ROOM ---
     useEffect(() => {
         if (!activeRoom) return;
         
+        // NOUVEAU : On marque comme lu dès qu'on entre
+        if (activeRoom.status === 'accepted') {
+            markRoomAsRead(activeRoom.id);
+        }
+
         // Reset
         fetchParticipants(activeRoom.id);
         setShowGroupDetails(false); 
@@ -85,7 +139,7 @@ export default function ChatManager({ user }) {
         setEditingMessageId(null);
         setReplyingTo(null);
         setNewMessage('');
-        setCurrentPinIndex(0); // Reset carousel
+        setCurrentPinIndex(0); 
 
         if (activeRoom.status === 'pending') {
             setMessages([]); 
@@ -112,6 +166,8 @@ export default function ChatManager({ user }) {
                         return [...current, payload.new];
                     });
                     scrollToBottom();
+                    // NOUVEAU : Si je suis dans la salle et qu'un message arrive, je le marque lu tout de suite
+                    markRoomAsRead(activeRoom.id);
                 } 
                 else if (payload.eventType === 'DELETE') {
                     setMessages(current => current.filter(msg => msg.id !== payload.old.id));
@@ -198,7 +254,10 @@ export default function ChatManager({ user }) {
             setNewMessage(''); setReplyingTo(null);
             const payload = { room_id: activeRoom.id, sender_id: user.id, content: text, reply_to_id: replyingTo ? replyingTo.id : null };
             const { error } = await supabase.from('chat_messages').insert([payload]);
-            if (error) { alert("Erreur envoi"); setNewMessage(text); } else { fetchMessages(activeRoom.id); }
+            if (error) { alert("Erreur envoi"); setNewMessage(text); } else { 
+                fetchMessages(activeRoom.id);
+                markRoomAsRead(activeRoom.id); // On marque lu quand on écrit aussi
+            }
         }
     };
 
@@ -249,10 +308,16 @@ export default function ChatManager({ user }) {
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {rooms.map(room => (
-                        <div key={room.id} onClick={() => { setActiveRoom(room); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className={`p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+                        <div key={room.id} onClick={() => { setActiveRoom(room); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
                             <div className="flex justify-between items-start mb-1 pr-6">
                                 <span className={`font-bold truncate ${activeRoom?.id === room.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>{room.name}</span>
                                 {room.status === 'pending' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Invité</span>}
+                                {/* NOUVEAU : BADGE NON LU PAR SALLE */}
+                                {unreadCounts[room.id] > 0 && room.id !== activeRoom?.id && (
+                                    <span className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
+                                        {unreadCounts[room.id]}
+                                    </span>
+                                )}
                             </div>
                             <div className="text-xs text-slate-400 flex items-center gap-1">
                                 {room.isOwner ? <User size={12}/> : <Users size={12}/>} {room.isOwner ? 'Propriétaire' : 'Participant'}

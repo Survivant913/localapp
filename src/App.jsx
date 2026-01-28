@@ -64,6 +64,39 @@ export default function App() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS (POUR LA RECONNEXION) ---
+  useEffect(() => {
+    if (!session?.user?.email) return;
+
+    const fetchInitialUnreadCount = async () => {
+        // 1. On récupère mes participations et ma date de dernière lecture
+        const { data: participations } = await supabase
+            .from('chat_participants')
+            .select('room_id, last_read_at')
+            .eq('user_email', session.user.email);
+
+        if (!participations || participations.length === 0) return;
+
+        // 2. On compte les messages reçus APRÈS cette date
+        const countPromises = participations.map(async (p) => {
+            const { count } = await supabase
+                .from('chat_messages')
+                .select('*', { count: 'exact', head: true }) 
+                .eq('room_id', p.room_id)
+                .gt('created_at', p.last_read_at || '2000-01-01'); // Si jamais lu, on compte tout
+            
+            return count || 0;
+        });
+
+        const counts = await Promise.all(countPromises);
+        const totalUnread = counts.reduce((a, b) => a + b, 0);
+        setUnreadCount(totalUnread);
+    };
+
+    fetchInitialUnreadCount();
+  }, [session]); 
+  // -------------------------------------------------------------------------------
+
   // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES ---
   useEffect(() => {
     if (!session) return;
