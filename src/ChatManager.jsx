@@ -17,6 +17,9 @@ export default function ChatManager({ user }) {
     const [isCreating, setIsCreating] = useState(false);
     const [participants, setParticipants] = useState([]); 
     
+    // NOUVEAU : État pour suivre les utilisateurs en ligne
+    const [onlineUsers, setOnlineUsers] = useState(new Set());
+    
     // UI States
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showGroupDetails, setShowGroupDetails] = useState(false);
@@ -25,7 +28,7 @@ export default function ChatManager({ user }) {
     const [newChatName, setNewChatName] = useState('');
     const [inviteEmails, setInviteEmails] = useState('');
 
-    // Formulaire Ajout Membre (Groupe existant)
+    // Formulaire Ajout Membre
     const [newMemberEmail, setNewMemberEmail] = useState('');
     
     const messagesEndRef = useRef(null);
@@ -67,20 +70,30 @@ export default function ChatManager({ user }) {
         }
     };
 
-    // --- 2. CHARGEMENT MESSAGES & PARTICIPANTS ---
+    // --- 2. CHARGEMENT MESSAGES, PARTICIPANTS & PRÉSENCE (TEMPS RÉEL) ---
     useEffect(() => {
         if (!activeRoom) return;
         
         fetchParticipants(activeRoom.id);
         setShowGroupDetails(false); 
-        setNewMemberEmail(''); // Reset input ajout
+        setNewMemberEmail('');
+        setOnlineUsers(new Set()); // Reset online users quand on change de room
 
         if (activeRoom.status === 'pending') return;
 
         fetchMessages(activeRoom.id);
 
-        const messageSubscription = supabase
-            .channel(`room-${activeRoom.id}`)
+        // --- CONFIGURATION DU CANAL (Messages + Présence) ---
+        const channel = supabase.channel(`room-${activeRoom.id}`, {
+            config: {
+                presence: {
+                    key: user.id, // On s'identifie avec notre ID
+                },
+            },
+        });
+
+        channel
+            // A. Écoute des messages (Base de données)
             .on('postgres_changes', { 
                 event: 'INSERT', 
                 schema: 'public', 
@@ -90,9 +103,23 @@ export default function ChatManager({ user }) {
                 setMessages(current => [...current, payload.new]);
                 scrollToBottom();
             })
-            .subscribe();
+            // B. Écoute de la PRÉSENCE (Qui est là ?)
+            .on('presence', { event: 'sync' }, () => {
+                const newState = channel.presenceState();
+                const onlineIds = new Set(Object.keys(newState));
+                setOnlineUsers(onlineIds);
+            })
+            // C. Connexion
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    // On dit "Je suis là !"
+                    await channel.track({ online_at: new Date().toISOString() });
+                }
+            });
 
-        return () => { supabase.removeChannel(messageSubscription); };
+        return () => { 
+            channel.unsubscribe(); // Important : on se déconnecte quand on change de salle
+        };
     }, [activeRoom]);
 
     const fetchParticipants = async (roomId) => {
@@ -190,11 +217,8 @@ export default function ChatManager({ user }) {
         }
     };
 
-    // --- NOUVEAU : AJOUTER UN MEMBRE À UN GROUPE EXISTANT ---
     const handleAddMember = async () => {
         if (!newMemberEmail.trim()) return;
-        
-        // Vérifier si déjà présent
         if (participants.some(p => p.user_email === newMemberEmail.trim())) {
             return alert("Cette personne est déjà dans le groupe.");
         }
@@ -207,7 +231,6 @@ export default function ChatManager({ user }) {
             }]);
 
             if (error) throw error;
-
             setNewMemberEmail('');
             fetchParticipants(activeRoom.id);
             alert("Invitation envoyée !");
@@ -320,9 +343,10 @@ export default function ChatManager({ user }) {
                                         <MessageSquare size={20} className="text-indigo-500 shrink-0"/>
                                         <span className="truncate">{activeRoom.name}</span>
                                     </h3>
+                                    {/* INDICATEUR EN LIGNE HEADER */}
                                     <span className="text-xs text-slate-400 flex items-center gap-1">
-                                        <div className={`w-2 h-2 rounded-full ${participants.length > 1 ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                                        {participants.length} membre{participants.length > 1 ? 's' : ''}
+                                        <div className={`w-2 h-2 rounded-full ${onlineUsers.size > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                                        {onlineUsers.size} en ligne
                                     </span>
                                 </div>
                             </div>
@@ -415,18 +439,25 @@ export default function ChatManager({ user }) {
                             {participants.map(p => {
                                 const isMe = p.user_email === user.email;
                                 const isOwner = activeRoom.isOwner;
+                                // VÉRIFICATION EN LIGNE (Pour les users ayant un ID Supabase)
+                                const isOnline = p.user_id && onlineUsers.has(p.user_id);
+
                                 return (
                                     <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
-                                                {p.user_email[0].toUpperCase()}
+                                            <div className="relative">
+                                                <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                    {p.user_email[0].toUpperCase()}
+                                                </div>
+                                                {/* INDICATEUR EN LIGNE (PASTILLE) */}
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium text-slate-800 dark:text-white truncate">
                                                     {p.user_email} {isMe && "(Moi)"}
                                                 </p>
-                                                <p className="text-[10px] text-slate-400">
-                                                    {p.status === 'pending' ? 'En attente...' : 'Membre actif'}
+                                                <p className={`text-[10px] ${isOnline ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                                                    {p.status === 'pending' ? 'Invité (En attente)' : (isOnline ? 'En ligne' : 'Hors ligne')}
                                                 </p>
                                             </div>
                                         </div>
@@ -440,7 +471,7 @@ export default function ChatManager({ user }) {
                             })}
                         </div>
 
-                        {/* AJOUT DE MEMBRE (Seulement pour le propriétaire) */}
+                        {/* AJOUT DE MEMBRE */}
                         {activeRoom.isOwner && (
                             <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mb-4">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Ajouter un membre</label>
@@ -474,7 +505,7 @@ export default function ChatManager({ user }) {
                 </div>
             )}
 
-            {/* MODAL CRÉATION */}
+            {/* MODAL CRÉATION (Inchangé visuellement, mais code complet ici pour copier-coller) */}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95">
