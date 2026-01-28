@@ -81,11 +81,11 @@ export default function JournalManager({ data, updateData }) {
     const navigateToFolder = (folderId) => {
         setCurrentFolderId(folderId);
         setActivePageId(null);
-        setSearchQuery(''); // On efface la recherche quand on entre dans un dossier
+        setSearchQuery(''); 
     };
 
     const navigateUp = () => {
-        setSearchQuery(''); // On efface la recherche
+        setSearchQuery(''); 
         if (!currentFolderId) return;
         const current = allFolders.find(f => f.id === currentFolderId);
         if (current && current.parent_id) {
@@ -216,7 +216,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- ÉDITEUR : COMMANDES RÉPARÉES ---
+    // --- ÉDITEUR : COMMANDES ---
     const execCmd = (cmd, val = null) => {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('styleWithCSS', false, true);
@@ -262,6 +262,8 @@ export default function JournalManager({ data, updateData }) {
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
+                    /* FIX PRINT: Force background colors */
+                    span[style*="background-color"] { color: black !important; -webkit-print-color-adjust: exact; }
                 </style>
             </head>
             <body>
@@ -275,19 +277,12 @@ export default function JournalManager({ data, updateData }) {
         printWindow.document.close();
     };
 
-    // --- LOGIQUE D'AFFICHAGE (RECHERCHE VS NAVIGATION) ---
-    // 1. Filtrage Racine
+    // --- LOGIQUE D'AFFICHAGE ---
     const rootFolders = allFolders.filter(f => !f.parent_id); 
-    
-    // 2. Filtrage Contextuel (Dossier courant)
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
     const pagesInCurrent = allPages.filter(p => p.folder_id === currentFolderId);
-
-    // 3. Filtrage RECHERCHE GLOBALE
     const searchFolders = allFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const searchPages = allPages.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    // 4. Décision d'affichage
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
 
@@ -361,7 +356,6 @@ export default function JournalManager({ data, updateData }) {
                         <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{searchQuery ? 'Résultats de recherche' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
                     </div>
                     
-                    {/* Fil d'ariane (Caché si recherche active pour éviter la confusion) */}
                     {!searchQuery && (
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
                             {breadcrumbs.map((f, i) => (
@@ -382,7 +376,6 @@ export default function JournalManager({ data, updateData }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {/* LISTE DOSSIERS */}
                     {displayedFolders.map(folder => (
                         <div key={folder.id} onClick={() => navigateToFolder(folder.id)} className="group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors">
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -396,7 +389,6 @@ export default function JournalManager({ data, updateData }) {
                         </div>
                     ))}
 
-                    {/* LISTE PAGES */}
                     {displayedPages.map(page => (
                         <div key={page.id} onClick={() => { if(activePageId !== page.id) { saveCurrentPage(true); setActivePageId(page.id); } }} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all border border-transparent ${activePageId === page.id ? 'bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-500/30 shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -451,13 +443,30 @@ export default function JournalManager({ data, updateData }) {
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
+                            {/* SURLIGNEUR AVEC COULEURS NEON EN MODE SOMBRE */}
                             <div className="relative">
                                 <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                 {showColorPalette && (
                                     <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-[60] min-w-max animate-in fade-in zoom-in-95">
-                                        {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', 'transparent'].map((color, i) => (
-                                            <button key={i} onMouseDown={(e)=>{e.preventDefault();execCmd('hiliteColor', color)}} className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:scale-110 transition-transform" style={{backgroundColor: color === 'transparent' ? 'white' : color}}>
-                                                {color === 'transparent' && <X size={12} className="text-red-500"/>}
+                                        {[
+                                            { val: '#fef08a', darkVal: '#ffff00' }, // Jaune
+                                            { val: '#bbf7d0', darkVal: '#00ff00' }, // Vert
+                                            { val: '#bfdbfe', darkVal: '#00ffff' }, // Bleu
+                                            { val: '#fecaca', darkVal: '#ff00ff' }, // Rose
+                                            { val: 'transparent', darkVal: 'transparent', icon: X }
+                                        ].map((color, i) => (
+                                            <button 
+                                                key={i} 
+                                                onMouseDown={(e)=>{
+                                                    e.preventDefault();
+                                                    // Detection mode sombre via classe 'dark' sur html/body
+                                                    const isDark = document.documentElement.classList.contains('dark');
+                                                    execCmd('hiliteColor', isDark ? color.darkVal : color.val);
+                                                }} 
+                                                className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:scale-110 transition-transform" 
+                                                style={{backgroundColor: color.val === 'transparent' ? 'white' : color.val}}
+                                            >
+                                                {color.val === 'transparent' && <X size={12} className="text-red-500"/>}
                                             </button>
                                         ))}
                                     </div>
@@ -502,9 +511,17 @@ export default function JournalManager({ data, updateData }) {
                 .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose li { margin-bottom: 0.25em; }
-                /* Fix pour les Titres dans Tailwind Typography */
                 .prose h2 { font-size: 1.8em !important; font-weight: 800 !important; margin-top: 1.5em !important; }
                 .prose h3 { font-size: 1.4em !important; font-weight: 700 !important; margin-top: 1.2em !important; }
+                
+                /* --- FIX CONTRASTE SURLIGNAGE (DARK MODE) --- */
+                /* Force le texte surligné à devenir NOIR pour la lisibilité sur fond fluo */
+                .prose span[style*="background-color"] { 
+                    color: black !important; 
+                    padding: 0 2px;
+                    border-radius: 2px;
+                }
+                
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
