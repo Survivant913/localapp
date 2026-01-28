@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, Send, Plus, User, Check, X, Clock, 
-  Trash2, Search, AlertCircle, Ban 
+  Trash2, Search, AlertCircle, Ban, Users 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -14,11 +14,11 @@ export default function ChatManager({ user }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isCreating, setIsCreating] = useState(false);
-    const [participants, setParticipants] = useState([]); // Pour voir qui est invité
+    const [participants, setParticipants] = useState([]); 
     
     // Formulaire Nouveau Chat
     const [newChatName, setNewChatName] = useState('');
-    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteEmails, setInviteEmails] = useState(''); // Changé pour gérer plusieurs mails
     
     const messagesEndRef = useRef(null);
 
@@ -47,7 +47,6 @@ export default function ChatManager({ user }) {
         if (error) console.error("Erreur fetch rooms:", error);
         
         if (myParticipations) {
-            // On filtre les rooms nulles (si supprimées)
             const validRooms = myParticipations
                 .filter(p => p.chat_rooms) 
                 .map(p => ({
@@ -64,7 +63,6 @@ export default function ChatManager({ user }) {
     useEffect(() => {
         if (!activeRoom) return;
         
-        // Charger les participants de cette room (pour voir les invits en attente)
         fetchParticipants(activeRoom.id);
 
         if (activeRoom.status === 'pending') return;
@@ -121,7 +119,7 @@ export default function ChatManager({ user }) {
         if (!newMessage.trim() || !activeRoom) return;
 
         const text = newMessage;
-        setNewMessage(''); // Reset input immédiat
+        setNewMessage(''); 
 
         const { error } = await supabase
             .from('chat_messages')
@@ -134,18 +132,22 @@ export default function ChatManager({ user }) {
         if (error) {
             console.error(error);
             alert("Erreur envoi message : " + error.message);
-            setNewMessage(text); // Remettre le texte si échec
+            setNewMessage(text); 
         } else {
-            // Force refresh au cas où le realtime lag
             fetchMessages(activeRoom.id);
         }
     };
 
     const createChat = async () => {
-        if (!inviteEmail || !newChatName) return alert("Email et Nom requis");
+        if (!inviteEmails || !newChatName) return alert("Emails et Nom requis");
+
+        // 1. Découpage des emails (séparés par des virgules)
+        const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0);
+        
+        if (emailList.length === 0) return alert("Aucun email valide");
 
         try {
-            // 1. Créer la Room
+            // 2. Créer la Room
             const { data: roomData, error: roomError } = await supabase
                 .from('chat_rooms')
                 .insert([{ name: newChatName, created_by: user.id }])
@@ -154,20 +156,30 @@ export default function ChatManager({ user }) {
 
             if (roomError) throw roomError;
 
-            // 2. Ajouter les participants
+            // 3. Préparer la liste des participants
+            // Moi (Propriétaire)
             const participantsToAdd = [
-                { room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' },
-                { room_id: roomData.id, user_email: inviteEmail, status: 'pending' }
+                { room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' }
             ];
 
+            // Les Invités (Boucle sur la liste)
+            emailList.forEach(email => {
+                participantsToAdd.push({ 
+                    room_id: roomData.id, 
+                    user_email: email, 
+                    status: 'pending' 
+                });
+            });
+
+            // 4. Insertion en masse
             const { error: partError } = await supabase.from('chat_participants').insert(participantsToAdd);
             if (partError) throw partError;
 
             setIsCreating(false);
-            setInviteEmail('');
+            setInviteEmails('');
             setNewChatName('');
             fetchRooms();
-            alert("Invitation envoyée !");
+            alert(`Invitation envoyée à ${emailList.length} personnes !`);
 
         } catch (err) {
             console.error(err);
@@ -191,12 +203,9 @@ export default function ChatManager({ user }) {
 
     const handleDeleteRoom = async (roomId) => {
         if (!window.confirm("Supprimer définitivement cette discussion pour tout le monde ?")) return;
-        
         try {
-            // On supprime la room, la cascade SQL supprimera les messages et participants
             const { error } = await supabase.from('chat_rooms').delete().eq('id', roomId);
             if (error) throw error;
-            
             setActiveRoom(null);
             fetchRooms();
         } catch (err) {
@@ -233,10 +242,10 @@ export default function ChatManager({ user }) {
                                 {room.status === 'pending' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Invité</span>}
                             </div>
                             <div className="text-xs text-slate-400 flex items-center gap-1">
-                                <User size={12}/> {room.isOwner ? 'Propriétaire' : 'Participant'}
+                                {room.isOwner ? <User size={12}/> : <Users size={12}/>} 
+                                {room.isOwner ? 'Propriétaire' : 'Participant'}
                             </div>
 
-                            {/* Bouton Supprimer (Uniquement si propriétaire) */}
                             {room.isOwner && (
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id); }}
@@ -258,21 +267,26 @@ export default function ChatManager({ user }) {
                     <>
                         {/* Header Chat */}
                         <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 justify-between shrink-0">
-                            <div className="flex flex-col">
+                            <div className="flex flex-col w-full">
                                 <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                                     <MessageSquare size={20} className="text-indigo-500"/>
                                     {activeRoom.name}
                                 </h3>
                                 {/* Liste des invités en attente */}
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center gap-2 mt-1 overflow-x-auto pb-1 scrollbar-none">
                                     {participants.filter(p => p.status === 'pending').map(p => (
-                                        <div key={p.id} className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
+                                        <div key={p.id} className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 shrink-0">
                                             <span>En attente: {p.user_email}</span>
                                             {activeRoom.isOwner && (
                                                 <button onClick={() => handleCancelInvite(p.id)} className="hover:text-red-600"><X size={10}/></button>
                                             )}
                                         </div>
                                     ))}
+                                    {participants.length > 0 && (
+                                        <span className="text-[10px] text-slate-400 ml-2">
+                                            {participants.filter(p => p.status === 'accepted').length} membre(s) actif(s)
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -283,8 +297,13 @@ export default function ChatManager({ user }) {
                                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                                     {messages.map(msg => {
                                         const isMe = msg.sender_id === user.id;
+                                        // On cherche le nom de l'expéditeur parmi les participants
+                                        const sender = participants.find(p => p.user_id === msg.sender_id);
+                                        const senderName = sender ? sender.user_email.split('@')[0] : 'Inconnu';
+
                                         return (
-                                            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                                {!isMe && <span className="text-[10px] text-slate-400 ml-2 mb-0.5">{senderName}</span>}
                                                 <div className={`max-w-[70%] p-3 rounded-2xl shadow-sm text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
                                                     <p>{msg.content}</p>
                                                     <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
@@ -318,7 +337,7 @@ export default function ChatManager({ user }) {
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                                 <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4"><Clock size={32}/></div>
                                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Invitation reçue</h2>
-                                <p className="text-slate-500 max-w-md mb-8">Vous avez été invité à rejoindre la discussion <strong>"{activeRoom.name}"</strong>. Souhaitez-vous accepter ?</p>
+                                <p className="text-slate-500 max-w-md mb-8">Vous avez été invité à rejoindre le groupe <strong>"{activeRoom.name}"</strong>. Souhaitez-vous accepter ?</p>
                                 <div className="flex gap-4">
                                     <button onClick={() => handleInvitation(activeRoom.id, false)} className="px-6 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Refuser</button>
                                     <button onClick={() => handleInvitation(activeRoom.id, true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">Accepter & Rejoindre</button>
@@ -339,7 +358,7 @@ export default function ChatManager({ user }) {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold dark:text-white">Nouvelle discussion</h3>
+                            <h3 className="text-lg font-bold dark:text-white">Nouveau Groupe</h3>
                             <button onClick={() => setIsCreating(false)}><X size={20} className="text-slate-400"/></button>
                         </div>
                         <div className="space-y-4">
@@ -348,10 +367,11 @@ export default function ChatManager({ user }) {
                                 <input type="text" value={newChatName} onChange={e => setNewChatName(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="Ex: Projet Web"/>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email de l'invité</label>
-                                <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="client@email.com"/>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Emails des invités</label>
+                                <input type="text" value={inviteEmails} onChange={e => setInviteEmails(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="email1@test.com, email2@test.com"/>
+                                <p className="text-[10px] text-slate-400 mt-1">Séparez les emails par des virgules pour inviter plusieurs personnes.</p>
                             </div>
-                            <button onClick={createChat} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 mt-2">Envoyer l'invitation</button>
+                            <button onClick={createChat} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 mt-2">Envoyer les invitations</button>
                         </div>
                     </div>
                 </div>
