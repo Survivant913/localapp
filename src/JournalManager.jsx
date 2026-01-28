@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
-  Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
-  Heading, Type, Underline, Strikethrough,
+  Search, Trash2, Bold, Italic, List, CheckSquare, 
+  Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home
 } from 'lucide-react';
@@ -16,9 +16,9 @@ export default function JournalManager({ data, updateData }) {
     const [allPages, setAllPages] = useState([]);
     
     // --- ÉTATS NAVIGATION ---
-    const [activeNotebookId, setActiveNotebookId] = useState(null); // Racine (Carnet)
-    const [currentFolderId, setCurrentFolderId] = useState(null);   // Dossier courant
-    const [activePageId, setActivePageId] = useState(null);         // Page courante
+    const [activeNotebookId, setActiveNotebookId] = useState(null); 
+    const [currentFolderId, setCurrentFolderId] = useState(null);   
+    const [activePageId, setActivePageId] = useState(null);         
     const [breadcrumbs, setBreadcrumbs] = useState([]);
 
     // UI
@@ -26,11 +26,12 @@ export default function JournalManager({ data, updateData }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [showColorPalette, setShowColorPalette] = useState(false); // Menu Couleur
+    const [showColorPalette, setShowColorPalette] = useState(false);
     
-    // Contenu Editeur
+    // Editor State
     const [pageContent, setPageContent] = useState('');
     const [pageTitle, setPageTitle] = useState('');
+    const [currentBlockType, setCurrentBlockType] = useState('P'); // Pour le sélecteur
     
     // Refs
     const editorRef = useRef(null);
@@ -146,7 +147,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- 5. CRÉATION (CORRECTION CRITIQUE ID) ---
+    // --- 5. CRÉATION ---
     const createItem = async (type) => {
         let name = '';
         if (type === 'root') name = prompt("Nom du nouveau Carnet :");
@@ -159,13 +160,12 @@ export default function JournalManager({ data, updateData }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Non connecté");
 
-            // GÉNÉRATION ID MANUELLE OBLIGATOIRE POUR TA BASE DE DONNÉES
             const NEW_ID = Date.now(); 
 
             if (type === 'page') {
                 if (activePageId) await saveCurrentPage(true);
                 const { data, error } = await supabase.from('journal_pages').insert([{ 
-                    id: NEW_ID, // ICI : On force l'ID
+                    id: NEW_ID,
                     folder_id: currentFolderId, 
                     title: name, 
                     content: '',
@@ -180,7 +180,7 @@ export default function JournalManager({ data, updateData }) {
             } else {
                 const parentId = type === 'root' ? null : currentFolderId;
                 const { data, error } = await supabase.from('journal_folders').insert([{ 
-                    id: NEW_ID, // ICI : On force l'ID
+                    id: NEW_ID,
                     name, 
                     parent_id: parentId,
                     user_id: user.id
@@ -215,23 +215,26 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- ÉDITEUR : COMMANDES & COULEURS ---
+    // --- ÉDITEUR : COMMANDES ---
     const execCmd = (cmd, val = null) => {
         document.execCommand(cmd, false, val);
         if (editorRef.current) editorRef.current.focus();
-        if (cmd === 'hiliteColor' || cmd === 'foreColor') setShowColorPalette(false);
+        if (cmd === 'hiliteColor') setShowColorPalette(false);
+        
+        // Mise à jour visuelle du type de bloc
+        if (cmd === 'formatBlock') setCurrentBlockType(val);
     };
 
     const ToolbarButton = ({ icon: Icon, cmd, val }) => (
         <button 
             onMouseDown={(e) => { e.preventDefault(); execCmd(cmd, val); }}
-            className="p-1.5 rounded transition-colors text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 dark:text-slate-400"
+            className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 rounded transition-colors"
         >
-            <Icon size={16}/>
+            <Icon size={18}/>
         </button>
     );
 
-    // --- IMPRESSION ---
+    // --- IMPRESSION (CSS PRINT FIX) ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -246,6 +249,7 @@ export default function JournalManager({ data, updateData }) {
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
                     body { font-family: 'Merriweather', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: 0 auto; padding: 40px; }
+                    /* FIX COULEURS IMPRESSION */
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     h1 { font-size: 2.5em; font-weight: 700; margin: 0; color: #000; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 40px; }
                     .meta { color: #666; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
@@ -310,6 +314,7 @@ export default function JournalManager({ data, updateData }) {
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0`}>
+                
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
                     <div className="flex items-center gap-2 mb-3">
                         <button onClick={navigateUp} className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all">
@@ -317,6 +322,7 @@ export default function JournalManager({ data, updateData }) {
                         </button>
                         <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier'}</div>
                     </div>
+                    
                     <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
                         {breadcrumbs.map((f, i) => (
                             <span key={f.id} className="flex items-center shrink-0">
@@ -361,23 +367,63 @@ export default function JournalManager({ data, updateData }) {
             <div className="flex-1 flex flex-col bg-white dark:bg-black relative min-w-0">
                 {activePageId ? (
                     <>
-                        <div className="h-14 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between px-4 sticky top-0 bg-white dark:bg-black z-20">
-                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-                                <div className="flex gap-1 pr-2 border-r border-slate-100 dark:border-slate-800"><ToolbarButton cmd="formatBlock" val="H2" icon={Heading}/><ToolbarButton cmd="formatBlock" val="H3" icon={Type}/></div>
-                                <div className="flex gap-1 px-2 border-r border-slate-100 dark:border-slate-800"><ToolbarButton cmd="bold" icon={Bold}/><ToolbarButton cmd="italic" icon={Italic}/><ToolbarButton cmd="underline" icon={Underline}/><ToolbarButton cmd="strikeThrough" icon={Strikethrough}/></div>
-                                <div className="relative mx-2">
-                                    <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><Highlighter size={16}/></button>
-                                    {showColorPalette && (
-                                        <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-50">
-                                            {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', 'transparent'].map((color, i) => (
-                                                <button key={i} onMouseDown={(e)=>{e.preventDefault();execCmd('hiliteColor', color)}} className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:scale-110 transition-transform" style={{backgroundColor: color === 'transparent' ? 'white' : color}}>{color === 'transparent' && <X size={12} className="text-red-500"/>}</button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex gap-1 px-2 border-l border-slate-100 dark:border-slate-800"><ToolbarButton cmd="insertUnorderedList" icon={List}/><ToolbarButton cmd="justifyLeft" icon={AlignLeft}/><ToolbarButton cmd="justifyCenter" icon={AlignCenter}/><ToolbarButton cmd="justifyRight" icon={AlignRight}/></div>
+                        <div className="border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem]">
+                            
+                            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
+
+                            {/* SELECTEUR DE TITRE CLAIR */}
+                            <select 
+                                onChange={(e) => execCmd('formatBlock', e.target.value)} 
+                                value={currentBlockType}
+                                className="bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <option value="P">¶ Normal</option>
+                                <option value="H2">Grand Titre</option>
+                                <option value="H3">Sous-titre</option>
+                                <option value="BLOCKQUOTE">Citation</option>
+                            </select>
+
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            <ToolbarButton cmd="bold" icon={Bold} />
+                            <ToolbarButton cmd="italic" icon={Italic} />
+                            <ToolbarButton cmd="underline" icon={Underline} />
+                            <ToolbarButton cmd="strikeThrough" icon={Strikethrough} />
+
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            {/* SURLIGNEUR VISIBLE (POPUP ABSOLUTE) */}
+                            <div className="relative">
+                                <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><Highlighter size={18}/></button>
+                                {showColorPalette && (
+                                    <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-[60] min-w-max animate-in fade-in zoom-in-95">
+                                        {['#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca', 'transparent'].map((color, i) => (
+                                            <button key={i} onMouseDown={(e)=>{e.preventDefault();execCmd('hiliteColor', color)}} className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:scale-110 transition-transform" style={{backgroundColor: color === 'transparent' ? 'white' : color}}>
+                                                {color === 'transparent' && <X size={12} className="text-red-500"/>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex items-center gap-3"><button onClick={handlePrint} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Imprimer"><Printer size={18}/></button><div className="text-xs text-slate-400 font-mono w-24 text-right">{isSaving ? <span className="flex items-center justify-end gap-1 text-indigo-500"><Loader2 size={12} className="animate-spin"/> Save...</span> : <span className="flex items-center justify-end gap-1"><CheckSquare size={12}/> Prêt</span>}</div></div>
+
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            <ToolbarButton cmd="insertUnorderedList" icon={List} />
+                            <ToolbarButton cmd="insertOrderedList" icon={CheckSquare} />
+                            
+                            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            <ToolbarButton cmd="justifyLeft" icon={AlignLeft}/>
+                            <ToolbarButton cmd="justifyCenter" icon={AlignCenter}/>
+                            <ToolbarButton cmd="justifyRight" icon={AlignRight}/>
+                            <ToolbarButton cmd="justifyFull" icon={AlignJustify}/>
+
+                            <div className="flex-1"></div>
+                            
+                            <div className="flex items-center gap-3">
+                                <button onClick={handlePrint} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Imprimer"><Printer size={18}/></button>
+                                <div className="text-xs text-slate-400 font-mono w-20 text-right">{isSaving ? <span className="text-indigo-500 flex items-center justify-end gap-1"><Loader2 size={12} className="animate-spin"/> Save</span> : <span className="text-green-600 flex items-center justify-end gap-1">Prêt</span>}</div>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             <div className="max-w-3xl mx-auto px-10 py-16 min-h-full">
