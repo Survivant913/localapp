@@ -6,7 +6,7 @@ import {
   ArrowLeft, Underline, Strikethrough, Type,
   X, CornerDownRight, Highlighter, PanelLeft,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  MoreVertical, Star, Loader2, Calendar
+  MoreVertical, Star, Loader2, Calendar, Printer
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -117,6 +117,82 @@ export default function JournalManager({ data, updateData }) {
             setIsSaving(true); // Indicateur visuel immédiat
             saveTimeoutRef.current = setTimeout(performSave, 1500);
         }
+    };
+
+    // --- IMPRESSION MODE "ROMAN" ---
+    const handlePrint = () => {
+        if (!activePageId) return;
+
+        const printWindow = window.open('', '_blank');
+        const currentDate = format(new Date(), 'd MMMM yyyy', { locale: fr });
+        const contentToPrint = editorRef.current ? editorRef.current.innerHTML : pageContent;
+
+        const htmlContent = `
+            <html>
+            <head>
+                <title>${pageTitle}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Merriweather', serif;
+                        line-height: 1.8;
+                        color: #1a1a1a;
+                        max-width: 800px;
+                        margin: 0 auto;
+                        padding: 40px;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 60px;
+                        border-bottom: 1px solid #e5e5e5;
+                        padding-bottom: 20px;
+                    }
+                    .date {
+                        font-style: italic;
+                        color: #666;
+                        font-size: 0.9em;
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                    h1 {
+                        font-size: 2.5em;
+                        font-weight: 700;
+                        margin: 0;
+                        color: #000;
+                    }
+                    .content {
+                        font-size: 1.1em;
+                        text-align: justify;
+                    }
+                    /* Nettoyage des styles riches pour l'impression */
+                    .content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
+                    .content blockquote { border-left: 3px solid #ccc; padding-left: 15px; font-style: italic; margin: 20px 0; color: #555; }
+                    .content ul, .content ol { padding-left: 20px; margin-bottom: 15px; }
+                    
+                    @media print {
+                        body { padding: 0; margin: 2cm; max-width: 100%; }
+                        @page { margin: 2cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="date">${currentDate}</div>
+                    <h1>${pageTitle || 'Sans Titre'}</h1>
+                </div>
+                <div class="content">
+                    ${contentToPrint}
+                </div>
+                <script>
+                    window.onload = function() { window.print(); }
+                </script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
     };
 
     // --- ACTIONS NOTEBOOKS ---
@@ -332,6 +408,9 @@ export default function JournalManager({ data, updateData }) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+                                <button onClick={handlePrint} className="flex items-center gap-1 hover:text-slate-800 dark:hover:text-white transition-colors mr-2" title="Imprimer / PDF">
+                                    <Printer size={14} />
+                                </button>
                                 {isSaving ? <span className="flex items-center gap-1 text-indigo-500"><Loader2 size={10} className="animate-spin"/> Sauvegarde...</span> : <span><CheckSquare size={10} className="inline mr-1"/>Enregistré</span>}
                             </div>
                         </div>
