@@ -16,8 +16,11 @@ import GoalsManager from './GoalsManager';
 import JournalManager from './JournalManager';
 import PlanningManager from './PlanningManager';
 import HabitTracker from './HabitTracker'; 
-import ChatManager from './ChatManager'; // --- IMPORT NOUVEAU (MESSAGERIE) ---
+import ChatManager from './ChatManager'; 
 import { Loader2, Lock } from 'lucide-react';
+
+// --- AJOUT 1 : LE SON (Insertion ici) ---
+const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAERERERERERERERERERERMzMzMzMzMzMzMzMzMzMzMzMzREREREREREREREREREREREREZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZm//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjM1LjEwMAAAAAAAAAAAAAAAJAAAAAAAAAAAASNmNs4AAAAAAAAB//OEZAAAAAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAQAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAf/7kmRAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZAADAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 // --- NOUVEAU : PALETTE DE COULEURS ---
 const THEME_COLORS = {
@@ -38,6 +41,10 @@ export default function App() {
   const [notifMessage, setNotifMessage] = useState(null);
   const isLoaded = useRef(false);
   
+  // --- AJOUT 2 : ÉTATS POUR SON ET COMPTEUR ---
+  const [unreadCount, setUnreadCount] = useState(0);
+  const audioRef = useRef(typeof window !== 'undefined' ? new Audio(POP_SOUND) : null);
+
   const getInitialTheme = () => {
     if (typeof window !== 'undefined') return localStorage.getItem('freelanceCockpitTheme') || 'light';
     return 'light';
@@ -56,6 +63,26 @@ export default function App() {
 
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES ---
+  useEffect(() => {
+    if (!session) return;
+    // Reset si on est sur le chat
+    if (currentView === 'chat') setUnreadCount(0);
+
+    const channel = supabase.channel('global-chat-notifications')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+            // Si c'est moi, on ignore
+            if (payload.new.sender_id === session.user.id) return;
+            // Si je ne suis pas sur le chat, je sonne et j'incrémente
+            if (currentView !== 'chat') {
+                try { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch(e) {}
+                setUnreadCount(prev => prev + 1);
+            }
+        })
+        .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session, currentView]);
 
   // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE ---
   useEffect(() => {
@@ -470,7 +497,17 @@ export default function App() {
 
       {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
       
-      <Sidebar currentView={currentView} setView={setView} isMobileOpen={isMobileMenuOpen} toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} labels={data.customLabels} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />
+      {/* --- AJOUT 4 : ON PASSE UNREADCOUNT À LA SIDEBAR --- */}
+      <Sidebar 
+        currentView={currentView} 
+        setView={setView} 
+        isMobileOpen={isMobileMenuOpen} 
+        toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+        labels={data.customLabels} 
+        darkMode={data.settings?.theme === 'dark'} 
+        toggleTheme={toggleTheme} 
+        unreadCount={unreadCount} 
+      />
       
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">

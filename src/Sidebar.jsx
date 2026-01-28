@@ -3,11 +3,12 @@ import {
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
   Users, Box, Target, Book, CalendarRange, Clock, Activity,
-  MessageSquare // --- IMPORT ICONE MESSAGE ---
+  MessageSquare 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme }) {
+// --- AJOUT DE LA PROP "unreadCount" ICI ---
+export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   // --- CHRONO SECONDES ---
@@ -56,7 +57,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'workspace', label: 'Workspace', icon: Box }, 
-    { id: 'chat', label: 'Messages', icon: MessageSquare }, // --- NOUVEAU MENU ---
+    { id: 'chat', label: 'Messages', icon: MessageSquare, badge: unreadCount }, // --- AJOUT BADGE ICI ---
     { id: 'planning', label: 'Agenda', icon: CalendarRange },
     { id: 'calendar', label: 'Calendrier Financier', icon: Calendar }, 
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
@@ -129,17 +130,34 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                   }
                 `}
               >
-                <Icon size={20} className={`shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                <div className="relative">
+                    <Icon size={20} className={`shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-300'}`} />
+                    {/* PASTILLE BADGE COLLAPSED */}
+                    {isCollapsed && item.badge > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                    )}
+                </div>
                 
                 {!isCollapsed && (
-                  <span className="whitespace-nowrap overflow-hidden transition-all duration-300">
+                  <span className="whitespace-nowrap overflow-hidden transition-all duration-300 flex-1 text-left">
                     {item.label}
                   </span>
+                )}
+
+                {/* PASTILLE BADGE EXPANDED */}
+                {!isCollapsed && item.badge > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse shadow-sm ml-2">
+                        {item.badge}
+                    </span>
                 )}
 
                 {isCollapsed && (
                   <div className="absolute left-16 ml-2 bg-slate-900 text-white text-xs px-3 py-2 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap border border-slate-700 shadow-xl font-medium tracking-wide">
                     {item.label}
+                    {item.badge > 0 && ` (${item.badge})`}
                     <div className="absolute top-1/2 -left-1 -mt-1 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 transform rotate-45"></div>
                   </div>
                 )}

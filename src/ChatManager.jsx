@@ -3,14 +3,11 @@ import {
   MessageSquare, Send, Plus, User, Check, X, Clock, 
   Trash2, Search, AlertCircle, Ban, Users, PanelLeft,
   LogOut, MoreVertical, Settings, UserPlus, Pencil, Edit2, 
-  Reply, CornerDownRight, Pin, PinOff, Volume2, VolumeX
+  Reply, CornerDownRight, Pin, PinOff, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-// Petit son "Pop" (Base64 pour ne pas avoir à gérer de fichier externe)
-const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAERERERERERERERERERERMzMzMzMzMzMzMzMzMzMzMzMzREREREREREREREREREREREREZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZm//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjM1LjEwMAAAAAAAAAAAAAAAJAAAAAAAAAAAASNmNs4AAAAAAAAB//OEZAAAAAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAQAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAf/7kmRAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZAADAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 export default function ChatManager({ user }) {
     // --- ÉTATS ---
@@ -24,6 +21,9 @@ export default function ChatManager({ user }) {
     // États Action
     const [editingMessageId, setEditingMessageId] = useState(null); 
     const [replyingTo, setReplyingTo] = useState(null);
+    
+    // NOUVEAU : État Carousel Épinglé
+    const [currentPinIndex, setCurrentPinIndex] = useState(0);
 
     // État Présence & Frappe
     const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -33,7 +33,6 @@ export default function ChatManager({ user }) {
     // UI States
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showGroupDetails, setShowGroupDetails] = useState(false);
-    const [soundEnabled, setSoundEnabled] = useState(true); // Activer/Désactiver le son
 
     // Formulaires
     const [newChatName, setNewChatName] = useState('');
@@ -42,7 +41,6 @@ export default function ChatManager({ user }) {
     
     const messagesEndRef = useRef(null);
     const channelRef = useRef(null);
-    const audioRef = useRef(new Audio(POP_SOUND)); // Pré-chargement du son
 
     // --- 1. CHARGEMENT DES DISCUSSIONS ---
     useEffect(() => {
@@ -87,6 +85,7 @@ export default function ChatManager({ user }) {
         setEditingMessageId(null);
         setReplyingTo(null);
         setNewMessage('');
+        setCurrentPinIndex(0); // Reset carousel
 
         if (activeRoom.status === 'pending') {
             setMessages([]); 
@@ -108,14 +107,6 @@ export default function ChatManager({ user }) {
                 filter: `room_id=eq.${activeRoom.id}` 
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
-                    // JOUER LE SON SI CE N'EST PAS MOI
-                    if (payload.new.sender_id !== user.id && soundEnabled) {
-                        try {
-                            audioRef.current.currentTime = 0;
-                            audioRef.current.play().catch(e => console.log("Audio bloqué par navigateur", e));
-                        } catch(e) {}
-                    }
-
                     setMessages(current => {
                         if (current.some(m => m.id === payload.new.id)) return current;
                         return [...current, payload.new];
@@ -155,7 +146,7 @@ export default function ChatManager({ user }) {
             });
 
         return () => { channel.unsubscribe(); };
-    }, [activeRoom, soundEnabled]); // Ajout de soundEnabled aux dépendances pour le listener
+    }, [activeRoom]);
 
     const handleInputChange = async (e) => {
         setNewMessage(e.target.value);
@@ -213,13 +204,10 @@ export default function ChatManager({ user }) {
 
     const handleTogglePin = async (msg) => {
         const newStatus = !msg.is_pinned;
-        // Optimiste update
         setMessages(current => current.map(m => m.id === msg.id ? { ...m, is_pinned: newStatus } : m));
-        
         const { error } = await supabase.from('chat_messages').update({ is_pinned: newStatus }).eq('id', msg.id);
         if (error) {
             alert("Erreur épinglage");
-            // Rollback
             setMessages(current => current.map(m => m.id === msg.id ? { ...m, is_pinned: !newStatus } : m));
         }
     };
@@ -232,7 +220,6 @@ export default function ChatManager({ user }) {
         if (error) { alert("Erreur suppression"); setMessages(oldMessages); }
     };
 
-    // Autres helpers
     const startEditing = (msg) => { setReplyingTo(null); setEditingMessageId(msg.id); setNewMessage(msg.content); };
     const startReplying = (msg) => { setEditingMessageId(null); setReplyingTo(msg); };
     const cancelAction = () => { setEditingMessageId(null); setReplyingTo(null); setNewMessage(''); };
@@ -245,8 +232,12 @@ export default function ChatManager({ user }) {
     const handleLeaveRoom = async () => { if (!window.confirm("Quitter ?")) return; await supabase.from('chat_participants').delete().match({ room_id: activeRoom.id, user_email: user.email }); setActiveRoom(null); fetchRooms(); };
     const handleKickParticipant = async (pId) => { if (!window.confirm("Retirer ?")) return; await supabase.from('chat_participants').delete().eq('id', pId); };
 
-    // --- RENDER ---
+    // --- CAROUSEL NAVIGATION ---
     const pinnedMessages = messages.filter(m => m.is_pinned);
+    const displayedPin = pinnedMessages.length > 0 ? pinnedMessages[currentPinIndex >= pinnedMessages.length ? 0 : currentPinIndex] : null;
+
+    const nextPin = () => setCurrentPinIndex((prev) => (prev + 1) % pinnedMessages.length);
+    const prevPin = () => setCurrentPinIndex((prev) => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
 
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -281,7 +272,6 @@ export default function ChatManager({ user }) {
             <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative min-w-0">
                 {activeRoom ? (
                     <>
-                        {/* HEADER */}
                         <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600"><PanelLeft size={20}/></button>}
@@ -297,9 +287,6 @@ export default function ChatManager({ user }) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors" title={soundEnabled ? "Couper le son" : "Activer le son"}>
-                                    {soundEnabled ? <Volume2 size={20}/> : <VolumeX size={20}/>}
-                                </button>
                                 <button onClick={() => setShowGroupDetails(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative">
                                     <Users size={20}/>
                                     {participants.some(p => p.status === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
@@ -307,19 +294,29 @@ export default function ChatManager({ user }) {
                             </div>
                         </div>
 
-                        {/* MESSAGES ÉPINGLÉS (BANNER) */}
-                        {pinnedMessages.length > 0 && activeRoom.status === 'accepted' && (
+                        {/* CAROUSEL MESSAGES ÉPINGLÉS (CORRIGÉ) */}
+                        {displayedPin && activeRoom.status === 'accepted' && (
                             <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-900/30 px-4 py-2 flex items-center gap-3 shrink-0">
                                 <Pin size={16} className="text-amber-600 dark:text-amber-500 shrink-0 fill-amber-600 dark:fill-amber-500"/>
-                                <div className="flex-1 overflow-hidden">
-                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">Message épinglé</p>
+                                
+                                <div className="flex-1 overflow-hidden flex flex-col justify-center">
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">
+                                            Message épinglé ({currentPinIndex + 1}/{pinnedMessages.length})
+                                        </p>
+                                    </div>
                                     <p className="text-xs text-amber-600 dark:text-amber-500 truncate italic">
-                                        "{pinnedMessages[pinnedMessages.length - 1].content}"
+                                        "{displayedPin.content}"
                                     </p>
                                 </div>
-                                <span className="text-[10px] bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-1.5 py-0.5 rounded-md font-bold">
-                                    {pinnedMessages.length}
-                                </span>
+
+                                {/* FLÈCHES DE NAVIGATION */}
+                                {pinnedMessages.length > 1 && (
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={prevPin} className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded text-amber-700 dark:text-amber-300"><ChevronLeft size={14}/></button>
+                                        <button onClick={nextPin} className="p-1 hover:bg-amber-200 dark:hover:bg-amber-800 rounded text-amber-700 dark:text-amber-300"><ChevronRight size={14}/></button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -360,17 +357,13 @@ export default function ChatManager({ user }) {
                                                         </div>
                                                     </div>
 
-                                                    {/* BOUTONS D'ACTION */}
                                                     <div className={`absolute ${isMe ? '-left-28' : '-right-28'} top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
                                                         <button onClick={() => startReplying(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Répondre"><Reply size={12}/></button>
-                                                        
-                                                        {/* BOUTON PIN (Pour moi ou pour le propriétaire de la room) */}
                                                         {(isMe || activeRoom.isOwner) && (
                                                             <button onClick={() => handleTogglePin(msg)} className={`p-1.5 bg-white dark:bg-slate-800 rounded-full shadow border border-slate-200 dark:border-slate-700 ${msg.is_pinned ? 'text-amber-500 hover:text-slate-500' : 'text-slate-500 hover:text-amber-500'}`} title={msg.is_pinned ? "Désépingler" : "Épingler"}>
                                                                 {msg.is_pinned ? <PinOff size={12}/> : <Pin size={12}/>}
                                                             </button>
                                                         )}
-
                                                         {isMe && (
                                                             <>
                                                                 <button onClick={() => startEditing(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Modifier"><Pencil size={12}/></button>
@@ -382,7 +375,6 @@ export default function ChatManager({ user }) {
                                             </div>
                                         );
                                     })}
-                                    
                                     {typingUsers.size > 0 && (
                                         <div className="flex items-center gap-2 ml-4 text-xs text-slate-400 italic animate-pulse">
                                             <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
@@ -393,7 +385,6 @@ export default function ChatManager({ user }) {
                                     )}
                                     <div ref={messagesEndRef} />
                                 </div>
-
                                 <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
                                     {(editingMessageId || replyingTo) && (
                                         <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-t-xl text-xs text-indigo-600 dark:text-indigo-400 border-b border-indigo-100 dark:border-indigo-800">
@@ -430,8 +421,7 @@ export default function ChatManager({ user }) {
                     </div>
                 )}
             </div>
-            
-            {/* MODALS (Identiques, inclus pour completude) */}
+            {/* MODALS SONT IDENTIQUES AUX PRÉCÉDENTS */}
             {showGroupDetails && activeRoom && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -445,12 +435,13 @@ export default function ChatManager({ user }) {
                                 const isOnline = p.user_id && onlineUsers.has(p.user_id);
                                 const statusText = p.status === 'pending' ? 'En attente...' : (isOnline ? 'En ligne' : 'Hors ligne');
                                 const statusColor = p.status === 'pending' ? 'text-amber-500' : (isOnline ? 'text-emerald-600' : 'text-slate-400');
+                                const statusDot = p.status === 'pending' ? 'bg-amber-400' : (isOnline ? 'bg-emerald-500' : 'bg-slate-300');
                                 return (
                                     <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <div className="relative w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
                                                 {p.user_email[0].toUpperCase()}
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${p.status==='pending'?'bg-amber-400':(isOnline?'bg-emerald-500':'bg-slate-300')}`}></div>
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${statusDot}`}></div>
                                             </div>
                                             <div><p className="text-sm font-medium dark:text-white">{p.user_email} {isMe && "(Moi)"}</p><p className={`text-[10px] ${statusColor}`}>{statusText}</p></div>
                                         </div>
