@@ -1,69 +1,53 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
-  Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
-  Heading, Type, Underline, Strikethrough,
-  ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
-  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow, Clock, Pencil, Broom
+  ChevronLeft, ChevronRight, CheckCircle2, 
+  Plus, Repeat, Trash2, GripVertical, 
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar
 } from 'lucide-react';
-import { supabase } from './supabaseClient';
-import { format, parseISO, startOfWeek, addDays, startOfDay, addMinutes, isSameDay, getHours, getMinutes, setHours, setMinutes, addWeeks } from 'date-fns';
+import { 
+  format, addDays, startOfWeek, addWeeks, subWeeks, 
+  isSameDay, parseISO, getHours, getMinutes, 
+  setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
+} from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { supabase } from './supabaseClient';
 
-// --- COMPOSANT INTERNE : GESTIONNAIRE DE PLANNING ---
 export default function PlanningManager({ data, updateData }) {
-    // --- ÉTATS ---
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [events, setEvents] = useState([]);
-    const [draggedItem, setDraggedItem] = useState(null);
-    const [isCreating, setIsCreating] = useState(false);
+    const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
     const [selectedEvent, setSelectedEvent] = useState(null);
-    const [confirmMode, setConfirmMode] = useState(null); // 'ask_delete' | 'ask_update'
-    const [pendingUpdate, setPendingUpdate] = useState(null);
-    const [viewMode, setViewMode] = useState('week'); // 'week' only for now
+    const [isCreating, setIsCreating] = useState(false);
+    const [confirmMode, setConfirmMode] = useState(null); 
+    const [pendingUpdate, setPendingUpdate] = useState(null); 
+    
+    // Drag & Drop
+    const [draggedItem, setDraggedItem] = useState(null);
+    const [previewSlot, setPreviewSlot] = useState(null);
 
-    // Formulaire Création / Edition
+    // Resize
+    const [resizingEvent, setResizingEvent] = useState(null); 
+    const resizeRef = useRef(null);
+    const ignoreNextClick = useRef(false);
+    
+    // ON NE PREND QUE LES ÉVÉNEMENTS (Pas de todos)
+    const events = useMemo(() => Array.isArray(data.calendar_events) ? data.calendar_events : [], [data.calendar_events]);
+
     const [eventForm, setEventForm] = useState({ 
-        id: null, title: '', start: '', end: '', 
-        color: 'blue', isAllDay: false, 
-        recurrence: false, recurrenceWeeks: 1, recurrenceGroupId: null 
+        id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
+        startHour: 9, startMin: 0, duration: 60, 
+        type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
+        isAllDay: false
     });
 
-    const containerRef = useRef(null);
-    const resizeRef = useRef(null);
-
-    // --- CHARGEMENT ---
-    useEffect(() => {
-        // On charge les événements depuis les props (data) ou on initialise
-        if (data && data.calendar_events) {
-            setEvents(data.calendar_events);
-        }
-    }, [data]);
-
-    // --- SAUVEGARDE GLOBALE ---
-    const saveEvents = (updatedEvents) => {
-        setEvents(updatedEvents);
-        // Sauvegarde dans le JSON global (App.jsx)
-        updateData({ ...data, calendar_events: updatedEvents });
-        
-        // Sauvegarde Robuste en Base de Données (Optionnel si updateData le fait déjà, mais sécurité double)
-        // Ici on part du principe que updateData gère la persistance principale.
+    const isItemAllDay = (item) => {
+        if (!item || !item.data) return false;
+        return item.data.is_all_day === true;
     };
 
-    // --- NAVIGATION ---
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
-
-    const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
-    const prevWeek = () => setCurrentDate(addDays(currentDate, -7));
-    const goToToday = () => setCurrentDate(new Date());
-
-    // --- NETTOYAGE INTELLIGENT (NOUVEAU) ---
+    // --- NETTOYAGE INTELLIGENT ---
     const cleanPastEvents = async () => {
         const now = new Date();
-        // On filtre : on garde ceux qui finissent APRES maintenant
-        // (Donc on supprime ceux qui ont fini AVANT maintenant)
         const activeEvents = events.filter(ev => {
+            if (!ev.end_time) return false;
             const endDate = parseISO(ev.end_time);
             return endDate > now; 
         });
@@ -71,20 +55,18 @@ export default function PlanningManager({ data, updateData }) {
         const deletedCount = events.length - activeEvents.length;
 
         if (deletedCount === 0) {
-            alert("Votre agenda est déjà propre ! Aucun événement passé à supprimer.");
+            alert("Agenda déjà propre ! Aucun événement passé à supprimer.");
             return;
         }
 
-        if (window.confirm(`Voulez-vous supprimer ${deletedCount} événement(s) passé(s) ?\n\nCela n'affectera PAS les événements futurs (même récurrents).\nCette action est irréversible.`)) {
-            // Mise à jour locale
-            saveEvents(activeEvents);
+        if (window.confirm(`⚠️ SUPPRIMER ${deletedCount} ÉVÉNEMENTS PASSÉS ?\n\nCela va nettoyer l'historique avant aujourd'hui.\nLes événements futurs et récurrents NE SERONT PAS touchés.`)) {
+            updateData({ ...data, calendar_events: activeEvents });
             
-            // Mise à jour DB (Suppression des vieux IDs)
-            // Note: On envoie la nouvelle liste "propre" via updateData, 
-            // ce qui devrait suffire si la logique parente remplace tout.
-            // Sinon, pour être chirurgical avec Supabase :
             const pastEventsIds = events
-                .filter(ev => parseISO(ev.end_time) <= now)
+                .filter(ev => {
+                    if (!ev.end_time) return true;
+                    return parseISO(ev.end_time) <= now;
+                })
                 .map(ev => ev.id);
             
             if (pastEventsIds.length > 0) {
@@ -97,423 +79,571 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- GESTION ÉVÉNEMENTS ---
-    const handleSlotClick = (day, hour) => {
-        const start = setMinutes(setHours(day, hour), 0);
-        const end = addMinutes(start, 60);
-        setEventForm({ 
-            id: null, title: '', start: format(start, "yyyy-MM-dd'T'HH:mm"), end: format(end, "yyyy-MM-dd'T'HH:mm"), 
-            color: 'blue', isAllDay: false, recurrence: false, recurrenceWeeks: 1, recurrenceGroupId: null 
+    // --- GESTION RESIZE ---
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!resizeRef.current) return;
+            const { startY, startDuration } = resizeRef.current;
+            const deltaY = e.clientY - startY; 
+            let newDuration = startDuration + deltaY;
+            newDuration = Math.round(newDuration / 15) * 15;
+            if (newDuration < 15) newDuration = 15; 
+            setResizingEvent(prev => prev ? ({ ...prev, currentDuration: newDuration }) : null);
+        };
+
+        const handleMouseUp = () => {
+            if (!resizeRef.current) return;
+            ignoreNextClick.current = true;
+            setTimeout(() => { ignoreNextClick.current = false; }, 200);
+            finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
+            setResizingEvent(null);
+            resizeRef.current = null;
+        };
+
+        if (resizingEvent) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [resizingEvent]);
+
+    useEffect(() => {
+        if (resizingEvent && resizeRef.current) {
+            resizeRef.current.currentDurationTemp = resizingEvent.currentDuration;
+        }
+    }, [resizingEvent]);
+
+    const startResize = (e, evt) => {
+        e.stopPropagation(); 
+        e.preventDefault(); 
+        if (evt.is_all_day) return;
+
+        let startDuration = 60;
+        let startTime = parseISO(evt.start_time);
+        let endTime = parseISO(evt.end_time);
+        startDuration = differenceInMinutes(endTime, startTime);
+        
+        const initData = { id: evt.id, startY: e.clientY, startDuration: startDuration, currentDuration: startDuration, currentDurationTemp: startDuration, event: evt };
+        setResizingEvent(initData);
+        resizeRef.current = initData;
+    };
+
+    const finishResize = (evt, newDuration) => {
+        if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
+        const start = parseISO(evt.start_time);
+        const newEnd = addMinutes(start, newDuration);
+
+        if (evt.recurrence_group_id) {
+            setEventForm({
+                id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
+                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
+            });
+            setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
+            setConfirmMode('ask_update');
+            setIsCreating(true);
+        } else {
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString(), is_all_day: false } : ev);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
+        }
+    };
+
+    const handleEventClick = (e, itemData) => {
+        e.stopPropagation();
+        if (ignoreNextClick.current) { ignoreNextClick.current = false; return; }
+        setSelectedEvent({ type: 'event', data: itemData });
+    };
+
+    // --- NAVIGATION ---
+    const handlePreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
+    const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
+    const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+
+    // --- LAYOUT ENGINE ---
+    const getLayoutForDay = (dayItems) => {
+        const timedItems = dayItems.filter(item => !isItemAllDay(item));
+        const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
+        const columns = [];
+        sorted.forEach((item) => {
+            if(!item.startStr || !item.endStr) return;
+            const start = parseISO(item.startStr);
+            const end = parseISO(item.endStr);
+            if (!isValid(start) || !isValid(end)) return;
+
+            const startMin = getHours(start) * 60 + getMinutes(start);
+            let duration = differenceInMinutes(end, start);
+            if (resizingEvent && item.data.id === resizingEvent.id) duration = resizingEvent.currentDuration;
+
+            const top = Math.max(0, startMin); 
+            let placed = false;
+            for(let col of columns) {
+                if (!col.some(ev => {
+                    const evStart = parseISO(ev.startStr);
+                    const evEnd = parseISO(ev.endStr);
+                    let evDuration = differenceInMinutes(evEnd, evStart);
+                    if (resizingEvent && ev.data.id === resizingEvent.id) evDuration = resizingEvent.currentDuration;
+                    
+                    const myTop = top; const myBottom = top + duration;
+                    const otherStartMin = getHours(evStart) * 60 + getMinutes(evStart);
+                    const otherTop = Math.max(0, otherStartMin);
+                    const otherBottom = otherTop + evDuration;
+                    return (myTop < otherBottom && myBottom > otherTop);
+                })) {
+                    col.push({ ...item, top, height: Math.max(15, duration) });
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) columns.push([{ ...item, top, height: Math.max(15, duration) }]);
+        });
+        const result = [];
+        columns.forEach((col, colIndex) => {
+            col.forEach(item => {
+                result.push({
+                    ...item,
+                    style: {
+                        top: `${item.top}px`, height: `${item.height}px`,
+                        width: `${100 / columns.length}%`, left: `${(colIndex * 100) / columns.length}%`,
+                        position: 'absolute'
+                    }
+                });
+            });
+        });
+        return result;
+    };
+
+    // --- ACTIONS ---
+    const openCreateModal = (dayOffset = 0, hour = 9, isAllDay = false, title = '') => {
+        const targetDate = addDays(currentWeekStart, dayOffset);
+        setEventForm({
+            id: null, title: title, date: format(targetDate, 'yyyy-MM-dd'),
+            startHour: hour, startMin: 0, duration: 60,
+            type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
+            isAllDay: isAllDay
         });
         setIsCreating(true);
         setSelectedEvent(null);
     };
 
     const openEditModal = (evt) => {
+        const start = parseISO(evt.start_time);
+        const end = parseISO(evt.end_time);
+        const isAllDay = evt.is_all_day || false;
+        const duration = isAllDay ? 60 : differenceInMinutes(end, start);
+
         setEventForm({
-            id: evt.id,
-            title: evt.title,
-            start: evt.start_time.substring(0, 16),
-            end: evt.end_time.substring(0, 16),
-            color: evt.color || 'blue',
-            isAllDay: evt.is_all_day || false,
-            recurrence: false, // On n'édite pas la récurrence par défaut, on gère ça au save
-            recurrenceWeeks: 1,
-            recurrenceGroupId: evt.recurrence_group_id
+            id: evt.id, title: evt.title, date: format(start, 'yyyy-MM-dd'),
+            startHour: getHours(start), startMin: getMinutes(start),
+            duration: duration, 
+            type: 'event', 
+            recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
+            recurrenceGroupId: evt.recurrence_group_id, 
+            color: evt.color || 'blue', 
+            isAllDay: isAllDay
         });
         setIsCreating(true);
+        setSelectedEvent(null);
     };
 
-    const handleSave = async () => {
-        if (!eventForm.title) return alert("Le titre est obligatoire");
+    const handleSave = () => {
+        if (!eventForm.title) return alert("Titre requis");
+        const baseDate = parse(eventForm.date, 'yyyy-MM-dd', new Date());
+        let newStart, newEnd;
+        if (eventForm.isAllDay) {
+            newStart = setMinutes(setHours(baseDate, 0), 0);
+            newEnd = setMinutes(setHours(baseDate, 23), 59);
+        } else {
+            newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin);
+            newEnd = addMinutes(newStart, eventForm.duration);
+        }
 
-        // Récupération User
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return alert("Erreur: Non connecté");
-
-        const newStart = parseISO(eventForm.start);
-        const newEnd = parseISO(eventForm.end);
-        
-        // Logique Création vs Modification
         if (!eventForm.id) {
-            // --- CRÉATION ---
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
+            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay };
             let newEvents = [];
-            
-            // Base de l'objet événement
-            const createEventObj = (start, end, idOffset = 0) => ({
-                id: Date.now() + idOffset, // ID Unique forcé
-                user_id: user.id,
-                title: eventForm.title,
-                start_time: start.toISOString(),
-                end_time: end.toISOString(),
-                color: eventForm.color,
-                is_all_day: eventForm.isAllDay,
-                recurrence_group_id: groupId,
-                recurrence_type: eventForm.recurrence ? 'weekly' : null
-            });
-
             if (eventForm.recurrence) {
                 const weeks = parseInt(eventForm.recurrenceWeeks) || 1;
                 for (let i = 0; i < weeks; i++) {
                     const s = addWeeks(newStart, i);
                     const e = addWeeks(newEnd, i);
-                    newEvents.push(createEventObj(s, e, i));
+                    newEvents.push({ ...eventBase, id: Date.now() + i, start_time: s.toISOString(), end_time: e.toISOString() });
                 }
             } else {
-                newEvents.push(createEventObj(newStart, newEnd));
+                newEvents.push({ ...eventBase, id: Date.now(), start_time: newStart.toISOString(), end_time: newEnd.toISOString() });
             }
-
-            // Sauvegarde DB
-            const { error } = await supabase.from('calendar_events').insert(newEvents);
-            if (error) { alert("Erreur sauvegarde: " + error.message); return; }
-
-            // Mise à jour UI
-            saveEvents([...events, ...newEvents]);
+            updateData({ ...data, calendar_events: [...events, ...newEvents] });
+            supabase.from('calendar_events').insert(newEvents).then(({error}) => { if(error) console.error(error) });
             setIsCreating(false);
+            return;
+        }
 
+        if (eventForm.recurrenceGroupId) {
+            setPendingUpdate({ newStart, newEnd, ...eventForm }); 
+            setConfirmMode('ask_update'); setIsCreating(true); 
         } else {
-            // --- MODIFICATION ---
-            if (eventForm.recurrenceGroupId) {
-                // Demander si on modifie juste celui-là ou la série
-                setPendingUpdate({ newStart, newEnd, ...eventForm });
-                setConfirmMode('ask_update');
-                // La modal reste ouverte, on attend la réponse dans l'interface Confirm
-            } else {
-                // Modif simple
-                await applyUpdate(eventForm.id, newStart, newEnd, eventForm, 'single');
-            }
+            applyUpdate(eventForm.id, newStart, newEnd, eventForm, 'single');
         }
     };
 
-    const applyUpdate = async (targetId, startObj, endObj, formData, mode) => {
-        let eventsToUpdate = [];
-        let updatedLocalEvents = [...events];
+    const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
+        let updatedEvents = [...events];
+        let eventsToSave = [];
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            // Calcul du delta pour appliquer aux autres
-            const targetDay = startObj.getDay();
-            const targetH = getHours(startObj);
-            const targetM = getMinutes(startObj);
-            const duration = (endObj - startObj);
-
-            // On identifie les événements à modifier
-            updatedLocalEvents = updatedLocalEvents.map(ev => {
+            const targetDayOfWeek = startObj.getDay();
+            const targetHours = getHours(startObj);
+            const targetMinutes = getMinutes(startObj);
+            const targetDuration = formData.duration;
+            updatedEvents = updatedEvents.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
-                    // Logique complexe de décalage pour garder la cohérence des dates
                     let evStart = parseISO(ev.start_time);
-                    // On garde le jour de la semaine original de l'occurrence, ou on force le nouveau ?
-                    // Pour simplifier : on recalcule l'heure sur la date existante
-                    let newS = setMinutes(setHours(evStart, targetH), targetM);
+                    const currentDayOfWeek = evStart.getDay();
+                    if (currentDayOfWeek !== targetDayOfWeek) {
+                        const originalEvent = events.find(e => e.id === targetId);
+                        if(originalEvent) {
+                            const originalStart = parseISO(originalEvent.start_time);
+                            const daysDelta = Math.round((startOfDay(startObj) - startOfDay(originalStart)) / (1000 * 60 * 60 * 24));
+                            evStart = addDays(evStart, daysDelta);
+                        }
+                    }
+                    let newEvStart = formData.isAllDay ? setMinutes(setHours(evStart, 0), 0) : setMinutes(setHours(evStart, targetHours), targetMinutes);
+                    let newEvEnd = formData.isAllDay ? setMinutes(setHours(evStart, 23), 59) : addMinutes(newEvStart, targetDuration);
                     
-                    // Si on a changé de jour de semaine (ex: Lundi -> Mardi), c'est plus complexe.
-                    // Ici on suppose un décalage horaire simple ou rename.
-                    
-                    let newE = new Date(newS.getTime() + duration);
-                    
-                    const updated = { 
-                        ...ev, 
-                        title: formData.title, 
-                        color: formData.color,
-                        start_time: newS.toISOString(),
-                        end_time: newE.toISOString(),
-                        is_all_day: formData.isAllDay
-                    };
-                    eventsToUpdate.push(updated);
-                    return updated;
+                    const updatedEv = { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay };
+                    eventsToSave.push(updatedEv);
+                    return updatedEv;
                 }
                 return ev;
             });
         } else {
-            // Single
-            const updated = {
-                ...events.find(e => e.id === targetId),
-                title: formData.title,
-                color: formData.color,
-                start_time: startObj.toISOString(),
-                end_time: endObj.toISOString(),
-                is_all_day: formData.isAllDay,
-                recurrence_group_id: null // Détachement de la série
-            };
-            eventsToUpdate.push(updated);
-            updatedLocalEvents = updatedLocalEvents.map(e => e.id === targetId ? updated : e);
+            updatedEvents = updatedEvents.map(ev => {
+                if (ev.id === targetId) {
+                    const updatedEv = {
+                        ...ev, title: formData.title, color: formData.color,
+                        start_time: startObj.toISOString(), end_time: endObj.toISOString(),
+                        recurrence_group_id: null, is_all_day: formData.isAllDay
+                    };
+                    eventsToSave.push(updatedEv);
+                    return updatedEv;
+                }
+                return ev;
+            });
         }
-
-        // Sauvegarde DB
-        for (const ev of eventsToUpdate) {
-            await supabase.from('calendar_events').update({
-                title: ev.title,
-                start_time: ev.start_time,
-                end_time: ev.end_time,
-                color: ev.color,
-                is_all_day: ev.is_all_day,
-                recurrence_group_id: ev.recurrence_group_id
-            }).eq('id', ev.id);
-        }
-
-        saveEvents(updatedLocalEvents);
-        setConfirmMode(null);
-        setPendingUpdate(null);
-        setIsCreating(false);
-    };
-
-    const handleDelete = async (evt, mode = 'single') => {
-        let newEventsList = [...events];
         
-        if (mode === 'series' && evt.recurrence_group_id) {
-            const idsToDelete = events.filter(e => e.recurrence_group_id === evt.recurrence_group_id).map(e => e.id);
-            newEventsList = newEventsList.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
-            await supabase.from('calendar_events').delete().in('id', idsToDelete);
-        } else {
-            newEventsList = newEventsList.filter(e => e.id !== evt.id);
-            await supabase.from('calendar_events').delete().eq('id', evt.id);
-        }
+        updateData({ ...data, calendar_events: updatedEvents });
+        eventsToSave.forEach(ev => {
+            supabase.from('calendar_events').update({
+                title: ev.title, start_time: ev.start_time, end_time: ev.end_time, 
+                color: ev.color, is_all_day: ev.is_all_day, recurrence_group_id: ev.recurrence_group_id
+            }).eq('id', ev.id).then();
+        });
 
-        saveEvents(newEventsList);
-        setSelectedEvent(null);
-        setConfirmMode(null);
+        setConfirmMode(null); setPendingUpdate(null); setIsCreating(false);
     };
 
+    const handleDeleteRequest = (evt) => {
+        if (!evt) return;
+        if (evt.recurrence_group_id) { setSelectedEvent({type: 'event', data: evt}); setConfirmMode('ask_delete'); } 
+        else { if(window.confirm("Supprimer cet événement ?")) performDelete(evt, false); }
+    };
 
-    // --- RENDU ---
+    const performDelete = (evt, series) => {
+        if (!evt) { setConfirmMode(null); setSelectedEvent(null); return; }
+        let updatedEvents = [...events];
+        if (series && evt.recurrence_group_id) {
+            updatedEvents = updatedEvents.filter(e => e.recurrence_group_id !== evt.recurrence_group_id);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } });
+        } else {
+            updatedEvents = updatedEvents.filter(e => e.id !== evt.id);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
+        }
+        setSelectedEvent(null); setConfirmMode(null);
+    };
+
+    // --- DRAG HANDLERS ---
+    const onDragStart = (e, item) => {
+        if (resizeRef.current) { e.preventDefault(); return; }
+        setDraggedItem({ type: 'event', data: item });
+        e.dataTransfer.effectAllowed = "move";
+        const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        e.dataTransfer.setDragImage(img, 0, 0);
+    };
+
+    // --- DRAG SUR GRILLE ---
+    const onDragOverGrid = (e, dayIndex) => {
+        if (draggedItem && draggedItem.data.is_all_day) {
+            setPreviewSlot(null);
+            return; 
+        }
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        
+        let hour = Math.floor(y / 60); 
+        if (hour < 0) hour = 0; if (hour > 23) hour = 23;
+        
+        let rawMinutes = Math.floor(y % 60); 
+        let snappedMinutes = Math.round(rawMinutes / 15) * 15;
+        if (snappedMinutes === 60) { snappedMinutes = 0; hour += 1; }
+        
+        let duration = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time));
+        setPreviewSlot({ dayIndex, top: hour * 60 + snappedMinutes, height: Math.max(30, duration), timeLabel: `${hour}:${snappedMinutes.toString().padStart(2, '0')}` });
+    };
+
+    const onDrop = (e) => { e.preventDefault(); setPreviewSlot(null); };
+
+    const onDropGrid = (e, day) => {
+        e.preventDefault();
+        setPreviewSlot(null);
+        if (!draggedItem) return;
+        if (draggedItem.data.is_all_day) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        let hour = Math.floor(y / 60); if (hour < 0) hour = 0; if (hour > 23) hour = 23;
+        let rawMinutes = Math.floor(y % 60); let snappedMinutes = Math.round(rawMinutes / 15) * 15;
+        if (snappedMinutes === 60) { snappedMinutes = 0; hour += 1; }
+
+        const newStart = setMinutes(setHours(day, hour), snappedMinutes);
+        const evt = draggedItem.data;
+        const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
+        const newEnd = addMinutes(newStart, duration);
+        if (evt.recurrence_group_id) {
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, date: format(newStart, 'yyyy-MM-dd'), startHour: hour, startMin: snappedMinutes, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false });
+            setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
+            setConfirmMode('ask_update'); setIsCreating(true);
+        } else {
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: newStart.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
+        }
+        setDraggedItem(null);
+    };
+
+    const onDragOverAllDay = (e) => {
+        if (draggedItem && !draggedItem.data.is_all_day) return; 
+        e.preventDefault();
+    };
+
+    const onDropAllDay = (e, day) => {
+        e.preventDefault();
+        if (!draggedItem) return;
+        if (!draggedItem.data.is_all_day) return;
+
+        const evt = draggedItem.data;
+        const start = setMinutes(setHours(day, 0), 0);
+        const end = setMinutes(setHours(day, 23), 59);
+        if (evt.recurrence_group_id) {
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true });
+            setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
+            setConfirmMode('ask_update'); setIsCreating(true);
+        } else {
+            const updatedEvents = events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: end.toISOString(), is_all_day: true } : ev);
+            updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id });
+        }
+        setDraggedItem(null);
+    };
+
+    const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
+    const hours = Array.from({ length: 24 }).map((_, i) => i);
+    
+    const durationOptions = [];
+    for (let m = 15; m <= 720; m += 15) {
+        const h = Math.floor(m / 60); const min = m % 60;
+        let label = ''; if (h > 0) label += `${h}h`; if (min > 0) label += ` ${min}`; if (h === 0) label += ' min';
+        durationOptions.push(<option key={m} value={m}>{label}</option>);
+    }
+
     return (
-        <div className="h-full flex flex-col bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 p-6 overflow-hidden">
-            
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6 shrink-0">
-                <div className="flex items-center gap-4">
-                    <h2 className="text-2xl font-bold capitalize flex items-center gap-2">
-                        <Calendar className="text-indigo-600"/>
-                        {format(currentDate, 'MMMM yyyy', { locale: fr })}
-                    </h2>
-                    <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                        <button onClick={prevWeek} className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm transition-all"><ChevronRight className="rotate-180" size={20}/></button>
-                        <button onClick={goToToday} className="px-3 text-xs font-bold uppercase hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm transition-all">Auj.</button>
-                        <button onClick={nextWeek} className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded shadow-sm transition-all"><ChevronRight size={20}/></button>
-                    </div>
-                </div>
-                
-                <div className="flex gap-2">
-                    {/* BOUTON NETTOYAGE */}
-                    <button 
-                        onClick={cleanPastEvents}
-                        className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium"
-                        title="Supprimer les événements passés"
-                    >
-                        <Broom size={18}/> Nettoyer l'historique
-                    </button>
-
-                    <button 
-                        onClick={() => { setEventForm({ ...eventForm, id: null, title: '', start: format(new Date(), "yyyy-MM-dd'T'09:00"), end: format(new Date(), "yyyy-MM-dd'T'10:00") }); setIsCreating(true); }}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-all"
-                    >
-                        <Plus size={20}/> Nouvel Événement
-                    </button>
-                </div>
-            </div>
-
-            {/* Grille Semaine */}
-            <div className="flex-1 flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-900/50">
-                
-                {/* En-têtes Jours */}
-                <div className="flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pr-[17px]"> {/* pr pour scrollbar */}
-                    <div className="w-16 shrink-0 border-r border-slate-200 dark:border-slate-800"></div>
-                    {weekDays.map((day, i) => (
-                        <div key={i} className={`flex-1 py-3 text-center border-r border-slate-200 dark:border-slate-800 last:border-0 ${isSameDay(day, new Date()) ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
-                            <div className={`text-xs uppercase font-bold mb-1 ${isSameDay(day, new Date()) ? 'text-indigo-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</div>
-                            <div className={`text-xl font-black ${isSameDay(day, new Date()) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}>{format(day, 'd')}</div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Corps Grille (Scrollable) */}
-                <div ref={containerRef} className="flex-1 overflow-y-auto relative bg-white dark:bg-slate-900">
-                    <div className="flex min-h-[1440px]"> {/* 24h * 60px */}
-                        
-                        {/* Colonne Heures */}
-                        <div className="w-16 shrink-0 flex flex-col border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 z-10 sticky left-0">
-                            {Array.from({ length: 24 }).map((_, i) => (
-                                <div key={i} className="h-[60px] text-xs text-slate-400 text-right pr-2 pt-1 -mt-2.5 relative">
-                                    {i}:00
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Colonnes Jours */}
-                        {weekDays.map((day, dIndex) => (
-                            <div key={dIndex} className="flex-1 relative border-r border-slate-200 dark:border-slate-800 last:border-0">
-                                {/* Lignes Horaires (Background) */}
-                                {Array.from({ length: 24 }).map((_, h) => (
-                                    <div 
-                                        key={h} 
-                                        className="h-[60px] border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                                        onClick={() => handleSlotClick(day, h)}
-                                    ></div>
-                                ))}
-
-                                {/* Événements */}
-                                {events
-                                    .filter(ev => isSameDay(parseISO(ev.start_time), day) && !ev.is_all_day)
-                                    .map(ev => {
-                                        const start = parseISO(ev.start_time);
-                                        const end = parseISO(ev.end_time);
-                                        const top = (getHours(start) * 60) + getMinutes(start);
-                                        const height = Math.max(30, (end - start) / (1000 * 60)); // Min 30min height
-                                        
-                                        const colorClasses = {
-                                            blue: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200',
-                                            green: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200',
-                                            red: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200',
-                                            purple: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200',
-                                            orange: 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200',
-                                        }[ev.color || 'blue'];
-
-                                        return (
-                                            <div
-                                                key={ev.id}
-                                                onClick={(e) => { e.stopPropagation(); setSelectedEvent(ev); }}
-                                                className={`absolute left-1 right-1 rounded-md border p-1 text-xs cursor-pointer shadow-sm transition-all overflow-hidden ${colorClasses}`}
-                                                style={{ top: `${top}px`, height: `${height}px` }}
-                                            >
-                                                <div className="font-bold truncate">{ev.title}</div>
-                                                <div className="opacity-75 text-[10px]">{format(start, 'HH:mm')} - {format(end, 'HH:mm')}</div>
-                                                {ev.recurrence_group_id && <div className="absolute top-1 right-1 opacity-50"><Clock size={10}/></div>}
-                                            </div>
-                                        );
-                                    })}
+        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
+            <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
+                <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
+                        <div className="flex items-center gap-4 md:gap-6">
+                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize font-serif tracking-tight flex items-center gap-2"><Calendar className="text-blue-500" size={24}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
+                            <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
+                                <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronLeft size={18}/></button>
+                                <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300 border-x border-transparent hover:border-gray-200 dark:hover:border-slate-600 mx-1">Aujourd'hui</button>
+                                <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-all shadow-sm"><ChevronRight size={18}/></button>
                             </div>
-                        ))}
+                        </div>
+                        <div className="flex gap-2">
+                            {/* BOUTON NETTOYAGE AVEC ICÔNE SÉCURISÉE (TRASH2) */}
+                            <button 
+                                onClick={cleanPastEvents}
+                                className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-xs transition-colors border border-transparent hover:border-red-200"
+                                title="Nettoyer l'historique"
+                            >
+                                <Trash2 size={16}/> Nettoyer
+                            </button>
+
+                            <button onClick={() => openCreateModal()} className="py-2 px-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={16}/> Planifier</button>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none">
+                        <div className="flex w-full h-full min-h-[1440px]">
+                            
+                            {/* COLONNE GAUCHE (Heures) */}
+                            <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
+                                <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
+                                <div className="h-24 border-b-4 border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10">
+                                    <span>ALL</span><span>DAY</span>
+                                </div>
+                                {Array.from({length: 24}).map((_, i) => (
+                                    <div key={i} className="h-[60px] relative w-full border-b border-transparent">
+                                        <span className="absolute -top-2.5 right-2 text-xs font-bold text-slate-400">{i}:00</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* GRILLE JOURS */}
+                            <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
+                                {weekDays.map((day, dayIndex) => {
+                                    const isToday = isSameDay(day, new Date());
+                                    const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ type: 'event', data: e, startStr: e.start_time, endStr: e.end_time }));
+                                    
+                                    const allDayItems = rawEvents.filter(item => isItemAllDay(item));
+                                    const timedItems = rawEvents.filter(item => !isItemAllDay(item));
+                                    const layoutItems = getLayoutForDay(timedItems);
+
+                                    return (
+                                        <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
+                                            
+                                            {/* EN-TÊTE JOUR (Date) */}
+                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
+                                                <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
+                                                <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
+                                            </div>
+
+                                            {/* ZONE "TOUTE LA JOURNÉE" */}
+                                            <div 
+                                                className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`}
+                                                onDragOver={onDragOverAllDay}
+                                                onDrop={(e) => onDropAllDay(e, day)}
+                                            >
+                                                {allDayItems.map(item => {
+                                                    const isDraggingThis = draggedItem?.data?.id === item.data.id;
+                                                    const style = isDraggingThis ? { opacity: 0.5 } : {};
+                                                    const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
+
+                                                    return (
+                                                        <div key={item.data.id} draggable onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} style={style} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass}`}>
+                                                            {item.data.title}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            {/* GRILLE HEURES (0h-24h) */}
+                                            <div 
+                                                className={`relative h-[1440px] transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
+                                                onDragOver={(e) => onDragOverGrid(e, dayIndex)}
+                                                onDrop={(e) => onDropGrid(e, day)}
+                                            >
+                                                {Array.from({length: 24}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
+                                                {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
+                                                {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}><span className="text-xs font-bold text-blue-600 bg-white/80 px-2 py-1 rounded-md shadow-sm">{previewSlot.timeLabel}</span></div>)}
+                                                
+                                                {layoutItems.map((item) => {
+                                                    const dataItem = item.data;
+                                                    const isDraggingThis = draggedItem?.data?.id === dataItem.id;
+                                                    const style = { ...item.style, opacity: isDraggingThis ? 0.5 : 1 };
+                                                    const isRecurrent = !!dataItem.recurrence_group_id;
+                                                    const isResizingAny = !!resizeRef.current;
+                                                    const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
+
+                                                    return (
+                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
+                                                            <span className="font-bold truncate leading-tight text-[11px]">{dataItem.title}</span>
+                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
+                                                            <div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* MODAL CRÉATION / MODIFICATION */}
+            {/* MODALS */}
             {isCreating && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-                        
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
                         {confirmMode === 'ask_update' ? (
-                            <div className="p-6 text-center">
-                                <h3 className="text-xl font-bold mb-4">Modifier l'événement récurrent</h3>
-                                <p className="text-slate-500 mb-6">Cet événement fait partie d'une série. Que voulez-vous modifier ?</p>
-                                <div className="flex flex-col gap-3">
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="p-3 bg-white border border-slate-200 rounded-xl font-bold hover:bg-slate-50 text-slate-700">Juste cet événement</button>
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="p-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700">Toute la série (et futurs)</button>
-                                    <button onClick={() => { setConfirmMode(null); setIsCreating(false); }} className="mt-2 text-slate-400 text-sm hover:underline">Annuler</button>
+                            <div className="text-center space-y-4">
+                                <div className="w-12 h-12 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-2"><Repeat size={24}/></div>
+                                <h3 className="font-bold text-lg dark:text-white">Modifier la récurrence ?</h3>
+                                <div className="grid gap-3">
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là (Détacher)</button>
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Toute la série (Écraser)</button>
+                                    <button onClick={() => { setConfirmMode(null); setIsCreating(false); }} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                                    <h3 className="font-bold text-lg">{eventForm.id ? 'Modifier' : 'Nouvel événement'}</h3>
-                                    <button onClick={() => setIsCreating(false)}><X size={20} className="text-slate-400 hover:text-slate-600"/></button>
-                                </div>
-                                
-                                <div className="p-6 space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Titre</label>
-                                        <input 
-                                            autoFocus
-                                            type="text" 
-                                            value={eventForm.title} 
-                                            onChange={e => setEventForm({...eventForm, title: e.target.value})}
-                                            className="w-full text-lg font-bold border-b-2 border-slate-200 dark:border-slate-700 bg-transparent outline-none focus:border-indigo-500 py-1"
-                                            placeholder="Ex: Réunion Client"
-                                        />
+                                <h3 className="text-xl font-bold mb-6 text-slate-800 dark:text-white font-serif flex items-center gap-2">
+                                    <Calendar className="text-blue-500"/>
+                                    {eventForm.id ? 'Modifier' : 'Planifier'}
+                                </h3>
+                                <div className="space-y-4">
+                                    <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
+                                    <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
+                                    
+                                    <div className="flex items-center gap-2 py-2">
+                                        <input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"/>
+                                        <label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Début</label>
-                                            <input type="datetime-local" value={eventForm.start} onChange={e => setEventForm({...eventForm, start: e.target.value})} className="w-full bg-slate-100 dark:bg-slate-800 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"/>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fin</label>
-                                            <input type="datetime-local" value={eventForm.end} onChange={e => setEventForm({...eventForm, end: e.target.value})} className="w-full bg-slate-100 dark:bg-slate-800 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"/>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 py-2">
-                                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                                            <input type="checkbox" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500"/>
-                                            Toute la journée
-                                        </label>
-                                        
-                                        {!eventForm.id && ( // On ne change pas la récurrence d'un existant pour simplifier
-                                            <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
-                                                <input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500"/>
-                                                Répéter (Hebdo)
-                                            </label>
-                                        )}
-                                    </div>
-
-                                    {eventForm.recurrence && !eventForm.id && (
-                                        <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg flex items-center gap-3">
-                                            <span className="text-sm font-medium">Pendant</span>
-                                            <input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center rounded border border-indigo-200 font-bold"/>
-                                            <span className="text-sm font-medium">semaines</span>
+                                    {!eventForm.isAllDay && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 24}).map((_, i) => <option key={i} value={i}>{i}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">{durationOptions}</select></div>
                                         </div>
                                     )}
 
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Couleur</label>
-                                        <div className="flex gap-2">
-                                            {['blue', 'green', 'red', 'purple', 'orange'].map(c => (
-                                                <button 
-                                                    key={c}
-                                                    onClick={() => setEventForm({...eventForm, color: c})}
-                                                    className={`w-8 h-8 rounded-full border-2 ${eventForm.color === c ? 'border-slate-600 scale-110' : 'border-transparent'} transition-all`}
-                                                    style={{ backgroundColor: `var(--color-${c}-400)` }} // Utilise classes Tailwind via style simulé ou classe directe
-                                                >
-                                                    <div className={`w-full h-full rounded-full ${c === 'blue' ? 'bg-blue-400' : c === 'green' ? 'bg-green-400' : c === 'red' ? 'bg-red-400' : c === 'purple' ? 'bg-purple-400' : 'bg-orange-400'}`}></div>
-                                                </button>
-                                            ))}
+                                    {!eventForm.id && (
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
+                                            <div className="flex items-center justify-between mb-2"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label></div>
+                                            {eventForm.recurrence && (<div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-500">Pendant</span><input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm"/><span className="text-xs text-slate-500">semaines</span></div>)}
                                         </div>
-                                    </div>
-
-                                    <button onClick={handleSave} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none mt-4">
-                                        {eventForm.id ? 'Enregistrer les modifications' : 'Créer l\'événement'}
-                                    </button>
+                                    )}
+                                    <div className="flex gap-3 pt-2">{['blue', 'green', 'gray'].map(c => (<button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`flex-1 h-8 rounded-lg border-2 transition-all ${eventForm.color === c ? 'border-slate-800 dark:border-white opacity-100' : 'border-transparent opacity-40'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></button>))}</div>
+                                    <div className="flex gap-3 pt-4"><button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm">{eventForm.id ? 'Modifier' : 'Créer'}</button></div>
                                 </div>
                             </>
                         )}
                     </div>
                 </div>
             )}
-
-            {/* MODAL DETAIL / SUPPRESSION */}
-            {selectedEvent && !isCreating && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-6 animate-in zoom-in-95">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.title}</h3>
-                            <button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button>
-                        </div>
-                        
-                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center">
-                            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div>
-                            <div>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p>
-                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                    {selectedEvent.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}
-                                </p>
-                            </div>
-                        </div>
-
-                        {selectedEvent.recurrence_group_id ? (
-                            <div className="space-y-3">
-                                <p className="text-xs font-bold text-slate-400 text-center mb-2">Élément d'une série</p>
-                                <div className="flex gap-2">
-                                    <button onClick={() => openEditModal(selectedEvent)} className="flex-1 py-2 border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-50">Modifier</button>
-                                    <button onClick={() => handleDelete(selectedEvent, 'single')} className="flex-1 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-bold hover:bg-red-100">Supprimer (Juste lui)</button>
+            {selectedEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
+                        {confirmMode === 'ask_delete' ? (
+                            <div className="text-center space-y-4">
+                                <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><AlertTriangle size={24}/></div>
+                                <h3 className="font-bold text-lg dark:text-white">Supprimer la série ?</h3>
+                                <div className="grid gap-3">
+                                    <button onClick={() => performDelete(selectedEvent.data, false)} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là</button>
+                                    <button onClick={() => performDelete(selectedEvent.data, true)} className="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-sm hover:bg-red-600">Toute la série</button>
+                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
                                 </div>
-                                <button onClick={() => handleDelete(selectedEvent, 'series')} className="w-full py-2 text-red-600 border border-red-100 rounded-lg text-sm font-bold hover:bg-red-50">Supprimer toute la série</button>
                             </div>
                         ) : (
-                            <div className="flex gap-3">
-                                <button onClick={() => openEditModal(selectedEvent)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
-                                <button onClick={() => handleDelete(selectedEvent)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
-                            </div>
+                            <>
+                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
+                                    <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
