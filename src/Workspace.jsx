@@ -740,7 +740,7 @@ export default function Workspace() {
         await supabase.from('ventures').delete().eq('id', id); setVentures(ventures.filter(v => v.id !== id));
     };
 
-    // --- FONCTION MAGIQUE EXPORT PDF V2 (PRO & COMPLET) ---
+    // --- EXPORT PDF V3 : ULTIMATE EDITION (AVEC SWOT MATRICE) ---
     const generateBusinessPlan = async () => {
         if (!activeVenture) return;
         setIsExporting(true);
@@ -755,119 +755,166 @@ export default function Workspace() {
                 supabase.from('venture_mindmaps').select('content').eq('venture_id', activeVenture.id).single()
             ]);
 
-            // 2. Préparer les données
             const pagesData = pages.data || [];
             const stratData = strat.data || [];
-            const f = fin.data?.scenarios || { realistic: {}, optimistic: {}, pessimistic: {} }; // Sécurisation
+            const f = fin.data?.scenarios || { realistic: {}, optimistic: {}, pessimistic: {} };
             const compData = comps.data || [];
             const mindData = mind.data?.content || [];
 
-            // Helper pour le calcul
             const calcProfit = (s) => (s.target * s.price) - (s.fixed + (s.target * s.var));
 
-            // 3. HTML PRO & COMPLET
+            // --- HTML TEMPLATE ---
             const htmlContent = `
                 <html>
                 <head>
                     <title>Business Plan - ${activeVenture.title}</title>
                     <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
                         @page { margin: 0; }
-                        body { font-family: 'Inter', sans-serif; color: #1e293b; line-height: 1.5; margin: 0; padding: 0; background: #fff; }
+                        
+                        body { 
+                            font-family: 'Inter', sans-serif; 
+                            color: #1e293b; 
+                            line-height: 1.6; 
+                            margin: 0; 
+                            background: #fff; 
+                        }
+                        
                         .sheet { padding: 40px; max-width: 210mm; margin: 0 auto; min-height: 297mm; }
-                        
-                        /* COUVERTURE */
-                        .cover { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #f8fafc; border-bottom: 20px solid #2563eb; }
-                        .cover h1 { font-size: 56px; margin: 0; font-weight: 800; letter-spacing: -2px; color: #0f172a; }
-                        .cover .subtitle { font-size: 24px; color: #64748b; margin-top: 10px; font-weight: 300; }
-                        .cover .meta { margin-top: 60px; font-size: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
-
-                        /* TYPO */
-                        h2 { font-size: 24px; color: #0f172a; border-left: 5px solid #2563eb; padding-left: 15px; margin-top: 50px; margin-bottom: 25px; }
-                        h3 { font-size: 16px; font-weight: 700; margin-top: 20px; color: #334155; text-transform: uppercase; }
-                        
-                        /* PAGE BREAK */
                         .page-break { page-break-before: always; }
                         .no-break { page-break-inside: avoid; }
 
-                        /* GRILLES */
-                        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                        .grid-canvas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+                        /* HEADER/FOOTER */
+                        .page-number { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
 
-                        /* CANVAS CARDS */
-                        .card { border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; background: #fff; font-size: 12px; height: 100%; box-sizing: border-box; }
-                        .card strong { display: block; margin-bottom: 8px; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; color: #64748b; }
+                        /* TYPOGRAPHY */
+                        h2 { font-size: 24px; color: #0f172a; border-left: 6px solid #2563eb; padding-left: 15px; margin-top: 40px; margin-bottom: 25px; letter-spacing: -0.5px; }
+                        h3 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+
+                        /* COVER */
+                        .cover { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #f8fafc; border-bottom: 20px solid #2563eb; }
+                        .cover h1 { font-size: 48px; margin: 0; font-weight: 800; color: #0f172a; line-height: 1.2; }
+                        .cover .subtitle { font-size: 20px; color: #64748b; margin-top: 15px; font-weight: 400; }
+                        .cover .meta { margin-top: 60px; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
+
+                        /* CANVAS */
+                        .canvas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+                        .card { border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; background: #fff; font-size: 11px; min-height: 100px; }
+                        .card strong { display: block; margin-bottom: 5px; color: #475569; font-size: 10px; text-transform: uppercase; }
                         .card ul { padding-left: 15px; margin: 0; }
-                        .card li { margin-bottom: 4px; color: #334155; }
-                        .bg-blue { border-top: 4px solid #3b82f6; background: #eff6ff; }
-                        .bg-green { border-top: 4px solid #10b981; background: #ecfdf5; }
-                        .bg-red { border-top: 4px solid #ef4444; background: #fef2f2; }
-                        .bg-yellow { border-top: 4px solid #eab308; background: #fefce8; }
+                        .card li { margin-bottom: 2px; }
 
-                        /* NOTES (COLONNES) */
-                        .notes-cols { column-count: 2; column-gap: 40px; }
-                        .note-item { margin-bottom: 30px; break-inside: avoid; }
-                        .note-title { font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #2563eb; }
+                        /* SWOT MATRIX (NEW) */
+                        .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+                        .swot-box { padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
+                        .swot-box.positive { background-color: #f0fdf4; border-color: #bbf7d0; }
+                        .swot-box.negative { background-color: #fef2f2; border-color: #fecaca; }
+                        .swot-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: 800; font-size: 14px; text-transform: uppercase; }
+                        .positive .swot-header { color: #166534; }
+                        .negative .swot-header { color: #991b1b; }
+                        .swot-list { list-style: none; padding: 0; margin: 0; }
+                        .swot-list li { margin-bottom: 6px; padding-left: 15px; position: relative; font-size: 12px; }
+                        .swot-list li::before { content: "•"; position: absolute; left: 0; color: inherit; font-weight: bold; }
 
-                        /* TABLEAUX FINANCE */
-                        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-                        th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; }
-                        th { text-align: left; background: #f1f5f9; color: #475569; font-weight: 600; }
+                        /* FINANCE TABLE */
+                        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+                        th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; }
+                        th { text-align: left; background: #f1f5f9; color: #334155; font-weight: 600; }
                         td:first-child { text-align: left; font-weight: 500; color: #334155; }
-                        .highlight-row { background: #f8fafc; font-weight: bold; }
+                        .highlight-row { background: #f8fafc; font-weight: 700; }
                         .positive { color: #059669; }
                         .negative { color: #dc2626; }
 
-                        /* COMPETITORS BARS */
-                        .comp-bar-bg { width: 100px; height: 6px; background: #e2e8f0; border-radius: 3px; display: inline-block; vertical-align: middle; margin-left: 10px; }
-                        .comp-bar-fill { height: 100%; border-radius: 3px; }
-                        
-                        @media print {
-                            body { -webkit-print-color-adjust: exact; }
-                        }
+                        @media print { body { -webkit-print-color-adjust: exact; } }
                     </style>
                 </head>
                 <body>
                     
                     <div class="cover">
                         <h1>${activeVenture.title}</h1>
-                        <div class="subtitle">Dossier de Projet & Business Plan</div>
-                        <div class="meta">
-                            Généré le ${new Date().toLocaleDateString('fr-FR')} par Freelance Cockpit<br>
-                            Document Confidentiel
-                        </div>
+                        <div class="subtitle">Document de Synthèse Stratégique</div>
+                        <div class="meta">Généré le ${new Date().toLocaleDateString('fr-FR')} | Confidentiel</div>
                     </div>
 
                     <div class="sheet">
-                        <h2>1. Notes & Concepts</h2>
-                        <div class="notes-cols">
+                        <h2>1. Résumé Exécutif</h2>
+                        <div style="column-count: 2; column-gap: 40px; font-size: 12px; text-align: justify;">
                             ${pagesData.length === 0 ? '<p>Aucune note enregistrée.</p>' : pagesData.map(p => `
-                                <div class="note-item">
-                                    <div class="note-title">${p.title}</div>
-                                    <div style="font-size: 13px; color: #475569; white-space: pre-wrap;">${p.content || ''}</div>
+                                <div style="margin-bottom: 20px; break-inside: avoid;">
+                                    <div style="font-weight: 700; font-size: 14px; color: #2563eb; margin-bottom: 5px;">${p.title}</div>
+                                    <div style="white-space: pre-wrap;">${p.content || ''}</div>
                                 </div>
                             `).join('')}
                         </div>
+                        <div class="page-number">Page 2</div>
+                    </div>
 
-                        <div class="page-break"></div>
+                    <div class="page-break"></div>
+                    <div class="sheet">
                         <h2>2. Business Model Canvas</h2>
-                        <div class="grid-canvas">
-                            <div class="card bg-blue"><strong>PARTENAIRES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='partners')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-yellow"><strong>ACTIVITÉS CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='activities')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-red"><strong>PROPOSITIONS DE VALEUR</strong><ul>${(stratData.find(s=>s.section_id==='valueProps')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-green"><strong>RELATIONS CLIENT</strong><ul>${(stratData.find(s=>s.section_id==='relationships')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-green"><strong>SEGMENTS CLIENTS</strong><ul>${(stratData.find(s=>s.section_id==='segments')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-yellow"><strong>RESSOURCES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='resources')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-green"><strong>CANAUX</strong><ul>${(stratData.find(s=>s.section_id==='channels')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                        <div class="canvas-grid">
+                            <div class="card" style="background:#eff6ff; border-color:#bfdbfe;"><strong>PARTENAIRES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='partners')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#fefce8; border-color:#fde047;"><strong>ACTIVITÉS CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='activities')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#fef2f2; border-color:#fecaca;"><strong>PROPOSITIONS DE VALEUR</strong><ul>${(stratData.find(s=>s.section_id==='valueProps')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>RELATIONS CLIENT</strong><ul>${(stratData.find(s=>s.section_id==='relationships')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>SEGMENTS CLIENTS</strong><ul>${(stratData.find(s=>s.section_id==='segments')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#fefce8; border-color:#fde047;"><strong>RESSOURCES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='resources')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>CANAUX</strong><ul>${(stratData.find(s=>s.section_id==='channels')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#fef2f2; border-color:#fecaca;"><strong>COÛTS</strong><ul>${(stratData.find(s=>s.section_id==='cost')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>REVENUS</strong><ul>${(stratData.find(s=>s.section_id==='revenue')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
                         </div>
-                        <div class="grid-2" style="margin-top: 15px;">
-                            <div class="card bg-red"><strong>STRUCTURE DE COÛTS</strong><ul>${(stratData.find(s=>s.section_id==='cost')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card bg-green"><strong>FLUX DE REVENUS</strong><ul>${(stratData.find(s=>s.section_id==='revenue')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
+                        <div class="page-number">Page 3</div>
+                    </div>
+
+                    <div class="page-break"></div>
+                    <div class="sheet">
+                        <h2>3. Analyse Stratégique (SWOT)</h2>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Analyse des facteurs internes et externes influençant le projet.</p>
+                        
+                        <div class="swot-grid">
+                            <div class="swot-box positive">
+                                <div class="swot-header">Forces (Interne)</div>
+                                <ul class="swot-list">
+                                    ${(stratData.find(s=>s.section_id==='strengths')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune force listée</li>'}
+                                </ul>
+                            </div>
+                            
+                            <div class="swot-box negative">
+                                <div class="swot-header">Faiblesses (Interne)</div>
+                                <ul class="swot-list">
+                                    ${(stratData.find(s=>s.section_id==='weaknesses')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune faiblesse listée</li>'}
+                                </ul>
+                            </div>
+
+                            <div class="swot-box positive">
+                                <div class="swot-header">Opportunités (Externe)</div>
+                                <ul class="swot-list">
+                                    ${(stratData.find(s=>s.section_id==='opportunities')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune opportunité listée</li>'}
+                                </ul>
+                            </div>
+
+                            <div class="swot-box negative">
+                                <div class="swot-header">Menaces (Externe)</div>
+                                <ul class="swot-list">
+                                    ${(stratData.find(s=>s.section_id==='threats')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune menace listée</li>'}
+                                </ul>
+                            </div>
                         </div>
 
-                        <div class="page-break"></div>
-                        <h2>3. Prévisions Financières (Comparatif)</h2>
-                        <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Analyse de sensibilité basée sur 3 scénarios.</p>
+                        <div class="no-break" style="margin-top: 40px;">
+                            <h3>Structure des Idées (Mindmap)</h3>
+                            <div style="font-size: 11px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 6px; background: #f8fafc;">
+                                <ul style="list-style-type: circle; padding-left: 20px;">
+                                    ${mindData.map(n => `<li>${n.label}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="page-number">Page 4</div>
+                    </div>
+
+                    <div class="page-break"></div>
+                    <div class="sheet">
+                        <h2>4. Prévisions Financières & Marché</h2>
                         
                         <table>
                             <thead>
@@ -879,42 +926,10 @@ export default function Workspace() {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>Prix de Vente</td>
-                                    <td>${f.pessimistic?.price || 0} €</td>
-                                    <td><strong>${f.realistic?.price || 0} €</strong></td>
-                                    <td>${f.optimistic?.price || 0} €</td>
-                                </tr>
-                                <tr>
-                                    <td>Coût Variable (Unitaire)</td>
-                                    <td>${f.pessimistic?.var || 0} €</td>
-                                    <td>${f.realistic?.var || 0} €</td>
-                                    <td>${f.optimistic?.var || 0} €</td>
-                                </tr>
-                                <tr>
-                                    <td>Marge sur Coût Variable</td>
-                                    <td>${(f.pessimistic?.price - f.pessimistic?.var).toFixed(2)} €</td>
-                                    <td>${(f.realistic?.price - f.realistic?.var).toFixed(2)} €</td>
-                                    <td>${(f.optimistic?.price - f.optimistic?.var).toFixed(2)} €</td>
-                                </tr>
-                                <tr>
-                                    <td>Coûts Fixes (Mensuel)</td>
-                                    <td>${f.pessimistic?.fixed || 0} €</td>
-                                    <td>${f.realistic?.fixed || 0} €</td>
-                                    <td>${f.optimistic?.fixed || 0} €</td>
-                                </tr>
-                                <tr>
-                                    <td>Volume de Ventes (Cible)</td>
-                                    <td>${f.pessimistic?.target || 0}</td>
-                                    <td><strong>${f.realistic?.target || 0}</strong></td>
-                                    <td>${f.optimistic?.target || 0}</td>
-                                </tr>
-                                <tr class="highlight-row" style="border-top: 2px solid #e2e8f0;">
-                                    <td>Chiffre d'Affaires</td>
-                                    <td>${(f.pessimistic?.target * f.pessimistic?.price).toFixed(2)} €</td>
-                                    <td>${(f.realistic?.target * f.realistic?.price).toFixed(2)} €</td>
-                                    <td>${(f.optimistic?.target * f.optimistic?.price).toFixed(2)} €</td>
-                                </tr>
+                                <tr><td>Prix de Vente</td><td>${f.pessimistic?.price || 0} €</td><td><strong>${f.realistic?.price || 0} €</strong></td><td>${f.optimistic?.price || 0} €</td></tr>
+                                <tr><td>Coût Variable</td><td>${f.pessimistic?.var || 0} €</td><td>${f.realistic?.var || 0} €</td><td>${f.optimistic?.var || 0} €</td></tr>
+                                <tr><td>Coûts Fixes (Mois)</td><td>${f.pessimistic?.fixed || 0} €</td><td>${f.realistic?.fixed || 0} €</td><td>${f.optimistic?.fixed || 0} €</td></tr>
+                                <tr><td>Volume Ventes</td><td>${f.pessimistic?.target || 0}</td><td><strong>${f.realistic?.target || 0}</strong></td><td>${f.optimistic?.target || 0}</td></tr>
                                 <tr class="highlight-row">
                                     <td>RÉSULTAT NET</td>
                                     <td class="${calcProfit(f.pessimistic || {}) >= 0 ? 'positive' : 'negative'}">${calcProfit(f.pessimistic || {}).toFixed(2)} €</td>
@@ -924,35 +939,23 @@ export default function Workspace() {
                             </tbody>
                         </table>
 
-                        <div class="no-break" style="margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 8px;">
-                            <h3>Seuil de Rentabilité (Scénario Réaliste)</h3>
-                            <p>Il faut vendre <strong>${f.realistic?.price > f.realistic?.var ? Math.ceil(f.realistic.fixed / (f.realistic.price - f.realistic.var)) : 0} unités</strong> pour couvrir les frais fixes, soit un CA de ${(f.realistic?.price > f.realistic?.var ? Math.ceil(f.realistic.fixed / (f.realistic.price - f.realistic.var)) * f.realistic.price : 0)} €.</p>
+                        <div style="margin-top: 40px;">
+                            <h3>Positionnement Concurrentiel</h3>
+                            <table>
+                                <thead><tr><th>Concurrent</th><th>Forces / Faiblesses</th><th>Note</th></tr></thead>
+                                <tbody>
+                                    ${compData.map(c => {
+                                        const score = (Object.values(c.scores || {}).reduce((a,b)=>a+b,0) / (Object.values(c.scores || {}).length || 1));
+                                        return `<tr>
+                                            <td><strong>${c.name}</strong> ${c.is_primary ? '(Vous)' : ''}</td>
+                                            <td style="font-size: 10px;">${c.strengths ? `+ ${c.strengths}` : ''} <br> ${c.weaknesses ? `- ${c.weaknesses}` : ''}</td>
+                                            <td><strong>${score.toFixed(1)}/5</strong></td>
+                                        </tr>`
+                                    }).join('')}
+                                </tbody>
+                            </table>
                         </div>
-
-                        <div class="page-break"></div>
-                        <h2>4. Analyse Concurrentielle</h2>
-                        <table>
-                            <thead><tr><th>Concurrent</th><th>Forces / Faiblesses</th><th>Note Globale</th></tr></thead>
-                            <tbody>
-                                ${compData.map(c => {
-                                    const score = (Object.values(c.scores || {}).reduce((a,b)=>a+b,0) / (Object.values(c.scores || {}).length || 1));
-                                    const color = score > 3.5 ? '#10b981' : score < 2.5 ? '#ef4444' : '#f59e0b';
-                                    return `
-                                    <tr>
-                                        <td style="width: 30%"><strong>${c.name}</strong> ${c.is_primary ? '(Moi)' : ''}</td>
-                                        <td style="font-size: 11px;">
-                                            <div style="color: #059669;">+ ${c.strengths || '-'}</div>
-                                            <div style="color: #dc2626;">- ${c.weaknesses || '-'}</div>
-                                        </td>
-                                        <td style="width: 25%">
-                                            <span style="font-weight:bold; font-size: 14px;">${score.toFixed(1)}/5</span>
-                                            <div class="comp-bar-bg"><div class="comp-bar-fill" style="width: ${(score/5)*100}%; background: ${color};"></div></div>
-                                        </td>
-                                    </tr>
-                                `}).join('')}
-                            </tbody>
-                        </table>
-                        
+                        <div class="page-number">Page 5</div>
                     </div>
                 </body>
                 </html>
@@ -963,7 +966,6 @@ export default function Workspace() {
             printWindow.document.write(htmlContent);
             printWindow.document.close();
             
-            // Petit délai pour laisser charger (police + CSS)
             setTimeout(() => {
                 printWindow.print();
                 setIsExporting(false);
