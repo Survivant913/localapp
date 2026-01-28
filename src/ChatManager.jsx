@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, Send, Plus, User, Check, X, Clock, 
-  MoreVertical, Search, AlertCircle 
+  Trash2, Search, AlertCircle, Ban 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -14,6 +14,7 @@ export default function ChatManager({ user }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+    const [participants, setParticipants] = useState([]); // Pour voir qui est invité
     
     // Formulaire Nouveau Chat
     const [newChatName, setNewChatName] = useState('');
@@ -25,7 +26,6 @@ export default function ChatManager({ user }) {
     useEffect(() => {
         fetchRooms();
         
-        // Souscription aux changements de statut (invitations)
         const roomSubscription = supabase
             .channel('room-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participants' }, () => {
@@ -39,7 +39,6 @@ export default function ChatManager({ user }) {
     const fetchRooms = async () => {
         if (!user) return;
         
-        // On récupère les ID des salles où je suis participant
         const { data: myParticipations, error } = await supabase
             .from('chat_participants')
             .select('room_id, status, chat_rooms(name, created_by)')
@@ -48,25 +47,30 @@ export default function ChatManager({ user }) {
         if (error) console.error("Erreur fetch rooms:", error);
         
         if (myParticipations) {
-            // On formate un peu les données pour l'affichage
-            const formattedRooms = myParticipations.map(p => ({
-                id: p.room_id,
-                name: p.chat_rooms?.name || "Discussion sans titre",
-                status: p.status, // 'pending' ou 'accepted'
-                isOwner: p.chat_rooms?.created_by === user.id
-            }));
-            setRooms(formattedRooms);
+            // On filtre les rooms nulles (si supprimées)
+            const validRooms = myParticipations
+                .filter(p => p.chat_rooms) 
+                .map(p => ({
+                    id: p.room_id,
+                    name: p.chat_rooms.name || "Discussion sans titre",
+                    status: p.status,
+                    isOwner: p.chat_rooms.created_by === user.id
+                }));
+            setRooms(validRooms);
         }
     };
 
-    // --- 2. CHARGEMENT DES MESSAGES & TEMPS RÉEL ---
+    // --- 2. CHARGEMENT MESSAGES & PARTICIPANTS ---
     useEffect(() => {
         if (!activeRoom) return;
-        if (activeRoom.status === 'pending') return; // Pas de messages si pas accepté
+        
+        // Charger les participants de cette room (pour voir les invits en attente)
+        fetchParticipants(activeRoom.id);
+
+        if (activeRoom.status === 'pending') return;
 
         fetchMessages(activeRoom.id);
 
-        // ABONNEMENT TEMPS RÉEL (La magie Supabase)
         const messageSubscription = supabase
             .channel(`room-${activeRoom.id}`)
             .on('postgres_changes', { 
@@ -82,6 +86,14 @@ export default function ChatManager({ user }) {
 
         return () => { supabase.removeChannel(messageSubscription); };
     }, [activeRoom]);
+
+    const fetchParticipants = async (roomId) => {
+        const { data } = await supabase
+            .from('chat_participants')
+            .select('*')
+            .eq('room_id', roomId);
+        setParticipants(data || []);
+    };
 
     const fetchMessages = async (roomId) => {
         const { data, error } = await supabase
@@ -120,8 +132,12 @@ export default function ChatManager({ user }) {
             }]);
 
         if (error) {
-            alert("Erreur envoi message");
+            console.error(error);
+            alert("Erreur envoi message : " + error.message);
             setNewMessage(text); // Remettre le texte si échec
+        } else {
+            // Force refresh au cas où le realtime lag
+            fetchMessages(activeRoom.id);
         }
     };
 
@@ -139,16 +155,14 @@ export default function ChatManager({ user }) {
             if (roomError) throw roomError;
 
             // 2. Ajouter les participants
-            // Moi (accepté d'office) + Invité (pending)
-            const participants = [
+            const participantsToAdd = [
                 { room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' },
                 { room_id: roomData.id, user_email: inviteEmail, status: 'pending' }
             ];
 
-            const { error: partError } = await supabase.from('chat_participants').insert(participants);
+            const { error: partError } = await supabase.from('chat_participants').insert(participantsToAdd);
             if (partError) throw partError;
 
-            // Reset et Refresh
             setIsCreating(false);
             setInviteEmail('');
             setNewChatName('');
@@ -167,7 +181,6 @@ export default function ChatManager({ user }) {
                 .update({ status: 'accepted', user_id: user.id })
                 .match({ room_id: roomId, user_email: user.email });
         } else {
-            // Refus = on supprime sa participation
             await supabase.from('chat_participants')
                 .delete()
                 .match({ room_id: roomId, user_email: user.email });
@@ -176,11 +189,32 @@ export default function ChatManager({ user }) {
         setActiveRoom(null);
     };
 
+    const handleDeleteRoom = async (roomId) => {
+        if (!window.confirm("Supprimer définitivement cette discussion pour tout le monde ?")) return;
+        
+        try {
+            // On supprime la room, la cascade SQL supprimera les messages et participants
+            const { error } = await supabase.from('chat_rooms').delete().eq('id', roomId);
+            if (error) throw error;
+            
+            setActiveRoom(null);
+            fetchRooms();
+        } catch (err) {
+            alert("Erreur suppression: " + err.message);
+        }
+    };
+
+    const handleCancelInvite = async (participantId) => {
+        if (!window.confirm("Annuler cette invitation ?")) return;
+        await supabase.from('chat_participants').delete().eq('id', participantId);
+        fetchParticipants(activeRoom.id);
+    };
+
     // --- RENDER ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             
-            {/* LISTE DES CONVERSATIONS (Sidebar Gauche) */}
+            {/* LISTE DES CONVERSATIONS */}
             <div className="w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                     <h2 className="font-bold text-lg dark:text-white">Messages</h2>
@@ -192,32 +226,55 @@ export default function ChatManager({ user }) {
                         <div 
                             key={room.id}
                             onClick={() => setActiveRoom(room)}
-                            className={`p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}
+                            className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}
                         >
-                            <div className="flex justify-between items-start mb-1">
+                            <div className="flex justify-between items-start mb-1 pr-6">
                                 <span className={`font-bold truncate ${activeRoom?.id === room.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>{room.name}</span>
                                 {room.status === 'pending' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Invité</span>}
                             </div>
                             <div className="text-xs text-slate-400 flex items-center gap-1">
-                                <User size={12}/> Participant
+                                <User size={12}/> {room.isOwner ? 'Propriétaire' : 'Participant'}
                             </div>
+
+                            {/* Bouton Supprimer (Uniquement si propriétaire) */}
+                            {room.isOwner && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id); }}
+                                    className="absolute right-2 top-3 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Supprimer la discussion"
+                                >
+                                    <Trash2 size={14}/>
+                                </button>
+                            )}
                         </div>
                     ))}
                     {rooms.length === 0 && <div className="text-center text-slate-400 text-sm mt-10">Aucune discussion</div>}
                 </div>
             </div>
 
-            {/* ZONE DE CHAT (Droite) */}
+            {/* ZONE DE CHAT */}
             <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative">
                 {activeRoom ? (
                     <>
                         {/* Header Chat */}
                         <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 justify-between shrink-0">
-                            <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                                <MessageSquare size={20} className="text-indigo-500"/>
-                                {activeRoom.name}
-                            </h3>
-                            {activeRoom.status === 'pending' && <span className="text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full font-bold">Invitation en attente</span>}
+                            <div className="flex flex-col">
+                                <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                                    <MessageSquare size={20} className="text-indigo-500"/>
+                                    {activeRoom.name}
+                                </h3>
+                                {/* Liste des invités en attente */}
+                                <div className="flex items-center gap-2 mt-1">
+                                    {participants.filter(p => p.status === 'pending').map(p => (
+                                        <div key={p.id} className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100">
+                                            <span>En attente: {p.user_email}</span>
+                                            {activeRoom.isOwner && (
+                                                <button onClick={() => handleCancelInvite(p.id)} className="hover:text-red-600"><X size={10}/></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Contenu Chat */}
@@ -270,7 +327,6 @@ export default function ChatManager({ user }) {
                         )}
                     </>
                 ) : (
-                    /* Écran vide */
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700">
                         <MessageSquare size={64} className="opacity-20 mb-4"/>
                         <p>Sélectionnez une discussion</p>
@@ -288,13 +344,12 @@ export default function ChatManager({ user }) {
                         </div>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nom du groupe / projet</label>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nom du groupe</label>
                                 <input type="text" value={newChatName} onChange={e => setNewChatName(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="Ex: Projet Web"/>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email de l'invité</label>
                                 <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="client@email.com"/>
-                                <p className="text-[10px] text-slate-400 mt-1">L'utilisateur doit déjà être inscrit sur la plateforme.</p>
                             </div>
                             <button onClick={createChat} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 mt-2">Envoyer l'invitation</button>
                         </div>
