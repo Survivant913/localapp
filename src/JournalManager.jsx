@@ -81,9 +81,11 @@ export default function JournalManager({ data, updateData }) {
     const navigateToFolder = (folderId) => {
         setCurrentFolderId(folderId);
         setActivePageId(null);
+        setSearchQuery(''); // On efface la recherche quand on entre dans un dossier
     };
 
     const navigateUp = () => {
+        setSearchQuery(''); // On efface la recherche
         if (!currentFolderId) return;
         const current = allFolders.find(f => f.id === currentFolderId);
         if (current && current.parent_id) {
@@ -216,23 +218,16 @@ export default function JournalManager({ data, updateData }) {
 
     // --- ÉDITEUR : COMMANDES RÉPARÉES ---
     const execCmd = (cmd, val = null) => {
-        // 1. Force le focus sur l'éditeur pour ne pas perdre la sélection
         if (editorRef.current) editorRef.current.focus();
-        
-        // 2. Active le mode CSS (indispensable pour les couleurs et alignements modernes)
         document.execCommand('styleWithCSS', false, true);
-        
-        // 3. Exécute la commande avec la valeur correcte
         document.execCommand(cmd, false, val);
-        
         if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // Bouton de barre d'outils optimisé
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
         <button 
             onMouseDown={(e) => { 
-                e.preventDefault(); // CRUCIAL : Empêche le bouton de voler le focus au texte
+                e.preventDefault(); 
                 execCmd(cmd, val); 
             }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 rounded transition-colors"
@@ -257,7 +252,6 @@ export default function JournalManager({ data, updateData }) {
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
                     body { font-family: 'Merriweather', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: 0 auto; padding: 40px; }
-                    /* FIX COULEURS IMPRESSION */
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     h1 { font-size: 2.5em; font-weight: 700; margin: 0; color: #000; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 40px; }
                     h2 { font-size: 1.8em; margin-top: 30px; font-weight: 700; }
@@ -281,11 +275,24 @@ export default function JournalManager({ data, updateData }) {
         printWindow.document.close();
     };
 
+    // --- LOGIQUE D'AFFICHAGE (RECHERCHE VS NAVIGATION) ---
+    // 1. Filtrage Racine
     const rootFolders = allFolders.filter(f => !f.parent_id); 
-    const currentSubFolders = allFolders.filter(f => f.parent_id === currentFolderId);
-    const currentPages = allPages.filter(p => p.folder_id === currentFolderId);
+    
+    // 2. Filtrage Contextuel (Dossier courant)
+    const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
+    const pagesInCurrent = allPages.filter(p => p.folder_id === currentFolderId);
 
-    // --- VUE DASHBOARD ---
+    // 3. Filtrage RECHERCHE GLOBALE
+    const searchFolders = allFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const searchPages = allPages.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // 4. Décision d'affichage
+    const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
+    const displayedPages = searchQuery ? searchPages : pagesInCurrent;
+
+
+    // --- VUE DASHBOARD (ACCUEIL) ---
     if (!activeNotebookId) {
         return (
             <div className="h-full w-full bg-slate-50 dark:bg-slate-950 p-8 overflow-y-auto">
@@ -323,34 +330,60 @@ export default function JournalManager({ data, updateData }) {
         );
     }
 
-    // --- VUE CONTENU ---
+    // --- VUE CONTENU (NAVIGATION + RECHERCHE) ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0`}>
                 
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
+                    
+                    {/* BARRE DE RECHERCHE */}
+                    <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+                        <input 
+                            type="text" 
+                            placeholder="Rechercher..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-lg text-sm outline-none transition-all"
+                        />
+                        {searchQuery && (
+                            <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                <X size={14}/>
+                            </button>
+                        )}
+                    </div>
+
                     <div className="flex items-center gap-2 mb-3">
                         <button onClick={navigateUp} className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all">
                             {currentFolderId === activeNotebookId ? <Home size={16}/> : <ArrowLeft size={16}/>}
                         </button>
-                        <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier'}</div>
+                        <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{searchQuery ? 'Résultats de recherche' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
                     </div>
                     
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
-                        {breadcrumbs.map((f, i) => (
-                            <span key={f.id} className="flex items-center shrink-0">
-                                <span onClick={() => navigateToFolder(f.id)} className="hover:text-indigo-500 cursor-pointer transition-colors">{f.name}</span>
-                                {i < breadcrumbs.length - 1 && <ChevronRight size={10} className="mx-1 opacity-50"/>}
-                            </span>
-                        ))}
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition-all flex items-center justify-center gap-1 shadow-sm"><FolderPlus size={14}/> Dossier</button>
-                        <button onClick={() => createItem('page')} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 shadow-md shadow-indigo-200 dark:shadow-none"><Plus size={14}/> Page</button>
-                    </div>
+                    {/* Fil d'ariane (Caché si recherche active pour éviter la confusion) */}
+                    {!searchQuery && (
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
+                            {breadcrumbs.map((f, i) => (
+                                <span key={f.id} className="flex items-center shrink-0">
+                                    <span onClick={() => navigateToFolder(f.id)} className="hover:text-indigo-500 cursor-pointer transition-colors">{f.name}</span>
+                                    {i < breadcrumbs.length - 1 && <ChevronRight size={10} className="mx-1 opacity-50"/>}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {!searchQuery && (
+                        <div className="flex gap-2">
+                            <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition-all flex items-center justify-center gap-1 shadow-sm"><FolderPlus size={14}/> Dossier</button>
+                            <button onClick={() => createItem('page')} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 shadow-md shadow-indigo-200 dark:shadow-none"><Plus size={14}/> Page</button>
+                        </div>
+                    )}
                 </div>
+
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {currentSubFolders.map(folder => (
+                    {/* LISTE DOSSIERS */}
+                    {displayedFolders.map(folder => (
                         <div key={folder.id} onClick={() => navigateToFolder(folder.id)} className="group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <Folder size={18} className="text-amber-400 fill-amber-100 dark:fill-amber-900/20 shrink-0"/>
@@ -362,7 +395,9 @@ export default function JournalManager({ data, updateData }) {
                             </div>
                         </div>
                     ))}
-                    {currentPages.map(page => (
+
+                    {/* LISTE PAGES */}
+                    {displayedPages.map(page => (
                         <div key={page.id} onClick={() => { if(activePageId !== page.id) { saveCurrentPage(true); setActivePageId(page.id); } }} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all border border-transparent ${activePageId === page.id ? 'bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-500/30 shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <FileText size={16} className={`shrink-0 ${activePageId === page.id ? 'text-indigo-500' : 'text-slate-400'}`}/>
@@ -373,7 +408,22 @@ export default function JournalManager({ data, updateData }) {
                             </div>
                         </div>
                     ))}
-                    {currentSubFolders.length === 0 && currentPages.length === 0 && <div className="flex flex-col items-center justify-center py-10 text-slate-400"><FolderPlus size={32} className="opacity-20 mb-2"/><span className="text-xs">Dossier vide</span></div>}
+
+                    {displayedFolders.length === 0 && displayedPages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                            {searchQuery ? (
+                                <>
+                                    <Search size={32} className="opacity-20 mb-2"/>
+                                    <span className="text-xs">Aucun résultat</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FolderPlus size={32} className="opacity-20 mb-2"/>
+                                    <span className="text-xs">Dossier vide</span>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="flex flex-col items-center py-4 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-4 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer transition-colors" onClick={() => setIsSidebarOpen(!isSidebarOpen)}><div className="w-1 h-8 bg-slate-300 dark:bg-slate-700 rounded-full my-auto"></div></div>
@@ -384,12 +434,10 @@ export default function JournalManager({ data, updateData }) {
                             
                             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
 
-                            {/* BOUTON RESET (TEXTE NORMAL) */}
                             <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal (Reset)" />
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            {/* TITRES CORRIGÉS (Avec chevrons) */}
                             <ToolbarButton cmd="formatBlock" val="<h2>" icon={Heading} title="Grand Titre" />
                             <ToolbarButton cmd="formatBlock" val="<h3>" icon={Type} title="Sous-titre" />
                             <ToolbarButton cmd="formatBlock" val="<blockquote>" icon={Quote} title="Citation" />
@@ -403,7 +451,6 @@ export default function JournalManager({ data, updateData }) {
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            {/* SURLIGNEUR */}
                             <div className="relative">
                                 <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                 {showColorPalette && (
