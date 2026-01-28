@@ -37,6 +37,7 @@ export default function ChatManager({ user }) {
     // --- 1. CHARGEMENT DES DISCUSSIONS ---
     useEffect(() => {
         fetchRooms();
+        // Écoute globale pour la liste des rooms (sidebar)
         const roomSubscription = supabase
             .channel('room-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_participants' }, () => { fetchRooms(); })
@@ -64,10 +65,11 @@ export default function ChatManager({ user }) {
         }
     };
 
-    // --- 2. CHARGEMENT MESSAGES & TEMPS RÉEL ---
+    // --- 2. LOGIQUE ACTIVE ROOM (MESSAGES + PARTICIPANTS + PRÉSENCE) ---
     useEffect(() => {
         if (!activeRoom) return;
         
+        // Reset des états au changement de salle
         fetchParticipants(activeRoom.id);
         setShowGroupDetails(false); 
         setNewMemberEmail('');
@@ -75,8 +77,13 @@ export default function ChatManager({ user }) {
         setEditingMessageId(null);
         setNewMessage('');
 
-        if (activeRoom.status === 'pending') return;
+        // SI JE SUIS JUSTE INVITÉ (PENDING) : JE NE CHARGE PAS LES MESSAGES NI LA PRÉSENCE
+        if (activeRoom.status === 'pending') {
+            setMessages([]); // On vide les messages par sécurité
+            return; 
+        }
 
+        // SI JE SUIS ACCEPTÉ : JE CHARGE TOUT
         fetchMessages(activeRoom.id);
 
         const channel = supabase.channel(`room-${activeRoom.id}`, {
@@ -84,13 +91,13 @@ export default function ChatManager({ user }) {
         });
 
         channel
+            // A. MESSAGES (Insert, Update, Delete)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'chat_messages',
                 filter: `room_id=eq.${activeRoom.id}` 
             }, (payload) => {
-                // INSERT : On ajoute seulement si on ne l'a pas déjà (pour éviter doublon si envoi local rapide)
                 if (payload.eventType === 'INSERT') {
                     setMessages(current => {
                         if (current.some(m => m.id === payload.new.id)) return current;
@@ -98,15 +105,24 @@ export default function ChatManager({ user }) {
                     });
                     scrollToBottom();
                 } 
-                // DELETE : On filtre (si pas déjà fait localement)
                 else if (payload.eventType === 'DELETE') {
                     setMessages(current => current.filter(msg => msg.id !== payload.old.id));
                 }
-                // UPDATE : On met à jour (si pas déjà fait localement)
                 else if (payload.eventType === 'UPDATE') {
                     setMessages(current => current.map(msg => msg.id === payload.new.id ? payload.new : msg));
                 }
             })
+            // B. PARTICIPANTS (Mise à jour en temps réel des statuts "Pending" -> "Accepted")
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'chat_participants', 
+                filter: `room_id=eq.${activeRoom.id}` 
+            }, () => {
+                // Dès qu'un participant change (accepte, quitte, est viré), on recharge la liste
+                fetchParticipants(activeRoom.id);
+            })
+            // C. PRÉSENCE (Seulement si accepté)
             .on('presence', { event: 'sync' }, () => {
                 const newState = channel.presenceState();
                 setOnlineUsers(new Set(Object.keys(newState)));
@@ -149,66 +165,30 @@ export default function ChatManager({ user }) {
         const text = newMessage;
         
         if (editingMessageId) {
-            // --- MODIFICATION INSTANTANÉE (Optimiste) ---
+            // EDIT OPTIMISTE
             const oldMessages = [...messages];
-            // 1. Mise à jour visuelle immédiate
-            setMessages(current => current.map(msg => 
-                msg.id === editingMessageId ? { ...msg, content: text } : msg
-            ));
-            
+            setMessages(current => current.map(msg => msg.id === editingMessageId ? { ...msg, content: text } : msg));
             setEditingMessageId(null);
             setNewMessage('');
 
-            // 2. Envoi serveur
-            const { error } = await supabase
-                .from('chat_messages')
-                .update({ content: text })
-                .eq('id', editingMessageId);
-            
-            if (error) {
-                alert("Erreur modification");
-                setMessages(oldMessages); // Annuler si erreur
-            }
+            const { error } = await supabase.from('chat_messages').update({ content: text }).eq('id', editingMessageId);
+            if (error) { alert("Erreur modification"); setMessages(oldMessages); }
         } else {
-            // MODE CRÉATION
+            // SEND STANDARD
             setNewMessage(''); 
-            const { error } = await supabase
-                .from('chat_messages')
-                .insert([{
-                    room_id: activeRoom.id,
-                    sender_id: user.id,
-                    content: text
-                }]);
-            
-            if (error) {
-                alert("Erreur envoi");
-                setNewMessage(text); 
-            } else {
-                // Pas besoin d'ajout optimiste ici car le Realtime est assez rapide pour l'ajout,
-                // et on veut l'ID réel généré par la base.
-                // Mais on force un fetch au cas où.
-                fetchMessages(activeRoom.id);
-            }
+            const { error } = await supabase.from('chat_messages').insert([{ room_id: activeRoom.id, sender_id: user.id, content: text }]);
+            if (error) { alert("Erreur envoi"); setNewMessage(text); }
+            else { fetchMessages(activeRoom.id); }
         }
     };
 
     const handleDeleteMessage = async (messageId) => {
         if (!window.confirm("Supprimer ce message ?")) return;
-
-        // --- SUPPRESSION INSTANTANÉE (Optimiste) ---
-        // 1. On garde une copie au cas où ça plante
+        // DELETE OPTIMISTE
         const oldMessages = [...messages];
-
-        // 2. On supprime VISUELLEMENT tout de suite
         setMessages(current => current.filter(msg => msg.id !== messageId));
-
-        // 3. On envoie la commande au serveur
         const { error } = await supabase.from('chat_messages').delete().eq('id', messageId);
-
-        if (error) {
-            alert("Erreur suppression : " + error.message);
-            setMessages(oldMessages); // On remet le message si erreur
-        }
+        if (error) { alert("Erreur suppression"); setMessages(oldMessages); }
     };
 
     const startEditing = (msg) => {
@@ -221,7 +201,6 @@ export default function ChatManager({ user }) {
         setNewMessage('');
     };
 
-    // ... (Autres fonctions inchangées)
     const createChat = async () => {
         if (!inviteEmails || !newChatName) return alert("Champs requis");
         const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0);
@@ -241,14 +220,23 @@ export default function ChatManager({ user }) {
         if (participants.some(p => p.user_email === newMemberEmail.trim())) return alert("Déjà membre");
         try {
             await supabase.from('chat_participants').insert([{ room_id: activeRoom.id, user_email: newMemberEmail.trim(), status: 'pending' }]);
-            setNewMemberEmail(''); fetchParticipants(activeRoom.id);
+            setNewMemberEmail(''); 
+            // Pas besoin de fetchParticipants ici, le realtime s'en charge
         } catch (err) { alert("Erreur: " + err.message); }
     };
 
     const handleInvitation = async (roomId, accept) => {
-        if (accept) await supabase.from('chat_participants').update({ status: 'accepted', user_id: user.id }).match({ room_id: roomId, user_email: user.email });
-        else await supabase.from('chat_participants').delete().match({ room_id: roomId, user_email: user.email });
-        fetchRooms(); setActiveRoom(null);
+        if (accept) {
+            await supabase.from('chat_participants').update({ status: 'accepted', user_id: user.id }).match({ room_id: roomId, user_email: user.email });
+            // On force un refresh immédiat de la room active pour activer la connexion
+            const updatedRoom = { ...activeRoom, status: 'accepted' };
+            setActiveRoom(updatedRoom);
+            fetchRooms();
+        }
+        else {
+            await supabase.from('chat_participants').delete().match({ room_id: roomId, user_email: user.email });
+            fetchRooms(); setActiveRoom(null);
+        }
     };
 
     const handleDeleteRoom = async (roomId) => {
@@ -266,7 +254,7 @@ export default function ChatManager({ user }) {
     const handleKickParticipant = async (pId) => {
         if (!window.confirm("Retirer ce membre ?")) return;
         await supabase.from('chat_participants').delete().eq('id', pId);
-        fetchParticipants(activeRoom.id);
+        // Pas besoin de fetchParticipants ici, le realtime s'en charge
     };
 
     // --- RENDER ---
@@ -311,11 +299,15 @@ export default function ChatManager({ user }) {
                                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2 truncate">
                                         <MessageSquare size={20} className="text-indigo-500 shrink-0"/> <span className="truncate">{activeRoom.name}</span>
                                     </h3>
-                                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                                        <div className={`w-2 h-2 rounded-full ${onlineUsers.size > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div> {onlineUsers.size} en ligne
-                                    </span>
+                                    {/* MASQUER LA PRÉSENCE SI STATUS PENDING */}
+                                    {activeRoom.status === 'accepted' && (
+                                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                                            <div className={`w-2 h-2 rounded-full ${onlineUsers.size > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div> {onlineUsers.size} en ligne
+                                        </span>
+                                    )}
                                 </div>
                             </div>
+                            {/* BOUTON MEMBRES TOUJOURS VISIBLE MAIS CONTENU MODAL ADAPTÉ */}
                             <button onClick={() => setShowGroupDetails(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative">
                                 <Users size={20}/>
                                 {participants.some(p => p.status === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
@@ -348,23 +340,10 @@ export default function ChatManager({ user }) {
                                                         </div>
                                                     </div>
 
-                                                    {/* BOUTONS D'ACTION */}
                                                     {isMe && (
                                                         <div className="absolute -left-14 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button 
-                                                                onClick={() => startEditing(msg)} 
-                                                                className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700"
-                                                                title="Modifier"
-                                                            >
-                                                                <Pencil size={12}/>
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleDeleteMessage(msg.id)}
-                                                                className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-red-600 rounded-full shadow border border-slate-200 dark:border-slate-700"
-                                                                title="Supprimer"
-                                                            >
-                                                                <Trash2 size={12}/>
-                                                            </button>
+                                                            <button onClick={() => startEditing(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700"><Pencil size={12}/></button>
+                                                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-red-600 rounded-full shadow border border-slate-200 dark:border-slate-700"><Trash2 size={12}/></button>
                                                         </div>
                                                     )}
                                                 </div>
@@ -382,13 +361,7 @@ export default function ChatManager({ user }) {
                                         </div>
                                     )}
                                     <form onSubmit={handleSendMessage} className={`flex gap-2 ${editingMessageId ? 'bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-b-xl' : ''}`}>
-                                        <input 
-                                            type="text" 
-                                            value={newMessage}
-                                            onChange={e => setNewMessage(e.target.value)}
-                                            placeholder="Écrivez votre message..." 
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-950 focus:border-indigo-500 border rounded-xl px-4 py-3 outline-none transition-all dark:text-white"
-                                        />
+                                        <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Écrivez votre message..." className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-950 focus:border-indigo-500 border rounded-xl px-4 py-3 outline-none transition-all dark:text-white"/>
                                         <button type="submit" className={`p-3 text-white rounded-xl transition-colors ${editingMessageId ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
                                             {editingMessageId ? <Check size={20}/> : <Send size={20}/>}
                                         </button>
@@ -397,7 +370,8 @@ export default function ChatManager({ user }) {
                             </>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                                <h2 className="text-2xl font-bold dark:text-white mb-4">Invitation</h2>
+                                <h2 className="text-2xl font-bold dark:text-white mb-4">Invitation reçue</h2>
+                                <p className="text-slate-500 mb-6 max-w-md">Vous devez accepter l'invitation pour voir les messages et les membres en ligne.</p>
                                 <div className="flex gap-4">
                                     <button onClick={() => handleInvitation(activeRoom.id, false)} className="px-6 py-3 border border-slate-300 rounded-xl font-bold">Refuser</button>
                                     <button onClick={() => handleInvitation(activeRoom.id, true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold">Accepter</button>
@@ -413,7 +387,7 @@ export default function ChatManager({ user }) {
                 )}
             </div>
 
-            {/* MODAL MEMBRES & MODAL CREATION (Codes identiques, inclus pour complétude) */}
+            {/* MODAL MEMBRES */}
             {showGroupDetails && activeRoom && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -423,17 +397,24 @@ export default function ChatManager({ user }) {
                         </div>
                         <div className="flex-1 overflow-y-auto space-y-3 mb-4 custom-scrollbar">
                             {participants.map(p => {
+                                const isMe = p.user_email === user.email;
                                 const isOnline = p.user_id && onlineUsers.has(p.user_id);
+                                // AFFICHER "EN ATTENTE" SI PENDING
+                                const statusText = p.status === 'pending' ? 'En attente...' : (isOnline ? 'En ligne' : 'Hors ligne');
+                                const statusColor = p.status === 'pending' ? 'text-amber-500' : (isOnline ? 'text-emerald-600' : 'text-slate-400');
+                                const statusDot = p.status === 'pending' ? 'bg-amber-400' : (isOnline ? 'bg-emerald-500' : 'bg-slate-300');
+
                                 return (
                                     <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <div className="relative w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
                                                 {p.user_email[0].toUpperCase()}
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                                                {/* SI LE USER EST MOI ET QUE JE SUIS PENDING, JE NE DOIS PAS VOIR LE STATUT DES AUTRES. MAIS ICI JE VOIS LA LISTE. C'EST OK, JE VOIS JUSTE QUI EST DANS LE GROUPE. */}
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${statusDot}`}></div>
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium dark:text-white">{p.user_email}</p>
-                                                <p className={`text-[10px] ${isOnline ? 'text-emerald-600' : 'text-slate-400'}`}>{isOnline ? 'En ligne' : 'Hors ligne'}</p>
+                                                <p className="text-sm font-medium dark:text-white">{p.user_email} {isMe && "(Moi)"}</p>
+                                                <p className={`text-[10px] ${statusColor}`}>{statusText}</p>
                                             </div>
                                         </div>
                                         {activeRoom.isOwner && p.user_email !== user.email && <button onClick={() => handleKickParticipant(p.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Ban size={16}/></button>}
@@ -456,6 +437,8 @@ export default function ChatManager({ user }) {
                     </div>
                 </div>
             )}
+            
+            {/* MODAL CREATION (Identique) */}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm">
