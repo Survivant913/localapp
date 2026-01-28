@@ -1,12 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
   Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
-  Heading, Quote, Save, FolderPlus, FilePlus,
-  ArrowLeft, Underline, Strikethrough, Type,
-  X, CornerDownRight, Highlighter, PanelLeft,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  MoreVertical, Star, Loader2, Calendar, Printer, LayoutGrid
+  Heading, Type, Underline, Strikethrough,
+  ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -41,16 +38,15 @@ export default function JournalManager({ data, updateData }) {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [nbRes, pgRes] = await Promise.all([
-                supabase.from('journal_notebooks').select('*').order('created_at'),
-                supabase.from('journal_pages').select('id, notebook_id, title, created_at, updated_at, is_favorite').order('updated_at', { ascending: false })
-            ]);
+            // Chargement parallèle mais indépendant (si l'un échoue, l'autre fonctionne)
+            const nbPromise = supabase.from('journal_notebooks').select('*').order('created_at');
+            const pgPromise = supabase.from('journal_pages').select('id, notebook_id, title, created_at, updated_at, is_favorite').order('updated_at', { ascending: false });
+
+            const [nbRes, pgRes] = await Promise.all([nbPromise, pgPromise]);
             
             if (nbRes.data) setNotebooks(nbRes.data);
             if (pgRes.data) setPages(pgRes.data);
             
-            // CORRECTION : On NE force PLUS l'ouverture du premier dossier
-            // On laisse l'utilisateur choisir sur le Dashboard
         } catch (error) {
             console.error("Erreur chargement journal:", error);
         } finally {
@@ -112,7 +108,7 @@ export default function JournalManager({ data, updateData }) {
             await performSave();
         } else {
             // Debounce (attendre 1.5s après la frappe)
-            setIsSaving(true); // Indicateur visuel immédiat
+            setIsSaving(true); 
             saveTimeoutRef.current = setTimeout(performSave, 1500);
         }
     };
@@ -191,41 +187,38 @@ export default function JournalManager({ data, updateData }) {
         printWindow.document.close();
     };
 
-    // --- ACTIONS NOTEBOOKS ---
+    // --- ACTIONS NOTEBOOKS (CORRIGÉ) ---
     const createNotebook = async () => {
         const name = prompt("Nom du nouveau dossier :");
         if (!name) return;
         
         try {
-            // CORRECTION CRITIQUE : Ajout de user_id explicitement si besoin
-            const { data: { user } } = await supabase.auth.getUser();
-            
+            // CORRECTION: On laisse Supabase gérer l'ID utilisateur automatiquement
+            // On n'envoie que le nom et la couleur
             const { data, error } = await supabase
                 .from('journal_notebooks')
-                .insert([{ 
-                    name, 
-                    color: 'blue',
-                    user_id: user.id // Force l'ID utilisateur
-                }])
+                .insert([{ name, color: 'blue' }])
                 .select();
                 
             if (error) throw error;
 
             if (data) {
                 setNotebooks([...notebooks, data[0]]);
-                // On n'ouvre pas forcément le dossier, on laisse l'utilisateur voir son nouveau dossier
             }
         } catch (err) {
             console.error("Erreur création dossier:", err);
-            alert("Erreur lors de la création du dossier.");
+            alert("Erreur lors de la création. Vérifiez votre connexion.");
         }
     };
 
     const deleteNotebook = async (id, e) => {
         e.stopPropagation();
         if (!window.confirm("⚠️ ATTENTION : Supprimer ce dossier effacera TOUTES les pages à l'intérieur. Continuer ?")) return;
+        
+        // Suppression propre : Pages d'abord, Dossier ensuite
         await supabase.from('journal_pages').delete().eq('notebook_id', id);
         await supabase.from('journal_notebooks').delete().eq('id', id);
+        
         setNotebooks(notebooks.filter(n => n.id !== id));
         setPages(pages.filter(p => p.notebook_id !== id));
         if (activeNotebookId === id) setActiveNotebookId(null);
@@ -237,6 +230,8 @@ export default function JournalManager({ data, updateData }) {
             alert("Sélectionnez un dossier d'abord.");
             return;
         }
+        
+        // Sauvegarder la page actuelle avant de changer
         if (activePageId) await saveCurrentPage(true);
 
         const { data } = await supabase.from('journal_pages').insert([{ 
@@ -265,7 +260,7 @@ export default function JournalManager({ data, updateData }) {
         setPages(pages.map(p => p.id === id ? { ...p, is_favorite: !currentStatus } : p));
     };
 
-    // --- ÉDITEUR FORMATAGE ---
+    // --- ÉDITEUR FORMATAGE (FIX FOCUS) ---
     const execCmd = (cmd, value = null) => {
         document.execCommand(cmd, false, value);
         if (editorRef.current) editorRef.current.focus();
@@ -288,7 +283,7 @@ export default function JournalManager({ data, updateData }) {
                 <div className="max-w-5xl mx-auto">
                     <div className="flex justify-between items-center mb-8">
                         <div>
-                            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Mes Journaux</h2>
+                            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-2">Mes Journaux </h2>
                             <p className="text-slate-500 dark:text-slate-400">Gérez vos notes et vos pensées.</p>
                         </div>
                         <button 
@@ -300,49 +295,53 @@ export default function JournalManager({ data, updateData }) {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {/* Carte Nouveau (alternative visuelle) */}
-                        <div 
-                            onClick={createNotebook}
-                            className="group flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all min-h-[160px]"
-                        >
-                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30">
-                                <Plus size={24} className="text-slate-400 group-hover:text-indigo-600" />
-                            </div>
-                            <span className="font-bold text-slate-500 group-hover:text-indigo-600">Créer un journal</span>
-                        </div>
-
-                        {/* Liste des Notebooks */}
-                        {notebooks.map(nb => (
+                    {isLoading ? (
+                        <div className="text-center py-20 text-slate-400"><Loader2 size={32} className="animate-spin mx-auto mb-4"/>Chargement...</div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            {/* Carte Nouveau */}
                             <div 
-                                key={nb.id}
-                                onClick={() => setActiveNotebookId(nb.id)}
-                                className="group relative bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-500 dark:hover:border-indigo-500 cursor-pointer transition-all flex flex-col justify-between min-h-[160px]"
+                                onClick={createNotebook}
+                                className="group flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all min-h-[160px]"
                             >
-                                <div>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                            <Book size={20} />
-                                        </div>
-                                        <button 
-                                            onClick={(e) => deleteNotebook(nb.id, e)}
-                                            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                    <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-1 truncate">{nb.name}</h3>
-                                    <p className="text-xs text-slate-500">
-                                        {pages.filter(p => p.notebook_id === nb.id).length} page(s)
-                                    </p>
+                                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30">
+                                    <Plus size={24} className="text-slate-400 group-hover:text-indigo-600" />
                                 </div>
-                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                                    <span>{new Date(nb.created_at).toLocaleDateString()}</span>
-                                    <span className="group-hover:translate-x-1 transition-transform text-indigo-500 flex items-center gap-1 font-bold">Ouvrir <ChevronRight size={12}/></span>
-                                </div>
+                                <span className="font-bold text-slate-500 group-hover:text-indigo-600">Créer un journal</span>
                             </div>
-                        ))}
-                    </div>
+
+                            {/* Liste des Notebooks */}
+                            {notebooks.map(nb => (
+                                <div 
+                                    key={nb.id}
+                                    onClick={() => setActiveNotebookId(nb.id)}
+                                    className="group relative bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-500 dark:hover:border-indigo-500 cursor-pointer transition-all flex flex-col justify-between min-h-[160px]"
+                                >
+                                    <div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                                <Book size={20} />
+                                            </div>
+                                            <button 
+                                                onClick={(e) => deleteNotebook(nb.id, e)}
+                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-1 truncate">{nb.name}</h3>
+                                        <p className="text-xs text-slate-500">
+                                            {pages.filter(p => p.notebook_id === nb.id).length} page(s)
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                                        <span>{new Date(nb.created_at).toLocaleDateString()}</span>
+                                        <span className="group-hover:translate-x-1 transition-transform text-indigo-500 flex items-center gap-1 font-bold">Ouvrir <ChevronRight size={12}/></span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -462,15 +461,15 @@ export default function JournalManager({ data, updateData }) {
                                     type="text" 
                                     value={pageTitle}
                                     onChange={(e) => { setPageTitle(e.target.value); saveCurrentPage(false); }}
-                                    onBlur={() => saveCurrentPage(true)}
+                                    onBlur={() => saveCurrentPage(true)} // Sauvegarde Immédiate
                                     placeholder="Titre de la page..."
                                     className="w-full text-4xl font-bold text-slate-800 dark:text-slate-100 bg-transparent outline-none placeholder-slate-300 dark:placeholder-slate-700 mb-8"
                                 />
                                 <div 
                                     ref={editorRef}
                                     contentEditable
-                                    onInput={() => saveCurrentPage(false)}
-                                    onBlur={() => saveCurrentPage(true)}
+                                    onInput={() => saveCurrentPage(false)} // Debounce save
+                                    onBlur={() => saveCurrentPage(true)} // Force save on blur
                                     className="prose dark:prose-invert max-w-none outline-none min-h-[50vh] text-slate-700 dark:text-slate-300 leading-relaxed text-lg pb-32 empty:before:content-[attr(placeholder)] empty:before:text-slate-300"
                                     placeholder="Commencez à écrire..."
                                 ></div>
@@ -487,7 +486,8 @@ export default function JournalManager({ data, updateData }) {
                     </div>
                 )}
             </div>
-            
+
+            {/* STYLES GLOBAUX */}
             <style>{`
                 .prose h2 { font-size: 1.5em; font-weight: 800; margin-top: 1.5em; margin-bottom: 0.5em; color: inherit; }
                 .prose h3 { font-size: 1.25em; font-weight: 700; margin-top: 1.2em; margin-bottom: 0.5em; color: inherit; }
