@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, Send, Plus, User, Check, X, Clock, 
-  Trash2, Search, AlertCircle, Ban, Users 
+  Trash2, Search, AlertCircle, Ban, Users, PanelLeft,
+  LogOut, MoreVertical, Settings, UserPlus
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -16,9 +17,16 @@ export default function ChatManager({ user }) {
     const [isCreating, setIsCreating] = useState(false);
     const [participants, setParticipants] = useState([]); 
     
+    // UI States
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [showGroupDetails, setShowGroupDetails] = useState(false);
+
     // Formulaire Nouveau Chat
     const [newChatName, setNewChatName] = useState('');
-    const [inviteEmails, setInviteEmails] = useState(''); // Changé pour gérer plusieurs mails
+    const [inviteEmails, setInviteEmails] = useState('');
+
+    // Formulaire Ajout Membre (Groupe existant)
+    const [newMemberEmail, setNewMemberEmail] = useState('');
     
     const messagesEndRef = useRef(null);
 
@@ -64,6 +72,8 @@ export default function ChatManager({ user }) {
         if (!activeRoom) return;
         
         fetchParticipants(activeRoom.id);
+        setShowGroupDetails(false); 
+        setNewMemberEmail(''); // Reset input ajout
 
         if (activeRoom.status === 'pending') return;
 
@@ -141,13 +151,10 @@ export default function ChatManager({ user }) {
     const createChat = async () => {
         if (!inviteEmails || !newChatName) return alert("Emails et Nom requis");
 
-        // 1. Découpage des emails (séparés par des virgules)
         const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0);
-        
         if (emailList.length === 0) return alert("Aucun email valide");
 
         try {
-            // 2. Créer la Room
             const { data: roomData, error: roomError } = await supabase
                 .from('chat_rooms')
                 .insert([{ name: newChatName, created_by: user.id }])
@@ -156,13 +163,10 @@ export default function ChatManager({ user }) {
 
             if (roomError) throw roomError;
 
-            // 3. Préparer la liste des participants
-            // Moi (Propriétaire)
             const participantsToAdd = [
                 { room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' }
             ];
 
-            // Les Invités (Boucle sur la liste)
             emailList.forEach(email => {
                 participantsToAdd.push({ 
                     room_id: roomData.id, 
@@ -171,7 +175,6 @@ export default function ChatManager({ user }) {
                 });
             });
 
-            // 4. Insertion en masse
             const { error: partError } = await supabase.from('chat_participants').insert(participantsToAdd);
             if (partError) throw partError;
 
@@ -184,6 +187,32 @@ export default function ChatManager({ user }) {
         } catch (err) {
             console.error(err);
             alert("Erreur création: " + err.message);
+        }
+    };
+
+    // --- NOUVEAU : AJOUTER UN MEMBRE À UN GROUPE EXISTANT ---
+    const handleAddMember = async () => {
+        if (!newMemberEmail.trim()) return;
+        
+        // Vérifier si déjà présent
+        if (participants.some(p => p.user_email === newMemberEmail.trim())) {
+            return alert("Cette personne est déjà dans le groupe.");
+        }
+
+        try {
+            const { error } = await supabase.from('chat_participants').insert([{
+                room_id: activeRoom.id,
+                user_email: newMemberEmail.trim(),
+                status: 'pending'
+            }]);
+
+            if (error) throw error;
+
+            setNewMemberEmail('');
+            fetchParticipants(activeRoom.id);
+            alert("Invitation envoyée !");
+        } catch (err) {
+            alert("Erreur ajout : " + err.message);
         }
     };
 
@@ -213,28 +242,45 @@ export default function ChatManager({ user }) {
         }
     };
 
-    const handleCancelInvite = async (participantId) => {
-        if (!window.confirm("Annuler cette invitation ?")) return;
-        await supabase.from('chat_participants').delete().eq('id', participantId);
-        fetchParticipants(activeRoom.id);
+    const handleLeaveRoom = async () => {
+        if (!window.confirm("Voulez-vous vraiment quitter ce groupe ?")) return;
+        try {
+            await supabase.from('chat_participants')
+                .delete()
+                .match({ room_id: activeRoom.id, user_email: user.email });
+            setActiveRoom(null);
+            fetchRooms();
+        } catch (err) {
+            alert("Erreur : " + err.message);
+        }
+    };
+
+    const handleKickParticipant = async (participantId, participantEmail) => {
+        if (!window.confirm(`Retirer ${participantEmail} du groupe ?`)) return;
+        try {
+            await supabase.from('chat_participants').delete().eq('id', participantId);
+            fetchParticipants(activeRoom.id);
+        } catch (err) {
+            alert("Erreur : " + err.message);
+        }
     };
 
     // --- RENDER ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             
-            {/* LISTE DES CONVERSATIONS */}
-            <div className="w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                    <h2 className="font-bold text-lg dark:text-white">Messages</h2>
-                    <button onClick={() => setIsCreating(true)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 transition-colors"><Plus size={20}/></button>
+            {/* SIDEBAR */}
+            <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
+                    <h2 className="font-bold text-lg dark:text-white truncate">Discussions</h2>
+                    <button onClick={() => setIsCreating(true)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 transition-colors shrink-0"><Plus size={20}/></button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {rooms.map(room => (
                         <div 
                             key={room.id}
-                            onClick={() => setActiveRoom(room)}
+                            onClick={() => { setActiveRoom(room); if (window.innerWidth < 768) setIsSidebarOpen(false); }}
                             className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}
                         >
                             <div className="flex justify-between items-start mb-1 pr-6">
@@ -245,66 +291,72 @@ export default function ChatManager({ user }) {
                                 {room.isOwner ? <User size={12}/> : <Users size={12}/>} 
                                 {room.isOwner ? 'Propriétaire' : 'Participant'}
                             </div>
-
-                            {room.isOwner && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id); }}
-                                    className="absolute right-2 top-3 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                    title="Supprimer la discussion"
-                                >
-                                    <Trash2 size={14}/>
-                                </button>
-                            )}
                         </div>
                     ))}
                     {rooms.length === 0 && <div className="text-center text-slate-400 text-sm mt-10">Aucune discussion</div>}
                 </div>
             </div>
 
-            {/* ZONE DE CHAT */}
-            <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative">
+            {/* TOGGLE */}
+            <div 
+                className="flex flex-col items-center py-4 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-4 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer transition-colors z-10" 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+                <div className="w-1 h-8 bg-slate-300 dark:bg-slate-700 rounded-full my-auto"></div>
+            </div>
+
+            {/* CHAT */}
+            <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative min-w-0">
                 {activeRoom ? (
                     <>
-                        {/* Header Chat */}
-                        <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-6 justify-between shrink-0">
-                            <div className="flex flex-col w-full">
-                                <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                                    <MessageSquare size={20} className="text-indigo-500"/>
-                                    {activeRoom.name}
-                                </h3>
-                                {/* Liste des invités en attente */}
-                                <div className="flex items-center gap-2 mt-1 overflow-x-auto pb-1 scrollbar-none">
-                                    {participants.filter(p => p.status === 'pending').map(p => (
-                                        <div key={p.id} className="flex items-center gap-1 text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 shrink-0">
-                                            <span>En attente: {p.user_email}</span>
-                                            {activeRoom.isOwner && (
-                                                <button onClick={() => handleCancelInvite(p.id)} className="hover:text-red-600"><X size={10}/></button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {participants.length > 0 && (
-                                        <span className="text-[10px] text-slate-400 ml-2">
-                                            {participants.filter(p => p.status === 'accepted').length} membre(s) actif(s)
-                                        </span>
-                                    )}
+                        {/* Header */}
+                        <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                {!isSidebarOpen && (
+                                    <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600"><PanelLeft size={20}/></button>
+                                )}
+                                <div className="flex flex-col truncate">
+                                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2 truncate">
+                                        <MessageSquare size={20} className="text-indigo-500 shrink-0"/>
+                                        <span className="truncate">{activeRoom.name}</span>
+                                    </h3>
+                                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                                        <div className={`w-2 h-2 rounded-full ${participants.length > 1 ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                                        {participants.length} membre{participants.length > 1 ? 's' : ''}
+                                    </span>
                                 </div>
                             </div>
+                            <button 
+                                onClick={() => setShowGroupDetails(true)} 
+                                className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors relative"
+                                title="Gérer les membres"
+                            >
+                                <Users size={20}/>
+                                {participants.some(p => p.status === 'pending') && (
+                                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+                                )}
+                            </button>
                         </div>
 
-                        {/* Contenu Chat */}
+                        {/* Contenu */}
                         {activeRoom.status === 'accepted' ? (
                             <>
                                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                                     {messages.map(msg => {
                                         const isMe = msg.sender_id === user.id;
-                                        // On cherche le nom de l'expéditeur parmi les participants
                                         const sender = participants.find(p => p.user_id === msg.sender_id);
                                         const senderName = sender ? sender.user_email.split('@')[0] : 'Inconnu';
+                                        const avatarColor = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][senderName.length % 5];
 
                                         return (
                                             <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                                                {!isMe && <span className="text-[10px] text-slate-400 ml-2 mb-0.5">{senderName}</span>}
-                                                <div className={`max-w-[70%] p-3 rounded-2xl shadow-sm text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
+                                                {!isMe && (
+                                                    <div className="flex items-center gap-2 ml-1 mb-1">
+                                                        <div className={`w-4 h-4 rounded-full ${avatarColor} flex items-center justify-center text-[8px] text-white font-bold uppercase`}>{senderName[0]}</div>
+                                                        <span className="text-[10px] text-slate-400 font-medium">{senderName}</span>
+                                                    </div>
+                                                )}
+                                                <div className={`max-w-[75%] md:max-w-[60%] p-3 rounded-2xl shadow-sm text-sm break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
                                                     <p>{msg.content}</p>
                                                     <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
                                                         {format(new Date(msg.created_at), 'HH:mm')}
@@ -316,7 +368,6 @@ export default function ChatManager({ user }) {
                                     <div ref={messagesEndRef} />
                                 </div>
 
-                                {/* Input Bar */}
                                 <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
                                     <form onSubmit={handleSendMessage} className="flex gap-2">
                                         <input 
@@ -333,14 +384,12 @@ export default function ChatManager({ user }) {
                                 </div>
                             </>
                         ) : (
-                            /* Écran Invitation */
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                                 <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4"><Clock size={32}/></div>
                                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Invitation reçue</h2>
-                                <p className="text-slate-500 max-w-md mb-8">Vous avez été invité à rejoindre le groupe <strong>"{activeRoom.name}"</strong>. Souhaitez-vous accepter ?</p>
                                 <div className="flex gap-4">
-                                    <button onClick={() => handleInvitation(activeRoom.id, false)} className="px-6 py-3 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Refuser</button>
-                                    <button onClick={() => handleInvitation(activeRoom.id, true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-colors">Accepter & Rejoindre</button>
+                                    <button onClick={() => handleInvitation(activeRoom.id, false)} className="px-6 py-3 border border-slate-300 rounded-xl font-bold text-slate-600">Refuser</button>
+                                    <button onClick={() => handleInvitation(activeRoom.id, true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold">Accepter</button>
                                 </div>
                             </div>
                         )}
@@ -352,6 +401,78 @@ export default function ChatManager({ user }) {
                     </div>
                 )}
             </div>
+
+            {/* MODAL GESTION MEMBRES */}
+            {showGroupDetails && activeRoom && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+                        <div className="flex justify-between items-center mb-4 shrink-0">
+                            <h3 className="text-lg font-bold dark:text-white">Membres du groupe</h3>
+                            <button onClick={() => setShowGroupDetails(false)}><X size={20} className="text-slate-400"/></button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 custom-scrollbar">
+                            {participants.map(p => {
+                                const isMe = p.user_email === user.email;
+                                const isOwner = activeRoom.isOwner;
+                                return (
+                                    <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                                {p.user_email[0].toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-slate-800 dark:text-white truncate">
+                                                    {p.user_email} {isMe && "(Moi)"}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400">
+                                                    {p.status === 'pending' ? 'En attente...' : 'Membre actif'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {isOwner && !isMe && (
+                                            <button onClick={() => handleKickParticipant(p.id, p.user_email)} className="p-1.5 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">
+                                                <Ban size={16}/>
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* AJOUT DE MEMBRE (Seulement pour le propriétaire) */}
+                        {activeRoom.isOwner && (
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mb-4">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Ajouter un membre</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="email" 
+                                        value={newMemberEmail}
+                                        onChange={e => setNewMemberEmail(e.target.value)}
+                                        placeholder="email@exemple.com"
+                                        className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none text-sm dark:text-white"
+                                    />
+                                    <button onClick={handleAddMember} disabled={!newMemberEmail} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                                        <UserPlus size={18}/>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 shrink-0">
+                            {activeRoom.isOwner ? (
+                                <button onClick={() => handleDeleteRoom(activeRoom.id)} className="w-full flex items-center justify-center gap-2 p-3 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/10 rounded-xl font-bold text-sm">
+                                    <Trash2 size={16}/> Supprimer le groupe
+                                </button>
+                            ) : (
+                                <button onClick={handleLeaveRoom} className="w-full flex items-center justify-center gap-2 p-3 text-slate-500 hover:text-red-600 bg-slate-100 hover:bg-red-50 dark:bg-slate-800 rounded-xl font-bold text-sm">
+                                    <LogOut size={16}/> Quitter le groupe
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL CRÉATION */}
             {isCreating && (
@@ -369,9 +490,8 @@ export default function ChatManager({ user }) {
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Emails des invités</label>
                                 <input type="text" value={inviteEmails} onChange={e => setInviteEmails(e.target.value)} className="w-full p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white" placeholder="email1@test.com, email2@test.com"/>
-                                <p className="text-[10px] text-slate-400 mt-1">Séparez les emails par des virgules pour inviter plusieurs personnes.</p>
                             </div>
-                            <button onClick={createChat} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 mt-2">Envoyer les invitations</button>
+                            <button onClick={createChat} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 mt-2">Envoyer</button>
                         </div>
                     </div>
                 </div>
