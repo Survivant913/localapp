@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
-  Users, Box, Target, Book, CalendarRange, Clock, Activity // --- IMPORT ICONE ---
+  Users, Box, Target, Book, CalendarRange, Clock, Activity,
+  MessageSquare // --- IMPORT ICONE MESSAGE ---
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -55,11 +56,12 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
   const menuItems = [
     { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { id: 'workspace', label: 'Workspace', icon: Box }, 
+    { id: 'chat', label: 'Messages', icon: MessageSquare }, // --- NOUVEAU MENU ---
     { id: 'planning', label: 'Agenda', icon: CalendarRange },
     { id: 'calendar', label: 'Calendrier Financier', icon: Calendar }, 
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'goals', label: 'Objectifs', icon: Target },
-    { id: 'habits', label: 'Suivi Habitudes', icon: Activity }, // --- NOUVEAU LIEN ---
+    { id: 'habits', label: 'Suivi Habitudes', icon: Activity },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
     { id: 'clients', label: 'Clients', icon: Users },
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },

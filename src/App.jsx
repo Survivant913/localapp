@@ -15,7 +15,8 @@ import Workspace from './Workspace';
 import GoalsManager from './GoalsManager'; 
 import JournalManager from './JournalManager';
 import PlanningManager from './PlanningManager';
-import HabitTracker from './HabitTracker'; // --- IMPORT NOUVEAU COMPOSANT ---
+import HabitTracker from './HabitTracker'; 
+import ChatManager from './ChatManager'; // --- IMPORT NOUVEAU (MESSAGERIE) ---
 import { Loader2, Lock } from 'lucide-react';
 
 // --- NOUVEAU : PALETTE DE COULEURS ---
@@ -436,7 +437,8 @@ export default function App() {
       case 'todo': return <TodoList data={data} updateData={updateData} />;
       case 'goals': return <GoalsManager data={data} updateData={updateData} />;
       case 'journal': return <JournalManager data={data} updateData={updateData} />;
-      case 'habits': return <HabitTracker data={data} updateData={updateData} />; // --- NOUVEAU CAS ---
+      case 'habits': return <HabitTracker data={data} updateData={updateData} />;
+      case 'chat': return <ChatManager user={session.user} />; // --- NOUVEAU CAS (MESSAGERIE) ---
       case 'clients': return <ClientHub data={data} updateData={updateData} />;
       case 'workspace': return <Workspace data={data} updateData={updateData} />;
       case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
@@ -445,7 +447,7 @@ export default function App() {
     }
   };
 
-  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits'; // --- AJOUT HABITS AU STYLE FULL WIDTH (Optionnel, à ton choix) ---
+  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits' || currentView === 'chat'; // --- AJOUT CHAT AU STYLE FULL WIDTH ---
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
