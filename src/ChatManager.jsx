@@ -18,7 +18,7 @@ export default function ChatManager({ user }) {
     const [participants, setParticipants] = useState([]); 
     
     // États pour l'édition
-    const [editingMessageId, setEditingMessageId] = useState(null); // ID du message en cours de modif
+    const [editingMessageId, setEditingMessageId] = useState(null); 
 
     // État Présence
     const [onlineUsers, setOnlineUsers] = useState(new Set());
@@ -84,20 +84,25 @@ export default function ChatManager({ user }) {
         });
 
         channel
-            // Écoute TOUS les changements (INSERT, UPDATE, DELETE)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'chat_messages',
                 filter: `room_id=eq.${activeRoom.id}` 
             }, (payload) => {
+                // INSERT : On ajoute seulement si on ne l'a pas déjà (pour éviter doublon si envoi local rapide)
                 if (payload.eventType === 'INSERT') {
-                    setMessages(current => [...current, payload.new]);
+                    setMessages(current => {
+                        if (current.some(m => m.id === payload.new.id)) return current;
+                        return [...current, payload.new];
+                    });
                     scrollToBottom();
                 } 
+                // DELETE : On filtre (si pas déjà fait localement)
                 else if (payload.eventType === 'DELETE') {
                     setMessages(current => current.filter(msg => msg.id !== payload.old.id));
                 }
+                // UPDATE : On met à jour (si pas déjà fait localement)
                 else if (payload.eventType === 'UPDATE') {
                     setMessages(current => current.map(msg => msg.id === payload.new.id ? payload.new : msg));
                 }
@@ -144,16 +149,25 @@ export default function ChatManager({ user }) {
         const text = newMessage;
         
         if (editingMessageId) {
-            // MODE MODIFICATION
+            // --- MODIFICATION INSTANTANÉE (Optimiste) ---
+            const oldMessages = [...messages];
+            // 1. Mise à jour visuelle immédiate
+            setMessages(current => current.map(msg => 
+                msg.id === editingMessageId ? { ...msg, content: text } : msg
+            ));
+            
+            setEditingMessageId(null);
+            setNewMessage('');
+
+            // 2. Envoi serveur
             const { error } = await supabase
                 .from('chat_messages')
                 .update({ content: text })
                 .eq('id', editingMessageId);
             
-            if (error) alert("Erreur modification");
-            else {
-                setEditingMessageId(null);
-                setNewMessage('');
+            if (error) {
+                alert("Erreur modification");
+                setMessages(oldMessages); // Annuler si erreur
             }
         } else {
             // MODE CRÉATION
@@ -165,10 +179,14 @@ export default function ChatManager({ user }) {
                     sender_id: user.id,
                     content: text
                 }]);
+            
             if (error) {
                 alert("Erreur envoi");
                 setNewMessage(text); 
             } else {
+                // Pas besoin d'ajout optimiste ici car le Realtime est assez rapide pour l'ajout,
+                // et on veut l'ID réel généré par la base.
+                // Mais on force un fetch au cas où.
                 fetchMessages(activeRoom.id);
             }
         }
@@ -176,14 +194,26 @@ export default function ChatManager({ user }) {
 
     const handleDeleteMessage = async (messageId) => {
         if (!window.confirm("Supprimer ce message ?")) return;
+
+        // --- SUPPRESSION INSTANTANÉE (Optimiste) ---
+        // 1. On garde une copie au cas où ça plante
+        const oldMessages = [...messages];
+
+        // 2. On supprime VISUELLEMENT tout de suite
+        setMessages(current => current.filter(msg => msg.id !== messageId));
+
+        // 3. On envoie la commande au serveur
         const { error } = await supabase.from('chat_messages').delete().eq('id', messageId);
-        if (error) alert("Erreur suppression : " + error.message);
+
+        if (error) {
+            alert("Erreur suppression : " + error.message);
+            setMessages(oldMessages); // On remet le message si erreur
+        }
     };
 
     const startEditing = (msg) => {
         setEditingMessageId(msg.id);
         setNewMessage(msg.content);
-        // Focus automatique sur l'input (optionnel, géré par React)
     };
 
     const cancelEditing = () => {
@@ -191,8 +221,7 @@ export default function ChatManager({ user }) {
         setNewMessage('');
     };
 
-    // ... (Les autres fonctions createChat, handleInvitation, etc. restent identiques)
-    // Je les inclus pour que le fichier soit complet
+    // ... (Autres fonctions inchangées)
     const createChat = async () => {
         if (!inviteEmails || !newChatName) return alert("Champs requis");
         const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0);
@@ -319,7 +348,7 @@ export default function ChatManager({ user }) {
                                                         </div>
                                                     </div>
 
-                                                    {/* BOUTONS D'ACTION (Seulement pour moi) */}
+                                                    {/* BOUTONS D'ACTION */}
                                                     {isMe && (
                                                         <div className="absolute -left-14 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button 
@@ -384,7 +413,7 @@ export default function ChatManager({ user }) {
                 )}
             </div>
 
-            {/* MODAL MEMBRES (Code inchangé visuellement) */}
+            {/* MODAL MEMBRES & MODAL CREATION (Codes identiques, inclus pour complétude) */}
             {showGroupDetails && activeRoom && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -427,8 +456,6 @@ export default function ChatManager({ user }) {
                     </div>
                 </div>
             )}
-            
-            {/* MODAL CREATION (Code identique) */}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm">
