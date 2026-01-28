@@ -3,11 +3,14 @@ import {
   MessageSquare, Send, Plus, User, Check, X, Clock, 
   Trash2, Search, AlertCircle, Ban, Users, PanelLeft,
   LogOut, MoreVertical, Settings, UserPlus, Pencil, Edit2, 
-  Reply, CornerDownRight
+  Reply, CornerDownRight, Pin, PinOff, Volume2, VolumeX
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+// Petit son "Pop" (Base64 pour ne pas avoir à gérer de fichier externe)
+const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAERERERERERERERERERERMzMzMzMzMzMzMzMzMzMzMzMzREREREREREREREREREREREREZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZm//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjM1LjEwMAAAAAAAAAAAAAAAJAAAAAAAAAAAASNmNs4AAAAAAAAB//OEZAAAAAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAQAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAf/7kmRAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZAADAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 export default function ChatManager({ user }) {
     // --- ÉTATS ---
@@ -18,18 +21,19 @@ export default function ChatManager({ user }) {
     const [isCreating, setIsCreating] = useState(false);
     const [participants, setParticipants] = useState([]); 
     
-    // États pour l'édition et la réponse
+    // États Action
     const [editingMessageId, setEditingMessageId] = useState(null); 
-    const [replyingTo, setReplyingTo] = useState(null); // Le message auquel on répond
+    const [replyingTo, setReplyingTo] = useState(null);
 
     // État Présence & Frappe
     const [onlineUsers, setOnlineUsers] = useState(new Set());
-    const [typingUsers, setTypingUsers] = useState(new Set()); // IDs des gens qui écrivent
-    const typingTimeoutRef = useRef(null); // Pour arrêter l'indicateur après X secondes
+    const [typingUsers, setTypingUsers] = useState(new Set());
+    const typingTimeoutRef = useRef(null);
     
     // UI States
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showGroupDetails, setShowGroupDetails] = useState(false);
+    const [soundEnabled, setSoundEnabled] = useState(true); // Activer/Désactiver le son
 
     // Formulaires
     const [newChatName, setNewChatName] = useState('');
@@ -37,7 +41,8 @@ export default function ChatManager({ user }) {
     const [newMemberEmail, setNewMemberEmail] = useState('');
     
     const messagesEndRef = useRef(null);
-    const channelRef = useRef(null); // Référence pour accéder au channel hors du useEffect
+    const channelRef = useRef(null);
+    const audioRef = useRef(new Audio(POP_SOUND)); // Pré-chargement du son
 
     // --- 1. CHARGEMENT DES DISCUSSIONS ---
     useEffect(() => {
@@ -73,7 +78,7 @@ export default function ChatManager({ user }) {
     useEffect(() => {
         if (!activeRoom) return;
         
-        // Reset des états
+        // Reset
         fetchParticipants(activeRoom.id);
         setShowGroupDetails(false); 
         setNewMemberEmail('');
@@ -103,6 +108,14 @@ export default function ChatManager({ user }) {
                 filter: `room_id=eq.${activeRoom.id}` 
             }, (payload) => {
                 if (payload.eventType === 'INSERT') {
+                    // JOUER LE SON SI CE N'EST PAS MOI
+                    if (payload.new.sender_id !== user.id && soundEnabled) {
+                        try {
+                            audioRef.current.currentTime = 0;
+                            audioRef.current.play().catch(e => console.log("Audio bloqué par navigateur", e));
+                        } catch(e) {}
+                    }
+
                     setMessages(current => {
                         if (current.some(m => m.id === payload.new.id)) return current;
                         return [...current, payload.new];
@@ -122,53 +135,35 @@ export default function ChatManager({ user }) {
                 table: 'chat_participants', 
                 filter: `room_id=eq.${activeRoom.id}` 
             }, () => { fetchParticipants(activeRoom.id); })
-            // GESTION PRÉSENCE + TYPING
             .on('presence', { event: 'sync' }, () => {
                 const newState = channel.presenceState();
                 const online = new Set();
                 const typing = new Set();
-                
                 Object.keys(newState).forEach(key => {
                     online.add(key);
-                    // Vérifie si cet utilisateur est en train d'écrire (payload envoyé via track)
-                    const userState = newState[key][0]; // Supabase stocke un array d'états
-                    if (userState && userState.isTyping && key !== user.id) {
-                        typing.add(key);
-                    }
+                    const userState = newState[key][0];
+                    if (userState && userState.isTyping && key !== user.id) typing.add(key);
                 });
-                
                 setOnlineUsers(online);
                 setTypingUsers(typing);
-                if (typing.size > 0) scrollToBottom(); // Scroll si qqn écrit pour voir l'indicateur
+                if (typing.size > 0) scrollToBottom();
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    // On envoie notre état initial (En ligne, ne tape pas)
                     await channel.track({ online_at: new Date().toISOString(), isTyping: false });
                 }
             });
 
         return () => { channel.unsubscribe(); };
-    }, [activeRoom]);
+    }, [activeRoom, soundEnabled]); // Ajout de soundEnabled aux dépendances pour le listener
 
-    // --- GESTION DE LA FRAPPE (Input Change) ---
     const handleInputChange = async (e) => {
         setNewMessage(e.target.value);
-
         if (!activeRoom || activeRoom.status !== 'accepted') return;
-
-        // Signaler qu'on écrit
-        if (channelRef.current) {
-            await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: true });
-        }
-
-        // Debounce pour arrêter de signaler après 2 secondes d'inactivité
+        if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: true });
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        
         typingTimeoutRef.current = setTimeout(async () => {
-            if (channelRef.current) {
-                await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
-            }
+            if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
         }, 2000);
     };
 
@@ -193,43 +188,39 @@ export default function ChatManager({ user }) {
         setTimeout(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, 100);
     };
 
-    // --- 3. ACTIONS ---
+    // --- ACTIONS ---
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !activeRoom) return;
 
         const text = newMessage;
-        
-        // Stop typing indicator immédiatement
-        if (channelRef.current) {
-            await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
-        }
+        if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
         if (editingMessageId) {
-            // EDIT
             const oldMessages = [...messages];
             setMessages(current => current.map(msg => msg.id === editingMessageId ? { ...msg, content: text } : msg));
-            setEditingMessageId(null);
-            setNewMessage('');
-
+            setEditingMessageId(null); setNewMessage('');
             const { error } = await supabase.from('chat_messages').update({ content: text }).eq('id', editingMessageId);
             if (error) { alert("Erreur modification"); setMessages(oldMessages); }
         } else {
-            // SEND
-            setNewMessage('');
-            setReplyingTo(null); // Reset reply
-
-            const payload = { 
-                room_id: activeRoom.id, 
-                sender_id: user.id, 
-                content: text,
-                reply_to_id: replyingTo ? replyingTo.id : null // On ajoute l'ID de réponse
-            };
-
+            setNewMessage(''); setReplyingTo(null);
+            const payload = { room_id: activeRoom.id, sender_id: user.id, content: text, reply_to_id: replyingTo ? replyingTo.id : null };
             const { error } = await supabase.from('chat_messages').insert([payload]);
-            if (error) { alert("Erreur envoi"); setNewMessage(text); }
-            else { fetchMessages(activeRoom.id); }
+            if (error) { alert("Erreur envoi"); setNewMessage(text); } else { fetchMessages(activeRoom.id); }
+        }
+    };
+
+    const handleTogglePin = async (msg) => {
+        const newStatus = !msg.is_pinned;
+        // Optimiste update
+        setMessages(current => current.map(m => m.id === msg.id ? { ...m, is_pinned: newStatus } : m));
+        
+        const { error } = await supabase.from('chat_messages').update({ is_pinned: newStatus }).eq('id', msg.id);
+        if (error) {
+            alert("Erreur épinglage");
+            // Rollback
+            setMessages(current => current.map(m => m.id === msg.id ? { ...m, is_pinned: !newStatus } : m));
         }
     };
 
@@ -241,69 +232,25 @@ export default function ChatManager({ user }) {
         if (error) { alert("Erreur suppression"); setMessages(oldMessages); }
     };
 
-    const startEditing = (msg) => {
-        setReplyingTo(null); // On ne peut pas éditer et répondre en même temps
-        setEditingMessageId(msg.id);
-        setNewMessage(msg.content);
-    };
-
-    const startReplying = (msg) => {
-        setEditingMessageId(null); // On annule l'édition si en cours
-        setReplyingTo(msg);
-        // Focus input (optionnel si géré par l'utilisateur)
-    };
-
-    const cancelAction = () => {
-        setEditingMessageId(null);
-        setReplyingTo(null);
-        setNewMessage('');
-    };
-
-    // ... (Fonctions de gestion de groupe inchangées)
-    const createChat = async () => { /* ... Code identique ... */ 
-        if (!inviteEmails || !newChatName) return alert("Champs requis");
-        const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0);
-        if (emailList.length === 0) return alert("Aucun email valide");
-        try {
-            const { data: roomData, error: roomError } = await supabase.from('chat_rooms').insert([{ name: newChatName, created_by: user.id }]).select().single();
-            if (roomError) throw roomError;
-            const participantsToAdd = [{ room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' }];
-            emailList.forEach(email => participantsToAdd.push({ room_id: roomData.id, user_email: email, status: 'pending' }));
-            await supabase.from('chat_participants').insert(participantsToAdd);
-            setIsCreating(false); setInviteEmails(''); setNewChatName(''); fetchRooms();
-        } catch (err) { alert("Erreur: " + err.message); }
-    };
-    const handleAddMember = async () => { /* ... Code identique ... */ 
-        if (!newMemberEmail.trim()) return;
-        if (participants.some(p => p.user_email === newMemberEmail.trim())) return alert("Déjà membre");
-        try {
-            await supabase.from('chat_participants').insert([{ room_id: activeRoom.id, user_email: newMemberEmail.trim(), status: 'pending' }]);
-            setNewMemberEmail(''); 
-        } catch (err) { alert("Erreur: " + err.message); }
-    };
-    const handleInvitation = async (roomId, accept) => { /* ... Code identique ... */ 
-        if (accept) {
-            await supabase.from('chat_participants').update({ status: 'accepted', user_id: user.id }).match({ room_id: roomId, user_email: user.email });
-            const updatedRoom = { ...activeRoom, status: 'accepted' }; setActiveRoom(updatedRoom); fetchRooms();
-        } else {
-            await supabase.from('chat_participants').delete().match({ room_id: roomId, user_email: user.email });
-            fetchRooms(); setActiveRoom(null);
-        }
-    };
-    const handleDeleteRoom = async (roomId) => { /* ... Code identique ... */ 
-        if (!window.confirm("Supprimer ?")) return; await supabase.from('chat_rooms').delete().eq('id', roomId); setActiveRoom(null); fetchRooms();
-    };
-    const handleLeaveRoom = async () => { /* ... Code identique ... */ 
-        if (!window.confirm("Quitter ?")) return; await supabase.from('chat_participants').delete().match({ room_id: activeRoom.id, user_email: user.email }); setActiveRoom(null); fetchRooms();
-    };
-    const handleKickParticipant = async (pId) => { /* ... Code identique ... */ 
-        if (!window.confirm("Retirer ?")) return; await supabase.from('chat_participants').delete().eq('id', pId);
-    };
+    // Autres helpers
+    const startEditing = (msg) => { setReplyingTo(null); setEditingMessageId(msg.id); setNewMessage(msg.content); };
+    const startReplying = (msg) => { setEditingMessageId(null); setReplyingTo(msg); };
+    const cancelAction = () => { setEditingMessageId(null); setReplyingTo(null); setNewMessage(''); };
+    
+    // Group management helpers
+    const createChat = async () => { if (!inviteEmails || !newChatName) return alert("Champs requis"); const emailList = inviteEmails.split(',').map(e => e.trim()).filter(e => e.length > 0); if (emailList.length === 0) return alert("Aucun email valide"); try { const { data: roomData, error: roomError } = await supabase.from('chat_rooms').insert([{ name: newChatName, created_by: user.id }]).select().single(); if (roomError) throw roomError; const participantsToAdd = [{ room_id: roomData.id, user_email: user.email, user_id: user.id, status: 'accepted' }]; emailList.forEach(email => participantsToAdd.push({ room_id: roomData.id, user_email: email, status: 'pending' })); await supabase.from('chat_participants').insert(participantsToAdd); setIsCreating(false); setInviteEmails(''); setNewChatName(''); fetchRooms(); } catch (err) { alert("Erreur: " + err.message); } };
+    const handleAddMember = async () => { if (!newMemberEmail.trim()) return; if (participants.some(p => p.user_email === newMemberEmail.trim())) return alert("Déjà membre"); try { await supabase.from('chat_participants').insert([{ room_id: activeRoom.id, user_email: newMemberEmail.trim(), status: 'pending' }]); setNewMemberEmail(''); } catch (err) { alert("Erreur: " + err.message); } };
+    const handleInvitation = async (roomId, accept) => { if (accept) { await supabase.from('chat_participants').update({ status: 'accepted', user_id: user.id }).match({ room_id: roomId, user_email: user.email }); const updatedRoom = { ...activeRoom, status: 'accepted' }; setActiveRoom(updatedRoom); fetchRooms(); } else { await supabase.from('chat_participants').delete().match({ room_id: roomId, user_email: user.email }); fetchRooms(); setActiveRoom(null); } };
+    const handleDeleteRoom = async (roomId) => { if (!window.confirm("Supprimer ?")) return; await supabase.from('chat_rooms').delete().eq('id', roomId); setActiveRoom(null); fetchRooms(); };
+    const handleLeaveRoom = async () => { if (!window.confirm("Quitter ?")) return; await supabase.from('chat_participants').delete().match({ room_id: activeRoom.id, user_email: user.email }); setActiveRoom(null); fetchRooms(); };
+    const handleKickParticipant = async (pId) => { if (!window.confirm("Retirer ?")) return; await supabase.from('chat_participants').delete().eq('id', pId); };
 
     // --- RENDER ---
+    const pinnedMessages = messages.filter(m => m.is_pinned);
+
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* SIDEBAR (Identique) */}
+            {/* SIDEBAR */}
             <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
                     <h2 className="font-bold text-lg dark:text-white truncate">Discussions</h2>
@@ -334,7 +281,8 @@ export default function ChatManager({ user }) {
             <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative min-w-0">
                 {activeRoom ? (
                     <>
-                        <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20">
+                        {/* HEADER */}
+                        <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600"><PanelLeft size={20}/></button>}
                                 <div className="flex flex-col truncate">
@@ -348,11 +296,32 @@ export default function ChatManager({ user }) {
                                     )}
                                 </div>
                             </div>
-                            <button onClick={() => setShowGroupDetails(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative">
-                                <Users size={20}/>
-                                {participants.some(p => p.status === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors" title={soundEnabled ? "Couper le son" : "Activer le son"}>
+                                    {soundEnabled ? <Volume2 size={20}/> : <VolumeX size={20}/>}
+                                </button>
+                                <button onClick={() => setShowGroupDetails(true)} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full relative">
+                                    <Users size={20}/>
+                                    {participants.some(p => p.status === 'pending') && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
+                                </button>
+                            </div>
                         </div>
+
+                        {/* MESSAGES ÉPINGLÉS (BANNER) */}
+                        {pinnedMessages.length > 0 && activeRoom.status === 'accepted' && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-900/30 px-4 py-2 flex items-center gap-3 shrink-0">
+                                <Pin size={16} className="text-amber-600 dark:text-amber-500 shrink-0 fill-amber-600 dark:fill-amber-500"/>
+                                <div className="flex-1 overflow-hidden">
+                                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">Message épinglé</p>
+                                    <p className="text-xs text-amber-600 dark:text-amber-500 truncate italic">
+                                        "{pinnedMessages[pinnedMessages.length - 1].content}"
+                                    </p>
+                                </div>
+                                <span className="text-[10px] bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200 px-1.5 py-0.5 rounded-md font-bold">
+                                    {pinnedMessages.length}
+                                </span>
+                            </div>
+                        )}
 
                         {activeRoom.status === 'accepted' ? (
                             <>
@@ -362,22 +331,20 @@ export default function ChatManager({ user }) {
                                         const sender = participants.find(p => p.user_id === msg.sender_id);
                                         const senderName = sender ? sender.user_email.split('@')[0] : 'Inconnu';
                                         const avatarColor = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][senderName.length % 5];
-                                        
-                                        // Trouver le message original si c'est une réponse
                                         const replyOrigin = msg.reply_to_id ? messages.find(m => m.id === msg.reply_to_id) : null;
                                         const replySender = replyOrigin ? participants.find(p => p.user_id === replyOrigin.sender_id)?.user_email.split('@')[0] || 'Inconnu' : 'Message supprimé';
 
                                         return (
-                                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group`}>
+                                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group ${msg.is_pinned ? 'bg-amber-50/50 dark:bg-amber-900/10 -mx-4 px-4 py-2 rounded-lg' : ''}`}>
                                                 {!isMe && (
                                                     <div className="flex items-center gap-2 ml-1 mb-1">
                                                         <div className={`w-4 h-4 rounded-full ${avatarColor} flex items-center justify-center text-[8px] text-white font-bold uppercase`}>{senderName[0]}</div>
                                                         <span className="text-[10px] text-slate-400 font-medium">{senderName}</span>
+                                                        {msg.is_pinned && <Pin size={10} className="text-amber-500 fill-amber-500"/>}
                                                     </div>
                                                 )}
                                                 
                                                 <div className="relative max-w-[75%] md:max-w-[60%]">
-                                                    {/* AFFICHAGE DE LA RÉPONSE AU DESSUS DU MESSAGE */}
                                                     {msg.reply_to_id && (
                                                         <div className={`mb-1 px-3 py-2 text-xs rounded-lg opacity-80 ${isMe ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} border-l-2 border-indigo-400 flex flex-col`}>
                                                             <span className="font-bold flex items-center gap-1"><CornerDownRight size={10}/> Réponse à {replySender}</span>
@@ -385,16 +352,25 @@ export default function ChatManager({ user }) {
                                                         </div>
                                                     )}
 
-                                                    <div className={`p-3 rounded-2xl shadow-sm text-sm break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'}`}>
+                                                    <div className={`p-3 rounded-2xl shadow-sm text-sm break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'} ${msg.is_pinned ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900' : ''}`}>
                                                         <p>{msg.content}</p>
-                                                        <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                                        <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-slate-400'} flex justify-end gap-1 items-center`}>
+                                                            {isMe && msg.is_pinned && <Pin size={8} className="text-indigo-200 fill-indigo-200"/>}
                                                             {format(new Date(msg.created_at), 'HH:mm')}
                                                         </div>
                                                     </div>
 
                                                     {/* BOUTONS D'ACTION */}
-                                                    <div className={`absolute ${isMe ? '-left-20' : '-right-20'} top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                                                    <div className={`absolute ${isMe ? '-left-28' : '-right-28'} top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
                                                         <button onClick={() => startReplying(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Répondre"><Reply size={12}/></button>
+                                                        
+                                                        {/* BOUTON PIN (Pour moi ou pour le propriétaire de la room) */}
+                                                        {(isMe || activeRoom.isOwner) && (
+                                                            <button onClick={() => handleTogglePin(msg)} className={`p-1.5 bg-white dark:bg-slate-800 rounded-full shadow border border-slate-200 dark:border-slate-700 ${msg.is_pinned ? 'text-amber-500 hover:text-slate-500' : 'text-slate-500 hover:text-amber-500'}`} title={msg.is_pinned ? "Désépingler" : "Épingler"}>
+                                                                {msg.is_pinned ? <PinOff size={12}/> : <Pin size={12}/>}
+                                                            </button>
+                                                        )}
+
                                                         {isMe && (
                                                             <>
                                                                 <button onClick={() => startEditing(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Modifier"><Pencil size={12}/></button>
@@ -407,7 +383,6 @@ export default function ChatManager({ user }) {
                                         );
                                     })}
                                     
-                                    {/* INDICATEUR DE FRAPPE */}
                                     {typingUsers.size > 0 && (
                                         <div className="flex items-center gap-2 ml-4 text-xs text-slate-400 italic animate-pulse">
                                             <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
@@ -420,7 +395,6 @@ export default function ChatManager({ user }) {
                                 </div>
 
                                 <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-                                    {/* BANNER : EN COURS D'ÉDITION OU RÉPONSE */}
                                     {(editingMessageId || replyingTo) && (
                                         <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-t-xl text-xs text-indigo-600 dark:text-indigo-400 border-b border-indigo-100 dark:border-indigo-800">
                                             <span className="flex items-center gap-1 font-bold">
@@ -430,15 +404,8 @@ export default function ChatManager({ user }) {
                                             <button onClick={cancelAction} className="ml-auto hover:bg-indigo-100 dark:hover:bg-indigo-800 p-1 rounded"><X size={14}/></button>
                                         </div>
                                     )}
-                                    
                                     <form onSubmit={handleSendMessage} className={`flex gap-2 ${(editingMessageId || replyingTo) ? 'bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-b-xl' : ''}`}>
-                                        <input 
-                                            type="text" 
-                                            value={newMessage}
-                                            onChange={handleInputChange} // Changé pour gérer le typing
-                                            placeholder={replyingTo ? "Votre réponse..." : "Écrivez votre message..."}
-                                            className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-950 focus:border-indigo-500 border rounded-xl px-4 py-3 outline-none transition-all dark:text-white"
-                                        />
+                                        <input type="text" value={newMessage} onChange={handleInputChange} placeholder={replyingTo ? "Votre réponse..." : "Écrivez votre message..."} className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-950 focus:border-indigo-500 border rounded-xl px-4 py-3 outline-none transition-all dark:text-white"/>
                                         <button type="submit" className={`p-3 text-white rounded-xl transition-colors ${editingMessageId ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
                                             {editingMessageId ? <Check size={20}/> : <Send size={20}/>}
                                         </button>
@@ -464,7 +431,7 @@ export default function ChatManager({ user }) {
                 )}
             </div>
             
-            {/* MODALS (Membres & Création) - Code identique */}
+            {/* MODALS (Identiques, inclus pour completude) */}
             {showGroupDetails && activeRoom && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm animate-in zoom-in-95 flex flex-col max-h-[90vh]">
@@ -474,21 +441,18 @@ export default function ChatManager({ user }) {
                         </div>
                         <div className="flex-1 overflow-y-auto space-y-3 mb-4 custom-scrollbar">
                             {participants.map(p => {
+                                const isMe = p.user_email === user.email;
                                 const isOnline = p.user_id && onlineUsers.has(p.user_id);
                                 const statusText = p.status === 'pending' ? 'En attente...' : (isOnline ? 'En ligne' : 'Hors ligne');
                                 const statusColor = p.status === 'pending' ? 'text-amber-500' : (isOnline ? 'text-emerald-600' : 'text-slate-400');
-                                const statusDot = p.status === 'pending' ? 'bg-amber-400' : (isOnline ? 'bg-emerald-500' : 'bg-slate-300');
                                 return (
                                     <div key={p.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <div className="relative w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
                                                 {p.user_email[0].toUpperCase()}
-                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${statusDot}`}></div>
+                                                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${p.status==='pending'?'bg-amber-400':(isOnline?'bg-emerald-500':'bg-slate-300')}`}></div>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-medium dark:text-white">{p.user_email}</p>
-                                                <p className={`text-[10px] ${statusColor}`}>{statusText}</p>
-                                            </div>
+                                            <div><p className="text-sm font-medium dark:text-white">{p.user_email} {isMe && "(Moi)"}</p><p className={`text-[10px] ${statusColor}`}>{statusText}</p></div>
                                         </div>
                                         {activeRoom.isOwner && p.user_email !== user.email && <button onClick={() => handleKickParticipant(p.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Ban size={16}/></button>}
                                     </div>
