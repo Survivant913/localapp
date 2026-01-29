@@ -108,11 +108,8 @@ export default function CalendarView({ data }) {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const today = new Date();
         today.setHours(0,0,0,0);
-
-        // --- CORRECTION : CALCUL UNIVERSEL DU SOLDE DE DÉBUT DE MOIS ---
-        let startOfMonthProjection = currentBalance;
         const firstDayOfView = new Date(year, month, 1);
-        
+
         const calculateImpact = (item) => {
             const amt = parseFloat(item.amount || 0);
             const disp = getContextDisplay(item);
@@ -126,6 +123,19 @@ export default function CalendarView({ data }) {
                 return 0;
             }
         };
+
+        // --- CORRECTIF : CALCUL DU SOLDE INITIAL (HISTORIQUE CUMULÉ) ---
+        let startOfMonthProjection = budget.transactions
+            .filter(t => checkFilter(t.accountId, t.targetAccountId) && parseLocalDate(t.date) < firstDayOfView)
+            .reduce((acc, t) => {
+                const amt = parseFloat(t.amount || 0);
+                if (t.type === 'transfer') {
+                    if (calendarFilter === 'total') return acc;
+                    if (String(t.accountId) === String(calendarFilter)) return acc - amt;
+                    if (String(t.targetAccountId) === String(calendarFilter)) return acc + amt;
+                }
+                return t.type === 'income' ? acc + amt : acc - amt;
+            }, 0);
 
         if (firstDayOfView > today) {
             let simDate = new Date(today);
@@ -144,9 +154,7 @@ export default function CalendarView({ data }) {
                     }
                 });
                 budget.recurring.forEach(r => {
-                    // Logique "Filet" pour la projection du solde
                     const matchDay = r.dayOfMonth === simDay || (isSimLastDay && r.dayOfMonth > simDay);
-                    
                     if (matchDay && (!r.endDate || parseLocalDate(r.endDate) >= simDate)) {
                         if (checkFilter(r.accountId, r.targetAccountId)) {
                             startOfMonthProjection += calculateImpact(r);
@@ -156,11 +164,10 @@ export default function CalendarView({ data }) {
                 simDate.setDate(simDate.getDate() + 1);
             }
         } 
-        else if (firstDayOfView < today && !isSameDay(firstDayOfView, new Date(today.getFullYear(), today.getMonth(), 1))) {
-             startOfMonthProjection = 0; 
-        }
+        // Suppression du else if qui remettait à 0 pour les mois passés
 
         const daysMap = {};
+        let runningBalance = startOfMonthProjection;
 
         for (let d = 1; d <= daysInMonth; d++) {
             const date = new Date(year, month, d);
@@ -168,21 +175,9 @@ export default function CalendarView({ data }) {
             let dailyChange = 0;
 
             const addEvent = (item, type, source) => {
-                const amt = parseFloat(item.amount || 0);
-                const display = getContextDisplay(item);
-                let impact = 0;
-                
-                if (calendarFilter === 'total') {
-                    if (item.type === 'transfer') impact = 0; 
-                    else if (item.type === 'income') impact = amt;
-                    else impact = -amt;
-                } else {
-                    if (display.isIncome) impact = amt;
-                    else if (display.isExpense) impact = -amt;
-                }
-
+                const impact = calculateImpact(item);
                 dailyChange += impact;
-                events.push({ id: item.id, data: item, type, source, impact, display });
+                events.push({ id: item.id, data: item, type, source, impact, display: getContextDisplay(item) });
             };
 
             // Transactions passées (Historique)
@@ -205,35 +200,16 @@ export default function CalendarView({ data }) {
                 }
             });
 
-            // Récurrents (Futur) - AVEC CORRECTION VISUELLE "MOIS COURTS"
+            // Récurrents (Futur)
             if (date >= today) {
                 budget.recurring.forEach(r => {
-                    // EST-CE LE DERNIER JOUR DU MOIS ?
                     const isLastDay = d === daysInMonth;
-                    
-                    // RÈGLE : On affiche si c'est le bon jour, OU SI c'est le dernier jour et que le paiement tombe "après" (ex: paiement le 30, on est le 28)
                     const matchDay = r.dayOfMonth === d || (isLastDay && r.dayOfMonth > d);
 
                     if (matchDay && (!r.endDate || parseLocalDate(r.endDate) >= date)) {
                         if (checkFilter(r.accountId, r.targetAccountId)) {
-                            
-                            // CHECK 1 : Existe-t-il déjà en "scheduled" ?
-                            const alreadyScheduled = budget.scheduled.some(s => 
-                                s.status === 'pending' && 
-                                isSameDay(parseLocalDate(s.date), date) && 
-                                Math.abs(parseFloat(s.amount) - parseFloat(r.amount)) < 0.01 &&
-                                s.description === r.description
-                            );
-
-                            // CHECK 2 (CRITIQUE - CORRIGÉ) : Filtre Anti-Doublon Intelligent
-                            // Si le paiement a été généré ce matin, on masque le récurrent.
-                            // Modification : On accepte que la description transactionnelle contienne la description de base
-                            // (Ex: "Virement (Rec.) : Loyer" contient "Loyer")
-                            const alreadyPaidToday = budget.transactions.some(t => 
-                                isSameDay(parseLocalDate(t.date), date) && 
-                                Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 &&
-                                (t.description === r.description || t.description.includes(r.description))
-                            );
+                            const alreadyScheduled = budget.scheduled.some(s => s.status === 'pending' && isSameDay(parseLocalDate(s.date), date) && Math.abs(parseFloat(s.amount) - parseFloat(r.amount)) < 0.01 && s.description === r.description);
+                            const alreadyPaidToday = budget.transactions.some(t => isSameDay(parseLocalDate(t.date), date) && Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 && (t.description === r.description || t.description.includes(r.description)));
                             
                             if (!alreadyScheduled && !alreadyPaidToday) {
                                 addEvent(r, 'recurring', 'recurring');
@@ -247,44 +223,8 @@ export default function CalendarView({ data }) {
             todos.forEach(t => { if (!t.completed && t.deadline && isSameDay(parseLocalDate(t.deadline), date)) extras.push({ type: 'todo', text: t.text }); });
             projects.forEach(p => { if (p.deadline && p.status !== 'done' && isSameDay(parseLocalDate(p.deadline), date)) extras.push({ type: 'project', text: p.title }); });
 
-            daysMap[d] = { date, events, dailyChange, extras, endBalance: 0 };
-        }
-
-        // --- CALCUL DES SOLDES DE FIN DE JOURNÉE ---
-        if (today.getMonth() === month && today.getFullYear() === year) {
-            const todayDay = today.getDate();
-            
-            // Futur
-            let futureBalance = currentBalance;
-            for (let d = todayDay + 1; d <= daysInMonth; d++) {
-                if (daysMap[d]) {
-                    futureBalance += daysMap[d].dailyChange;
-                    daysMap[d].endBalance = futureBalance;
-                }
-            }
-
-            // Passé
-            let pastBalance = currentBalance;
-            if (daysMap[todayDay]) daysMap[todayDay].endBalance = pastBalance;
-            
-            for (let d = todayDay; d >= 1; d--) {
-                if (daysMap[d]) {
-                    pastBalance -= daysMap[d].dailyChange;
-                    if (daysMap[d-1]) daysMap[d-1].endBalance = pastBalance;
-                }
-            }
-        } 
-        else if (firstDayOfView > today) {
-            let projected = startOfMonthProjection; 
-            for (let d = 1; d <= daysInMonth; d++) {
-                if (daysMap[d]) {
-                    projected += daysMap[d].dailyChange;
-                    daysMap[d].endBalance = projected;
-                }
-            }
-        } 
-        else {
-            for (let d = 1; d <= daysInMonth; d++) if (daysMap[d]) daysMap[d].endBalance = null;
+            runningBalance += dailyChange;
+            daysMap[d] = { date, events, dailyChange, extras, endBalance: Math.round(runningBalance * 100) / 100 };
         }
 
         return daysMap;
@@ -384,10 +324,10 @@ export default function CalendarView({ data }) {
 
                                 <div className="flex-1 flex flex-col gap-0.5 md:gap-1 overflow-hidden min-h-[40px] md:min-h-[60px]">
                                     {dayData.events.slice(0, 4).map((e, idx) => {
-                                        const d = e.display;
-                                        const Icon = d.icon;
+                                        const dDisp = e.display;
+                                        const Icon = dDisp.icon;
                                         return (
-                                            <div key={idx} className={`text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 md:py-1 rounded border flex justify-between items-center gap-1 ${d.bgClass} ${d.colorClass} ${d.borderClass}`}>
+                                            <div key={idx} className={`text-[9px] md:text-[10px] px-1 md:px-1.5 py-0.5 md:py-1 rounded border flex justify-between items-center gap-1 ${dDisp.bgClass} ${dDisp.colorClass} ${dDisp.borderClass}`}>
                                                 <div className="flex items-center gap-1 min-w-0">
                                                     <Icon size={8} className="shrink-0 md:w-[10px] md:h-[10px]"/>
                                                     <span className="truncate font-medium max-w-[40px] md:max-w-none">{e.data.description}</span>
@@ -407,7 +347,7 @@ export default function CalendarView({ data }) {
                                     )}
                                 </div>
 
-                                {dayData.endBalance !== null && dayData.endBalance !== undefined && (
+                                {dayData.endBalance !== null && (
                                     <div className="mt-auto pt-1 md:pt-2 border-t border-dashed border-gray-100 dark:border-slate-700 flex justify-end">
                                         <span className={`text-[9px] md:text-xs font-extrabold ${dayData.endBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
                                             {formatCurrency(dayData.endBalance)}
@@ -444,21 +384,21 @@ export default function CalendarView({ data }) {
                             ) : (
                                 <>
                                     {selectedDateDetails.events.map((e, i) => {
-                                        const d = e.display;
-                                        const Icon = d.icon;
+                                        const dDisp = e.display;
+                                        const Icon = dDisp.icon;
                                         return (
                                             <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-700 border border-gray-100 dark:border-slate-600 shadow-sm">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-full ${d.bgClass} ${d.colorClass}`}>
+                                                    <div className={`p-2 rounded-full ${dDisp.bgClass} ${dDisp.colorClass}`}>
                                                         <Icon size={18}/>
                                                     </div>
                                                     <div>
                                                         <p className="font-bold text-slate-800 dark:text-white text-sm">{e.data.description}</p>
-                                                        <p className="text-xs text-slate-400 capitalize">{d.label} • {e.source === 'history' ? 'Réalisé' : e.source === 'planned' ? 'Planifié' : 'Récurrent'}</p>
+                                                        <p className="text-xs text-slate-400 capitalize">{dDisp.label} • {e.source === 'history' ? 'Réalisé' : e.source === 'planned' ? 'Planifié' : 'Récurrent'}</p>
                                                     </div>
                                                 </div>
-                                                <span className={`font-bold ${d.colorClass}`}>
-                                                    {d.sign}{formatCurrency(e.data.amount)}
+                                                <span className={`font-bold ${dDisp.colorClass}`}>
+                                                    {dDisp.sign}{formatCurrency(e.data.amount)}
                                                 </span>
                                             </div>
                                         );
