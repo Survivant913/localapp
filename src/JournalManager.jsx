@@ -237,7 +237,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION ---
+    // --- IMPRESSION (FIXÉ POUR LE MODE SOMBRE ET LES CITATIONS) ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -251,26 +251,45 @@ export default function JournalManager({ data, updateData }) {
                 <title>${title}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
-                    body { font-family: 'Merriweather', serif; line-height: 1.8; color: #1a1a1a; max-width: 800px; margin: 0 auto; padding: 40px; }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    h1 { font-size: 2.5em; font-weight: 700; margin: 0; color: #000; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 40px; }
+                    /* REGENERATION DU NOIR POUR L'IMPRESSION */
+                    * { 
+                        color: #000 !important; 
+                        -webkit-print-color-adjust: exact !important; 
+                        print-color-adjust: exact !important;
+                    }
+                    body { font-family: 'Merriweather', serif; line-height: 1.8; background: #fff !important; max-width: 800px; margin: 0 auto; padding: 40px; }
+                    h1 { font-size: 2.5em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
                     h2 { font-size: 1.8em; margin-top: 30px; font-weight: 700; }
-                    h3 { font-size: 1.4em; margin-top: 20px; font-weight: 600; color: #444; }
-                    .meta { color: #666; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
+                    h3 { font-size: 1.4em; margin-top: 20px; font-weight: 600; }
+                    .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
                     .content { font-size: 1.1em; text-align: justify; }
-                    blockquote { border-left: 4px solid #ddd; padding-left: 15px; font-style: italic; color: #555; background: #f9f9f9; padding: 10px 15px; margin: 20px 0; }
+                    
+                    /* STYLE CITATION ROBUSTE POUR PAPIER */
+                    blockquote { 
+                        border-left: 5px solid #333 !important; 
+                        padding: 15px 20px !important; 
+                        margin: 25px 0 !important; 
+                        background: #f0f0f0 !important; 
+                        font-style: italic !important;
+                        display: block !important;
+                    }
+
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
-                    /* FIX PRINT: Force background colors */
-                    span[style*="background-color"] { color: black !important; -webkit-print-color-adjust: exact; }
+
+                    /* GESTION DES SURLIGNAGES POUR L'IMPRESSION */
+                    span[style*="background-color"] { 
+                        color: #000 !important; 
+                        -webkit-print-color-adjust: exact; 
+                    }
                 </style>
             </head>
             <body>
                 <div class="meta">${date}</div>
                 <h1>${title}</h1>
                 <div class="content">${content}</div>
-                <script>window.onload = () => window.print();</script>
+                <script>window.onload = () => { window.print(); window.close(); }</script>
             </body>
             </html>
         `);
@@ -443,7 +462,6 @@ export default function JournalManager({ data, updateData }) {
 
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-                            {/* SURLIGNEUR AVEC COULEURS NEON EN MODE SOMBRE */}
                             <div className="relative">
                                 <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                 {showColorPalette && (
@@ -459,7 +477,6 @@ export default function JournalManager({ data, updateData }) {
                                                 key={i} 
                                                 onMouseDown={(e)=>{
                                                     e.preventDefault();
-                                                    // Detection mode sombre via classe 'dark' sur html/body
                                                     const isDark = document.documentElement.classList.contains('dark');
                                                     execCmd('hiliteColor', isDark ? color.darkVal : color.val);
                                                 }} 
@@ -514,8 +531,6 @@ export default function JournalManager({ data, updateData }) {
                 .prose h2 { font-size: 1.8em !important; font-weight: 800 !important; margin-top: 1.5em !important; }
                 .prose h3 { font-size: 1.4em !important; font-weight: 700 !important; margin-top: 1.2em !important; }
                 
-                /* --- FIX CONTRASTE SURLIGNAGE (DARK MODE) --- */
-                /* Force le texte surligné à devenir NOIR pour la lisibilité sur fond fluo */
                 .prose span[style*="background-color"] { 
                     color: black !important; 
                     padding: 0 2px;
