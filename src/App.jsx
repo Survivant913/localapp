@@ -40,6 +40,7 @@ export default function App() {
  const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
+ const loadSuccess = useRef(false); // --- SÉCURITÉ ANTI-EFFACEMENT ---
  
  // --- AJOUT 2 : ÉTATS POUR SON ET COMPTEUR ---
  const [unreadCount, setUnreadCount] = useState(0);
@@ -233,6 +234,13 @@ export default function App() {
    setLoading(true);
 
    try {
+     // --- CORRECTION CRITIQUE : RÉCUPÉRATION SÉCURISÉE DE L'EMAIL ---
+     const { data: { user: currentUser } } = await supabase.auth.getUser();
+     const userEmail = currentUser?.email;
+
+     // SI L'EMAIL N'EST PAS ENCORE LÀ, ON ANNULE POUR ÉVITER L'ERREUR undefined
+     if (!userEmail) { isLoaded.current = false; setLoading(false); return; }
+
      const results = await Promise.all([
        supabase.from('profiles').select('*').single(),
        supabase.from('todos').select('*'),
@@ -256,10 +264,10 @@ export default function App() {
        supabase.from('goal_milestones').select('*'),
        supabase.from('journal_folders').select('*'),
        supabase.from('journal_pages').select('*'),
-       // --- GREFFE CALENDRIER PARTAGÉ ICI (FILTRE OR) ---
+       // --- GREFFE CALENDRIER PARTAGÉ SÉCURISÉE ---
        supabase.from('calendar_events')
         .select('*')
-        .or(`user_id.eq.${userId},invited_email.eq.${session?.user?.email}`) 
+        .or(`user_id.eq.${userId},invited_email.eq.${userEmail}`) 
      ]);
 
      const [
@@ -407,6 +415,7 @@ export default function App() {
      };
 
      setData(newData);
+     loadSuccess.current = true; // --- VERROU DÉBLOQUÉ : CHARGEMENT OK ---
      if (newData.settings?.pin) setIsLocked(true);
 
    } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
@@ -444,7 +453,8 @@ export default function App() {
  }, [data, unsavedChanges]);
 
  const saveDataToSupabase = async () => {
-   if (!session) return;
+   // --- SÉCURITÉ CRITIQUE : ON NE SAUVEGARDE QUE SI LE CHARGEMENT EST RÉUSSI ---
+   if (!session || !loadSuccess.current) return; 
    setIsSaving(true);
    try {
      const { user } = session;
@@ -466,7 +476,7 @@ export default function App() {
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
-     await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.targetAccountId }));
+     await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.target_account_id }));
      await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
      
      await upsertInBatches('goals', data.goals, 50, g => ({ 
@@ -482,13 +492,13 @@ export default function App() {
      // --- GREFFE SAUVEGARDE CALENDRIER (SANS SUPPRESSION DE LOGIQUE) ---
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
          id: e.id, 
-         user_id: e.user_id || user.id, // Garde le créateur original
+         user_id: e.user_id || user.id, // Garde le créateur original !
          title: e.title, start_time: e.start_time, 
          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
          recurrence_group_id: e.recurrence_group_id,
          is_all_day: e.is_all_day,
-         invited_email: e.invited_email,
-         status: e.status
+         invited_email: e.invited_email, // COLONNE PERSISTANTE
+         status: e.status // COLONNE PERSISTANTE
      }));
 
      const bases = data.budget.planner.safetyBases;
