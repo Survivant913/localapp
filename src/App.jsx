@@ -264,7 +264,7 @@ export default function App() {
        supabase.from('goal_milestones').select('*'),
        supabase.from('journal_folders').select('*'),
        supabase.from('journal_pages').select('*'),
-       // --- GREFFE CALENDRIER PARTAGÉ SÉCURISÉE ---
+       // --- GREFFE CALENDRIER PARTAGÉ SÉCURISÉE (FILTRE OR) ---
        supabase.from('calendar_events')
         .select('*')
         .or(`user_id.eq.${userId},invited_email.eq.${userEmail}`) 
