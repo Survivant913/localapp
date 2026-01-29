@@ -145,7 +145,8 @@ export default function PlanningManager({ data, updateData }) {
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
             const updated = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
-            updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id });
+            // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE
+            updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
         }
     };
 
@@ -255,6 +256,9 @@ export default function PlanningManager({ data, updateData }) {
             updated = updated.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let s = parseISO(ev.start_time);
+                    if (s.getDay() !== startObj.getDay()) {
+                        s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => e.id === targetId).start_time))) / 86400000));
+                    }
                     let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
                     return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay, invited_email: '', status: 'accepted' };
                 }
@@ -285,7 +289,30 @@ export default function PlanningManager({ data, updateData }) {
     // --- DRAG HANDLERS ---
     const onDragStart = (e, item) => { if (resizeRef.current || item.status === 'pending') return e.preventDefault(); setDraggedItem({ type: 'event', data: item }); e.dataTransfer.effectAllowed = "move"; const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; e.dataTransfer.setDragImage(img, 0, 0); };
     const onDragOverGrid = (e, dayIdx) => { if (draggedItem?.data.is_all_day) return; e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let snap = Math.round((y % 60) / 15) * 15; if (snap === 60) { snap = 0; h++; } let dur = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time)); setPreviewSlot({ dayIndex: dayIdx, top: h * 60 + snap, height: Math.max(30, dur), timeLabel: `${h}:${snap.toString().padStart(2, '0')}` }); };
-    const onDropGrid = (e, day) => { e.preventDefault(); setPreviewSlot(null); if (!draggedItem || draggedItem.data.is_all_day) return; const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let m = Math.round((y % 60) / 15) * 15; if (m === 60) { m = 0; h++; } const start = setMinutes(setHours(day, h), m); const evt = draggedItem.data; const dur = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time)); if (evt.recurrence_group_id) { setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, date: format(start, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true }); setPendingUpdate({ newStart: start, newEnd: addMinutes(start, dur), title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); setConfirmMode('ask_update'); setIsCreating(true); } else { updateData({ ...data, calendar_events: events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: addMinutes(start, dur).toISOString() } : ev) }, { table: 'calendar_events', id: evt.id }); } setDraggedItem(null); };
+    
+    const onDropGrid = (e, day) => { 
+        e.preventDefault(); setPreviewSlot(null); 
+        if (!draggedItem || draggedItem.data.is_all_day) return; 
+        const rect = e.currentTarget.getBoundingClientRect(); 
+        const y = e.clientY - rect.top; 
+        let h = Math.floor(y / 60); 
+        let m = Math.round((y % 60) / 15) * 15; 
+        if (m === 60) { m = 0; h++; } 
+        const start = setMinutes(setHours(day, h), m); 
+        const evt = draggedItem.data; 
+        const dur = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time)); 
+        const newEnd = addMinutes(start, dur);
+        
+        if (evt.recurrence_group_id) { 
+            setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, date: format(start, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true }); 
+            setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); 
+            setConfirmMode('ask_update'); setIsCreating(true); 
+        } else { 
+            // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE COMPLET
+            updateData({ ...data, calendar_events: events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString() } : ev) }, { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); 
+        } 
+        setDraggedItem(null); 
+    };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
     const durationOptions = []; for (let m = 15; m <= 720; m += 15) { const h = Math.floor(m / 60); const min = m % 60; durationOptions.push(<option key={m} value={m}>{h > 0 ? `${h}h` : ''}{min > 0 ? ` ${min}` : h === 0 ? ' min' : ''}</option>); }
@@ -329,10 +356,22 @@ export default function PlanningManager({ data, updateData }) {
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
                                                 <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
                                             </div>
-                                            <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`} onDragOver={e => { if (draggedItem && !draggedItem.data.is_all_day) return; e.preventDefault(); }} onDrop={e => { e.preventDefault(); if (draggedItem?.data.is_all_day) updateData({ ...data, calendar_events: events.map(ev => ev.id === draggedItem.data.id ? { ...ev, start_time: setMinutes(setHours(day, 0), 0).toISOString(), end_time: setMinutes(setHours(day, 23), 59).toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id }); setDraggedItem(null); }}>
+                                            <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`} onDragOver={e => { if (draggedItem && !draggedItem.data.is_all_day) return; e.preventDefault(); }} 
+                                              onDrop={e => { 
+                                                e.preventDefault(); 
+                                                if (draggedItem?.data.is_all_day) {
+                                                    const st = setMinutes(setHours(day, 0), 0);
+                                                    const et = setMinutes(setHours(day, 23), 59);
+                                                    // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE
+                                                    updateData({ ...data, calendar_events: events.map(ev => ev.id === draggedItem.data.id ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); 
+                                                }
+                                                setDraggedItem(null); 
+                                              }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
-                                                    return (<div key={item.data.id} draggable={item.data.status !== 'pending'} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${item.data.status === 'pending' ? 'border-dashed opacity-70' : ''}`}>{item.data.status === 'pending' && '🔔 '}{item.data.title}</div>);
+                                                    // GREFFE : ON NE GRISE PAS SI JE SUIS LE PROPRIÉTAIRE
+                                                    const isPending = item.data.status === 'pending' && item.data.user_id !== data.profile?.id;
+                                                    return (<div key={item.data.id} draggable={!isPending} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
                                             </div>
                                             <div className={`relative h-[1440px] transition-colors ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOverGrid(e, dayIndex)} onDrop={(e) => onDropGrid(e, day)}>
@@ -340,7 +379,9 @@ export default function PlanningManager({ data, updateData }) {
                                                 {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center text-xs font-bold text-blue-600" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
                                                 {layoutItems.map((item) => {
-                                                    const dataItem = item.data; const isPending = dataItem.status === 'pending';
+                                                    const dataItem = item.data; 
+                                                    // GREFFE : ON NE GRISE PAS SI JE SUIS LE PROPRIÉTAIRE
+                                                    const isPending = dataItem.status === 'pending' && dataItem.user_id !== data.profile?.id;
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 text-emerald-900 dark:bg-slate-800 dark:text-emerald-100 shadow-sm border' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm border' : 'bg-white border-l-4 border-l-blue-600 text-blue-900 dark:bg-slate-800 dark:text-blue-100 shadow-sm border';
                                                     return (
                                                         <div key={item.data.id} style={{ ...item.style, opacity: (isPending ? 0.6 : 1) }} draggable={!resizeRef.current && !isPending} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
