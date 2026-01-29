@@ -256,7 +256,10 @@ export default function App() {
         supabase.from('goal_milestones').select('*'),
         supabase.from('journal_folders').select('*'),
         supabase.from('journal_pages').select('*'),
-        supabase.from('calendar_events').select('*') 
+        // --- GREFFE CALENDRIER PARTAGÉ ICI ---
+        supabase.from('calendar_events')
+          .select('*')
+          .or(`user_id.eq.${userId},invited_email.eq.${session?.user?.email}`) 
       ]);
 
       const [
@@ -480,7 +483,9 @@ export default function App() {
           id: e.id, user_id: user.id, title: e.title, start_time: e.start_time, 
           end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
           recurrence_group_id: e.recurrence_group_id,
-          is_all_day: e.is_all_day 
+          is_all_day: e.is_all_day,
+          invited_email: e.invited_email,
+          status: e.status
       }));
 
       const bases = data.budget.planner.safetyBases;
