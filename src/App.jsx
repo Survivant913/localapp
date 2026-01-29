@@ -69,7 +69,6 @@ export default function App() {
     if (!session?.user?.email) return;
 
     const fetchInitialUnreadCount = async () => {
-        // 1. On récupère mes participations et ma date de dernière lecture
         const { data: participations } = await supabase
             .from('chat_participants')
             .select('room_id, last_read_at')
@@ -77,13 +76,12 @@ export default function App() {
 
         if (!participations || participations.length === 0) return;
 
-        // 2. On compte les messages reçus APRÈS cette date
         const countPromises = participations.map(async (p) => {
             const { count } = await supabase
                 .from('chat_messages')
                 .select('*', { count: 'exact', head: true }) 
                 .eq('room_id', p.room_id)
-                .gt('created_at', p.last_read_at || '2000-01-01'); // Si jamais lu, on compte tout
+                .gt('created_at', p.last_read_at || '2000-01-01');
             
             return count || 0;
         });
@@ -97,20 +95,32 @@ export default function App() {
   }, [session]); 
   // -------------------------------------------------------------------------------
 
-  // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES ---
+  // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
   useEffect(() => {
     if (!session) return;
-    // Reset si on est sur le chat
+    
+    // 1. DEMANDE DE PERMISSION AU DÉMARRAGE
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
     if (currentView === 'chat') setUnreadCount(0);
 
     const channel = supabase.channel('global-chat-notifications')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
-            // Si c'est moi, on ignore
             if (payload.new.sender_id === session.user.id) return;
-            // Si je ne suis pas sur le chat, je sonne et j'incrémente
+            
             if (currentView !== 'chat') {
                 try { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch(e) {}
                 setUnreadCount(prev => prev + 1);
+
+                // 2. ENVOI DE LA NOTIFICATION SYSTÈME
+                if (Notification.permission === 'granted') {
+                    new Notification("Nouveau Message", {
+                        body: payload.new.content || "Vous avez reçu un message",
+                        silent: true // On gère le son nous-même
+                    });
+                }
             }
         })
         .subscribe();
