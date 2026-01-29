@@ -26,7 +26,7 @@ const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI
 const THEME_COLORS = {
  blue:    { primary: '#2563eb', hover: '#1d4ed8', light: '#eff6ff', text: '#2563eb', textLight: '#3b82f6', border: '#bfdbfe', badge: '#dbeafe' },
  violet:  { primary: '#7c3aed', hover: '#6d28d9', light: '#f5f3ff', text: '#7c3aed', textLight: '#8b5cf6', border: '#ddd6fe', badge: '#ede9fe' },
- emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10b981', border: '#a7f3d0', badge: '#d1fae5' },
+ emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10 b981', border: '#a7f3d0', badge: '#d1fae5' },
  amber:   { primary: '#d97706', hover: '#b45309', light: '#fffbeb', text: '#d97706', textLight: '#f59e0b', border: '#fde68a', badge: '#fef3c7' },
  rose:    { primary: '#e11d48', hover: '#be123c', light: '#fff1f2', text: '#e11d48', textLight: '#f43f5e', border: '#fecdd3', badge: '#ffe4e6' },
  indigo:  { primary: '#4f46e5', hover: '#4338ca', light: '#eef2ff', text: '#4f46e5', textLight: '#6366f1', border: '#c7d2fe', badge: '#e0e7ff' },
@@ -128,7 +128,7 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- NOUVEL AJOUT : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SANS SUPPRESSION) ---
+ // --- NOUVEL AJOUT : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SÉCURISÉ) ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
@@ -143,9 +143,12 @@ export default function App() {
            if (isForMe && !currentEvts.some(e => e.id === payload.new.id)) currentEvts.push(payload.new);
          } 
          else if (payload.eventType === 'UPDATE') {
-           const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
-           const isDeclinedByMe = payload.new.invited_email?.toLowerCase().includes(userEmail) && payload.new.status === 'declined';
-           if (isForMe && !isDeclinedByMe) {
+           const isOwner = payload.new.user_id === userId;
+           const isInvited = payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail);
+           const isDeclinedByMe = isInvited && !isOwner && payload.new.status === 'declined';
+           
+           // Si je suis concerné et que je n'ai pas refusé (ou si je suis le créateur)
+           if ((isOwner || isInvited) && !isDeclinedByMe) {
              const idx = currentEvts.findIndex(e => e.id === payload.new.id);
              if (idx !== -1) currentEvts[idx] = payload.new; else currentEvts.push(payload.new);
            } else {
@@ -437,11 +440,13 @@ export default function App() {
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
        
-       // --- GREFFE 1 : FILTRE MULTI-INVITÉS & REFUS ---
+       // --- GREFFE 1 : FILTRE MULTI-INVITÉS & REFUS SÉCURISÉ ---
        calendar_events: (calendar_events || []).filter(ev => {
+         const isOwner = ev.user_id === userId;
          const invitees = ev.invited_email?.split(',').map(s => s.trim().toLowerCase()) || [];
          const isInvited = invitees.includes(userEmail.toLowerCase());
-         return !(isInvited && ev.status === 'declined');
+         // On ne masque QUE si je suis invité et que j'ai refusé (pas si je suis propriétaire)
+         return isOwner || !(isInvited && ev.status === 'declined');
        }), 
        
        budget: {
