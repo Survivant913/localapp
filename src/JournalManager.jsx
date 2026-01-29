@@ -47,7 +47,7 @@ export default function JournalManager({ data, updateData }) {
         try {
             const [foldersRes, pagesRes] = await Promise.all([
                 supabase.from('journal_folders').select('*').order('created_at'),
-                supabase.from('journal_pages').select('id, folder_id, title, created_at, updated_at, is_favorite, content').order('updated_at', { ascending: false })
+                supabase.from('journal_pages').select('*').order('updated_at', { ascending: false })
             ]);
             
             if (foldersRes.data) setAllFolders(foldersRes.data);
@@ -196,7 +196,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- SUPPRESSION (LOGIQUE ANTI-ORPHELINS) ---
+    // --- SUPPRESSION (LOGIQUE ANTI-ORPHELINS PRÉSERVÉE) ---
     const deleteItem = async (id, type) => {
         const confirmMsg = type === 'page' 
             ? "Supprimer cette page ?" 
@@ -210,7 +210,6 @@ export default function JournalManager({ data, updateData }) {
                 setAllPages(allPages.filter(p => p.id !== id));
                 if (activePageId === id) setActivePageId(null);
             } else {
-                // 1. Trouver récursivement tous les dossiers enfants
                 const getAllDescendantIds = (parentId) => {
                     let ids = [parentId];
                     const children = allFolders.filter(f => f.parent_id === parentId);
@@ -219,20 +218,11 @@ export default function JournalManager({ data, updateData }) {
                     });
                     return ids;
                 };
-
                 const idsToDelete = getAllDescendantIds(id);
-
-                // 2. Supprimer TOUTES les pages rattachées à ces IDs dans Supabase
                 await supabase.from('journal_pages').delete().in('folder_id', idsToDelete);
-
-                // 3. Supprimer TOUS les dossiers dans Supabase
                 await supabase.from('journal_folders').delete().in('id', idsToDelete);
-
-                // 4. Mise à jour de l'état local pour refléter la cascade
                 setAllFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
                 setAllPages(prev => prev.filter(p => !idsToDelete.includes(p.folder_id)));
-
-                // 5. Si on était dans un dossier supprimé, on reset la vue
                 if (idsToDelete.includes(currentFolderId) || idsToDelete.includes(activeNotebookId)) {
                     setActiveNotebookId(null);
                     setCurrentFolderId(null);
@@ -243,6 +233,15 @@ export default function JournalManager({ data, updateData }) {
             console.error("Erreur suppression:", err);
             alert("Erreur lors de la suppression en cascade.");
         }
+    };
+
+    // --- FAVORIS (NOUVEAU) ---
+    const toggleFavorite = async (page) => {
+        const newStatus = !page.is_favorite;
+        // Update local
+        setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
+        // Update DB
+        await supabase.from('journal_pages').update({ is_favorite: newStatus }).eq('id', page.id);
     };
 
     // --- ÉDITEUR : COMMANDES ---
@@ -266,7 +265,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION ---
+    // --- IMPRESSION (LOGIQUE NOIR PUR PRÉSERVÉE) ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -280,32 +279,16 @@ export default function JournalManager({ data, updateData }) {
                 <title>${title}</title>
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
-                    * { 
-                        color: #000 !important; 
-                        -webkit-print-color-adjust: exact !important; 
-                        print-color-adjust: exact !important;
-                    }
+                    * { color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     body { font-family: 'Merriweather', serif; line-height: 1.8; background: #fff !important; max-width: 800px; margin: 0 auto; padding: 40px; }
                     h1 { font-size: 2.5em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
-                    h2 { font-size: 1.8em; margin-top: 30px; font-weight: 700; }
-                    h3 { font-size: 1.4em; margin-top: 20px; font-weight: 600; }
                     .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
                     .content { font-size: 1.1em; text-align: justify; }
-                    blockquote { 
-                        border-left: 5px solid #333 !important; 
-                        padding: 15px 20px !important; 
-                        margin: 25px 0 !important; 
-                        background: #f0f0f0 !important; 
-                        font-style: italic !important;
-                        display: block !important;
-                    }
+                    blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
-                    span[style*="background-color"] { 
-                        color: #000 !important; 
-                        -webkit-print-color-adjust: exact; 
-                    }
+                    span[style*="background-color"] { color: #000 !important; -webkit-print-color-adjust: exact; }
                 </style>
             </head>
             <body>
@@ -320,6 +303,7 @@ export default function JournalManager({ data, updateData }) {
     };
 
     // --- LOGIQUE D'AFFICHAGE ---
+    const favoritePages = allPages.filter(p => p.is_favorite);
     const rootFolders = allFolders.filter(f => !f.parent_id); 
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
     const pagesInCurrent = allPages.filter(p => p.folder_id === currentFolderId);
@@ -370,38 +354,27 @@ export default function JournalManager({ data, updateData }) {
     // --- VUE CONTENU ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0`}>
+            <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
-                    
                     <div className="relative mb-3">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-                        <input 
-                            type="text" 
-                            placeholder="Rechercher..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-lg text-sm outline-none transition-all"
-                        />
-                        {searchQuery && (
-                            <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                                <X size={14}/>
-                            </button>
-                        )}
+                        <input type="text" placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-lg text-sm outline-none transition-all" />
+                        {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><X size={14}/></button>}
                     </div>
 
                     <div className="flex items-center gap-2 mb-3">
-                        <button onClick={navigateUp} className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-all">
+                        <button onClick={navigateUp} className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
                             {currentFolderId === activeNotebookId ? <Home size={16}/> : <ArrowLeft size={16}/>}
                         </button>
-                        <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{searchQuery ? 'Résultats de recherche' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
+                        <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{searchQuery ? 'Résultats' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
                     </div>
                     
                     {!searchQuery && (
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
                             {breadcrumbs.map((f, i) => (
                                 <span key={f.id} className="flex items-center shrink-0">
-                                    <span onClick={() => navigateToFolder(f.id)} className="hover:text-indigo-500 cursor-pointer transition-colors">{f.name}</span>
+                                    <span onClick={() => navigateToFolder(f.id)} className="hover:text-indigo-500 cursor-pointer">{f.name}</span>
                                     {i < breadcrumbs.length - 1 && <ChevronRight size={10} className="mx-1 opacity-50"/>}
                                 </span>
                             ))}
@@ -410,13 +383,31 @@ export default function JournalManager({ data, updateData }) {
 
                     {!searchQuery && (
                         <div className="flex gap-2">
-                            <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition-all flex items-center justify-center gap-1 shadow-sm"><FolderPlus size={14}/> Dossier</button>
+                            <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition-all flex items-center justify-center gap-1"><FolderPlus size={14}/> Dossier</button>
                             <button onClick={() => createItem('page')} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 shadow-md shadow-indigo-200 dark:shadow-none"><Plus size={14}/> Page</button>
                         </div>
                     )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {/* SECTION FAVORIS (ACCÈS RAPIDE) */}
+                    {favoritePages.length > 0 && !searchQuery && (
+                        <div className="mb-4">
+                            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-2">
+                                <Star size={10} className="fill-amber-500"/> Favoris
+                            </div>
+                            {favoritePages.map(page => (
+                                <div key={`fav-${page.id}`} onClick={() => { saveCurrentPage(true); setActivePageId(page.id); }} className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all ${activePageId === page.id ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <FileText size={14} className="text-amber-500 shrink-0"/>
+                                        <span className={`truncate text-xs ${activePageId === page.id ? 'font-bold text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'}`}>{page.title || 'Sans titre'}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            <div className="h-px bg-slate-100 dark:bg-slate-800 mx-3 my-2"></div>
+                        </div>
+                    )}
+
                     {displayedFolders.map(folder => (
                         <div key={folder.id} onClick={() => navigateToFolder(folder.id)} className="group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors">
                             <div className="flex items-center gap-3 overflow-hidden">
@@ -436,8 +427,11 @@ export default function JournalManager({ data, updateData }) {
                                 <FileText size={16} className={`shrink-0 ${activePageId === page.id ? 'text-indigo-500' : 'text-slate-400'}`}/>
                                 <span className={`truncate text-sm ${activePageId === page.id ? 'font-bold text-indigo-900 dark:text-indigo-100' : 'text-slate-600 dark:text-slate-300'}`}>{page.title || 'Sans titre'}</span>
                             </div>
-                            <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                                <button onClick={(e) => { e.stopPropagation(); deleteItem(page.id, 'page'); }} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 rounded"><Trash2 size={12}/></button>
+                            <div className="flex items-center gap-1">
+                                {page.is_favorite && <Star size={12} className="text-amber-500 fill-amber-500"/>}
+                                <div className="opacity-0 group-hover:opacity-100">
+                                    <button onClick={(e) => { e.stopPropagation(); deleteItem(page.id, 'page'); }} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 rounded"><Trash2 size={12}/></button>
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -494,7 +488,17 @@ export default function JournalManager({ data, updateData }) {
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             <div className="max-w-3xl mx-auto px-10 py-16 min-h-full">
-                                <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</div>
+                                <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
+                                    <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
+                                    {/* BOUTON ÉTOILE FAVORIS */}
+                                    <button 
+                                        onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
+                                    >
+                                        <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
+                                        <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
+                                    </button>
+                                </div>
                                 <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className="w-full text-5xl font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight" placeholder="Titre..."/>
                                 <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className="prose dark:prose-invert max-w-none outline-none min-h-[50vh] text-lg leading-loose text-slate-600 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300" placeholder="Écrivez vos pensées ici..."></div>
                             </div>
@@ -514,8 +518,6 @@ export default function JournalManager({ data, updateData }) {
                 .prose h2 { font-size: 1.8em !important; font-weight: 800 !important; margin-top: 1.5em !important; }
                 .prose h3 { font-size: 1.4em !important; font-weight: 700 !important; margin-top: 1.2em !important; }
                 .prose span[style*="background-color"] { color: black !important; padding: 0 2px; border-radius: 2px; }
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
         </div>
     );
