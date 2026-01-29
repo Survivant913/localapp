@@ -668,13 +668,16 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
                                     
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Partager avec (Email)</label>
-                                        <div className="relative">
-                                            <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-                                            <input type="email" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="exemple@mail.com" />
+                                    {/* GREFFE : LE CHAMP DE PARTAGE NE S'AFFICHE QUE POUR LES ÉVÉNEMENTS NON RÉCURRENTS */}
+                                    {!eventForm.recurrence && !eventForm.recurrenceGroupId && (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Partager avec (Email)</label>
+                                            <div className="relative">
+                                                <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+                                                <input type="email" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="exemple@mail.com" />
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     
@@ -739,13 +742,13 @@ export default function PlanningManager({ data, updateData }) {
                                             <span>Invitation reçue. Accepter pour toute la série ?</span>
                                         </div>
                                         <div className="grid gap-3">
-                                            <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+                                            <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2">
                                                 <Check size={18}/> Accepter toute la série
                                             </button>
-                                            <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold flex items-center justify-center gap-2">
+                                            <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="flex-1 py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold flex items-center justify-center gap-2">
                                                 Uniquement celui-là
                                             </button>
-                                            <button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2">
+                                            <button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2">
                                                 Refuser tout
                                             </button>
                                         </div>
