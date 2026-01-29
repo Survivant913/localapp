@@ -23,7 +23,7 @@ export default function PlanningManager({ data, updateData }) {
     const [draggedItem, setDraggedItem] = useState(null);
     const [previewSlot, setPreviewSlot] = useState(null);
 
-    // Resize
+    // Resize (RÉPARÉ : Logique de suivi en temps réel)
     const [resizingEvent, setResizingEvent] = useState(null); 
     const resizeRef = useRef(null);
     const ignoreNextClick = useRef(false);
@@ -43,21 +43,20 @@ export default function PlanningManager({ data, updateData }) {
         return item.data.is_all_day === true;
     };
 
-    // --- LOGIQUE D'APPROBATION ---
+    // --- LOGIQUE D'APPROBATION INSTANTANNÉE ---
     const handleInvitation = async (evt, newStatus, applyToSeries = false) => {
-        let updatedEvents = [...events];
         let idsToUpdate = [evt.id];
-
         if (applyToSeries && evt.recurrence_group_id) {
             idsToUpdate = events
                 .filter(ev => ev.recurrence_group_id === evt.recurrence_group_id)
                 .map(ev => ev.id);
         }
 
-        updatedEvents = events.map(ev => 
+        const updatedEvents = events.map(ev => 
             idsToUpdate.includes(ev.id) ? { ...ev, status: newStatus } : ev
         );
         
+        // MISE À JOUR INSTANTANNÉE DE L'UI
         updateData({ ...data, calendar_events: updatedEvents });
         
         await supabase.from('calendar_events')
@@ -89,23 +88,30 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- GESTION RESIZE ---
+    // --- GESTION RESIZE (RÉPARÉ ET OPTIMISÉ) ---
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (!resizeRef.current) return;
             const { startY, startDuration } = resizeRef.current;
             const deltaY = e.clientY - startY; 
             let newDuration = Math.max(15, Math.round((startDuration + deltaY) / 15) * 15);
+            
             setResizingEvent(prev => prev ? ({ ...prev, currentDuration: newDuration }) : null);
+            resizeRef.current.currentDurationTemp = newDuration;
         };
+
         const handleMouseUp = () => {
             if (!resizeRef.current) return;
             ignoreNextClick.current = true;
             setTimeout(() => { ignoreNextClick.current = false; }, 200);
-            finishResize(resizeRef.current.event, resizeRef.current.currentDurationTemp);
+            
+            const finalDuration = resizeRef.current.currentDurationTemp;
+            finishResize(resizeRef.current.event, finalDuration);
+            
             setResizingEvent(null);
             resizeRef.current = null;
         };
+
         if (resizingEvent) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
@@ -119,15 +125,20 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); e.preventDefault(); 
         if (evt.is_all_day || evt.status === 'pending') return;
-        let startDuration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
-        const initData = { id: evt.id, startY: e.clientY, startDuration, currentDuration: startDuration, currentDurationTemp: startDuration, event: evt };
+
+        let startTime = parseISO(evt.start_time);
+        let endTime = parseISO(evt.end_time);
+        let dur = differenceInMinutes(endTime, startTime);
+        
+        const initData = { id: evt.id, startY: e.clientY, startDuration: dur, currentDuration: dur, currentDurationTemp: dur, event: evt };
         setResizingEvent(initData);
         resizeRef.current = initData;
     };
 
     const finishResize = (evt, newDuration) => {
-        if (!newDuration || newDuration === resizeRef.current?.startDuration) return;
-        const start = parseISO(evt.start_time); const newEnd = addMinutes(start, newDuration);
+        const start = parseISO(evt.start_time); 
+        const newEnd = addMinutes(start, newDuration);
+
         if (evt.recurrence_group_id) {
             setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true });
             setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
@@ -144,29 +155,34 @@ export default function PlanningManager({ data, updateData }) {
         setSelectedEvent({ type: 'event', data: itemData });
     };
 
-    // --- NAVIGATION ---
     const handlePreviousWeek = () => setCurrentWeekStart(subWeeks(currentWeekStart, 1));
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // --- LAYOUT ENGINE ---
+    // --- LAYOUT ENGINE (INTÉGRATION DU RESIZE TEMPS RÉEL) ---
     const getLayoutForDay = (dayItems) => {
         const timedItems = dayItems.filter(item => !isItemAllDay(item));
         const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
         const columns = [];
+        
         sorted.forEach((item) => {
             if(!item.startStr || !item.endStr) return;
             const start = parseISO(item.startStr); const end = parseISO(item.endStr);
             if (!isValid(start) || !isValid(end)) return;
+            
             const startMin = getHours(start) * 60 + getMinutes(start);
-            let duration = resizingEvent && item.data.id === resizingEvent.id ? resizingEvent.currentDuration : differenceInMinutes(end, start);
-            const top = Math.max(0, startMin); let placed = false;
+            let duration = (resizingEvent && item.data.id === resizingEvent.id) 
+                ? resizingEvent.currentDuration 
+                : differenceInMinutes(end, start);
+
+            const top = Math.max(0, startMin); 
+            let placed = false;
             for(let col of columns) {
                 if (!col.some(ev => {
-                    const evStart = parseISO(ev.startStr); const evEnd = parseISO(ev.endStr);
-                    let evDuration = resizingEvent && ev.data.id === resizingEvent.id ? resizingEvent.currentDuration : differenceInMinutes(evEnd, evStart);
-                    const otherTop = getHours(evStart) * 60 + getMinutes(evStart);
-                    return (top < otherTop + evDuration && top + duration > otherTop);
+                    const evS = parseISO(ev.startStr); const evE = parseISO(ev.endStr);
+                    let evD = (resizingEvent && ev.data.id === resizingEvent.id) ? resizingEvent.currentDuration : differenceInMinutes(evE, evS);
+                    const otherTop = getHours(evS) * 60 + getMinutes(evS);
+                    return (top < otherTop + evD && top + duration > otherTop);
                 })) { col.push({ ...item, top, height: Math.max(15, duration) }); placed = true; break; }
             }
             if (!placed) columns.push([{ ...item, top, height: Math.max(15, duration) }]);
@@ -197,73 +213,60 @@ export default function PlanningManager({ data, updateData }) {
         if (eventForm.isAllDay) { newStart = setMinutes(setHours(baseDate, 0), 0); newEnd = setMinutes(setHours(baseDate, 23), 59); } 
         else { newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin); newEnd = addMinutes(newStart, eventForm.duration); }
 
-        // --- VERROU DE SÉCURITÉ : PAS D'INVITÉS SI RÉCURRENT ---
-        const isActuallyRecurrent = eventForm.recurrence || !!eventForm.recurrenceGroupId;
-        const finalInvitedEmail = isActuallyRecurrent ? '' : eventForm.invitedEmail;
-        const isInviting = finalInvitedEmail.trim().length > 0;
+        // SÉCURITÉ : PAS D'INVITÉS SUR RÉCURRENTS
+        const isRec = eventForm.recurrence || !!eventForm.recurrenceGroupId;
+        const finalEmail = isRec ? '' : eventForm.invitedEmail;
 
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
             const eventBase = { 
                 user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, 
                 recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, 
-                is_all_day: eventForm.isAllDay, invited_email: finalInvitedEmail, 
-                status: isInviting ? 'pending' : 'accepted',
-                organizer_email: data.profile?.email // --- SAUVEGARDE DE L'EMAIL ---
+                is_all_day: eventForm.isAllDay, invited_email: finalEmail, 
+                status: finalEmail ? 'pending' : 'accepted',
+                organizer_email: data.profile?.email 
             };
-            let newEvents = [];
+            let newEvts = [];
             if (eventForm.recurrence) {
-                const weeks = parseInt(eventForm.recurrenceWeeks) || 1;
-                for (let i = 0; i < weeks; i++) {
-                    newEvents.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
+                for (let i = 0; i < (parseInt(eventForm.recurrenceWeeks) || 1); i++) {
+                    newEvts.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
                 }
             } else {
-                newEvents.push({ ...eventBase, id: Date.now(), start_time: newStart.toISOString(), end_time: newEnd.toISOString() });
+                newEvts.push({ ...eventBase, id: Date.now(), start_time: newStart.toISOString(), end_time: newEnd.toISOString() });
             }
-            updateData({ ...data, calendar_events: [...events, ...newEvents] });
-            supabase.from('calendar_events').insert(newEvents).then();
+            updateData({ ...data, calendar_events: [...events, ...newEvts] });
+            supabase.from('calendar_events').insert(newEvts).then();
             setIsCreating(false); return;
         }
 
         if (eventForm.recurrenceGroupId) {
-            setPendingUpdate({ newStart, newEnd, ...eventForm, invitedEmail: finalInvitedEmail }); 
+            setPendingUpdate({ newStart, newEnd, ...eventForm, invitedEmail: finalEmail }); 
             setConfirmMode('ask_update'); setIsCreating(true); 
         } else {
-            applyUpdate(eventForm.id, newStart, newEnd, { ...eventForm, invitedEmail: finalInvitedEmail }, 'single');
+            applyUpdate(eventForm.id, newStart, newEnd, { ...eventForm, invitedEmail: finalEmail }, 'single');
         }
     };
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
-        let updatedEvents = [...events]; let eventsToSave = [];
-        const originalEvent = events.find(e => e.id === targetId);
-        const shouldResetStatus = formData.invitedEmail && (formData.invitedEmail !== originalEvent?.invited_email);
+        let updated = [...events];
+        const resetStat = formData.invitedEmail && (formData.invitedEmail !== events.find(e => e.id === targetId)?.invited_email);
 
         if (mode === 'series' && formData.recurrenceGroupId) {
-            updatedEvents = updatedEvents.map(ev => {
+            updated = updated.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let s = parseISO(ev.start_time);
-                    if (s.getDay() !== startObj.getDay()) {
-                        s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(originalEvent.start_time))) / 86400000));
-                    }
                     let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
-                    let ne = formData.isAllDay ? setMinutes(setHours(s, 23), 59) : addMinutes(ns, formData.duration);
-                    // On force invited_email vide sur les séries
-                    const upd = { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: ne.toISOString(), is_all_day: formData.isAllDay, invited_email: '', status: 'accepted' };
-                    eventsToSave.push(upd); return upd;
+                    return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay, invited_email: '', status: 'accepted' };
                 }
                 return ev;
             });
         } else {
-            updatedEvents = updatedEvents.map(ev => {
-                if (ev.id === targetId) {
-                    const upd = { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: shouldResetStatus ? 'pending' : ev.status };
-                    eventsToSave.push(upd); return upd;
-                }
-                return ev;
-            });
+            updated = updated.map(ev => ev.id === targetId ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
         }
-        updateData({ ...data, calendar_events: updatedEvents });
-        eventsToSave.forEach(ev => { supabase.from('calendar_events').update({ title: ev.title, start_time: ev.start_time, end_time: ev.end_time, color: ev.color, is_all_day: ev.is_all_day, recurrence_group_id: ev.recurrence_group_id, invited_email: ev.invited_email, status: ev.status, organizer_email: data.profile?.email }).eq('id', ev.id).then(); });
+        
+        updateData({ ...data, calendar_events: updated });
+        const toSave = updated.filter(ev => ev.id === targetId || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
+        toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
         setConfirmMode(null); setIsCreating(false);
     };
 
@@ -285,7 +288,7 @@ export default function PlanningManager({ data, updateData }) {
     const onDropGrid = (e, day) => { e.preventDefault(); setPreviewSlot(null); if (!draggedItem || draggedItem.data.is_all_day) return; const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let m = Math.round((y % 60) / 15) * 15; if (m === 60) { m = 0; h++; } const start = setMinutes(setHours(day, h), m); const evt = draggedItem.data; const dur = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time)); if (evt.recurrence_group_id) { setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, date: format(start, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true }); setPendingUpdate({ newStart: start, newEnd: addMinutes(start, dur), title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); setConfirmMode('ask_update'); setIsCreating(true); } else { updateData({ ...data, calendar_events: events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: addMinutes(start, dur).toISOString() } : ev) }, { table: 'calendar_events', id: evt.id }); } setDraggedItem(null); };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
-    const durationOptions = []; for (let m = 15; m <= 720; m += 15) { const h = Math.floor(m / 60); const min = m % 60; let label = ''; if (h > 0) label += `${h}h`; if (min > 0) label += ` ${min}`; if (h === 0) label += ' min'; durationOptions.push(<option key={m} value={m}>{label}</option>); }
+    const durationOptions = []; for (let m = 15; m <= 720; m += 15) { const h = Math.floor(m / 60); const min = m % 60; durationOptions.push(<option key={m} value={m}>{h > 0 ? `${h}h` : ''}{min > 0 ? ` ${min}` : h === 0 ? ' min' : ''}</option>); }
 
     return (
         <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
@@ -296,13 +299,13 @@ export default function PlanningManager({ data, updateData }) {
                             <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize flex items-center gap-2"><Calendar className="text-blue-500" size={24}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
                             <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
                                 <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm"><ChevronLeft size={18}/></button>
-                                <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300">Aujourd'hui</button>
+                                <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300 mx-1">Aujourd'hui</button>
                                 <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm"><ChevronRight size={18}/></button>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={cleanPastEvents} className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-xs"><Trash2 size={16}/> Nettoyer</button>
-                            <button onClick={() => openCreateModal()} className="py-2 px-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs flex items-center gap-2 transition-all"><Plus size={16}/> Planifier</button>
+                            <button onClick={cleanPastEvents} className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-xs transition-colors border border-transparent hover:border-red-200" title="Nettoyer l'historique"><Trash2 size={16}/> Nettoyer</button>
+                            <button onClick={() => openCreateModal()} className="py-2 px-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={16}/> Planifier</button>
                         </div>
                     </div>
 
@@ -318,18 +321,16 @@ export default function PlanningManager({ data, updateData }) {
                                 {weekDays.map((day, dayIndex) => {
                                     const isToday = isSameDay(day, new Date());
                                     const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ data: e, startStr: e.start_time, endStr: e.end_time }));
-                                    const allDayItems = rawEvents.filter(item => isItemAllDay(item));
-                                    const timedItems = rawEvents.filter(item => !isItemAllDay(item));
-                                    const layoutItems = getLayoutForDay(timedItems);
+                                    const layoutItems = getLayoutForDay(rawEvents);
 
                                     return (
                                         <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
                                             <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
-                                                <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
+                                                <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
                                             </div>
                                             <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`} onDragOver={e => { if (draggedItem && !draggedItem.data.is_all_day) return; e.preventDefault(); }} onDrop={e => { e.preventDefault(); if (draggedItem?.data.is_all_day) updateData({ ...data, calendar_events: events.map(ev => ev.id === draggedItem.data.id ? { ...ev, start_time: setMinutes(setHours(day, 0), 0).toISOString(), end_time: setMinutes(setHours(day, 23), 59).toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id }); setDraggedItem(null); }}>
-                                                {allDayItems.map(item => {
+                                                {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
                                                     return (<div key={item.data.id} draggable={item.data.status !== 'pending'} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${item.data.status === 'pending' ? 'border-dashed opacity-70' : ''}`}>{item.data.status === 'pending' && '🔔 '}{item.data.title}</div>);
                                                 })}
@@ -342,7 +343,7 @@ export default function PlanningManager({ data, updateData }) {
                                                     const dataItem = item.data; const isPending = dataItem.status === 'pending';
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 text-emerald-900 dark:bg-slate-800 dark:text-emerald-100 shadow-sm border' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm border' : 'bg-white border-l-4 border-l-blue-600 text-blue-900 dark:bg-slate-800 dark:text-blue-100 shadow-sm border';
                                                     return (
-                                                        <div key={`${item.type}-${dataItem.id}`} style={{ ...item.style, opacity: draggedItem?.data?.id === dataItem.id ? 0.5 : (isPending ? 0.6 : 1) }} draggable={!resizeRef.current && !isPending} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
+                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isPending ? 0.6 : 1) }} draggable={!resizeRef.current && !isPending} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-blue-500"/>}{dataItem.title}</span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{!!dataItem.recurrence_group_id && <Repeat size={10} />}</div>
                                                             {!isPending && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
@@ -359,7 +360,7 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* CREATION MODAL */}
+            {/* MODALS */}
             {isCreating && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
@@ -379,38 +380,20 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
                                     
-                                    {/* GREFFE : LE CHAMP DE PARTAGE NE S'AFFICHE QUE POUR LES ÉVÉNEMENTS NON RÉCURRENTS */}
                                     {!eventForm.recurrence && !eventForm.recurrenceGroupId && (
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails séparés par virgule)</label>
-                                            <div className="relative">
-                                                <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-                                                <input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="ami1@test.com, ami2@test.com" />
-                                            </div>
-                                        </div>
+                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="ami1@test.com, ami2@test.com" /></div></div>
                                     )}
 
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
-                                    <div className="flex items-center gap-2 py-2">
-                                        <input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"/>
-                                        <label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label>
-                                    </div>
+                                    <div className="flex items-center gap-2 py-2"><input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded"/><label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label></div>
                                     {!eventForm.isAllDay && (
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 24}).map((_, i) => <option key={i} value={i}>{i}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none custom-scrollbar">{durationOptions}</select></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{durationOptions}</select></div>
                                         </div>
                                     )}
                                     {!eventForm.id && (
-                                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className="flex items-center gap-2 cursor-pointer">
-                                                    {/* SI ON RÉPÈTE, ON EFFACE L'EMAIL (PROTECTION MÉMOIRE) */}
-                                                    <input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span>
-                                                </label>
-                                            </div>
-                                            {eventForm.recurrence && (<div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-500">Pendant</span><input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm"/><span className="text-xs text-slate-500">semaines</span></div>)}
-                                        </div>
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label>{eventForm.recurrence && (<div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-500">Pendant</span><input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm"/><span className="text-xs text-slate-500">semaines</span></div>)}</div>
                                     )}
                                     <div className="flex gap-3 pt-2">{['blue', 'green', 'gray'].map(c => (<button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`flex-1 h-8 rounded-lg border-2 transition-all ${eventForm.color === c ? 'border-slate-800 dark:border-white' : 'border-transparent opacity-40'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></button>))}</div>
                                     <div className="flex gap-3 pt-4"><button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm">{eventForm.id ? 'Sauver' : 'Créer'}</button></div>
@@ -421,97 +404,30 @@ export default function PlanningManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* SELECTION MODAL */}
             {selectedEvent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
-                        {confirmMode === 'ask_cancel_series' ? (
-                            <div className="text-center space-y-4">
-                                <div className="w-12 h-12 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-2"><Ban size={24}/></div>
-                                <h3 className="font-bold text-lg dark:text-white">Retirer la série ?</h3>
+                        <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
+                        
+                        {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
+                            <div className="space-y-6">
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
                                 <div className="grid gap-3">
-                                    <button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là</button>
-                                    <button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700">Toute la série</button>
-                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
-                                </div>
-                            </div>
-                        ) : confirmMode === 'ask_delete' ? (
-                            <div className="text-center space-y-4">
-                                <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><AlertTriangle size={24}/></div>
-                                <h3 className="font-bold text-lg dark:text-white">Supprimer la série ?</h3>
-                                <div className="grid gap-3">
-                                    <button onClick={() => performDelete(selectedEvent.data, false)} className="w-full py-3 border border-slate-200 rounded-xl font-bold text-sm hover:bg-slate-50 dark:text-white dark:border-slate-700 dark:hover:bg-slate-700">Juste celui-là</button>
-                                    <button onClick={() => performDelete(selectedEvent.data, true)} className="w-full py-3 bg-red-50 text-white rounded-xl font-bold text-sm hover:bg-red-600">Toute la série</button>
-                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
+                                    {selectedEvent.data.recurrence_group_id ? (
+                                        <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"><Check size={18}/> Accepter toute la série</button><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold">Juste ce jour</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold">Refuser tout</button></>
+                                    ) : (
+                                        <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"><Check size={18}/> Accepter l'invitation</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2"><Ban size={18}/> Refuser</button></>
+                                    )}
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                                
-                                {/* LOGIQUE D'APPROBATION COHÉRENTE : PAS D'OPTION SÉRIE SI PAS RÉCURRENT */}
-                                {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
-                                    <div className="space-y-6">
-                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300">
-                                            <Bell size={20}/> 
-                                            <span>
-                                                Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.
-                                                {selectedEvent.data.recurrence_group_id ? " Accepter toute la série ?" : " Acceptez-vous cet événement ?"}
-                                            </span>
-                                        </div>
-                                        <div className="grid gap-3">
-                                            {selectedEvent.data.recurrence_group_id ? (
-                                                <>
-                                                    <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"><Check size={18}/> Accepter toute la série</button>
-                                                    <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold">Uniquement ce jour</button>
-                                                    <button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold">Refuser tout</button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"><Check size={18}/> Accepter l'invitation</button>
-                                                    <button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2"><Ban size={18}/> Refuser</button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
-                                        
-                                        <div className="mb-6 space-y-3">
-                                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                <Users size={14}/> <span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span>
-                                            </div>
-                                            {selectedEvent.data.invited_email && (
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase">Invités :</div>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {selectedEvent.data.invited_email.split(',').map((email, idx) => (
-                                                            <span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] dark:text-white">{email.trim()}</span>
-                                                        ))}
-                                                    </div>
-                                                    <span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                        selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : 
-                                                        selectedEvent.data.status === 'declined' ? 'bg-red-100 text-red-600' : 
-                                                        'bg-emerald-100 text-emerald-600'
-                                                    }`}>
-                                                        {selectedEvent.data.status === 'pending' ? '⌛ En attente' : 
-                                                         selectedEvent.data.status === 'declined' ? '❌ Refusé' : 
-                                                         '✅ Confirmé'}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex gap-3">
-                                            <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
-                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors">
-                                                <Trash2 size={18}/> 
-                                                {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Retirer'}
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                <div className="mb-6 space-y-3">
+                                    <div className="flex items-center gap-2 text-xs text-slate-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
+                                    {selectedEvent.data.invited_email && (<div className="flex flex-col gap-1"><div className="text-[10px] font-bold text-slate-400 uppercase">Invités :</div><div className="flex flex-wrap gap-1">{selectedEvent.data.invited_email.split(',').map((email, idx) => (<span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] dark:text-white">{email.trim()}</span>))}</div><span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : selectedEvent.data.status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{selectedEvent.data.status === 'pending' ? '⌛ En attente' : selectedEvent.data.status === 'declined' ? '❌ Refusé' : '✅ Confirmé'}</span></div>)}
+                                </div>
+                                <div className="flex gap-3"><button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button><button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Retirer'}</button></div>
                             </>
                         )}
                     </div>
