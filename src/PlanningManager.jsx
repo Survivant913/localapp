@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar, UserPlus, Check, Ban, Bell, Users
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar, UserPlus, Check, Ban, Bell, Users, UserMinus
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -67,6 +67,25 @@ export default function PlanningManager({ data, updateData }) {
         setConfirmMode(null);
     };
 
+    // --- GREFFE : ANNULER L'INVITATION (RESTER SEUL SUR L'ÉVÉNEMENT) ---
+    const handleUninvite = async (evt) => {
+        if (!window.confirm("Annuler l'invitation ? L'événement redeviendra privé pour vous.")) return;
+        
+        const updatedEvents = events.map(ev => 
+            ev.id === evt.id ? { ...ev, invited_email: '', status: 'accepted' } : ev
+        );
+        
+        // On vide l'email invité et on repasse en 'accepted' pour le propriétaire
+        updateData({ ...data, calendar_events: updatedEvents }, { 
+            table: 'calendar_events', 
+            id: evt.id, 
+            action: 'update', 
+            data: { invited_email: '', status: 'accepted' } 
+        });
+        
+        setSelectedEvent(null);
+    };
+
     // --- NETTOYAGE INTELLIGENT ---
     const cleanPastEvents = async () => {
         const now = new Date();
@@ -88,7 +107,7 @@ export default function PlanningManager({ data, updateData }) {
         }
     };
 
-    // --- GESTION RESIZE (RÉPARÉ ET OPTIMISÉ) ---
+    // --- GESTION RESIZE ---
     useEffect(() => {
         const handleMouseMove = (e) => {
             if (!resizeRef.current) return;
@@ -124,7 +143,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const startResize = (e, evt) => {
         e.stopPropagation(); e.preventDefault(); 
-        if (evt.is_all_day || evt.status === 'pending') return;
+        if (evt.is_all_day || (evt.status === 'pending' && evt.user_id !== data.profile?.id)) return;
 
         let startTime = parseISO(evt.start_time);
         let endTime = parseISO(evt.end_time);
@@ -145,7 +164,7 @@ export default function PlanningManager({ data, updateData }) {
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
             const updated = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
-            // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE
+            // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
             updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
         }
     };
@@ -160,7 +179,7 @@ export default function PlanningManager({ data, updateData }) {
     const handleNextWeek = () => setCurrentWeekStart(addWeeks(currentWeekStart, 1));
     const handleToday = () => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    // --- LAYOUT ENGINE (INTÉGRATION DU RESIZE TEMPS RÉEL) ---
+    // --- LAYOUT ENGINE ---
     const getLayoutForDay = (dayItems) => {
         const timedItems = dayItems.filter(item => !isItemAllDay(item));
         const sorted = [...timedItems].sort((a, b) => parseISO(a.startStr) - parseISO(b.startStr));
@@ -214,7 +233,6 @@ export default function PlanningManager({ data, updateData }) {
         if (eventForm.isAllDay) { newStart = setMinutes(setHours(baseDate, 0), 0); newEnd = setMinutes(setHours(baseDate, 23), 59); } 
         else { newStart = setMinutes(setHours(baseDate, eventForm.startHour), eventForm.startMin); newEnd = addMinutes(newStart, eventForm.duration); }
 
-        // SÉCURITÉ : PAS D'INVITÉS SUR RÉCURRENTS
         const isRec = eventForm.recurrence || !!eventForm.recurrenceGroupId;
         const finalEmail = isRec ? '' : eventForm.invitedEmail;
 
@@ -287,7 +305,7 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     // --- DRAG HANDLERS ---
-    const onDragStart = (e, item) => { if (resizeRef.current || item.status === 'pending') return e.preventDefault(); setDraggedItem({ type: 'event', data: item }); e.dataTransfer.effectAllowed = "move"; const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; e.dataTransfer.setDragImage(img, 0, 0); };
+    const onDragStart = (e, item) => { if (resizeRef.current || (item.status === 'pending' && item.user_id !== data.profile?.id)) return e.preventDefault(); setDraggedItem({ type: 'event', data: item }); e.dataTransfer.effectAllowed = "move"; const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; e.dataTransfer.setDragImage(img, 0, 0); };
     const onDragOverGrid = (e, dayIdx) => { if (draggedItem?.data.is_all_day) return; e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let snap = Math.round((y % 60) / 15) * 15; if (snap === 60) { snap = 0; h++; } let dur = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time)); setPreviewSlot({ dayIndex: dayIdx, top: h * 60 + snap, height: Math.max(30, dur), timeLabel: `${h}:${snap.toString().padStart(2, '0')}` }); };
     
     const onDropGrid = (e, day) => { 
@@ -308,7 +326,7 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); 
             setConfirmMode('ask_update'); setIsCreating(true); 
         } else { 
-            // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE COMPLET
+            // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
             updateData({ ...data, calendar_events: events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString() } : ev) }, { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); 
         } 
         setDraggedItem(null); 
@@ -362,7 +380,7 @@ export default function PlanningManager({ data, updateData }) {
                                                 if (draggedItem?.data.is_all_day) {
                                                     const st = setMinutes(setHours(day, 0), 0);
                                                     const et = setMinutes(setHours(day, 23), 59);
-                                                    // GREFFE : AJOUT DU PAYLOAD DE SAUVEGARDE
+                                                    // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
                                                     updateData({ ...data, calendar_events: events.map(ev => ev.id === draggedItem.data.id ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); 
                                                 }
                                                 setDraggedItem(null); 
@@ -466,7 +484,23 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
                                 <div className="mb-6 space-y-3">
                                     <div className="flex items-center gap-2 text-xs text-slate-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
-                                    {selectedEvent.data.invited_email && (<div className="flex flex-col gap-1"><div className="text-[10px] font-bold text-slate-400 uppercase">Invités :</div><div className="flex flex-wrap gap-1">{selectedEvent.data.invited_email.split(',').map((email, idx) => (<span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] dark:text-white">{email.trim()}</span>))}</div><span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : selectedEvent.data.status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{selectedEvent.data.status === 'pending' ? '⌛ En attente' : selectedEvent.data.status === 'declined' ? '❌ Refusé' : '✅ Confirmé'}</span></div>)}
+                                    {selectedEvent.data.invited_email && (
+                                        <div className="flex flex-col gap-1">
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Invités :</div>
+                                            <div className="flex flex-wrap gap-1">{selectedEvent.data.invited_email.split(',').map((email, idx) => (<span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] dark:text-white">{email.trim()}</span>))}</div>
+                                            <span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : selectedEvent.data.status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{selectedEvent.data.status === 'pending' ? '⌛ En attente' : selectedEvent.data.status === 'declined' ? '❌ Refusé' : '✅ Confirmé'}</span>
+                                            
+                                            {/* GREFFE : BOUTON D'ANNULATION POUR L'ORGANISATEUR */}
+                                            {selectedEvent.data.user_id === data.profile?.id && selectedEvent.data.invited_email && (
+                                                <button 
+                                                    onClick={() => handleUninvite(selectedEvent.data)} 
+                                                    className="mt-3 flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                                                >
+                                                    <UserMinus size={14}/> Annuler l'invitation
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex gap-3"><button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button><button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Retirer'}</button></div>
                             </>
