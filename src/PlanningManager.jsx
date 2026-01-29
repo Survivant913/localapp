@@ -322,6 +322,12 @@ export default function PlanningManager({ data, updateData }) {
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updatedEvents = [...events];
         let eventsToSave = [];
+        
+        // --- LOGIQUE DE STATUT GREFFÉE ---
+        const isInvitingNow = formData.invitedEmail && formData.invitedEmail.trim().length > 0;
+        const originalEvent = events.find(e => e.id === targetId);
+        // Si on ajoute un nouvel email ou qu'on le change, on repasse en 'pending'
+        const shouldResetStatus = isInvitingNow && (formData.invitedEmail !== originalEvent?.invited_email);
 
         if (mode === 'series' && formData.recurrenceGroupId) {
             const targetDayOfWeek = startObj.getDay();
@@ -333,7 +339,6 @@ export default function PlanningManager({ data, updateData }) {
                     let evStart = parseISO(ev.start_time);
                     const currentDayOfWeek = evStart.getDay();
                     if (currentDayOfWeek !== targetDayOfWeek) {
-                        const originalEvent = events.find(e => e.id === targetId);
                         if(originalEvent) {
                             const originalStart = parseISO(originalEvent.start_time);
                             const daysDelta = Math.round((startOfDay(startObj) - startOfDay(originalStart)) / (1000 * 60 * 60 * 24));
@@ -343,7 +348,16 @@ export default function PlanningManager({ data, updateData }) {
                     let newEvStart = formData.isAllDay ? setMinutes(setHours(evStart, 0), 0) : setMinutes(setHours(evStart, targetHours), targetMinutes);
                     let newEvEnd = formData.isAllDay ? setMinutes(setHours(evStart, 23), 59) : addMinutes(newEvStart, targetDuration);
                     
-                    const updatedEv = { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay, invited_email: formData.invitedEmail };
+                    const updatedEv = { 
+                        ...ev, 
+                        title: formData.title, 
+                        color: formData.color, 
+                        start_time: newEvStart.toISOString(), 
+                        end_time: newEvEnd.toISOString(), 
+                        is_all_day: formData.isAllDay, 
+                        invited_email: formData.invitedEmail,
+                        status: shouldResetStatus ? 'pending' : ev.status 
+                    };
                     eventsToSave.push(updatedEv);
                     return updatedEv;
                 }
@@ -355,7 +369,9 @@ export default function PlanningManager({ data, updateData }) {
                     const updatedEv = {
                         ...ev, title: formData.title, color: formData.color,
                         start_time: startObj.toISOString(), end_time: endObj.toISOString(),
-                        recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail
+                        recurrence_group_id: null, is_all_day: formData.isAllDay, 
+                        invited_email: formData.invitedEmail,
+                        status: shouldResetStatus ? 'pending' : ev.status
                     };
                     eventsToSave.push(updatedEv);
                     return updatedEv;
@@ -369,7 +385,8 @@ export default function PlanningManager({ data, updateData }) {
             supabase.from('calendar_events').update({
                 title: ev.title, start_time: ev.start_time, end_time: ev.end_time, 
                 color: ev.color, is_all_day: ev.is_all_day, recurrence_group_id: ev.recurrence_group_id,
-                invited_email: ev.invited_email
+                invited_email: ev.invited_email,
+                status: ev.status 
             }).eq('id', ev.id).then();
         });
 
@@ -688,7 +705,7 @@ export default function PlanningManager({ data, updateData }) {
                             <>
                                 <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
                                 
-                                {/* GREFFE LOGIQUE D'AFFICHAGE INTELLIGENTE ICI */}
+                                {/* LOGIQUE D'AFFICHAGE INTELLIGENTE ICI */}
                                 {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email === data.profile?.email ? (
                                     <div className="space-y-6">
                                         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300">
@@ -710,15 +727,17 @@ export default function PlanningManager({ data, updateData }) {
                                         
                                         {/* AFFICHAGE DES RÔLES DIFFÉRENCIÉ */}
                                         {selectedEvent.data.invited_email && (
-                                            <div className="mb-4 text-xs text-slate-500 flex items-center gap-2">
-                                                <UserPlus size={14}/> 
-                                                {selectedEvent.data.user_id === data.profile?.id ? (
-                                                    <span>Partagé avec : <strong>{selectedEvent.data.invited_email}</strong></span>
-                                                ) : (
-                                                    <span>Invitation reçue d'un collaborateur</span>
-                                                )}
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                                    {selectedEvent.data.status === 'pending' ? 'En attente' : 'Confirmé'}
+                                            <div className="mb-4 text-xs text-slate-500 flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <UserPlus size={14}/> 
+                                                    {selectedEvent.data.user_id === data.profile?.id ? (
+                                                        <span>Invité : <strong>{selectedEvent.data.invited_email}</strong></span>
+                                                    ) : (
+                                                        <span>Organisateur : <strong>Collaborateur externe</strong></span>
+                                                    )}
+                                                </div>
+                                                <span className={`w-fit px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                    {selectedEvent.data.status === 'pending' ? '⌛ En attente' : '✅ Confirmé'}
                                                 </span>
                                             </div>
                                         )}

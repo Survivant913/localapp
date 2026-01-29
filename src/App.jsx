@@ -400,7 +400,12 @@ export default function App() {
        todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-       calendar_events: calendar_events || [], 
+       
+       // --- GREFFE 1 : On filtre les événements refusés pour l'invité ---
+       calendar_events: (calendar_events || []).filter(ev => 
+         !(ev.invited_email === userEmail && ev.status === 'declined')
+       ), 
+       
        budget: {
          accounts: validAccounts, 
          transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -409,7 +414,10 @@ export default function App() {
        },
        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
        ventures: ventures || [], 
-       profile: { ...(profile || {}), email: userEmail }, // --- GREFFE ICI : On active l'email pour le partage ---
+       
+       // --- GREFFE 2 : Injection de l'email pour valider le rôle invité ---
+       profile: { ...(profile || {}), email: userEmail }, 
+       
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
        customLabels: profile?.custom_labels || {}, mainNote: ""
      };
@@ -578,7 +586,7 @@ export default function App() {
        
        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
          <div className={`w-full ${isWorkspace ? 'h-full' : 'px-6'}`}> 
-            {renderContent()} 
+           {renderContent()} 
          </div>
        </main>
      </div>
