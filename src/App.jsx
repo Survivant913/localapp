@@ -128,6 +128,42 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
+ // --- NOUVEL AJOUT : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SANS SUPPRESSION) ---
+ useEffect(() => {
+   if (!session || !session.user) return;
+   const userEmail = session.user.email?.toLowerCase();
+   const userId = session.user.id;
+
+   const calendarChannel = supabase.channel('calendar-sync')
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, (payload) => {
+       setData(prev => {
+         let currentEvts = [...prev.calendar_events];
+         if (payload.eventType === 'INSERT') {
+           const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
+           if (isForMe && !currentEvts.some(e => e.id === payload.new.id)) currentEvts.push(payload.new);
+         } 
+         else if (payload.eventType === 'UPDATE') {
+           const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
+           const isDeclinedByMe = payload.new.invited_email?.toLowerCase().includes(userEmail) && payload.new.status === 'declined';
+           if (isForMe && !isDeclinedByMe) {
+             const idx = currentEvts.findIndex(e => e.id === payload.new.id);
+             if (idx !== -1) currentEvts[idx] = payload.new; else currentEvts.push(payload.new);
+           } else {
+             currentEvts = currentEvts.filter(e => e.id !== payload.new.id);
+           }
+         } 
+         else if (payload.eventType === 'DELETE') {
+           currentEvts = currentEvts.filter(e => e.id !== payload.old.id);
+         }
+         return { ...prev, calendar_events: currentEvts };
+       });
+     })
+     .subscribe();
+
+   return () => { supabase.removeChannel(calendarChannel); };
+ }, [session]);
+ // -----------------------------------------------------------------------
+
  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE ---
  useEffect(() => {
    const colorKey = data.settings?.accentColor || 'blue';
