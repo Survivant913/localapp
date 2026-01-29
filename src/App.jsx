@@ -264,10 +264,10 @@ export default function App() {
        supabase.from('goal_milestones').select('*'),
        supabase.from('journal_folders').select('*'),
        supabase.from('journal_pages').select('*'),
-       // --- GREFFE CALENDRIER PARTAGÉ SÉCURISÉE (FILTRE OR) ---
+       // --- GREFFE CALENDRIER : RECHERCHE MULTI-INVITÉS (ILIKE) ---
        supabase.from('calendar_events')
         .select('*')
-        .or(`user_id.eq.${userId},invited_email.eq.${userEmail}`) 
+        .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`) 
      ]);
 
      const [
@@ -401,10 +401,12 @@ export default function App() {
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
        
-       // --- GREFFE 1 : On filtre les événements refusés pour l'invité ---
-       calendar_events: (calendar_events || []).filter(ev => 
-         !(ev.invited_email === userEmail && ev.status === 'declined')
-       ), 
+       // --- GREFFE 1 : FILTRE MULTI-INVITÉS & REFUS ---
+       calendar_events: (calendar_events || []).filter(ev => {
+         const invitees = ev.invited_email?.split(',').map(s => s.trim().toLowerCase()) || [];
+         const isInvited = invitees.includes(userEmail.toLowerCase());
+         return !(isInvited && ev.status === 'declined');
+       }), 
        
        budget: {
          accounts: validAccounts, 
@@ -500,13 +502,14 @@ export default function App() {
      // --- GREFFE SAUVEGARDE CALENDRIER (SANS SUPPRESSION DE LOGIQUE) ---
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
          id: e.id, 
-         user_id: e.user_id || user.id, // Garde le créateur original !
+         user_id: e.user_id || user.id, 
          title: e.title, start_time: e.start_time, 
          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
          recurrence_group_id: e.recurrence_group_id,
          is_all_day: e.is_all_day,
-         invited_email: e.invited_email, // COLONNE PERSISTANTE
-         status: e.status // COLONNE PERSISTANTE
+         invited_email: e.invited_email, 
+         status: e.status,
+         organizer_email: e.organizer_email || user.email // --- GREFFE : On sauve l'email du créateur ---
      }));
 
      const bases = data.budget.planner.safetyBases;
@@ -534,7 +537,7 @@ export default function App() {
      case 'goals': return <GoalsManager data={data} updateData={updateData} />;
      case 'journal': return <JournalManager data={data} updateData={updateData} />;
      case 'habits': return <HabitTracker data={data} updateData={updateData} />;
-     case 'chat': return <ChatManager user={session.user} />; // --- NOUVEAU CAS (MESSAGERIE) ---
+     case 'chat': return <ChatManager user={session.user} />; 
      case 'clients': return <ClientHub data={data} updateData={updateData} />;
      case 'workspace': return <Workspace data={data} updateData={updateData} />;
      case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
@@ -543,7 +546,7 @@ export default function App() {
    }
  };
 
- const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits' || currentView === 'chat'; // --- AJOUT CHAT AU STYLE FULL WIDTH ---
+ const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits' || currentView === 'chat'; 
 
  return (
    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
@@ -566,7 +569,6 @@ export default function App() {
 
      {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
      
-     {/* --- AJOUT 4 : ON PASSE UNREADCOUNT À LA SIDEBAR --- */}
      <Sidebar 
        currentView={currentView} 
        setView={setView} 
