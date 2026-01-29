@@ -164,7 +164,6 @@ export default function CalendarView({ data }) {
                 simDate.setDate(simDate.getDate() + 1);
             }
         } 
-        // Suppression du else if qui remettait à 0 pour les mois passés
 
         const daysMap = {};
         let runningBalance = startOfMonthProjection;
@@ -232,6 +231,8 @@ export default function CalendarView({ data }) {
 
     const changeMonth = (delta) => {
         const newDate = new Date(viewDate);
+        // FIX : On force le jour à 1 pour éviter le bug du 30/31 (ex: 30 Janvier -> 30 Février qui devient 2 Mars)
+        newDate.setDate(1); 
         newDate.setMonth(newDate.getMonth() + delta);
         setViewDate(newDate);
         setSelectedDateDetails(null);
