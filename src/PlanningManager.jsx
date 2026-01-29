@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ChevronLeft, ChevronRight, CheckCircle2, 
   Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar
+  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar, UserPlus, Check, Ban, Bell
 } from 'lucide-react';
 import { 
   format, addDays, startOfWeek, addWeeks, subWeeks, 
@@ -35,12 +35,31 @@ export default function PlanningManager({ data, updateData }) {
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
         startHour: 9, startMin: 0, duration: 60, 
         type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
-        isAllDay: false
+        isAllDay: false, invitedEmail: '' // AJOUTÉ POUR LE PARTAGE
     });
 
     const isItemAllDay = (item) => {
         if (!item || !item.data) return false;
         return item.data.is_all_day === true;
+    };
+
+    // --- LOGIQUE D'APPROBATION (NOUVEAU) ---
+    const handleInvitation = async (evt, newStatus) => {
+        const updatedEvents = events.map(ev => 
+            ev.id === evt.id ? { ...ev, status: newStatus } : ev
+        );
+        
+        const finalEvents = newStatus === 'declined' 
+            ? updatedEvents.filter(ev => ev.id !== evt.id)
+            : updatedEvents;
+
+        updateData({ ...data, calendar_events: finalEvents });
+        
+        await supabase.from('calendar_events')
+            .update({ status: newStatus })
+            .eq('id', evt.id);
+            
+        setSelectedEvent(null);
     };
 
     // --- NETTOYAGE INTELLIGENT ---
@@ -119,7 +138,7 @@ export default function PlanningManager({ data, updateData }) {
     const startResize = (e, evt) => {
         e.stopPropagation(); 
         e.preventDefault(); 
-        if (evt.is_all_day) return;
+        if (evt.is_all_day || evt.status === 'pending') return; // Bloqué si invitation en attente
 
         let startDuration = 60;
         let startTime = parseISO(evt.start_time);
@@ -139,7 +158,8 @@ export default function PlanningManager({ data, updateData }) {
         if (evt.recurrence_group_id) {
             setEventForm({
                 id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, 
-                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false
+                date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false,
+                invitedEmail: evt.invited_email || ''
             });
             setPendingUpdate({ newStart: start, newEnd: newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
             setConfirmMode('ask_update');
@@ -221,7 +241,7 @@ export default function PlanningManager({ data, updateData }) {
             id: null, title: title, date: format(targetDate, 'yyyy-MM-dd'),
             startHour: hour, startMin: 0, duration: 60,
             type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
-            isAllDay: isAllDay
+            isAllDay: isAllDay, invitedEmail: ''
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -241,7 +261,8 @@ export default function PlanningManager({ data, updateData }) {
             recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12,
             recurrenceGroupId: evt.recurrence_group_id, 
             color: evt.color || 'blue', 
-            isAllDay: isAllDay
+            isAllDay: isAllDay,
+            invitedEmail: evt.invited_email || ''
         });
         setIsCreating(true);
         setSelectedEvent(null);
@@ -259,9 +280,20 @@ export default function PlanningManager({ data, updateData }) {
             newEnd = addMinutes(newStart, eventForm.duration);
         }
 
+        const isInviting = eventForm.invitedEmail.trim().length > 0;
+
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
-            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay };
+            const eventBase = { 
+                user_id: data.profile?.id, 
+                title: eventForm.title, 
+                color: eventForm.color, 
+                recurrence_group_id: groupId, 
+                recurrence_type: eventForm.recurrence ? 'weekly' : null, 
+                is_all_day: eventForm.isAllDay,
+                invited_email: eventForm.invitedEmail,
+                status: isInviting ? 'pending' : 'accepted'
+            };
             let newEvents = [];
             if (eventForm.recurrence) {
                 const weeks = parseInt(eventForm.recurrenceWeeks) || 1;
@@ -311,7 +343,7 @@ export default function PlanningManager({ data, updateData }) {
                     let newEvStart = formData.isAllDay ? setMinutes(setHours(evStart, 0), 0) : setMinutes(setHours(evStart, targetHours), targetMinutes);
                     let newEvEnd = formData.isAllDay ? setMinutes(setHours(evStart, 23), 59) : addMinutes(newEvStart, targetDuration);
                     
-                    const updatedEv = { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay };
+                    const updatedEv = { ...ev, title: formData.title, color: formData.color, start_time: newEvStart.toISOString(), end_time: newEvEnd.toISOString(), is_all_day: formData.isAllDay, invited_email: formData.invitedEmail };
                     eventsToSave.push(updatedEv);
                     return updatedEv;
                 }
@@ -323,7 +355,7 @@ export default function PlanningManager({ data, updateData }) {
                     const updatedEv = {
                         ...ev, title: formData.title, color: formData.color,
                         start_time: startObj.toISOString(), end_time: endObj.toISOString(),
-                        recurrence_group_id: null, is_all_day: formData.isAllDay
+                        recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail
                     };
                     eventsToSave.push(updatedEv);
                     return updatedEv;
@@ -336,7 +368,8 @@ export default function PlanningManager({ data, updateData }) {
         eventsToSave.forEach(ev => {
             supabase.from('calendar_events').update({
                 title: ev.title, start_time: ev.start_time, end_time: ev.end_time, 
-                color: ev.color, is_all_day: ev.is_all_day, recurrence_group_id: ev.recurrence_group_id
+                color: ev.color, is_all_day: ev.is_all_day, recurrence_group_id: ev.recurrence_group_id,
+                invited_email: ev.invited_email
             }).eq('id', ev.id).then();
         });
 
@@ -364,7 +397,7 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG HANDLERS ---
     const onDragStart = (e, item) => {
-        if (resizeRef.current) { e.preventDefault(); return; }
+        if (resizeRef.current || item.status === 'pending') { e.preventDefault(); return; } // Bloqué si invitation en attente
         setDraggedItem({ type: 'event', data: item });
         e.dataTransfer.effectAllowed = "move";
         const img = new Image(); img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -411,7 +444,7 @@ export default function PlanningManager({ data, updateData }) {
         const duration = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time));
         const newEnd = addMinutes(newStart, duration);
         if (evt.recurrence_group_id) {
-            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, date: format(newStart, 'yyyy-MM-dd'), startHour: hour, startMin: snappedMinutes, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false });
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, date: format(newStart, 'yyyy-MM-dd'), startHour: hour, startMin: snappedMinutes, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: false, invitedEmail: evt.invited_email || '' });
             setPendingUpdate({ newStart, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration, isAllDay: false });
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
@@ -435,7 +468,7 @@ export default function PlanningManager({ data, updateData }) {
         const start = setMinutes(setHours(day, 0), 0);
         const end = setMinutes(setHours(day, 23), 59);
         if (evt.recurrence_group_id) {
-            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true });
+            setEventForm({ id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, date: format(day, 'yyyy-MM-dd'), startHour: 9, startMin: 0, recurrence: true, recurrenceWeeks: 12, type: 'event', isAllDay: true, invitedEmail: evt.invited_email || '' });
             setPendingUpdate({ newStart: start, newEnd: end, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: 60, isAllDay: true });
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
@@ -469,7 +502,6 @@ export default function PlanningManager({ data, updateData }) {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            {/* BOUTON NETTOYAGE AVEC ICÔNE SÉCURISÉE (TRASH2) */}
                             <button 
                                 onClick={cleanPastEvents}
                                 className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-xs transition-colors border border-transparent hover:border-red-200"
@@ -524,13 +556,14 @@ export default function PlanningManager({ data, updateData }) {
                                                 onDrop={(e) => onDropAllDay(e, day)}
                                             >
                                                 {allDayItems.map(item => {
+                                                    const isPending = item.data.status === 'pending';
                                                     const isDraggingThis = draggedItem?.data?.id === item.data.id;
                                                     const style = isDraggingThis ? { opacity: 0.5 } : {};
                                                     const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
 
                                                     return (
-                                                        <div key={item.data.id} draggable onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} style={style} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass}`}>
-                                                            {item.data.title}
+                                                        <div key={item.data.id} draggable={!isPending} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} style={style} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>
+                                                            {isPending && '🔔 '}{item.data.title}
                                                         </div>
                                                     );
                                                 })}
@@ -548,17 +581,23 @@ export default function PlanningManager({ data, updateData }) {
                                                 
                                                 {layoutItems.map((item) => {
                                                     const dataItem = item.data;
+                                                    const isPending = dataItem.status === 'pending';
                                                     const isDraggingThis = draggedItem?.data?.id === dataItem.id;
-                                                    const style = { ...item.style, opacity: isDraggingThis ? 0.5 : 1 };
+                                                    const style = { ...item.style, opacity: isDraggingThis ? 0.5 : (isPending ? 0.6 : 1) };
                                                     const isRecurrent = !!dataItem.recurrence_group_id;
                                                     const isResizingAny = !!resizeRef.current;
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white border-l-4 border-l-blue-600 shadow-sm border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:border-l-blue-600 text-blue-900 dark:text-blue-100';
 
                                                     return (
-                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass}`}>
-                                                            <span className="font-bold truncate leading-tight text-[11px]">{dataItem.title}</span>
+                                                        <div key={`${item.type}-${dataItem.id}`} style={style} draggable={!isResizingAny && !isPending} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
+                                                            <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">
+                                                                {isPending && <Bell size={10} className="text-blue-500"/>}
+                                                                {dataItem.title}
+                                                            </span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{isRecurrent && <Repeat size={10} />}</div>
-                                                            <div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>
+                                                            {!isPending && (
+                                                                <div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
@@ -594,6 +633,16 @@ export default function PlanningManager({ data, updateData }) {
                                 </h3>
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
+                                    
+                                    {/* CHAMP PARTAGE EMAIL AJOUTÉ */}
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Partager avec (Email)</label>
+                                        <div className="relative">
+                                            <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+                                            <input type="email" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="exemple@mail.com" />
+                                        </div>
+                                    </div>
+
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     
                                     <div className="flex items-center gap-2 py-2">
@@ -622,6 +671,7 @@ export default function PlanningManager({ data, updateData }) {
                     </div>
                 </div>
             )}
+
             {selectedEvent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 border border-slate-200 dark:border-slate-700">
@@ -638,11 +688,40 @@ export default function PlanningManager({ data, updateData }) {
                         ) : (
                             <>
                                 <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
-                                    <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
-                                </div>
+                                
+                                {/* LOGIQUE APPROBATION DANS LE DÉTAIL */}
+                                {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email === data.profile?.email ? (
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300">
+                                            <Bell size={20}/> 
+                                            <span>Invitation reçue. Acceptez-vous cet événement dans votre agenda ?</span>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button onClick={() => handleInvitation(selectedEvent.data, 'accepted')} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+                                                <Check size={18}/> Accepter
+                                            </button>
+                                            <button onClick={() => handleInvitation(selectedEvent.data, 'declined')} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2">
+                                                <Ban size={18}/> Refuser
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                        {selectedEvent.data.invited_email && (
+                                            <div className="mb-4 text-xs text-slate-500 flex items-center gap-2">
+                                                <UserPlus size={14}/> Partagé avec : {selectedEvent.data.invited_email} 
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                    {selectedEvent.data.status === 'pending' ? 'En attente' : 'Confirmé'}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex gap-3">
+                                            <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"><Pencil size={16}/> Modifier</button>
+                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 flex items-center justify-center gap-2 transition-colors"><Trash2 size={18}/> Supprimer</button>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
