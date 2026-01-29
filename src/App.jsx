@@ -125,7 +125,7 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER ---
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (CORRECTIF ANNULATION) ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
@@ -137,23 +137,25 @@ export default function App() {
          let currentEvts = [...prev.calendar_events];
          if (payload.eventType === 'INSERT') {
            const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
-           if (isForMe && !currentEvts.some(e => e.id === payload.new.id)) currentEvts.push(payload.new);
+           if (isForMe && !currentEvts.some(e => String(e.id) === String(payload.new.id))) currentEvts.push(payload.new);
          } 
          else if (payload.eventType === 'UPDATE') {
            const isOwner = payload.new.user_id === userId;
-           const invitees = payload.new.invited_email?.toLowerCase().split(',').map(s => s.trim()) || [];
+           const invitees = (payload.new.invited_email || "").toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
            const isInvited = invitees.includes(userEmail);
            const isDeclinedByMe = isInvited && !isOwner && payload.new.status === 'declined';
            
+           // Si je suis concerné et n'ai pas refusé
            if ((isOwner || isInvited) && !isDeclinedByMe) {
-             const idx = currentEvts.findIndex(e => e.id === payload.new.id);
+             const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
              if (idx !== -1) currentEvts[idx] = payload.new; else currentEvts.push(payload.new);
            } else {
-             currentEvts = currentEvts.filter(e => e.id !== payload.new.id);
+             // ACTION CRITIQUE : Si je ne suis plus sur la liste (annulation), on retire l'événement
+             currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.new.id));
            }
          } 
          else if (payload.eventType === 'DELETE') {
-           currentEvts = currentEvts.filter(e => e.id !== payload.old.id);
+           currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.old.id));
          }
          return { ...prev, calendar_events: currentEvts };
        });
