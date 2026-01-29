@@ -67,15 +67,16 @@ export default function PlanningManager({ data, updateData }) {
         setConfirmMode(null);
     };
 
-    // --- GREFFE : ANNULER L'INVITATION (RESTER SEUL SUR L'ÉVÉNEMENT) ---
+    // --- GREFFE : ANNULER L'INVITATION (AVEC SÉCURITÉ ID STRING) ---
     const handleUninvite = async (evt) => {
         if (!window.confirm("Annuler l'invitation ? L'événement redeviendra privé pour vous.")) return;
         
         const updatedEvents = events.map(ev => 
-            ev.id === evt.id ? { ...ev, invited_email: '', status: 'accepted' } : ev
+            String(ev.id) === String(evt.id) ? { ...ev, invited_email: '', status: 'accepted' } : ev
         );
         
         // On vide l'email invité et on repasse en 'accepted' pour le propriétaire
+        // L'action 'update' avec payload data garantit que Supabase diffuse le changement
         updateData({ ...data, calendar_events: updatedEvents }, { 
             table: 'calendar_events', 
             id: evt.id, 
@@ -163,8 +164,8 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
-            const updated = events.map(ev => ev.id === evt.id ? { ...ev, end_time: newEnd.toISOString() } : ev);
-            // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
+            const updated = events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, end_time: newEnd.toISOString() } : ev);
+            // GREFFE : SÉCURITÉ PERSISTANCE
             updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
         }
     };
@@ -191,7 +192,7 @@ export default function PlanningManager({ data, updateData }) {
             if (!isValid(start) || !isValid(end)) return;
             
             const startMin = getHours(start) * 60 + getMinutes(start);
-            let duration = (resizingEvent && item.data.id === resizingEvent.id) 
+            let duration = (resizingEvent && String(item.data.id) === String(resizingEvent.id)) 
                 ? resizingEvent.currentDuration 
                 : differenceInMinutes(end, start);
 
@@ -200,7 +201,7 @@ export default function PlanningManager({ data, updateData }) {
             for(let col of columns) {
                 if (!col.some(ev => {
                     const evS = parseISO(ev.startStr); const evE = parseISO(ev.endStr);
-                    let evD = (resizingEvent && ev.data.id === resizingEvent.id) ? resizingEvent.currentDuration : differenceInMinutes(evE, evS);
+                    let evD = (resizingEvent && String(ev.data.id) === String(resizingEvent.id)) ? resizingEvent.currentDuration : differenceInMinutes(evE, evS);
                     const otherTop = getHours(evS) * 60 + getMinutes(evS);
                     return (top < otherTop + evD && top + duration > otherTop);
                 })) { col.push({ ...item, top, height: Math.max(15, duration) }); placed = true; break; }
@@ -268,14 +269,14 @@ export default function PlanningManager({ data, updateData }) {
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
         let updated = [...events];
-        const resetStat = formData.invitedEmail && (formData.invitedEmail !== events.find(e => e.id === targetId)?.invited_email);
+        const resetStat = formData.invitedEmail && (formData.invitedEmail !== events.find(e => String(e.id) === String(targetId))?.invited_email);
 
         if (mode === 'series' && formData.recurrenceGroupId) {
             updated = updated.map(ev => {
                 if (ev.recurrence_group_id === formData.recurrenceGroupId) {
                     let s = parseISO(ev.start_time);
                     if (s.getDay() !== startObj.getDay()) {
-                        s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => e.id === targetId).start_time))) / 86400000));
+                        s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => String(e.id) === String(targetId)).start_time))) / 86400000));
                     }
                     let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
                     return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay, invited_email: '', status: 'accepted' };
@@ -283,11 +284,11 @@ export default function PlanningManager({ data, updateData }) {
                 return ev;
             });
         } else {
-            updated = updated.map(ev => ev.id === targetId ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
+            updated = updated.map(ev => String(ev.id) === String(targetId) ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
         }
         
         updateData({ ...data, calendar_events: updated });
-        const toSave = updated.filter(ev => ev.id === targetId || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
+        const toSave = updated.filter(ev => String(ev.id) === String(targetId) || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
         toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
         setConfirmMode(null); setIsCreating(false);
     };
@@ -299,7 +300,7 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const performDelete = (evt, series) => {
-        const updated = events.filter(e => series ? e.recurrence_group_id !== evt.recurrence_group_id : e.id !== evt.id);
+        const updated = events.filter(e => series ? e.recurrence_group_id !== evt.recurrence_group_id : String(e.id) !== String(evt.id));
         updateData({ ...data, calendar_events: updated }, series ? { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } } : { table: 'calendar_events', id: evt.id });
         setSelectedEvent(null); setConfirmMode(null);
     };
@@ -326,8 +327,7 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); 
             setConfirmMode('ask_update'); setIsCreating(true); 
         } else { 
-            // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
-            updateData({ ...data, calendar_events: events.map(ev => ev.id === evt.id ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString() } : ev) }, { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); 
+            updateData({ ...data, calendar_events: events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString() } : ev) }, { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); 
         } 
         setDraggedItem(null); 
     };
@@ -380,14 +380,12 @@ export default function PlanningManager({ data, updateData }) {
                                                 if (draggedItem?.data.is_all_day) {
                                                     const st = setMinutes(setHours(day, 0), 0);
                                                     const et = setMinutes(setHours(day, 23), 59);
-                                                    // GREFFE : AJOUT DU PAYLOAD DATA POUR PERSISTANCE DB
-                                                    updateData({ ...data, calendar_events: events.map(ev => ev.id === draggedItem.data.id ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); 
+                                                    updateData({ ...data, calendar_events: events.map(ev => String(ev.id) === String(draggedItem.data.id) ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); 
                                                 }
                                                 setDraggedItem(null); 
                                               }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
-                                                    // GREFFE : ON NE GRISE PAS SI JE SUIS LE PROPRIÉTAIRE
                                                     const isPending = item.data.status === 'pending' && item.data.user_id !== data.profile?.id;
                                                     return (<div key={item.data.id} draggable={!isPending} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
@@ -398,7 +396,6 @@ export default function PlanningManager({ data, updateData }) {
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center text-xs font-bold text-blue-600" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
                                                 {layoutItems.map((item) => {
                                                     const dataItem = item.data; 
-                                                    // GREFFE : ON NE GRISE PAS SI JE SUIS LE PROPRIÉTAIRE
                                                     const isPending = dataItem.status === 'pending' && dataItem.user_id !== data.profile?.id;
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 text-emerald-900 dark:bg-slate-800 dark:text-emerald-100 shadow-sm border' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm border' : 'bg-white border-l-4 border-l-blue-600 text-blue-900 dark:bg-slate-800 dark:text-blue-100 shadow-sm border';
                                                     return (
@@ -438,11 +435,9 @@ export default function PlanningManager({ data, updateData }) {
                                 <h3 className="text-xl font-bold mb-6 text-slate-800 dark:text-white flex items-center gap-2"><Calendar className="text-blue-500"/>{eventForm.id ? 'Modifier' : 'Planifier'}</h3>
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
-                                    
                                     {!eventForm.recurrence && !eventForm.recurrenceGroupId && (
                                         <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="ami1@test.com, ami2@test.com" /></div></div>
                                     )}
-
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     <div className="flex items-center gap-2 py-2"><input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded"/><label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label></div>
                                     {!eventForm.isAllDay && (
@@ -467,7 +462,6 @@ export default function PlanningManager({ data, updateData }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
                         <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                        
                         {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
                             <div className="space-y-6">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
