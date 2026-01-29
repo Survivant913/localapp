@@ -409,7 +409,7 @@ export default function App() {
        },
        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
        ventures: ventures || [], 
-       profile: profile || {},
+       profile: { ...(profile || {}), email: userEmail }, // --- GREFFE ICI : On active l'email pour le partage ---
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
        customLabels: profile?.custom_labels || {}, mainNote: ""
      };
@@ -578,7 +578,7 @@ export default function App() {
        
        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
          <div className={`w-full ${isWorkspace ? 'h-full' : 'px-6'}`}> 
-           {renderContent()} 
+            {renderContent()} 
          </div>
        </main>
      </div>
