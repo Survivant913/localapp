@@ -19,14 +19,14 @@ import HabitTracker from './HabitTracker';
 import ChatManager from './ChatManager'; 
 import { Loader2, Lock } from 'lucide-react';
 
-// --- AJOUT 1 : LE SON (Insertion ici) ---
+// --- AJOUT 1 : LE SON ---
 const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIwAAERERERERERERERERERERMzMzMzMzMzMzMzMzMzMzMzMzREREREREREREREREREREREREZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZm//OEAAAAAAAAAAAAAAAAAAAAAAAATGF2YzU4LjM1LjEwMAAAAAAAAAAAAAAAJAAAAAAAAAAAASNmNs4AAAAAAAAB//OEZAAAAAAABAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAQAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAf/7kmRAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAABAAABAAAAAAAAAAAAAAAAAAAAAAAAAAA//uSZAADAAAAAAABAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 // --- NOUVEAU : PALETTE DE COULEURS ---
 const THEME_COLORS = {
  blue:    { primary: '#2563eb', hover: '#1d4ed8', light: '#eff6ff', text: '#2563eb', textLight: '#3b82f6', border: '#bfdbfe', badge: '#dbeafe' },
  violet:  { primary: '#7c3aed', hover: '#6d28d9', light: '#f5f3ff', text: '#7c3aed', textLight: '#8b5cf6', border: '#ddd6fe', badge: '#ede9fe' },
- emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10 b981', border: '#a7f3d0', badge: '#d1fae5' },
+ emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10b981', border: '#a7f3d0', badge: '#d1fae5' },
  amber:   { primary: '#d97706', hover: '#b45309', light: '#fffbeb', text: '#d97706', textLight: '#f59e0b', border: '#fde68a', badge: '#fef3c7' },
  rose:    { primary: '#e11d48', hover: '#be123c', light: '#fff1f2', text: '#e11d48', textLight: '#f43f5e', border: '#fecdd3', badge: '#ffe4e6' },
  indigo:  { primary: '#4f46e5', hover: '#4338ca', light: '#eef2ff', text: '#4f46e5', textLight: '#6366f1', border: '#c7d2fe', badge: '#e0e7ff' },
@@ -65,7 +65,7 @@ export default function App() {
  const [unsavedChanges, setUnsavedChanges] = useState(false);
  const [isSaving, setIsSaving] = useState(false);
 
- // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS (POUR LA RECONNEXION) ---
+ // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS ---
  useEffect(() => {
    if (!session?.user?.email) return;
 
@@ -94,13 +94,11 @@ export default function App() {
 
    fetchInitialUnreadCount();
  }, [session]); 
- // -------------------------------------------------------------------------------
 
  // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
  useEffect(() => {
    if (!session) return;
    
-   // 1. DEMANDE DE PERMISSION AU DÉMARRAGE
    if ('Notification' in window && Notification.permission === 'default') {
        Notification.requestPermission();
    }
@@ -115,11 +113,10 @@ export default function App() {
                try { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch(e) {}
                setUnreadCount(prev => prev + 1);
 
-               // 2. ENVOI DE LA NOTIFICATION SYSTÈME
                if (Notification.permission === 'granted') {
                    new Notification("Nouveau Message", {
                        body: payload.new.content || "Vous avez reçu un message",
-                       silent: true // On gère le son nous-même
+                       silent: true 
                    });
                }
            }
@@ -128,7 +125,7 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- NOUVEL AJOUT : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SÉCURISÉ) ---
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
@@ -144,10 +141,10 @@ export default function App() {
          } 
          else if (payload.eventType === 'UPDATE') {
            const isOwner = payload.new.user_id === userId;
-           const isInvited = payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail);
+           const invitees = payload.new.invited_email?.toLowerCase().split(',').map(s => s.trim()) || [];
+           const isInvited = invitees.includes(userEmail);
            const isDeclinedByMe = isInvited && !isOwner && payload.new.status === 'declined';
            
-           // Si je suis concerné et que je n'ai pas refusé (ou si je suis le créateur)
            if ((isOwner || isInvited) && !isDeclinedByMe) {
              const idx = currentEvts.findIndex(e => e.id === payload.new.id);
              if (idx !== -1) currentEvts[idx] = payload.new; else currentEvts.push(payload.new);
@@ -165,13 +162,11 @@ export default function App() {
 
    return () => { supabase.removeChannel(calendarChannel); };
  }, [session]);
- // -----------------------------------------------------------------------
 
  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE ---
  useEffect(() => {
    const colorKey = data.settings?.accentColor || 'blue';
    
-   // Si c'est bleu (défaut), on nettoie le style custom
    if (colorKey === 'blue') {
        const existingStyle = document.getElementById('dynamic-theme-style');
        if (existingStyle) existingStyle.remove();
@@ -181,7 +176,6 @@ export default function App() {
    const theme = THEME_COLORS[colorKey];
    if (!theme) return;
 
-   // On écrase les classes Tailwind "blue" par nos couleurs choisies
    const css = `
      .bg-blue-600 { background-color: ${theme.primary} !important; }
      .hover\\:bg-blue-700:hover { background-color: ${theme.hover} !important; }
@@ -214,7 +208,7 @@ export default function App() {
    } catch(e) { return new Date(); }
  };
 
- // --- CORRECTION DU BUG DE DATE (Timezone Buffer AJUSTÉ - PRESERVÉ) ---
+ // --- CORRECTION DU BUG DE DATE (+6H PRÉSERVÉ) ---
  const isDatePastOrToday = (dateStr) => {
      if (!dateStr) return false;
      const today = new Date();
@@ -273,11 +267,9 @@ export default function App() {
    setLoading(true);
 
    try {
-     // --- CORRECTION CRITIQUE : RÉCUPÉRATION SÉCURISÉE DE L'EMAIL ---
      const { data: { user: currentUser } } = await supabase.auth.getUser();
      const userEmail = currentUser?.email;
 
-     // SI L'EMAIL N'EST PAS ENCORE LÀ, ON ANNULE POUR ÉVITER L'ERREUR undefined
      if (!userEmail) { isLoaded.current = false; setLoading(false); return; }
 
      const results = await Promise.all([
@@ -286,9 +278,7 @@ export default function App() {
        supabase.from('notes').select('*'),
        supabase.from('projects').select('*'),
        supabase.from('accounts').select('*'),
-       // --- MODIFICATION ICI : AUGMENTATION DE LA LIMITE À 10 000 ---
        supabase.from('transactions').select('*').limit(10000), 
-       // -----------------------------------------------------------
        supabase.from('recurring').select('*'),
        supabase.from('scheduled').select('*'),
        supabase.from('events').select('*'),
@@ -303,7 +293,6 @@ export default function App() {
        supabase.from('goal_milestones').select('*'),
        supabase.from('journal_folders').select('*'),
        supabase.from('journal_pages').select('*'),
-       // --- GREFFE CALENDRIER : RECHERCHE MULTI-INVITÉS (ILIKE) ---
        supabase.from('calendar_events')
         .select('*')
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`) 
@@ -319,7 +308,6 @@ export default function App() {
        { data: calendar_events } 
      ] = results;
 
-     // --- CATCH-UP ENGINE ---
      let newDBTransactions = [];
      let updatedDBScheduled = [];
      let updatedDBRecurring = [];
@@ -439,16 +427,12 @@ export default function App() {
        todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-       
-       // --- GREFFE 1 : FILTRE MULTI-INVITÉS & REFUS SÉCURISÉ ---
        calendar_events: (calendar_events || []).filter(ev => {
          const isOwner = ev.user_id === userId;
          const invitees = ev.invited_email?.split(',').map(s => s.trim().toLowerCase()) || [];
          const isInvited = invitees.includes(userEmail.toLowerCase());
-         // On ne masque QUE si je suis invité et que j'ai refusé (pas si je suis propriétaire)
          return isOwner || !(isInvited && ev.status === 'declined');
        }), 
-       
        budget: {
          accounts: validAccounts, 
          transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -457,16 +441,13 @@ export default function App() {
        },
        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
        ventures: ventures || [], 
-       
-       // --- GREFFE 2 : Injection de l'email pour valider le rôle invité ---
        profile: { ...(profile || {}), email: userEmail }, 
-       
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
        customLabels: profile?.custom_labels || {}, mainNote: ""
      };
 
      setData(newData);
-     loadSuccess.current = true; // --- VERROU DÉBLOQUÉ : CHARGEMENT OK ---
+     loadSuccess.current = true; 
      if (newData.settings?.pin) setIsLocked(true);
 
    } catch (error) { console.error("Erreur chargement:", error); } finally { setLoading(false); }
@@ -477,14 +458,14 @@ export default function App() {
    setUnsavedChanges(true); 
 
    if (dbRequest) {
-     const { table, id, data, action, filter } = dbRequest; 
+     const { table, id, data: payload, action, filter } = dbRequest; 
      try {
-       if (action === 'insert' && table && data) {
+       if (action === 'insert' && table && payload) {
            const { data: { session } } = await supabase.auth.getSession();
-           await supabase.from(table).insert({ ...data, user_id: session?.user?.id });
+           await supabase.from(table).insert({ ...payload, user_id: session?.user?.id });
        } 
-       else if (action === 'update' && table && id && data) {
-           await supabase.from(table).update(data).eq('id', id);
+       else if (action === 'update' && table && id && payload) {
+           await supabase.from(table).update(payload).eq('id', id);
        }
        else if ((action === 'delete' || (!action && table && id)) || (filter)) {
            if (filter && filter.column && filter.value) {
@@ -504,7 +485,6 @@ export default function App() {
  }, [data, unsavedChanges]);
 
  const saveDataToSupabase = async () => {
-   // --- SÉCURITÉ CRITIQUE : ON NE SAUVEGARDE QUE SI LE CHARGEMENT EST RÉUSSI ---
    if (!session || !loadSuccess.current) return; 
    setIsSaving(true);
    try {
@@ -522,40 +502,28 @@ export default function App() {
      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-     
      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes }));
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
      await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.target_account_id }));
      await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
-     
-     await upsertInBatches('goals', data.goals, 50, g => ({ 
-         id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, 
-         status: g.status, is_favorite: g.is_favorite,
-         category: g.category, priority: g.priority, motivation: g.motivation 
-     })); 
+     await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite, category: g.category, priority: g.priority, motivation: g.motivation })); 
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
-     
      await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
      await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
 
-     // --- GREFFE SAUVEGARDE CALENDRIER (SANS SUPPRESSION DE LOGIQUE) ---
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
-         id: e.id, 
-         user_id: e.user_id || user.id, 
-         title: e.title, start_time: e.start_time, 
+         id: e.id, user_id: e.user_id || user.id, title: e.title, start_time: e.start_time, 
          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
-         recurrence_group_id: e.recurrence_group_id,
-         is_all_day: e.is_all_day,
-         invited_email: e.invited_email, 
-         status: e.status,
-         organizer_email: e.organizer_email || user.email // --- GREFFE : On sauve l'email du créateur ---
+         recurrence_group_id: e.recurrence_group_id, is_all_day: e.is_all_day,
+         invited_email: e.invited_email, status: e.status, organizer_email: e.organizer_email || user.email 
      }));
 
      const bases = data.budget.planner.safetyBases;
      const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
      if (basesSQL.length > 0) await supabase.from('safety_bases').upsert(basesSQL, { onConflict: 'user_id, account_id' });
+     
      setUnsavedChanges(false);
      setNotifMessage(null);
    } catch (err) { 
