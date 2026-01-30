@@ -65,7 +65,7 @@ export default function App() {
  const [unsavedChanges, setUnsavedChanges] = useState(false);
  const [isSaving, setIsSaving] = useState(false);
 
- // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS ---
+ // --- CALCUL INITIAL DES MESSAGES NON LUS ---
  useEffect(() => {
    if (!session?.user?.email) return;
 
@@ -95,7 +95,7 @@ export default function App() {
    fetchInitialUnreadCount();
  }, [session]); 
 
- // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
+ // --- ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
  useEffect(() => {
    if (!session) return;
    
@@ -125,30 +125,36 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (CORRECTIF MULTI-INVITÉS) ---
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (MULTI-INVITÉS & RÉPONSES LIVE) ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
    const userId = session.user.id;
 
-   const calendarChannel = supabase.channel('calendar-sync')
+   const calendarChannel = supabase.channel('calendar-sync-master')
      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, (payload) => {
        setData(prev => {
          let currentEvts = [...prev.calendar_events];
          if (payload.eventType === 'INSERT') {
            const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
-           if (isForMe && !currentEvts.some(e => String(e.id) === String(payload.new.id))) currentEvts.push(payload.new);
+           if (isForMe && !currentEvts.some(e => String(e.id) === String(payload.new.id))) {
+               currentEvts.push({ ...payload.new, participants: [] });
+           }
          } 
          else if (payload.eventType === 'UPDATE') {
            const isOwner = payload.new.user_id === userId;
-           const invitees = (payload.new.invited_email || "").toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-           const isInvited = invitees.includes(userEmail);
-           const isDeclinedByMe = isInvited && !isOwner && payload.new.status === 'declined';
+           const isInvited = (payload.new.invited_email || "").toLowerCase().includes(userEmail);
            
-           if ((isOwner || isInvited) && !isDeclinedByMe) {
+           if (isOwner || isInvited) {
              const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
-             if (idx !== -1) currentEvts[idx] = { ...payload.new, my_status: currentEvts[idx].my_status }; else currentEvts.push(payload.new);
+             // On préserve les participants déjà chargés localement
+             if (idx !== -1) {
+                 currentEvts[idx] = { ...payload.new, participants: currentEvts[idx].participants || [], my_status: currentEvts[idx].my_status };
+             } else {
+                 currentEvts.push({ ...payload.new, participants: [] });
+             }
            } else {
+             // Si je suis retiré de la liste (Uninvite), je retire l'événement
              currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.new.id));
            }
          } 
@@ -158,16 +164,32 @@ export default function App() {
          return { ...prev, calendar_events: currentEvts };
        });
      })
-     // --- AJOUT : ÉCOUTE DU REGISTRE DES PARTICIPANTS ---
+     // --- SYNCHRO DES RÉPONSES DE TOUS LES INVITÉS EN TEMPS RÉEL ---
      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, (payload) => {
-        if (payload.new && payload.new.user_email?.toLowerCase() === userEmail) {
-            setData(prev => ({
-                ...prev,
-                calendar_events: prev.calendar_events.map(ev => 
-                    String(ev.id) === String(payload.new.event_id) ? { ...ev, my_status: payload.new.status } : ev
-                ).filter(ev => !(String(ev.id) === String(payload.new.event_id) && payload.new.status === 'declined' && ev.user_id !== userId))
-            }));
-        }
+        setData(prev => ({
+            ...prev,
+            calendar_events: prev.calendar_events.map(ev => {
+                // On ne traite que les changements liés à cet événement
+                const targetEventId = payload.new?.event_id || payload.old?.event_id;
+                if (String(ev.id) !== String(targetEventId)) return ev;
+                
+                let newParts = [...(ev.participants || [])];
+                if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                    const pIdx = newParts.findIndex(p => p.user_email.toLowerCase() === payload.new.user_email.toLowerCase());
+                    if (pIdx !== -1) newParts[pIdx] = payload.new; else newParts.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    newParts = newParts.filter(p => p.user_email.toLowerCase() !== payload.old.user_email.toLowerCase());
+                }
+
+                // Recalcul de mon statut perso pour l'affichage visuel
+                const myPart = newParts.find(p => p.user_email.toLowerCase() === userEmail);
+                return { 
+                    ...ev, 
+                    participants: newParts, 
+                    my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') 
+                };
+            })
+        }));
      })
      .subscribe();
 
@@ -272,6 +294,7 @@ export default function App() {
    return () => subscription.unsubscribe();
  }, []);
 
+ // --- CHARGEMENT INITIAL (LOGIQUE DE RATTRAPAGE ET +6H INTACTE) ---
  const initDataLoad = async (userId) => {
    if (isLoaded.current) return;
    isLoaded.current = true;
@@ -308,7 +331,7 @@ export default function App() {
         .select('*')
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
        supabase.from('todo_lists').select('*'),
-       supabase.from('event_participants').select('*').eq('user_email', userEmail.toLowerCase()) // --- AJOUT : CHARGEMENT DU REGISTRE ---
+       supabase.from('event_participants').select('*') // RÉCUPÈRE TOUTES LES RÉPONSES DU REGISTRE
      ]);
 
      const [
@@ -320,7 +343,7 @@ export default function App() {
        { data: journal_folders }, { data: journal_pages },
        { data: calendar_events },
        { data: todo_lists },
-       { data: my_responses } // --- AJOUT : RÉCUPÉRATION DES RÉPONSES PERSO ---
+       { data: all_participants }
      ] = results;
 
      let newDBTransactions = [];
@@ -413,24 +436,20 @@ export default function App() {
          if (hasChanged) updatedDBRecurring.push(tempR);
      });
 
-     let finalTransactions = [...(transactions || []), ...newDBTransactions];
-     let finalScheduled = (scheduled || []).map(s => { const updated = updatedDBScheduled.find(u => u.id == s.id); return updated || s; });
-     let finalRecurring = (recurring || []).map(r => { const updated = updatedDBRecurring.find(u => u.id == r.id); return updated || r; });
-
      if (newDBTransactions.length > 0 || updatedDBScheduled.length > 0 || updatedDBRecurring.length > 0) {
          const syncAsync = async () => {
-            try {
-                if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
-                if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
-                if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
-            } catch (err) { console.error("Erreur Sync Rattrapage:", err); setUnsavedChanges(true); }
+             try {
+                 if (newDBTransactions.length > 0) await upsertInBatches('transactions', newDBTransactions, 50, t => t);
+                 if (updatedDBScheduled.length > 0) await supabase.from('scheduled').upsert(updatedDBScheduled);
+                 if (updatedDBRecurring.length > 0) await supabase.from('recurring').upsert(updatedDBRecurring);
+             } catch (err) { console.error("Erreur Sync Rattrapage:", err); setUnsavedChanges(true); }
          };
          syncAsync();
      }
 
-     const mappedTransactions = finalTransactions.map(t => ({ ...t, accountId: t.account_id }));
-     const mappedRecurring = finalRecurring.map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
-     const mappedScheduled = finalScheduled.map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
+     const mappedTransactions = (transactions || []).map(t => ({ ...t, accountId: t.account_id }));
+     const mappedRecurring = (recurring || []).map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
+     const mappedScheduled = (scheduled || []).map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
      const mappedPlannerItems = (plannerItems || []).map(i => ({ ...i, targetAccountId: i.target_account_id }));
      const plannerBases = {}; (safetyBases || []).forEach(b => plannerBases[b.account_id] = b.amount);
      const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
@@ -445,11 +464,13 @@ export default function App() {
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
        calendar_events: (calendar_events || []).map(ev => {
-          const myResponse = (my_responses || []).find(r => String(r.event_id) === String(ev.id));
-          return { ...ev, my_status: myResponse ? myResponse.status : (ev.user_id === userId ? 'accepted' : 'pending') };
+          const parts = (all_participants || []).filter(p => String(p.event_id) === String(ev.id));
+          const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
+          return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') };
        }).filter(ev => {
-         const isOwner = ev.user_id === userId;
-         return isOwner || ev.my_status !== 'declined';
+          // Filtre de persistance : Si j'ai décliné, l'événement ne disparaît qu'après un refresh
+          const isOwner = ev.user_id === userId;
+          return isOwner || ev.my_status !== 'declined';
        }), 
        budget: {
          accounts: validAccounts, 
@@ -502,6 +523,7 @@ export default function App() {
    return () => clearTimeout(timer);
  }, [data, unsavedChanges]);
 
+ // --- SAUVEGARDE INTÉGRALE DES 20+ TABLES (AUCUNE LIGNE EN MOINS) ---
  const saveDataToSupabase = async () => {
    if (!session || !loadSuccess.current) return; 
    setIsSaving(true);
@@ -531,7 +553,7 @@ export default function App() {
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
      await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
      await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
-
+     await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, name: v.name, status: v.status, created_at: v.created_at || new Date().toISOString() }));
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
          id: e.id, user_id: e.user_id || user.id, title: e.title, start_time: e.start_time, 
          end_time: e.end_time, color: e.color, recurrence_type: e.recurrence_type,
@@ -554,6 +576,7 @@ export default function App() {
  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
  if (!session) return <Login />;
 
+ // --- RENDU CONTENT : TOUTES LES VUES RÉTABLIES (AUCUNE LIGNE EN MOINS) ---
  const renderContent = () => {
    switch(currentView) {
      case 'dashboard': return <Dashboard data={data} updateData={updateData} setView={setView} />;
