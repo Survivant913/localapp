@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { 
   CheckCircle2, Circle, Plus, Trash2, Calendar, Flag, 
   Filter, CheckSquare, AlertCircle, X, ListTodo,
-  LayoutDashboard, List, ChevronRight, Clock, Hash, ArrowRight
+  LayoutDashboard, List, ChevronRight, Clock, Hash, ArrowRight,
+  GripVertical, ChevronLeft, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 
 export default function TodoList({ data, updateData }) {
@@ -12,17 +13,18 @@ export default function TodoList({ data, updateData }) {
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
     const [filter, setFilter] = useState('all'); 
 
-    // --- NOUVEAUX ÉTATS (SANS SIMPLIFICATION) ---
-    const [viewMode, setViewMode] = useState('list'); // 'list' ou 'kanban'
+    // --- ÉTATS DE NAVIGATION ET DRAG & DROP ---
+    const [viewMode, setViewMode] = useState('list'); 
     const [activeListId, setActiveListId] = useState('default');
     const [isAddingList, setIsAddingList] = useState(false);
     const [newListTitle, setNewListTitle] = useState('');
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Menu rétractable
+    const [draggingTaskId, setDraggingTaskId] = useState(null); // Pour le Drag & Drop
 
     const isDark = data.settings?.theme === 'dark';
 
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
-    // --- CORRECTION : FUSION DES LISTES POUR LA NAVIGATION ---
     const todoListsFromData = data.todoLists || [];
     const allLists = [{ id: 'default', name: 'To-Do', color: 'indigo' }, ...todoListsFromData];
 
@@ -40,7 +42,28 @@ export default function TodoList({ data, updateData }) {
     const circumference = 2 * Math.PI * radius; 
     const strokeDashoffset = circumference - (stats.percentage / 100) * circumference; 
 
-    // --- ACTIONS (LOGIQUE ORIGINALE PRÉSERVÉE + KANBAN) ---
+    // --- LOGIQUE DRAG & DROP NATIVE ---
+    const handleDragStart = (e, taskId) => {
+        setDraggingTaskId(taskId);
+        e.dataTransfer.setData('taskId', taskId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e, newStatus) => {
+        e.preventDefault();
+        const taskId = e.dataTransfer.getData('taskId');
+        if (taskId) {
+            updateStatus(Number(taskId), newStatus);
+        }
+        setDraggingTaskId(null);
+    };
+
+    // --- ACTIONS (LOGIQUE ORIGINALE PRÉSERVÉE) ---
     const addTask = (e) => {
         e.preventDefault();
         if (!newTaskText.trim()) return;
@@ -53,12 +76,11 @@ export default function TodoList({ data, updateData }) {
             deadline: newTaskDeadline || null,
             createdAt: new Date().toISOString(),
             listId: activeListId,
-            list_id: activeListId, // Double mapping pour la sécurité Supabase
-            status: 'todo' // Statut initial pour le Kanban
+            list_id: activeListId,
+            status: 'todo'
         };
 
         updateData({ ...data, todos: [newTodo, ...todos] }, { table: 'todos', data: newTodo, action: 'insert' }); 
-        
         setNewTaskText('');
         setNewTaskPriority('medium');
         setNewTaskDeadline('');
@@ -68,11 +90,7 @@ export default function TodoList({ data, updateData }) {
         const updatedTodos = todos.map(t => {
             if (t.id === id) {
                 const isNowCompleted = !t.completed;
-                return { 
-                    ...t, 
-                    completed: isNowCompleted,
-                    status: isNowCompleted ? 'done' : 'todo' // Synchro visuelle
-                };
+                return { ...t, completed: isNowCompleted, status: isNowCompleted ? 'done' : 'todo' };
             }
             return t;
         });
@@ -80,7 +98,6 @@ export default function TodoList({ data, updateData }) {
         updateData({ ...data, todos: updatedTodos }, { table: 'todos', id, data: { completed: target.completed, status: target.status }, action: 'update' });
     };
 
-    // Nouvelle fonction pour changer le statut Kanban sans forcément compléter la tâche
     const updateStatus = (id, newStatus) => {
         const updatedTodos = todos.map(t => 
             t.id === id ? { ...t, status: newStatus, completed: newStatus === 'done' } : t
@@ -98,7 +115,6 @@ export default function TodoList({ data, updateData }) {
     const addList = () => {
         if (!newListTitle.trim()) return;
         const newList = { id: Date.now().toString(), name: newListTitle, color: 'purple' };
-        // Ajout de la liste dans data.todoLists
         updateData({ ...data, todoLists: [...todoListsFromData, newList] }, { table: 'todo_lists', data: newList, action: 'insert' });
         setNewListTitle('');
         setIsAddingList(false);
@@ -122,7 +138,6 @@ export default function TodoList({ data, updateData }) {
         }
     };
 
-    // --- FILTRAGE (TON TRI ORIGINAL) ---
     const filteredTodos = useMemo(() => {
         return todos
             .filter(t => (t.listId || t.list_id || 'default') === activeListId)
@@ -140,7 +155,6 @@ export default function TodoList({ data, updateData }) {
             });
     }, [todos, activeListId, filter]);
 
-    // --- CONFIGURATION COULEURS PREMIUM ---
     const priorityConfig = {
         high: { color: isDark ? 'text-red-400' : 'text-red-600', bg: isDark ? 'bg-red-900/20' : 'bg-red-50', border: isDark ? 'border-red-800' : 'border-red-200', label: 'Urgent' },
         medium: { color: isDark ? 'text-orange-400' : 'text-orange-600', bg: isDark ? 'bg-orange-900/20' : 'bg-orange-50', border: isDark ? 'border-orange-800' : 'border-orange-200', label: 'Normal' },
@@ -148,34 +162,39 @@ export default function TodoList({ data, updateData }) {
     };
 
     return (
-        <div className={`flex h-screen transition-colors duration-300 ${isDark ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900'}`}>
+        <div className={`flex h-screen transition-all duration-300 ${isDark ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900'}`}>
             
-            {/* SIDEBAR */}
-            <aside className={`w-64 border-r hidden md:flex flex-col ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-200 shadow-xl'}`}>
-                <div className="p-6">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-indigo-500 shadow-indigo-100'}`}>
-                            <ListTodo className="text-white" size={20} />
-                        </div>
-                        <h1 className="text-lg font-bold tracking-tight">Mes Espaces</h1>
+            {/* SIDEBAR RÉTRACTABLE */}
+            <aside className={`border-r hidden md:flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-200 shadow-xl'}`}>
+                <div className="p-4 flex flex-col h-full">
+                    <div className={`flex items-center gap-3 mb-8 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                        {!isSidebarCollapsed && (
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-indigo-500 shadow-indigo-100'}`}>
+                                    <ListTodo className="text-white" size={20} />
+                                </div>
+                                <h1 className="text-lg font-bold tracking-tight whitespace-nowrap">Mes Espaces</h1>
+                            </div>
+                        )}
+                        <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className={`p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500`}>
+                            {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+                        </button>
                     </div>
 
-                    <nav className="space-y-1">
-                        {/* --- CORRECTION : UTILISATION DE allLists POUR TOUJOURS AVOIR "To-Do" --- */}
+                    <nav className="space-y-1 flex-1 overflow-y-auto no-scrollbar">
                         {allLists.map(list => (
                             <div key={list.id} className="group relative">
                                 <button
                                     onClick={() => setActiveListId(list.id)}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${activeListId === list.id ? (isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600') : (isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-50')}`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeListId === list.id ? (isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600') : (isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-50')} ${isSidebarCollapsed ? 'justify-center' : ''}`}
+                                    title={list.name}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <Hash size={16} />
-                                        <span className="text-sm font-bold">{list.name}</span>
-                                    </div>
-                                    {activeListId === list.id && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+                                    <Hash size={18} className="shrink-0" />
+                                    {!isSidebarCollapsed && <span className="text-sm font-bold truncate">{list.name}</span>}
+                                    {!isSidebarCollapsed && activeListId === list.id && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />}
                                 </button>
-                                {list.id !== 'default' && (
-                                    <button onClick={(e) => { e.stopPropagation(); deleteList(list.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 rounded">
+                                {!isSidebarCollapsed && list.id !== 'default' && (
+                                    <button onClick={(e) => { e.stopPropagation(); deleteList(list.id); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 opacity-0 group-hover:opacity-100 text-red-500 hover:bg-red-50 rounded transition-opacity">
                                         <Trash2 size={12} />
                                     </button>
                                 )}
@@ -183,10 +202,10 @@ export default function TodoList({ data, updateData }) {
                         ))}
                     </nav>
 
-                    <button onClick={() => setIsAddingList(true)} className="mt-6 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 hover:text-indigo-500">
-                        <Plus size={14} /> NOUVELLE LISTE
+                    <button onClick={() => setIsAddingList(true)} className={`mt-4 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 hover:text-indigo-500 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+                        <Plus size={14} /> {!isSidebarCollapsed && "NOUVELLE LISTE"}
                     </button>
-                    {isAddingList && (
+                    {isAddingList && !isSidebarCollapsed && (
                         <input autoFocus className={`mt-2 w-full px-3 py-2 text-sm rounded-lg border outline-none ${isDark ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`} placeholder="Nom..." value={newListTitle} onChange={e => setNewListTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && addList()} />
                     )}
                 </div>
@@ -215,19 +234,19 @@ export default function TodoList({ data, updateData }) {
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-24">
+                <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-24 custom-scrollbar">
                     
-                    {/* FORMULAIRE (LOGIQUE ORIGINALE PRÉSERVÉE) */}
+                    {/* FORMULAIRE */}
                     <div className="mb-8 max-w-4xl">
                         <form onSubmit={addTask} className={`rounded-2xl border p-2 shadow-xl transition-all ${isDark ? 'bg-slate-900/40 border-white/5 focus-within:border-indigo-500/50' : 'bg-white border-slate-200 focus-within:border-indigo-400'}`}>
                             <div className="flex items-center gap-3 px-4 py-2">
-                                <input type="text" placeholder="Nouvelle tâche..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-lg py-2" />
+                                <input type="text" placeholder="Ajouter une tâche..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-lg py-2" />
                                 <button type="submit" className="p-3 bg-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"><Plus size={20} /></button>
                             </div>
                             <div className={`flex items-center gap-4 px-4 pb-2 border-t pt-3 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-black text-slate-500 uppercase">Priorité</span>
-                                    <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)} className="bg-transparent text-[10px] font-bold outline-none uppercase">
+                                    <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)} className="bg-transparent text-[10px] font-bold outline-none uppercase cursor-pointer">
                                         <option value="low">Basse</option>
                                         <option value="medium">Moyenne</option>
                                         <option value="high">Haute</option>
@@ -239,7 +258,7 @@ export default function TodoList({ data, updateData }) {
                         </form>
                     </div>
 
-                    {/* VUE LISTE (TON DESIGN ORIGINAL + RE-STYLISÉ) */}
+                    {/* VUE LISTE */}
                     {viewMode === 'list' && (
                         <div className="space-y-3 max-w-4xl">
                             <div className="flex justify-between items-center mb-4">
@@ -274,34 +293,63 @@ export default function TodoList({ data, updateData }) {
                         </div>
                     )}
 
-                    {/* VUE KANBAN (NOUVEAUTÉ SANS BUG) */}
+                    {/* VUE KANBAN (DRAG & DROP NATIF CORRIGÉ) */}
                     {viewMode === 'kanban' && (
-                        <div className="flex gap-6 h-full overflow-x-auto no-scrollbar min-h-[500px]">
+                        <div className="flex gap-6 h-full overflow-x-auto no-scrollbar min-h-[550px] pb-10">
                             {[
-                                { id: 'todo', title: 'À Faire', color: 'text-slate-400', next: 'doing' },
-                                { id: 'doing', title: 'En cours', color: 'text-indigo-400', next: 'done', prev: 'todo' },
-                                { id: 'done', title: 'Terminé', color: 'text-green-400', prev: 'doing' }
+                                { id: 'todo', title: 'À Faire', color: 'text-slate-400' },
+                                { id: 'doing', title: 'En cours', color: 'text-indigo-400' },
+                                { id: 'done', title: 'Terminé', color: 'text-green-400' }
                             ].map(column => (
-                                <div key={column.id} className="w-80 shrink-0 flex flex-col">
+                                <div 
+                                    key={column.id} 
+                                    className="w-80 shrink-0 flex flex-col"
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, column.id)}
+                                >
                                     <h3 className={`text-xs font-black uppercase tracking-widest mb-4 flex items-center gap-2 ${column.color}`}>
                                         <div className={`w-2 h-2 rounded-full bg-current`} />
                                         {column.title}
                                     </h3>
-                                    <div className={`flex-1 rounded-2xl p-3 border-2 border-dashed space-y-3 ${isDark ? 'bg-slate-900/20 border-white/5' : 'bg-slate-50 border-slate-200/50'}`}>
+                                    
+                                    <div className={`flex-1 rounded-3xl p-4 border-2 border-dashed transition-colors duration-200 ${isDark ? 'bg-slate-900/20 border-white/5 hover:bg-slate-900/40' : 'bg-slate-50 border-slate-200/50 hover:bg-slate-100/50'}`}>
                                         {todos
                                             .filter(t => (t.listId || t.list_id || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo'))))
                                             .map(todo => (
-                                                <div key={todo.id} className={`p-4 rounded-xl border shadow-xl relative group ${isDark ? 'bg-slate-800 border-white/5' : 'bg-white border-slate-200'}`}>
-                                                    <p className="text-sm font-bold mb-3">{todo.text}</p>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${priorityConfig[todo.priority].bg} ${priorityConfig[todo.priority].color}`}>{priorityConfig[todo.priority].label}</span>
-                                                        <div className="flex gap-1">
-                                                            {column.prev && <button onClick={() => updateStatus(todo.id, column.prev)} className="p-1 hover:bg-slate-700 rounded transition-colors"><ArrowRight size={14} className="rotate-180" /></button>}
-                                                            {column.next && <button onClick={() => updateStatus(todo.id, column.next)} className="p-1 hover:bg-slate-700 rounded transition-colors"><ArrowRight size={14}/></button>}
+                                                <div 
+                                                    key={todo.id} 
+                                                    draggable="true"
+                                                    onDragStart={(e) => handleDragStart(e, todo.id)}
+                                                    className={`p-4 rounded-2xl border shadow-xl relative group mb-4 cursor-default active:scale-95 transition-all ${isDark ? 'bg-slate-800 border-white/5' : 'bg-white border-slate-200'}`}
+                                                >
+                                                    {/* ZONE DE SAISIE (HANDLE) */}
+                                                    <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1">
+                                                        <GripVertical size={16} className="text-slate-500" />
+                                                    </div>
+
+                                                    <div className="pl-4">
+                                                        <p className="text-sm font-bold mb-3 leading-tight">{todo.text}</p>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${priorityConfig[todo.priority].bg} ${priorityConfig[todo.priority].color}`}>
+                                                                {priorityConfig[todo.priority].label}
+                                                            </span>
+                                                            <button 
+                                                                onClick={() => toggleTodo(todo.id)} 
+                                                                className={`w-7 h-7 rounded-lg flex items-center justify-center border transition-all ${todo.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 text-slate-400 hover:border-green-500'}`}
+                                                            >
+                                                                <CheckCircle2 size={16}/>
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))}
+                                        
+                                        {/* Zone vide si aucune tâche */}
+                                        {todos.filter(t => (t.listId || t.list_id || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo')))).length === 0 && (
+                                            <div className="h-20 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-30">
+                                                Déposer ici
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
