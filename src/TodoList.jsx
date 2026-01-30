@@ -13,12 +13,12 @@ export default function TodoList({ data, updateData }) {
     const [newTaskDeadline, setNewTaskDeadline] = useState('');
     const [filter, setFilter] = useState('all'); 
 
-    // --- ÉTATS DE NAVIGATION ET DRAG & DROP ---
+    // --- ÉTATS DE NAVIGATION ET DRAG & DROP (CONSERVÉS À 100%) ---
     const [viewMode, setViewMode] = useState('list'); 
     const [activeListId, setActiveListId] = useState('default');
     const [isAddingList, setIsAddingList] = useState(false);
     const [newListTitle, setNewListTitle] = useState('');
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Menu rétractable
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Menu rétractable (Logique intacte)
     const [draggingTaskId, setDraggingTaskId] = useState(null); // Pour le Drag & Drop
 
     const isDark = data.settings?.theme === 'dark';
@@ -42,7 +42,7 @@ export default function TodoList({ data, updateData }) {
     const circumference = 2 * Math.PI * radius; 
     const strokeDashoffset = circumference - (stats.percentage / 100) * circumference; 
 
-    // --- LOGIQUE DRAG & DROP NATIVE ---
+    // --- LOGIQUE DRAG & DROP NATIVE (CONSERVÉE À 100%) ---
     const handleDragStart = (e, taskId) => {
         setDraggingTaskId(taskId);
         e.dataTransfer.setData('taskId', taskId);
@@ -131,21 +131,12 @@ export default function TodoList({ data, updateData }) {
         }
     };
 
-    // --- CORRECTION CRITIQUE : SUPPRESSION RÉELLE EN BASE ---
     const clearCompleted = () => {
         if(window.confirm("Supprimer toutes les tâches terminées de cette liste ?")) {
-            // 1. On identifie les tâches à supprimer physiquement de Supabase
             const todosToDelete = todos.filter(t => t.completed && (t.listId || t.list_id || 'default') === activeListId);
-            
             if (todosToDelete.length === 0) return;
-
-            // 2. On calcule le nouvel état local (tâches restantes)
             const activeTodos = todos.filter(t => !t.completed || (t.listId || t.list_id || 'default') !== activeListId);
-
-            // 3. On met à jour l'état local immédiatement
             updateData({ ...data, todos: activeTodos });
-
-            // 4. On lance l'ordre de suppression en base pour chaque tâche terminée
             todosToDelete.forEach(todo => {
                 updateData({ ...data, todos: activeTodos }, { table: 'todos', id: todo.id, action: 'delete' });
             });
@@ -178,7 +169,7 @@ export default function TodoList({ data, updateData }) {
     return (
         <div className={`flex h-screen transition-all duration-300 ${isDark ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900'}`}>
             
-            {/* SIDEBAR RÉTRACTABLE */}
+            {/* SIDEBAR RÉTRACTABLE (LOGIQUE INTACTE) */}
             <aside className={`border-r hidden md:flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-200 shadow-xl'}`}>
                 <div className="p-4 flex flex-col h-full">
                     <div className={`flex items-center gap-3 mb-8 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -225,8 +216,8 @@ export default function TodoList({ data, updateData }) {
                 </div>
             </aside>
 
-            {/* MAIN */}
-            <main className="flex-1 flex flex-col overflow-hidden">
+            {/* MAIN (PLEINE LARGEUR ACTIVÉE) */}
+            <main className="flex-1 flex flex-col overflow-hidden w-full">
                 <header className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex items-center gap-6">
                         <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0">
@@ -250,8 +241,8 @@ export default function TodoList({ data, updateData }) {
 
                 <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-24 custom-scrollbar">
                     
-                    {/* FORMULAIRE */}
-                    <div className="mb-8 max-w-4xl">
+                    {/* FORMULAIRE (PLEINE LARGEUR) */}
+                    <div className="mb-8 w-full">
                         <form onSubmit={addTask} className={`rounded-2xl border p-2 shadow-xl transition-all ${isDark ? 'bg-slate-900/40 border-white/5 focus-within:border-indigo-500/50' : 'bg-white border-slate-200 focus-within:border-indigo-400'}`}>
                             <div className="flex items-center gap-3 px-4 py-2">
                                 <input type="text" placeholder="Ajouter une tâche..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-lg py-2" />
@@ -260,10 +251,11 @@ export default function TodoList({ data, updateData }) {
                             <div className={`flex items-center gap-4 px-4 pb-2 border-t pt-3 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-black text-slate-500 uppercase">Priorité</span>
-                                    <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)} className="bg-transparent text-[10px] font-bold outline-none uppercase cursor-pointer">
-                                        <option value="low">Basse</option>
-                                        <option value="medium">Moyenne</option>
-                                        <option value="high">Haute</option>
+                                    {/* FIX DARK MODE : classes bg-slate-900 et text-white sur les options */}
+                                    <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)} className="bg-transparent text-[10px] font-bold outline-none uppercase cursor-pointer dark:text-white">
+                                        <option value="low" className="dark:bg-slate-900 dark:text-white">Basse</option>
+                                        <option value="medium" className="dark:bg-slate-900 dark:text-white">Moyenne</option>
+                                        <option value="high" className="dark:bg-slate-900 dark:text-white">Haute</option>
                                     </select>
                                 </div>
                                 <div className="h-4 w-px bg-slate-200 dark:bg-white/5" />
@@ -272,9 +264,9 @@ export default function TodoList({ data, updateData }) {
                         </form>
                     </div>
 
-                    {/* VUE LISTE */}
+                    {/* VUE LISTE (PLEINE LARGEUR) */}
                     {viewMode === 'list' && (
-                        <div className="space-y-3 max-w-4xl">
+                        <div className="space-y-3 w-full">
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex gap-2 bg-slate-900/10 dark:bg-slate-900/50 p-1 rounded-lg">
                                     {['all', 'active', 'completed'].map(f => (
@@ -307,7 +299,7 @@ export default function TodoList({ data, updateData }) {
                         </div>
                     )}
 
-                    {/* VUE KANBAN */}
+                    {/* VUE KANBAN (INTACTE) */}
                     {viewMode === 'kanban' && (
                         <div className="flex gap-6 h-full overflow-x-auto no-scrollbar min-h-[550px] pb-10">
                             {[
