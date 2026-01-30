@@ -131,10 +131,24 @@ export default function TodoList({ data, updateData }) {
         }
     };
 
+    // --- CORRECTION CRITIQUE : SUPPRESSION RÉELLE EN BASE ---
     const clearCompleted = () => {
-        if(window.confirm("Supprimer toutes les tâches terminées ?")) {
+        if(window.confirm("Supprimer toutes les tâches terminées de cette liste ?")) {
+            // 1. On identifie les tâches à supprimer physiquement de Supabase
+            const todosToDelete = todos.filter(t => t.completed && (t.listId || t.list_id || 'default') === activeListId);
+            
+            if (todosToDelete.length === 0) return;
+
+            // 2. On calcule le nouvel état local (tâches restantes)
             const activeTodos = todos.filter(t => !t.completed || (t.listId || t.list_id || 'default') !== activeListId);
+
+            // 3. On met à jour l'état local immédiatement
             updateData({ ...data, todos: activeTodos });
+
+            // 4. On lance l'ordre de suppression en base pour chaque tâche terminée
+            todosToDelete.forEach(todo => {
+                updateData({ ...data, todos: activeTodos }, { table: 'todos', id: todo.id, action: 'delete' });
+            });
         }
     };
 
@@ -293,7 +307,7 @@ export default function TodoList({ data, updateData }) {
                         </div>
                     )}
 
-                    {/* VUE KANBAN (DRAG & DROP NATIF CORRIGÉ) */}
+                    {/* VUE KANBAN */}
                     {viewMode === 'kanban' && (
                         <div className="flex gap-6 h-full overflow-x-auto no-scrollbar min-h-[550px] pb-10">
                             {[
@@ -322,7 +336,6 @@ export default function TodoList({ data, updateData }) {
                                                     onDragStart={(e) => handleDragStart(e, todo.id)}
                                                     className={`p-4 rounded-2xl border shadow-xl relative group mb-4 cursor-default active:scale-95 transition-all ${isDark ? 'bg-slate-800 border-white/5' : 'bg-white border-slate-200'}`}
                                                 >
-                                                    {/* ZONE DE SAISIE (HANDLE) */}
                                                     <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1">
                                                         <GripVertical size={16} className="text-slate-500" />
                                                     </div>
@@ -343,13 +356,6 @@ export default function TodoList({ data, updateData }) {
                                                     </div>
                                                 </div>
                                             ))}
-                                        
-                                        {/* Zone vide si aucune tâche */}
-                                        {todos.filter(t => (t.listId || t.list_id || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo')))).length === 0 && (
-                                            <div className="h-20 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-widest opacity-30">
-                                                Déposer ici
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             ))}
