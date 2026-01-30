@@ -43,8 +43,11 @@ export default function PlanningManager({ data, updateData }) {
         return item.data.is_all_day === true;
     };
 
-    // --- LOGIQUE D'APPROBATION INSTANTANNÉE ---
+    // --- LOGIQUE D'APPROBATION INSTANTANNÉE (CORRIGÉE POUR MULTI-INVITÉS) ---
     const handleInvitation = async (evt, newStatus, applyToSeries = false) => {
+        const userEmail = data.profile?.email;
+        if (!userEmail) return;
+
         let idsToUpdate = [evt.id];
         if (applyToSeries && evt.recurrence_group_id) {
             idsToUpdate = events
@@ -52,16 +55,23 @@ export default function PlanningManager({ data, updateData }) {
                 .map(ev => ev.id);
         }
 
+        // MISE À JOUR INSTANTANNÉE DE L'UI (On utilise my_status pour l'utilisateur actuel)
         const updatedEvents = events.map(ev => 
-            idsToUpdate.includes(ev.id) ? { ...ev, status: newStatus } : ev
+            idsToUpdate.includes(ev.id) ? { ...ev, my_status: newStatus, status: newStatus } : ev
         );
         
-        // MISE À JOUR INSTANTANNÉE DE L'UI
         updateData({ ...data, calendar_events: updatedEvents });
         
-        await supabase.from('calendar_events')
-            .update({ status: newStatus })
-            .in('id', idsToUpdate);
+        // CORRECTION : On met à jour le registre individuel, pas l'événement global
+        await supabase.from('event_participants')
+            .upsert(
+                idsToUpdate.map(id => ({
+                    event_id: id,
+                    user_email: userEmail.toLowerCase(),
+                    status: newStatus
+                })),
+                { onConflict: 'event_id, user_email' }
+            );
             
         setSelectedEvent(null);
         setConfirmMode(null);
@@ -75,8 +85,6 @@ export default function PlanningManager({ data, updateData }) {
             String(ev.id) === String(evt.id) ? { ...ev, invited_email: '', status: 'accepted' } : ev
         );
         
-        // On vide l'email invité et on repasse en 'accepted' pour le propriétaire
-        // L'action 'update' avec payload data garantit que Supabase diffuse le changement
         updateData({ ...data, calendar_events: updatedEvents }, { 
             table: 'calendar_events', 
             id: evt.id, 
@@ -165,7 +173,6 @@ export default function PlanningManager({ data, updateData }) {
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
             const updated = events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, end_time: newEnd.toISOString() } : ev);
-            // GREFFE : SÉCURITÉ PERSISTANCE
             updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
         }
     };
@@ -227,7 +234,8 @@ export default function PlanningManager({ data, updateData }) {
         setIsCreating(true); setSelectedEvent(null);
     };
 
-    const handleSave = () => {
+    // --- SAUVEGARDE CORRIGÉE POUR PLUSIEURS INVITÉS ---
+    const handleSave = async () => {
         if (!eventForm.title) return alert("Titre requis");
         const baseDate = parse(eventForm.date, 'yyyy-MM-dd', new Date());
         let newStart, newEnd;
@@ -236,6 +244,7 @@ export default function PlanningManager({ data, updateData }) {
 
         const isRec = eventForm.recurrence || !!eventForm.recurrenceGroupId;
         const finalEmail = isRec ? '' : eventForm.invitedEmail;
+        const invitedEmails = finalEmail ? finalEmail.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
 
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
@@ -243,19 +252,30 @@ export default function PlanningManager({ data, updateData }) {
                 user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, 
                 recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, 
                 is_all_day: eventForm.isAllDay, invited_email: finalEmail, 
-                status: finalEmail ? 'pending' : 'accepted',
+                status: 'accepted', // Le créateur est toujours accepté
                 organizer_email: data.profile?.email 
             };
+            
             let newEvts = [];
-            if (eventForm.recurrence) {
-                for (let i = 0; i < (parseInt(eventForm.recurrenceWeeks) || 1); i++) {
-                    newEvts.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
-                }
-            } else {
-                newEvts.push({ ...eventBase, id: Date.now(), start_time: newStart.toISOString(), end_time: newEnd.toISOString() });
+            for (let i = 0; i < (eventForm.recurrence ? (parseInt(eventForm.recurrenceWeeks) || 1) : 1); i++) {
+                newEvts.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
             }
-            updateData({ ...data, calendar_events: [...events, ...newEvts] });
-            supabase.from('calendar_events').insert(newEvts).then();
+
+            // Insertion des événements
+            const { data: createdEvts } = await supabase.from('calendar_events').insert(newEvts).select();
+
+            // INSCRIPTION DES INVITÉS DANS LE REGISTRE
+            if (createdEvts && invitedEmails.length > 0) {
+                const participants = [];
+                createdEvts.forEach(evt => {
+                    invitedEmails.forEach(email => {
+                        participants.push({ event_id: evt.id, user_email: email, status: 'pending' });
+                    });
+                });
+                await supabase.from('event_participants').insert(participants);
+            }
+
+            updateData({ ...data, calendar_events: [...events, ...(createdEvts || newEvts)] });
             setIsCreating(false); return;
         }
 
@@ -336,7 +356,7 @@ export default function PlanningManager({ data, updateData }) {
     const durationOptions = []; for (let m = 15; m <= 720; m += 15) { const h = Math.floor(m / 60); const min = m % 60; durationOptions.push(<option key={m} value={m}>{h > 0 ? `${h}h` : ''}{min > 0 ? ` ${min}` : h === 0 ? ' min' : ''}</option>); }
 
     return (
-        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
+        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-955 font-sans">
             <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
                 <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
@@ -386,7 +406,7 @@ export default function PlanningManager({ data, updateData }) {
                                               }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const colorClass = item.data.color === 'green' ? 'bg-emerald-100 border-emerald-200 text-emerald-800 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 border-slate-200 text-slate-700 border-l-slate-500' : 'bg-blue-100 border-blue-200 text-blue-800 border-l-blue-500';
-                                                    const isPending = item.data.status === 'pending' && item.data.user_id !== data.profile?.id;
+                                                    const isPending = (item.data.my_status || item.data.status) === 'pending' && item.data.user_id !== data.profile?.id;
                                                     return (<div key={item.data.id} draggable={!isPending} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
                                             </div>
@@ -396,7 +416,7 @@ export default function PlanningManager({ data, updateData }) {
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center text-xs font-bold text-blue-600" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
                                                 {layoutItems.map((item) => {
                                                     const dataItem = item.data; 
-                                                    const isPending = dataItem.status === 'pending' && dataItem.user_id !== data.profile?.id;
+                                                    const isPending = (dataItem.my_status || dataItem.status) === 'pending' && dataItem.user_id !== data.profile?.id;
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white border-l-4 border-l-emerald-500 text-emerald-900 dark:bg-slate-800 dark:text-emerald-100 shadow-sm border' : dataItem.color === 'gray' ? 'bg-white border-l-4 border-l-slate-500 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shadow-sm border' : 'bg-white border-l-4 border-l-blue-600 text-blue-900 dark:bg-slate-800 dark:text-blue-100 shadow-sm border';
                                                     return (
                                                         <div key={item.data.id} style={{ ...item.style, opacity: (isPending ? 0.6 : 1) }} draggable={!resizeRef.current && !isPending} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
@@ -462,7 +482,8 @@ export default function PlanningManager({ data, updateData }) {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
                         <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                        {selectedEvent.data.status === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
+                        {/* --- CONDITION D'INVITATION MODIFIÉE POUR LE REGISTRE --- */}
+                        {(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
                             <div className="space-y-6">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
                                 <div className="grid gap-3">
@@ -482,9 +503,9 @@ export default function PlanningManager({ data, updateData }) {
                                         <div className="flex flex-col gap-1">
                                             <div className="text-[10px] font-bold text-slate-400 uppercase">Invités :</div>
                                             <div className="flex flex-wrap gap-1">{selectedEvent.data.invited_email.split(',').map((email, idx) => (<span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] dark:text-white">{email.trim()}</span>))}</div>
-                                            <span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedEvent.data.status === 'pending' ? 'bg-amber-100 text-amber-600' : selectedEvent.data.status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{selectedEvent.data.status === 'pending' ? '⌛ En attente' : selectedEvent.data.status === 'declined' ? '❌ Refusé' : '✅ Confirmé'}</span>
+                                            {/* --- STATUT INDIVIDUEL --- */}
+                                            <span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' ? 'bg-amber-100 text-amber-600' : (selectedEvent.data.my_status || selectedEvent.data.status) === 'declined' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' ? '⌛ En attente' : (selectedEvent.data.my_status || selectedEvent.data.status) === 'declined' ? '❌ Refusé' : '✅ Confirmé'}</span>
                                             
-                                            {/* GREFFE : BOUTON D'ANNULATION POUR L'ORGANISATEUR */}
                                             {selectedEvent.data.user_id === data.profile?.id && selectedEvent.data.invited_email && (
                                                 <button 
                                                     onClick={() => handleUninvite(selectedEvent.data)} 

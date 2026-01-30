@@ -125,7 +125,7 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (CORRECTIF ANNULATION) ---
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (CORRECTIF MULTI-INVITÉS) ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
@@ -145,12 +145,10 @@ export default function App() {
            const isInvited = invitees.includes(userEmail);
            const isDeclinedByMe = isInvited && !isOwner && payload.new.status === 'declined';
            
-           // Si je suis concerné et n'ai pas refusé
            if ((isOwner || isInvited) && !isDeclinedByMe) {
              const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
-             if (idx !== -1) currentEvts[idx] = payload.new; else currentEvts.push(payload.new);
+             if (idx !== -1) currentEvts[idx] = { ...payload.new, my_status: currentEvts[idx].my_status }; else currentEvts.push(payload.new);
            } else {
-             // ACTION CRITIQUE : Si je ne suis plus sur la liste (annulation), on retire l'événement
              currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.new.id));
            }
          } 
@@ -159,6 +157,17 @@ export default function App() {
          }
          return { ...prev, calendar_events: currentEvts };
        });
+     })
+     // --- AJOUT : ÉCOUTE DU REGISTRE DES PARTICIPANTS ---
+     .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, (payload) => {
+        if (payload.new && payload.new.user_email?.toLowerCase() === userEmail) {
+            setData(prev => ({
+                ...prev,
+                calendar_events: prev.calendar_events.map(ev => 
+                    String(ev.id) === String(payload.new.event_id) ? { ...ev, my_status: payload.new.status } : ev
+                ).filter(ev => !(String(ev.id) === String(payload.new.event_id) && payload.new.status === 'declined' && ev.user_id !== userId))
+            }));
+        }
      })
      .subscribe();
 
@@ -298,7 +307,8 @@ export default function App() {
        supabase.from('calendar_events')
         .select('*')
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
-       supabase.from('todo_lists').select('*') // --- AJOUT : CHARGEMENT DES LISTES ---
+       supabase.from('todo_lists').select('*'),
+       supabase.from('event_participants').select('*').eq('user_email', userEmail.toLowerCase()) // --- AJOUT : CHARGEMENT DU REGISTRE ---
      ]);
 
      const [
@@ -309,7 +319,8 @@ export default function App() {
        { data: ventures }, { data: goals }, { data: goal_milestones },
        { data: journal_folders }, { data: journal_pages },
        { data: calendar_events },
-       { data: todo_lists } // --- AJOUT : RÉCUPÉRATION DES LISTES ---
+       { data: todo_lists },
+       { data: my_responses } // --- AJOUT : RÉCUPÉRATION DES RÉPONSES PERSO ---
      ] = results;
 
      let newDBTransactions = [];
@@ -429,15 +440,16 @@ export default function App() {
      
      const newData = {
        todos: todos || [], 
-       todoLists: todo_lists || [], // --- AJOUT : INTÉGRATION DES LISTES ---
+       todoLists: todo_lists || [], 
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-       calendar_events: (calendar_events || []).filter(ev => {
+       calendar_events: (calendar_events || []).map(ev => {
+          const myResponse = (my_responses || []).find(r => String(r.event_id) === String(ev.id));
+          return { ...ev, my_status: myResponse ? myResponse.status : (ev.user_id === userId ? 'accepted' : 'pending') };
+       }).filter(ev => {
          const isOwner = ev.user_id === userId;
-         const invitees = ev.invited_email?.split(',').map(s => s.trim().toLowerCase()) || [];
-         const isInvited = invitees.includes(userEmail.toLowerCase());
-         return isOwner || !(isInvited && ev.status === 'declined');
+         return isOwner || ev.my_status !== 'declined';
        }), 
        budget: {
          accounts: validAccounts, 
@@ -509,7 +521,7 @@ export default function App() {
      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes, list_id: t.list_id || t.listId }));
-     await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: user.id, name: l.name, color: l.color })); // --- AJOUT : SAUVEGARDE DES LISTES ---
+     await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: user.id, name: l.name, color: l.color })); 
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
