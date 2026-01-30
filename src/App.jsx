@@ -52,7 +52,7 @@ export default function App() {
  };
 
  const [data, setData] = useState({
-   todos: [], projects: [], 
+   todos: [], todoLists: [], projects: [], 
    goals: [], goal_milestones: [], 
    journal_folders: [], journal_pages: [],
    calendar_events: [], 
@@ -212,17 +212,17 @@ export default function App() {
 
  // --- CORRECTION DU BUG DE DATE (+6H PRÉSERVÉ) ---
  const isDatePastOrToday = (dateStr) => {
-     if (!dateStr) return false;
-     const today = new Date();
-     today.setHours(0,0,0,0);
-     
-     const d = new Date(dateStr);
-     d.setHours(d.getHours() + 6);
+      if (!dateStr) return false;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      
+      const d = new Date(dateStr);
+      d.setHours(d.getHours() + 6);
 
-     const checkDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-     checkDate.setHours(0,0,0,0);
-     
-     return checkDate <= today;
+      const checkDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      checkDate.setHours(0,0,0,0);
+      
+      return checkDate <= today;
  };
 
  // --- BATCH SAVE ---
@@ -297,7 +297,8 @@ export default function App() {
        supabase.from('journal_pages').select('*'),
        supabase.from('calendar_events')
         .select('*')
-        .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`) 
+        .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
+       supabase.from('todo_lists').select('*') // --- AJOUT : CHARGEMENT DES LISTES ---
      ]);
 
      const [
@@ -307,7 +308,8 @@ export default function App() {
        { data: clients }, { data: quotes }, { data: invoices }, { data: catalog },
        { data: ventures }, { data: goals }, { data: goal_milestones },
        { data: journal_folders }, { data: journal_pages },
-       { data: calendar_events } 
+       { data: calendar_events },
+       { data: todo_lists } // --- AJOUT : RÉCUPÉRATION DES LISTES ---
      ] = results;
 
      let newDBTransactions = [];
@@ -426,7 +428,9 @@ export default function App() {
      const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'light';
      
      const newData = {
-       todos: todos || [], notes: mappedNotes, projects: mappedProjects, events: events || [],
+       todos: todos || [], 
+       todoLists: todo_lists || [], // --- AJOUT : INTÉGRATION DES LISTES ---
+       notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
        calendar_events: (calendar_events || []).filter(ev => {
@@ -504,7 +508,8 @@ export default function App() {
      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-     await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes }));
+     await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes, list_id: t.list_id || t.listId }));
+     await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: user.id, name: l.name, color: l.color })); // --- AJOUT : SAUVEGARDE DES LISTES ---
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
