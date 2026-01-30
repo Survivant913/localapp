@@ -65,7 +65,7 @@ export default function App() {
  const [unsavedChanges, setUnsavedChanges] = useState(false);
  const [isSaving, setIsSaving] = useState(false);
 
- // --- CALCUL INITIAL DES MESSAGES NON LUS ---
+ // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS ---
  useEffect(() => {
    if (!session?.user?.email) return;
 
@@ -95,7 +95,7 @@ export default function App() {
    fetchInitialUnreadCount();
  }, [session]); 
 
- // --- ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
+ // --- AJOUT 3 : ÉCOUTEUR GLOBAL DE MESSAGES + NOTIFICATIONS SYSTÈME ---
  useEffect(() => {
    if (!session) return;
    
@@ -125,7 +125,7 @@ export default function App() {
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);
 
- // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (MULTI-INVITÉS & RÉPONSES LIVE) ---
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SÉCURITÉ & DISPARITION INSTANTANÉE) ---
  useEffect(() => {
    if (!session || !session.user) return;
    const userEmail = session.user.email?.toLowerCase();
@@ -147,14 +147,13 @@ export default function App() {
            
            if (isOwner || isInvited) {
              const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
-             // On préserve les participants déjà chargés localement
              if (idx !== -1) {
                  currentEvts[idx] = { ...payload.new, participants: currentEvts[idx].participants || [], my_status: currentEvts[idx].my_status };
              } else {
                  currentEvts.push({ ...payload.new, participants: [] });
              }
            } else {
-             // Si je suis retiré de la liste (Uninvite), je retire l'événement
+             // Si je suis retiré ou que je n'ai plus accès, suppression locale immédiate
              currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.new.id));
            }
          } 
@@ -164,12 +163,11 @@ export default function App() {
          return { ...prev, calendar_events: currentEvts };
        });
      })
-     // --- SYNCHRO DES RÉPONSES DE TOUS LES INVITÉS EN TEMPS RÉEL ---
+     // ÉCOUTE DES RÉPONSES POUR LA DISPARITION INSTANTANÉE DE L'INVITÉ
      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, (payload) => {
         setData(prev => ({
             ...prev,
             calendar_events: prev.calendar_events.map(ev => {
-                // On ne traite que les changements liés à cet événement
                 const targetEventId = payload.new?.event_id || payload.old?.event_id;
                 if (String(ev.id) !== String(targetEventId)) return ev;
                 
@@ -181,13 +179,16 @@ export default function App() {
                     newParts = newParts.filter(p => p.user_email.toLowerCase() !== payload.old.user_email.toLowerCase());
                 }
 
-                // Recalcul de mon statut perso pour l'affichage visuel
                 const myPart = newParts.find(p => p.user_email.toLowerCase() === userEmail);
                 return { 
                     ...ev, 
                     participants: newParts, 
                     my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') 
                 };
+            }).filter(ev => {
+                // LOGIQUE CRITIQUE : Si je suis invité (pas proprio) et que j'ai refusé, l'événement saute instantanément
+                const isOwner = ev.user_id === userId;
+                return isOwner || ev.my_status !== 'declined';
             })
         }));
      })
@@ -294,7 +295,7 @@ export default function App() {
    return () => subscription.unsubscribe();
  }, []);
 
- // --- CHARGEMENT INITIAL (LOGIQUE DE RATTRAPAGE ET +6H INTACTE) ---
+ // --- CHARGEMENT INITIAL (MOTEUR DE RATTRAPAGE ET +6H INTACTE) ---
  const initDataLoad = async (userId) => {
    if (isLoaded.current) return;
    isLoaded.current = true;
@@ -331,7 +332,7 @@ export default function App() {
         .select('*')
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
        supabase.from('todo_lists').select('*'),
-       supabase.from('event_participants').select('*') // RÉCUPÈRE TOUTES LES RÉPONSES DU REGISTRE
+       supabase.from('event_participants').select('*') 
      ]);
 
      const [
@@ -468,8 +469,8 @@ export default function App() {
           const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
           return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') };
        }).filter(ev => {
-          // Filtre de persistance : Si j'ai décliné, l'événement ne disparaît qu'après un refresh
           const isOwner = ev.user_id === userId;
+          // Sécurité de visibilité initiale
           return isOwner || ev.my_status !== 'declined';
        }), 
        budget: {
