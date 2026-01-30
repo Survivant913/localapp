@@ -22,11 +22,13 @@ export default function TodoList({ data, updateData }) {
 
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
-    const todoLists = data.todoLists || [{ id: 'default', name: 'To-Do', color: 'indigo' }];
+    // --- CORRECTION : FUSION DES LISTES POUR LA NAVIGATION ---
+    const todoListsFromData = data.todoLists || [];
+    const allLists = [{ id: 'default', name: 'To-Do', color: 'indigo' }, ...todoListsFromData];
 
     // --- STATISTIQUES (TON CODE ORIGINAL) ---
     const stats = useMemo(() => {
-        const currentTodos = todos.filter(t => (t.listId || 'default') === activeListId);
+        const currentTodos = todos.filter(t => (t.listId || t.list_id || 'default') === activeListId);
         const total = currentTodos.length;
         const completed = currentTodos.filter(t => t.completed).length;
         const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -51,6 +53,7 @@ export default function TodoList({ data, updateData }) {
             deadline: newTaskDeadline || null,
             createdAt: new Date().toISOString(),
             listId: activeListId,
+            list_id: activeListId, // Double mapping pour la sécurité Supabase
             status: 'todo' // Statut initial pour le Kanban
         };
 
@@ -95,7 +98,8 @@ export default function TodoList({ data, updateData }) {
     const addList = () => {
         if (!newListTitle.trim()) return;
         const newList = { id: Date.now().toString(), name: newListTitle, color: 'purple' };
-        updateData({ ...data, todoLists: [...todoLists, newList] }, { table: 'todo_lists', data: newList, action: 'insert' });
+        // Ajout de la liste dans data.todoLists
+        updateData({ ...data, todoLists: [...todoListsFromData, newList] }, { table: 'todo_lists', data: newList, action: 'insert' });
         setNewListTitle('');
         setIsAddingList(false);
         setActiveListId(newList.id);
@@ -104,8 +108,8 @@ export default function TodoList({ data, updateData }) {
     const deleteList = (id) => {
         if (id === 'default') return;
         if (window.confirm("Supprimer cette liste et toutes ses tâches ?")) {
-            const newLists = todoLists.filter(l => l.id !== id);
-            const newTodos = todos.filter(t => t.listId !== id);
+            const newLists = todoListsFromData.filter(l => l.id !== id);
+            const newTodos = todos.filter(t => (t.listId !== id && t.list_id !== id));
             updateData({ ...data, todoLists: newLists, todos: newTodos }, { table: 'todo_lists', id, action: 'delete' });
             setActiveListId('default');
         }
@@ -113,7 +117,7 @@ export default function TodoList({ data, updateData }) {
 
     const clearCompleted = () => {
         if(window.confirm("Supprimer toutes les tâches terminées ?")) {
-            const activeTodos = todos.filter(t => !t.completed || (t.listId || 'default') !== activeListId);
+            const activeTodos = todos.filter(t => !t.completed || (t.listId || t.list_id || 'default') !== activeListId);
             updateData({ ...data, todos: activeTodos });
         }
     };
@@ -121,7 +125,7 @@ export default function TodoList({ data, updateData }) {
     // --- FILTRAGE (TON TRI ORIGINAL) ---
     const filteredTodos = useMemo(() => {
         return todos
-            .filter(t => (t.listId || 'default') === activeListId)
+            .filter(t => (t.listId || t.list_id || 'default') === activeListId)
             .filter(t => {
                 if (filter === 'active') return !t.completed;
                 if (filter === 'completed') return t.completed;
@@ -157,7 +161,8 @@ export default function TodoList({ data, updateData }) {
                     </div>
 
                     <nav className="space-y-1">
-                        {todoLists.map(list => (
+                        {/* --- CORRECTION : UTILISATION DE allLists POUR TOUJOURS AVOIR "To-Do" --- */}
+                        {allLists.map(list => (
                             <div key={list.id} className="group relative">
                                 <button
                                     onClick={() => setActiveListId(list.id)}
@@ -199,7 +204,7 @@ export default function TodoList({ data, updateData }) {
                             <span className="absolute text-sm font-bold">{stats.percentage}%</span>
                         </div>
                         <div>
-                            <h2 className="text-xl md:text-3xl font-black">{todoLists.find(l => l.id === activeListId)?.name}</h2>
+                            <h2 className="text-xl md:text-3xl font-black">{allLists.find(l => l.id === activeListId)?.name}</h2>
                             <p className="text-xs md:text-sm text-slate-500">{stats.completed} terminées sur {stats.total}</p>
                         </div>
                     </div>
@@ -284,15 +289,15 @@ export default function TodoList({ data, updateData }) {
                                     </h3>
                                     <div className={`flex-1 rounded-2xl p-3 border-2 border-dashed space-y-3 ${isDark ? 'bg-slate-900/20 border-white/5' : 'bg-slate-50 border-slate-200/50'}`}>
                                         {todos
-                                            .filter(t => (t.listId || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo'))))
+                                            .filter(t => (t.listId || t.list_id || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo'))))
                                             .map(todo => (
                                                 <div key={todo.id} className={`p-4 rounded-xl border shadow-xl relative group ${isDark ? 'bg-slate-800 border-white/5' : 'bg-white border-slate-200'}`}>
                                                     <p className="text-sm font-bold mb-3">{todo.text}</p>
                                                     <div className="flex justify-between items-center">
                                                         <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${priorityConfig[todo.priority].bg} ${priorityConfig[todo.priority].color}`}>{priorityConfig[todo.priority].label}</span>
                                                         <div className="flex gap-1">
-                                                            {column.prev && <button onClick={() => updateStatus(todo.id, column.prev)} className="p-1 hover:bg-slate-700 rounded"><ArrowRight size={14} className="rotate-180" /></button>}
-                                                            {column.next && <button onClick={() => updateStatus(todo.id, column.next)} className="p-1 hover:bg-slate-700 rounded"><ArrowRight size={14}/></button>}
+                                                            {column.prev && <button onClick={() => updateStatus(todo.id, column.prev)} className="p-1 hover:bg-slate-700 rounded transition-colors"><ArrowRight size={14} className="rotate-180" /></button>}
+                                                            {column.next && <button onClick={() => updateStatus(todo.id, column.next)} className="p-1 hover:bg-slate-700 rounded transition-colors"><ArrowRight size={14}/></button>}
                                                         </div>
                                                     </div>
                                                 </div>
