@@ -73,10 +73,8 @@ export default function PlanningManager({ data, updateData }) {
                 { onConflict: 'event_id, user_email' }
             );
             
-        // Si c'est un refus, l'événement disparaîtra via le filtre d'App.jsx
-        if (newStatus === 'declined' || applyToSeries) {
-            setSelectedEvent(null);
-        }
+        // RÉGLAGE : On ferme la fenêtre systématiquement après une action (Accepter/Refuser)
+        setSelectedEvent(null);
         setConfirmMode(null);
     };
 
@@ -168,9 +166,7 @@ export default function PlanningManager({ data, updateData }) {
 
     const startResize = (e, evt) => {
         e.stopPropagation(); e.preventDefault(); 
-        // SÉCURITÉ : Seul le propriétaire peut redimensionner
         if (evt.is_all_day || evt.user_id !== data.profile?.id) return;
-        
         let startTime = parseISO(evt.start_time); let endTime = parseISO(evt.end_time);
         let dur = differenceInMinutes(endTime, startTime);
         const initData = { id: evt.id, startY: e.clientY, startDuration: dur, currentDuration: dur, currentDurationTemp: dur, event: evt };
@@ -312,9 +308,7 @@ export default function PlanningManager({ data, updateData }) {
 
     // --- DRAG HANDLERS ---
     const onDragStart = (e, item) => { 
-        // SÉCURITÉ : Seul le propriétaire peut déplacer
         if (resizeRef.current || item.user_id !== data.profile?.id) return e.preventDefault(); 
-        
         setDraggedItem({ type: 'event', data: item }); 
         e.dataTransfer.effectAllowed = "move"; 
         const img = new Image(); 
@@ -349,7 +343,6 @@ export default function PlanningManager({ data, updateData }) {
                         </div>
                     </div>
 
-                    {/* FIX DARK MODE : bg-white -> dark:bg-slate-900 */}
                     <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none bg-white dark:bg-slate-900">
                         <div className="flex w-full h-full min-h-[1440px]">
                             <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
@@ -386,13 +379,13 @@ export default function PlanningManager({ data, updateData }) {
                                                     const dataItem = item.data; 
                                                     const isOwner = dataItem.user_id === data.profile?.id;
                                                     const isPending = (dataItem.my_status || dataItem.status) === 'pending' && !isOwner;
+                                                    const isDeclined = (dataItem.my_status || dataItem.status) === 'declined';
                                                     const colorClass = dataItem.color === 'green' ? 'bg-white dark:bg-slate-800 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white dark:bg-slate-800 border-l-blue-600 text-blue-900 dark:text-blue-100';
                                                     return (
-                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm border border-gray-200 dark:border-slate-700 border-l-4 ${colorClass} ${isPending ? 'border-dashed' : ''}`}>
+                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm border border-gray-200 dark:border-slate-700 border-l-4 ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-blue-500"/>}{dataItem.title}</span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{!!dataItem.recurrence_group_id && <Repeat size={10} />}</div>
-                                                            {/* RÉSULTAT DU VERROU : OnMouseDown est seulement pour le proprio */}
-                                                            {isOwner && !isPending && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
+                                                            {isOwner && !isPending && !isDeclined && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
                                                         </div>
                                                     );
                                                 })}
@@ -426,7 +419,7 @@ export default function PlanningManager({ data, updateData }) {
                                 <div className="space-y-4">
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
                                     {!eventForm.recurrence && !eventForm.recurrenceGroupId && (
-                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="ami1@test.com, ami2@test.com" /></div></div>
+                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="" /></div></div>
                                     )}
                                     <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
                                     <div className="flex items-center gap-2 py-2"><input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded"/><label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label></div>
@@ -453,7 +446,6 @@ export default function PlanningManager({ data, updateData }) {
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
                         <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X size={20} className="text-slate-400"/></button></div>
                         
-                        {/* LOGIQUE D'INVITATION : INSTANTANÉITÉ CHEZ L'INVITÉ */}
                         {(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
                             <div className="space-y-6">
                                 <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
