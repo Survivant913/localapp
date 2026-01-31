@@ -241,10 +241,10 @@ export default function Dashboard({ data, updateData, setView }) {
         const diffTime = target - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100 dark:bg-emerald-900/30 dark:text-emerald-400' };
-        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' };
-        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100 dark:bg-slate-800 dark:text-slate-500' };
-        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400' };
+        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100' };
+        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100' };
+        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
+        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100' };
     };
 
     const toggleTodo = (id) => {
@@ -294,7 +294,8 @@ export default function Dashboard({ data, updateData, setView }) {
     const todayDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
-        <div className="space-y-8 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-500 bg-slate-50/10 dark:bg-slate-950/20">
+        // --- 1. PLEINE LARGEUR (W-FULL) ---
+        <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
                 <FocusProjectModal 
                     project={focusedProject} 
@@ -306,93 +307,85 @@ export default function Dashboard({ data, updateData, setView }) {
                 />
             )}
 
-            {/* HEADER DESIGN PREMIUM (GLASS) */}
-            <div className="flex flex-col lg:flex-row gap-8">
-                <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-8 md:p-10 rounded-[2.5rem] shadow-2xl border border-white dark:border-white/5 flex flex-col items-center justify-center gap-8 relative overflow-hidden group min-h-[250px]">
-                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl transition-all group-hover:bg-blue-500/10"></div>
+            {/* HEADER - DESIGN PREMIUM + TEXTE CENTRALISÉ */}
+            <div className="flex flex-col lg:flex-row gap-6">
+                <div className="flex-1 bg-white/70 dark:bg-slate-800/60 backdrop-blur-xl p-6 md:p-8 rounded-[2.5rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-between group overflow-hidden relative">
+                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
                     
-                    {/* MODIF : TEXTE CENTRALISÉ ET CHANGÉ */}
-                    <div className="relative z-10 text-center w-full">
-                        <h2 className="text-4xl md:text-6xl font-black text-slate-800 dark:text-white mb-4 tracking-tighter italic">
-                            Tableau de Bord
-                        </h2>
-                        <p className="text-blue-600 dark:text-blue-400 text-lg md:text-xl font-bold uppercase tracking-[0.2em]">{todayDate}</p>
+                    {/* --- 2. TITRE TABLEAU DE BORD AU MILIEU --- */}
+                    <div className="flex flex-col items-center justify-center text-center mb-6 relative z-10">
+                        <h2 className="text-3xl md:text-5xl font-black text-slate-800 dark:text-white mb-2 tracking-tighter italic">Tableau de Bord</h2>
+                        <p className="text-blue-600 dark:text-blue-400 text-sm md:text-base font-bold uppercase tracking-[0.2em]">{todayDate}</p>
                     </div>
 
-                    <div className="flex flex-col md:flex-row items-center gap-6 w-full md:w-auto relative z-10">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
                         <select 
                             value={dashboardFilter} 
                             onChange={(e) => setDashboardFilter(e.target.value)} 
-                            className="w-full md:w-auto px-6 py-3 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-black outline-none text-slate-800 dark:text-white shadow-sm ring-1 ring-inset ring-slate-100 dark:ring-slate-700 focus:ring-blue-500 transition-all"
+                            className="w-full md:w-auto px-4 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm font-bold outline-none text-slate-800 dark:text-white shadow-sm transition-all"
                         >
-                            <option value="total">Vue Stratégique</option>
+                            <option value="total">Vue Globale</option>
                             {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                         </select>
-                        <div className="flex gap-4">
-                            <button onClick={() => setView('budget')} className="p-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all"><Plus size={24}/></button>
-                            <button onClick={() => setView('todo')} className="p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm hover:bg-slate-50 transition-all"><CheckSquare size={24}/></button>
-                            <button onClick={() => setView('notes')} className="p-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm hover:bg-slate-50 transition-all"><StickyNote size={24}/></button>
+                        <div className="flex gap-2 md:gap-4 w-full md:w-auto">
+                            <button onClick={() => setView('budget')} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 md:px-5 md:py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-sm font-bold shadow-lg shadow-blue-900/20 transition-transform active:scale-95"><Plus size={18}/> Dépense</button>
+                            <button onClick={() => setView('todo')} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 md:px-5 md:py-3.5 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold shadow-sm active:scale-95"><CheckSquare size={18} className="text-orange-500"/> Tâche</button>
+                            <button onClick={() => setView('notes')} className="flex-1 flex items-center justify-center gap-2 px-3 py-3 md:px-5 md:py-3.5 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold shadow-sm active:scale-95"><StickyNote size={18} className="text-yellow-500"/> Note</button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* METRICS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* CARTE SOLDE */}
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
-                    <div className="relative z-10 flex justify-between items-start mb-10">
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
-                        <button onClick={togglePrivacyMode} className="p-2 text-slate-300 dark:text-slate-600 hover:text-blue-500 transition-all">
-                            {isPrivacyMode ? <EyeOff size={22}/> : <Eye size={22}/>}
-                        </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* CARTE SOLDE (OEIL + ESTIMATION CONSERVÉS) */}
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden flex flex-col justify-between group h-full transition-all">
+                    <div className="relative z-10 flex justify-between items-start">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={24}/></div>
+                        <button onClick={togglePrivacyMode} className="text-gray-400 dark:text-slate-500 hover:text-blue-500 transition-colors">{isPrivacyMode ? <EyeOff size={22}/> : <Eye size={22}/>}</button>
                     </div>
-                    <div className="relative z-10 mb-8">
-                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
-                            {renderAmount(currentBalance)}
-                        </h3>
-                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                           TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}
-                        </p>
+                    <div className="relative z-10 mt-6 mb-6">
+                        <h3 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-2">{renderAmount(currentBalance)}</h3>
+                        <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">Solde {dashboardFilter === 'total' ? 'Total' : 'du Compte'}</p>
                         {!isPrivacyMode && (
-                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-700">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Projeté fin de mois :</span>
-                                <span className={`text-xs font-black ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                            <div className="mt-3 text-xs font-bold flex items-center gap-1 opacity-80">
+                                <span className="text-gray-400">Est. fin de mois :</span>
+                                <span className={balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}>
                                     {renderAmount(projectedBalance)}
                                 </span>
                             </div>
                         )}
                     </div>
-                    <div className="h-20 w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-4 border border-slate-100 dark:border-slate-800/50">
+                    <div className="h-16 w-full mt-auto bg-gray-50/50 dark:bg-slate-800/30 rounded-2xl p-2 border border-gray-100 dark:border-slate-700/50">
                         <SparkLine data={sparkData} height={50} />
                     </div>
                 </div>
 
                 {/* CARTE À VENIR */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
-                    <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-200 dark:border-slate-800 flex flex-col group transition-all">
+                    <div className="flex items-center gap-3 mb-6 text-purple-600 dark:text-purple-400">
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
-                        <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Opérations à venir</h3>
+                        <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tighter">Opérations à venir</h3>
                     </div>
-                    <div className="flex-1 flex flex-col gap-4">
+                    <div className="flex-1 flex flex-col gap-3">
                         {upcomingList.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-slate-400 italic py-4 font-bold opacity-30 tracking-widest uppercase">Tranquillité totale</div>
+                            <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm font-bold uppercase italic tracking-widest py-6">Tranquillité totale</div>
                         ) : (
                             upcomingList.map((e, idx) => {
                                 const impact = getFinancialImpact(e.data);
                                 const isNeutral = impact === 0;
                                 const isPositive = impact > 0;
                                 return (
-                                    <div key={idx} className="flex items-center justify-between p-4 md:p-5 bg-slate-50/50 dark:bg-slate-800/40 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 shadow-sm">
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300">
                                         <div className="flex items-center gap-4 overflow-hidden">
-                                            <div className="p-2.5 bg-white dark:bg-slate-700 rounded-xl text-slate-500 shadow-sm shrink-0 border dark:border-slate-600">
+                                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-300 shadow-sm border dark:border-slate-600">
                                                 {e.data.type === 'transfer' ? <ArrowRightLeft size={18} className="text-blue-500"/> : e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{e.data.description}</p>
-                                                <div className="flex items-center gap-2 text-xs text-slate-400 font-bold uppercase tracking-tighter">
+                                                <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold uppercase">
                                                     <span>{e.date.toLocaleDateString()}</span>
-                                                    {e.type === 'recurring' && <span className="text-blue-500 flex items-center gap-1">• RÉCURRENCE</span>}
+                                                    {e.type === 'recurring' && <span className="text-blue-500">• RÉCURRENCE</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -407,21 +400,23 @@ export default function Dashboard({ data, updateData, setView }) {
                 </div>
             </div>
 
-            {/* MAIN CONTENT GRID */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 space-y-8">
-                    {/* MODIF : PROJETS ACTIFS */}
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
+            {/* MAIN CONTENT ROW */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* PROJETS ACTIFS (Titre Corrigé) */}
+                <div className="lg:col-span-8 space-y-6">
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-gray-200 dark:border-slate-800 shadow-xl">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
+                            <h3 className="font-black text-gray-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
                                 Projets Actifs
                             </h3>
-                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 transition-all active:scale-95">MODE FOCUS</button>
+                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 transition-all active:scale-95">FOCUS</button>
                         </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {activeProjects.length === 0 ? (
-                                <p className="col-span-full text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase">Aucun projet actif</p>
+                                <p className="col-span-full text-center text-gray-400 py-10 font-bold italic opacity-50 uppercase tracking-widest">Aucun projet actif</p>
                             ) : (
                                 activeProjects.map(p => {
                                     const cost = parseFloat(p.cost || 0);
@@ -430,22 +425,22 @@ export default function Dashboard({ data, updateData, setView }) {
                                     const safeProgress = Math.min(100, Math.max(0, p.progress || 0));
                                     const globalScore = cost > 0 ? (safeProgress + fundingPercentage) / 2 : safeProgress;
                                     return (
-                                        <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group" onClick={() => setView('projects')}>
+                                        <div key={p.id} className="bg-gray-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-gray-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group shadow-sm" onClick={() => setView('projects')}>
                                             <div className="flex items-center gap-5 mb-6">
                                                 <div className="relative w-16 h-16 shrink-0">
                                                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                                        <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                                        <path className="text-gray-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                                                         <path className="text-blue-500 transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                                     </svg>
                                                     <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black dark:text-white">{Math.round(globalScore)}%</span>
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h4 className="font-black text-slate-800 dark:text-white text-base truncate">{p.title}</h4>
-                                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Évolution</span>
+                                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase">Progression</span>
                                                 </div>
                                             </div>
                                             <div className="space-y-4">
-                                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                                <div className="h-1.5 w-full bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
                                                     <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
                                                 </div>
                                                 <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
@@ -462,7 +457,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {pinnedNotes.map(n => (
-                            <div key={n.id} className={`p-8 rounded-[2rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.01] transition-all`} onClick={() => setView('notes')}>
+                            <div key={n.id} className={`p-8 rounded-[2rem] border border-white/10 shadow-xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.01] transition-all`} onClick={() => setView('notes')}>
                                 <div className="absolute top-4 right-6 opacity-20"><StickyNote size={24}/></div>
                                 <h4 className="font-black text-lg mb-3 tracking-tighter">{n.title}</h4>
                                 <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
@@ -471,9 +466,10 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                 </div>
 
-                <div className="lg:col-span-4 space-y-8">
-                    {/* AGENDA */}
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl group transition-all" onClick={() => setView('planning')}>
+                {/* COLONNE DROITE : AGENDA + URGENCES */}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* WIDGET AGENDA */}
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-gray-200 dark:border-slate-800 shadow-xl group transition-all" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><Clock size={20}/></div>
@@ -482,23 +478,23 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                         <div className="space-y-4">
                             {nextCalendarEvents.length === 0 ? (
-                                <p className="text-slate-400 text-sm font-bold italic py-4 uppercase opacity-50 tracking-widest text-center">Calendrier vierge</p>
+                                <p className="text-gray-400 text-sm font-bold italic py-4 uppercase opacity-50 tracking-widest text-center">Calendrier vierge</p>
                             ) : (
                                 nextCalendarEvents.map(evt => {
                                     const d = new Date(evt.start_time);
                                     const dayLabel = getDayCounterLabel(evt.start_time);
                                     return (
-                                        <div key={`${evt.type}-${evt.id}`} className="flex gap-4 items-center p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer group/item">
-                                            <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-xl border shrink-0 transition-transform hover:scale-110 shadow-sm`}>
+                                        <div key={`${evt.type}-${evt.id}`} className="flex gap-4 items-center p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer group/item shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-slate-700">
+                                            <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-xl border shrink-0 transition-transform group-hover/item:scale-110`}>
                                                 <span className="text-[10px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
                                                 <span className="text-lg font-black leading-none mt-0.5">{d.getDate()}</span>
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${dayLabel.color} shadow-sm`}>{dayLabel.text}</span>
+                                                    <p className="text-sm font-black text-gray-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${dayLabel.color}`}>{dayLabel.text}</span>
                                                 </div>
-                                                <p className="text-[11px] font-bold text-slate-400 uppercase mt-0.5 flex items-center gap-1">
+                                                <p className="text-[11px] font-bold text-gray-400 uppercase mt-0.5 flex items-center gap-1">
                                                     {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                                                     {evt.is_todo && <CheckCircle2 size={10} className="text-orange-500"/>}
                                                 </p>
@@ -511,37 +507,33 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
 
                     {/* URGENCES */}
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
-                        <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500">
-                           <Flag size={80} className="-rotate-12"/>
-                        </div>
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-gray-200 dark:border-slate-800 shadow-xl relative overflow-hidden h-fit">
+                        <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500"><Flag size={80} className="-rotate-12"/></div>
                         <div className="flex justify-between items-center mb-8 relative z-10">
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest">
+                            <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-3 uppercase tracking-widest">
                                 <div className="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-xl text-rose-600"><Flag size={20}/></div>
                                 Priorités
                             </h3>
-                            <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-lg shadow-rose-500/20">{urgentTodos.length}</span>
+                            <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded-lg">{urgentTodos.length}</span>
                         </div>
                         <div className="space-y-3 relative z-10">
                             {urgentTodos.length === 0 ? (
-                                <p className="text-slate-400 text-sm font-bold italic py-4 text-center opacity-50 uppercase tracking-widest">Feu éteint</p>
+                                <p className="text-gray-400 text-sm font-bold italic py-4 text-center opacity-50 uppercase tracking-widest">Feu éteint</p>
                             ) : (
                                 urgentTodos.map(t => (
-                                    <div key={t.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-rose-500/30 transition-all cursor-pointer shadow-sm shadow-indigo-500/5" onClick={() => toggleTodo(t.id)}>
-                                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 dark:border-slate-600 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-500 transition-all text-transparent group-hover:text-white shadow-inner">
+                                    <div key={t.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-gray-100 dark:border-slate-700 hover:border-rose-500/30 transition-all cursor-pointer shadow-sm" onClick={() => toggleTodo(t.id)}>
+                                        <div className="w-6 h-6 rounded-lg border-2 border-gray-200 dark:border-slate-600 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-500 transition-all text-transparent group-hover:text-white shadow-inner">
                                             <Check size={12} strokeWidth={4} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <span className="text-sm font-black text-slate-800 dark:text-slate-100 truncate block tracking-tighter">{t.text}</span>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest px-1.5 py-0.5 border border-rose-500/30 rounded bg-rose-500/5">Urgent</span>
-                                            </div>
+                                            <div className="flex items-center gap-2 mt-1"><span className="text-[8px] font-black text-rose-500 uppercase tracking-widest px-1.5 py-0.5 border border-rose-500/30 rounded bg-rose-500/5">Urgent</span></div>
                                         </div>
                                     </div>
                                 ))
                             )}
                         </div>
-                        <button onClick={() => setView('todo')} className="w-full mt-8 py-4 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-95">Explorer les tâches</button>
+                        <button onClick={() => setView('todo')} className="w-full mt-8 py-4 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-95">Tout voir</button>
                     </div>
                 </div>
             </div>
