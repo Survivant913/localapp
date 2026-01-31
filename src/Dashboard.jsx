@@ -228,7 +228,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     if (e.is_all_day) return evtDate >= today;
                     return evtDate > now;
                 })
-                .sort((a, b) => a.date - b.date)
+                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
                 .slice(0, 4);
         } catch (e) { return []; }
     };
@@ -241,10 +241,10 @@ export default function Dashboard({ data, updateData, setView }) {
         const diffTime = target - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100' };
-        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100' };
-        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
-        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100' };
+        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100 dark:bg-emerald-900/30 dark:text-emerald-400' };
+        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' };
+        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100 dark:bg-slate-800 dark:text-slate-500' };
+        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400' };
     };
 
     const toggleTodo = (id) => {
@@ -294,6 +294,7 @@ export default function Dashboard({ data, updateData, setView }) {
     const todayDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
+        /* --- CHANGEMENT : w-full pour pleine largeur --- */
         <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
                 <FocusProjectModal 
@@ -306,13 +307,13 @@ export default function Dashboard({ data, updateData, setView }) {
                 />
             )}
 
-            {/* HEADER - SLIM, MODERN & CENTRALIZED */}
+            {/* HEADER - SLIM, MODERN & ACTION BUTTONS CALÉS À DROITE */}
             <div className="flex flex-col lg:flex-row gap-6">
                 <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-4 md:p-6 rounded-[2rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-center relative overflow-hidden group">
                     <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 items-center relative z-10 w-full gap-4">
-                        {/* LEFT: SELECTOR */}
+                        {/* GAUCHE : FILTRE DISCRET */}
                         <div className="flex justify-center md:justify-start">
                             <select 
                                 value={dashboardFilter} 
@@ -324,7 +325,7 @@ export default function Dashboard({ data, updateData, setView }) {
                             </select>
                         </div>
 
-                        {/* CENTER: TITLE & DATE */}
+                        {/* CENTRE : TITRE ET DATE (SANS BONJOUR) */}
                         <div className="text-center">
                             <h2 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tighter italic uppercase">
                                 Tableau de Bord
@@ -332,73 +333,78 @@ export default function Dashboard({ data, updateData, setView }) {
                             <p className="text-blue-600 dark:text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">{todayDate}</p>
                         </div>
 
-                        {/* RIGHT: ACTION BUTTONS SLIM */}
+                        {/* DROITE : BOUTONS D'ACTION MODERNES CALÉS À DROITE */}
                         <div className="flex justify-center md:justify-end gap-2">
-                            <button onClick={() => setView('budget')} className="p-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all" title="Dépense"><Plus size={16}/></button>
-                            <button onClick={() => setView('todo')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Tâche"><CheckSquare size={16}/></button>
-                            <button onClick={() => setView('notes')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Note"><StickyNote size={16}/></button>
+                            <button onClick={() => setView('budget')} className="p-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all" title="Dépense"><Plus size={16}/></button>
+                            <button onClick={() => setView('todo')} className="p-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Tâche"><CheckSquare size={16}/></button>
+                            <button onClick={() => setView('notes')} className="p-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Note"><StickyNote size={16}/></button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* METRICS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {/* CARTE SOLDE */}
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-200 dark:border-slate-800 relative overflow-hidden flex flex-col justify-between min-h-[220px] transition-all hover:border-emerald-500/20">
-                    <div className="relative z-10 flex justify-between items-start">
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400"><Wallet size={24}/></div>
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
+                    <div className="relative z-10 flex justify-between items-start mb-10">
+                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
                         <button onClick={togglePrivacyMode} className="p-2 text-slate-300 dark:text-slate-600 hover:text-blue-500 transition-all">
                             {isPrivacyMode ? <EyeOff size={22}/> : <Eye size={22}/>}
                         </button>
                     </div>
-                    <div className="relative z-10 mt-6 mb-6">
-                        <h3 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-2">{renderAmount(currentBalance)}</h3>
-                        <p className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}</p>
+                    <div className="relative z-10 mb-8">
+                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
+                            {renderAmount(currentBalance)}
+                        </h3>
+                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center md:text-left">
+                           TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}
+                        </p>
+                        
                         {!isPrivacyMode && (
-                            <div className="mt-3 text-[10px] font-bold flex items-center gap-1 opacity-80">
-                                <span className="text-gray-400 uppercase tracking-tighter">Projeté fin de mois :</span>
-                                <span className={balanceDiff >= 0 ? "text-emerald-500 font-black" : "text-rose-500 font-black"}>
+                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-700">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter opacity-70">Projeté fin de mois :</span>
+                                <span className={`text-xs font-black ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                                     {renderAmount(projectedBalance)}
                                 </span>
                             </div>
                         )}
                     </div>
-                    <div className="h-16 w-full mt-auto bg-gray-50/50 dark:bg-slate-800/30 rounded-2xl p-2 border border-gray-100 dark:border-slate-700/50">
+                    <div className="h-20 w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-4 border border-slate-100 dark:border-slate-800/50">
                         <SparkLine data={sparkData} height={50} />
                     </div>
                 </div>
 
-                {/* CARTE À VENIR - FIXED RECURRING LABEL */}
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-xl border border-gray-200 dark:border-slate-800 flex flex-col group transition-all">
-                    <div className="flex items-center gap-3 mb-6 text-purple-600 dark:text-purple-400">
+                {/* CARTE À VENIR - CORRECTION RÉCURRENCE ICI */}
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
+                    <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
-                        <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tighter">Opérations à venir</h3>
+                        <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Opérations à venir</h3>
                     </div>
-                    <div className="flex-1 flex flex-col gap-3">
+                    <div className="flex-1 flex flex-col gap-4">
                         {upcomingList.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-slate-500 text-sm font-bold uppercase italic tracking-widest py-6">Tranquillité totale</div>
+                            <div className="flex-1 flex items-center justify-center text-slate-400 italic py-4 font-bold opacity-30 tracking-widest uppercase text-center">Tranquillité totale</div>
                         ) : (
                             upcomingList.map((e, idx) => {
                                 const impact = getFinancialImpact(e.data);
                                 const isNeutral = impact === 0;
                                 const isPositive = impact > 0;
                                 return (
-                                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-700 transition-all hover:bg-white dark:hover:bg-slate-800">
-                                        <div className="flex items-center gap-4 overflow-hidden">
-                                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg text-gray-500 dark:text-slate-300 shadow-sm shrink-0 border dark:border-slate-600">
+                                    <div key={idx} className="flex items-center justify-between p-4 md:p-6 bg-slate-50/50 dark:bg-slate-800/40 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 shadow-sm">
+                                        <div className="flex items-center gap-5 overflow-hidden">
+                                            <div className="p-3 bg-white dark:bg-slate-700 rounded-xl text-slate-500 shadow-sm shrink-0 border dark:border-slate-600">
                                                 {e.data.type === 'transfer' ? <ArrowRightLeft size={18} className="text-blue-500"/> : e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{e.data.description}</p>
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
                                                     <span>{e.date.toLocaleDateString()}</span>
-                                                    {/* --- MODIF : LOGIQUE STRICTE ICI --- */}
+                                                    {/* --- MODIF CRUCIALE : CONDITION STRICTE POUR LE TEXTE RÉCURRENCE --- */}
                                                     {e.type === 'recurring' && <span className="text-blue-500 font-black">• RÉCURRENCE</span>}
                                                 </div>
                                             </div>
                                         </div>
-                                        <span className={`font-black text-sm shrink-0 pl-2 ${isNeutral ? 'text-blue-600' : isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        <span className={`font-black text-base shrink-0 pl-4 ${isNeutral ? 'text-blue-600' : isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
                                             {isNeutral ? 'TRANS.' : renderAmount(impact, true)}
                                         </span>
                                     </div>
@@ -411,19 +417,21 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* MAIN CONTENT GRID */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
                 {/* PROJETS ACTIFS */}
                 <div className="lg:col-span-8 space-y-8">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase text-center md:text-left">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
                                 Projets Actifs
                             </h3>
-                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 transition-all active:scale-95">FOCUS</button>
+                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 transition-all active:scale-95">MODE FOCUS</button>
                         </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {activeProjects.length === 0 ? (
-                                <p className="col-span-full text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase text-center">Aucun projet actif</p>
+                                <p className="col-span-full text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest text-center">AUCUN PROJET ACTIF</p>
                             ) : (
                                 activeProjects.map(p => {
                                     const cost = parseFloat(p.cost || 0);
@@ -431,6 +439,7 @@ export default function Dashboard({ data, updateData, setView }) {
                                     const fundingPercentage = cost > 0 ? Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100) : 0;
                                     const safeProgress = Math.min(100, Math.max(0, p.progress || 0));
                                     const globalScore = cost > 0 ? (safeProgress + fundingPercentage) / 2 : safeProgress;
+
                                     return (
                                         <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group shadow-sm" onClick={() => setView('projects')}>
                                             <div className="flex items-center gap-6 mb-8">
@@ -443,7 +452,7 @@ export default function Dashboard({ data, updateData, setView }) {
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h4 className="font-black text-slate-800 dark:text-white text-lg truncate group-hover:text-blue-600 transition-colors">{p.title}</h4>
-                                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase mt-1 inline-block">Progression</span>
+                                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase mt-1 inline-block tracking-widest">ÉVOLUTION</span>
                                                 </div>
                                             </div>
                                             <div className="space-y-4">
@@ -513,7 +522,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     </div>
 
-                    {/* URGENCES - RÉTABLIES ET SANS CRASH */}
+                    {/* URGENCES - CORRECTION TEXTE ICI */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
                         <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500">
                            <Flag size={80} className="-rotate-12"/>
@@ -527,7 +536,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                         <div className="space-y-4 relative z-10">
                             {urgentTodos.length === 0 ? (
-                                /* --- MODIF : TEXTE PROPRE & SANS CRASH --- */
+                                /* --- MODIF : TEXTE PROPRE & SÉCURISÉ --- */
                                 <p className="text-slate-400 text-sm font-bold italic py-6 text-center opacity-50 uppercase tracking-widest">Aucune tâche urgente</p>
                             ) : (
                                 urgentTodos.map(t => (
