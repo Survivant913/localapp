@@ -488,7 +488,8 @@ export default function BudgetManager({ data, updateData }) {
     const visibleScheduled = scheduledList.filter(s => s.status === 'pending');
 
     return (
-        <div className="space-y-6 fade-in max-w-4xl mx-auto pb-20">
+        // --- CHANGEMENT : w-full à la place de max-w-4xl mx-auto ---
+        <div className="space-y-6 fade-in w-full pb-20">
             {/* 1. CARTES DU HAUT */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-6 rounded-xl text-white shadow-lg col-span-2">
@@ -616,26 +617,29 @@ export default function BudgetManager({ data, updateData }) {
                                     <p className="text-gray-400 text-sm text-center py-4">Aucune transaction.</p>
                                 )}
 
-                                <ul className="space-y-3 mb-4 pr-2">
-                                    {displayedTransactions.map(t => (
-                                        <li key={t.id} className={`flex justify-between items-center p-3 border-b border-gray-50 dark:border-slate-700 last:border-0 ${t.archived ? 'opacity-50 grayscale' : ''}`}>
-                                            <div>
-                                                <span className="block font-medium text-gray-700 dark:text-gray-200 text-sm">{t.description} {t.archived && '(Archivé)'}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-400">{parseLocalDate(t.date).toLocaleDateString()}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
+                                {/* --- AJOUT : Conteneur de scroll interne --- */}
+                                <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <ul className="space-y-3 mb-4">
+                                        {displayedTransactions.map(t => (
+                                            <li key={t.id} className={`flex justify-between items-center p-3 border-b border-gray-50 dark:border-slate-700 last:border-0 ${t.archived ? 'opacity-50 grayscale' : ''}`}>
+                                                <div>
+                                                    <span className="block font-medium text-gray-700 dark:text-gray-200 text-sm">{t.description} {t.archived && '(Archivé)'}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-gray-400">{parseLocalDate(t.date).toLocaleDateString()}</span>
+                                                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className={`font-bold text-sm ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(t.amount))}</span>
-                                                <div className="flex gap-1">
-                                                    <button onClick={() => archiveTransaction(t.id)} className="text-gray-400 hover:text-blue-500 p-1" title={t.archived ? "Désarchiver" : "Archiver"}><Archive size={14}/></button>
-                                                    <button onClick={() => deleteItem('transactions', t.id)} className="text-gray-200 hover:text-red-400 p-1"><Trash2 size={14}/></button>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`font-bold text-sm ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(t.amount))}</span>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => archiveTransaction(t.id)} className="text-gray-400 hover:text-blue-500 p-1" title={t.archived ? "Désarchiver" : "Archiver"}><Archive size={14}/></button>
+                                                        <button onClick={() => deleteItem('transactions', t.id)} className="text-gray-200 hover:text-red-400 p-1"><Trash2 size={14}/></button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
                                 <div className="flex gap-2 mt-2">
                                     {visibleTransactions.length > historyLimit && (
