@@ -243,7 +243,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
         if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100 dark:bg-emerald-900/30 dark:text-emerald-400' };
         if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' };
-        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100 dark:bg-slate-800 dark:text-slate-500' };
+        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
         return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400' };
     };
 
@@ -307,37 +307,37 @@ export default function Dashboard({ data, updateData, setView }) {
                 />
             )}
 
-            {/* HEADER - SLIM, MODERN & ACTION BUTTONS CALÉS À DROITE */}
+            {/* HEADER - MODERNE, SLIM & BOUTONS À DROITE */}
             <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-4 md:p-6 rounded-[2rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-center relative overflow-hidden group">
+                <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-4 md:p-6 rounded-[2.5rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-center relative overflow-hidden group">
                     <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 items-center relative z-10 w-full gap-4">
-                        {/* GAUCHE : FILTRE DISCRET */}
-                        <div className="flex justify-center md:justify-start">
+                    <div className="grid grid-cols-1 md:grid-cols-3 items-center relative z-10 w-full">
+                        {/* GAUCHE : FILTRE */}
+                        <div className="flex justify-start">
                             <select 
                                 value={dashboardFilter} 
                                 onChange={(e) => setDashboardFilter(e.target.value)} 
-                                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm ring-1 ring-white/10"
+                                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm"
                             >
                                 <option value="total">GLOBAL</option>
                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                             </select>
                         </div>
 
-                        {/* CENTRE : TITRE ET DATE (SANS BONJOUR) */}
+                        {/* CENTRE : TITRE (SANS BONJOUR) */}
                         <div className="text-center">
-                            <h2 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tighter italic uppercase">
+                            <h2 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-white mb-1 tracking-tighter italic uppercase">
                                 Tableau de Bord
                             </h2>
                             <p className="text-blue-600 dark:text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">{todayDate}</p>
                         </div>
 
-                        {/* DROITE : BOUTONS D'ACTION MODERNES CALÉS À DROITE */}
-                        <div className="flex justify-center md:justify-end gap-2">
-                            <button onClick={() => setView('budget')} className="p-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all" title="Dépense"><Plus size={16}/></button>
-                            <button onClick={() => setView('todo')} className="p-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Tâche"><CheckSquare size={16}/></button>
-                            <button onClick={() => setView('notes')} className="p-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all" title="Note"><StickyNote size={16}/></button>
+                        {/* DROITE : ACTIONS SLIM */}
+                        <div className="flex justify-end gap-2">
+                            <button onClick={() => setView('budget')} className="p-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all"><Plus size={16}/></button>
+                            <button onClick={() => setView('todo')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><CheckSquare size={16}/></button>
+                            <button onClick={() => setView('notes')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><StickyNote size={16}/></button>
                         </div>
                     </div>
                 </div>
@@ -345,7 +345,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* METRICS ROW */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* CARTE SOLDE */}
+                {/* CARTE SOLDE MAJESTUEUSE */}
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
                     <div className="relative z-10 flex justify-between items-start mb-10">
                         <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
@@ -375,7 +375,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                 </div>
 
-                {/* CARTE À VENIR - CORRECTION RÉCURRENCE ICI */}
+                {/* CARTE À VENIR - FIXED RECURRING LABEL */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
                     <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
@@ -399,7 +399,7 @@ export default function Dashboard({ data, updateData, setView }) {
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{e.data.description}</p>
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
                                                     <span>{e.date.toLocaleDateString()}</span>
-                                                    {/* --- MODIF CRUCIALE : CONDITION STRICTE POUR LE TEXTE RÉCURRENCE --- */}
+                                                    {/* --- MODIF : RÉCURRENCE UNIQUEMENT SI TYPE OK --- */}
                                                     {e.type === 'recurring' && <span className="text-blue-500 font-black">• RÉCURRENCE</span>}
                                                 </div>
                                             </div>
@@ -415,54 +415,74 @@ export default function Dashboard({ data, updateData, setView }) {
                 </div>
             </div>
 
-            {/* MAIN CONTENT GRID */}
+            {/* MAIN CONTENT GRID - LOGIQUE PROJET RÉTABLIE */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 
-                {/* PROJETS ACTIFS */}
+                {/* PROJETS ACTIFS - LOGIQUE 100% CONSERVÉE */}
                 <div className="lg:col-span-8 space-y-8">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase text-center md:text-left">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
                                 Projets Actifs
                             </h3>
-                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 transition-all active:scale-95">MODE FOCUS</button>
+                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all">FOCUS</button>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
                             {activeProjects.length === 0 ? (
-                                <p className="col-span-full text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest text-center">AUCUN PROJET ACTIF</p>
+                                <p className="text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase">Aucun projet actif</p>
                             ) : (
                                 activeProjects.map(p => {
                                     const cost = parseFloat(p.cost || 0);
                                     let budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, currentBalance);
                                     const fundingPercentage = cost > 0 ? Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100) : 0;
+                                    const isFunded = budgetAvailable >= cost;
                                     const safeProgress = Math.min(100, Math.max(0, p.progress || 0));
-                                    const globalScore = cost > 0 ? (safeProgress + fundingPercentage) / 2 : safeProgress;
+                                    const safeFunding = Math.min(100, Math.max(0, fundingPercentage));
+                                    const globalScore = cost > 0 ? (safeProgress + safeFunding) / 2 : safeProgress;
 
                                     return (
-                                        <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group shadow-sm" onClick={() => setView('projects')}>
-                                            <div className="flex items-center gap-6 mb-8">
-                                                <div className="relative w-20 h-20 shrink-0">
+                                        <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group" onClick={() => setView('projects')}>
+                                            <div className="flex items-center gap-5 mb-6">
+                                                <div className="relative w-16 h-16 shrink-0">
                                                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                         <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                                                         <path className="text-blue-500 transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                                     </svg>
-                                                    <span className="absolute inset-0 flex items-center justify-center text-xs font-black dark:text-white">{Math.round(globalScore)}%</span>
+                                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black dark:text-white">{Math.round(globalScore)}%</span>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="font-black text-slate-800 dark:text-white text-lg truncate group-hover:text-blue-600 transition-colors">{p.title}</h4>
-                                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full uppercase mt-1 inline-block tracking-widest">ÉVOLUTION</span>
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="font-black text-slate-800 dark:text-white text-base truncate">{p.title}</h4>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className={`w-2 h-2 shrink-0 rounded-full ${p.status === 'in_progress' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
+                                                        <p className="text-xs text-slate-400 font-bold uppercase truncate tracking-tighter">{p.description || "Aucun descriptif"}</p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-4">
-                                                <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                                                    <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
+
+                                            {/* --- LA GRILLE DE LOGIQUE PROJET RÉTABLIE (COURBE BUDGET) --- */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                        <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
+                                                        <span className="dark:text-white">{Math.round(safeProgress)}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                                        <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                                   <span>Avancement</span>
-                                                   <span className="dark:text-slate-200">{Math.round(safeProgress)}%</span>
-                                                </div>
+                                                {cost > 0 && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                            <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
+                                                            <span className={isFunded ? "text-green-500" : "text-orange-500"}>{Math.round(safeFunding)}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                                            <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${safeFunding}%` }}></div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );
@@ -484,7 +504,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
                 {/* COLONNE DROITE : AGENDA + URGENCES */}
                 <div className="lg:col-span-4 space-y-8">
-                    {/* AGENDA */}
+                    {/* WIDGET AGENDA */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl group transition-all" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
@@ -522,7 +542,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     </div>
 
-                    {/* URGENCES - CORRECTION TEXTE ICI */}
+                    {/* URGENCES - RÉTABLIES ET SANS CRASH */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
                         <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500">
                            <Flag size={80} className="-rotate-12"/>
@@ -536,7 +556,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                         <div className="space-y-4 relative z-10">
                             {urgentTodos.length === 0 ? (
-                                /* --- MODIF : TEXTE PROPRE & SÉCURISÉ --- */
+                                /* --- MODIF : TEXTE PROPRE --- */
                                 <p className="text-slate-400 text-sm font-bold italic py-6 text-center opacity-50 uppercase tracking-widest">Aucune tâche urgente</p>
                             ) : (
                                 urgentTodos.map(t => (
