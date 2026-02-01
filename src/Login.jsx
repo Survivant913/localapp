@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from './supabaseClient'; // J'ai remis ton chemin d'origine './' pour éviter les bugs
+import { supabase } from './supabaseClient'; 
 import { Loader2, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
@@ -30,7 +30,7 @@ export default function Login() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* MODIF 1 : Largeur passée à max-w-[500px] (c'est large !) pour que le titre arabe tienne sur une ligne */}
+      {/* Carte Large pour le titre Arabe */}
       <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-700 relative z-10">
         
         {/* Carte Glassmorphism */}
@@ -38,9 +38,9 @@ export default function Login() {
             
             {/* En-tête Épuré */}
             <div className="text-center mb-10 mt-2">
-                {/* whitespace-nowrap force le texte à rester sur une ligne */}
                 <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm whitespace-nowrap">
-                    أهلاً بك في مساحتك الشخصية
+                    Mon Espace Personnel
+                 
                 </h1>
             </div>
 
@@ -92,7 +92,7 @@ export default function Login() {
         </div>
 
         {/* Footer Signature & Logo Dragon */}
-        <div className="mt-12 flex flex-col items-center gap-5 opacity-50 hover:opacity-100 transition-opacity duration-500 cursor-default">
+        <div className="mt-10 flex flex-col items-center gap-6 opacity-60 hover:opacity-100 transition-opacity duration-500 cursor-default">
             
             {/* Ligne de séparation */}
             <div className="h-px w-24 bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
@@ -101,16 +101,16 @@ export default function Login() {
                 Created by Henni Mohammed Al Amine
             </p>
 
-            {/* MODIF 2 : Le Dragon (dragon.png) */}
+            {/* MODIFICATION : TAILLE TITANESQUE (2.5x plus gros) */}
             <div className="relative group mt-2">
-                {/* Petite lueur bleue derrière le dragon pour le faire ressortir du fond noir */}
-                <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
+                {/* Lueur agrandie pour matcher la nouvelle taille */}
+                <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
                 
-                {/* L'image : Assure-toi que c'est bien dragon.png dans le dossier public */}
+                {/* Image passée de w-16 (64px) à w-40 (160px) */}
                 <img 
                     src="/dragon.png" 
                     alt="Dragon Logo" 
-                    className="w-16 h-16 object-contain relative z-10 drop-shadow-2xl grayscale hover:grayscale-0 transition-all duration-500"
+                    className="w-40 h-40 object-contain relative z-10 drop-shadow-2xl grayscale hover:grayscale-0 transition-all duration-500"
                 />
             </div>
 
