@@ -83,50 +83,26 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- DESIGN "PORTE DU DRAGON" (MASQUE CSS + COULEUR THÈME) --- */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            
-            {/* 1. Le Gardien du Haut (Descendant) */}
-            <div 
-                className={`absolute inset-x-0 h-[50%] bg-blue-600 transition-all duration-700 ease-in-out opacity-10 
-                ${isCollapsed ? '-top-12 scale-x-[-1] scale-y-[-1] origin-top' : '-top-16 scale-x-[-1] scale-y-[-1] origin-top-right rotate-3'}`}
-                style={{ 
-                    maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    maskPosition: 'top center',
-                    WebkitMaskPosition: 'top center',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat'
-                }}
-            ></div>
-
-            {/* 2. Le Gardien du Bas (Montant - REMONTÉ PLUS HAUT) */}
-             <div 
-                className={`absolute inset-x-0 h-[50%] bg-blue-600 transition-all duration-700 ease-in-out opacity-10 
-                ${isCollapsed ? 'bottom-16 scale-100 origin-bottom' : 'bottom-24 scale-110 origin-bottom-left -rotate-3'}`}
-                 style={{ 
-                    maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    maskPosition: 'bottom center',
-                    WebkitMaskPosition: 'bottom center',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat'
-                }}
-            ></div>
-            
-            {/* Gradient pour la lisibilité */}
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0B1120]/10 via-[#0B1120]/40 to-[#0B1120]/10"></div>
-        </div>
-
         {/* Header */}
         <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60 relative z-10`}>
           {!isCollapsed && (
-            <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
+            <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-3">
+              {/* --- LE LOGO DRAGON --- */}
+              {/* Remplace la pastille bleue par le dragon, mais garde la couleur bleue du thème via le masque */}
+              <div 
+                className="w-8 h-8 bg-blue-600 shrink-0 transition-colors duration-300"
+                style={{
+                    maskImage: 'url(/dragon.png)',
+                    WebkitMaskImage: 'url(/dragon.png)',
+                    maskSize: 'contain',
+                    WebkitMaskSize: 'contain',
+                    maskPosition: 'center',
+                    WebkitMaskPosition: 'center',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskRepeat: 'no-repeat'
+                }}
+              ></div>
+              
               {labels?.appName || 'Mon Espace'}
             </h1>
           )}
