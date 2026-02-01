@@ -85,8 +85,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) --- */}
-        {/* On crée un bloc de couleur (bleu/thème) et on applique l'image dragon.png comme masque par-dessus */}
+        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - REMPLISSAGE TOTAL --- */}
         <div 
             className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ${isCollapsed ? 'opacity-0' : 'opacity-10'}`}
         >
@@ -94,14 +93,15 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 className="w-full h-full bg-blue-600 transition-colors duration-300"
                 style={{
                     maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)', // Pour Safari/Chrome
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
+                    WebkitMaskImage: 'url(/dragon.png)',
+                    maskSize: 'cover', // MODIFIÉ : 'cover' remplit tout l'espace
+                    WebkitMaskSize: 'cover',
+                    maskPosition: 'center center', // MODIFIÉ : Centrage parfait
+                    WebkitMaskPosition: 'center center',
                     maskRepeat: 'no-repeat',
                     WebkitMaskRepeat: 'no-repeat',
-                    transform: 'scale(1.2) rotate(-10deg) translateX(20px)' // Ajustement position stylée
+                    // On enlève le transform complexe pour laisser 'cover' faire le travail de remplissage
+                    transform: 'scale(1.05)' 
                 }}
             />
         </div>
