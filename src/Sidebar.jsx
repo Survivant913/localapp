@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-// --- AJOUT DE LA PROP "unreadCount" ICI ---
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
@@ -15,7 +14,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
   useEffect(() => {
-    // Incrémente le compteur toutes les secondes (1000ms)
     const timer = setInterval(() => {
       setSessionSeconds(prev => prev + 1);
     }, 1000);
@@ -85,24 +83,43 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- CARTE BLANCHE CRÉATIVE : LA PORTE DU DRAGON --- */}
+        {/* --- DESIGN "PORTE DU DRAGON" (MASQUE CSS + COULEUR THÈME) --- */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            {/* Note: On utilise 'mix-blend-overlay' pour que l'image fusionne avec la couleur du thème */}
             
-            {/* 1. Le Gardien du Haut (Inversé, descendant) */}
+            {/* 1. Le Gardien du Haut (Descendant) */}
             <div 
-                className={`absolute top-0 inset-x-0 h-[55%] bg-no-repeat bg-contain bg-top transition-all duration-700 ease-in-out mix-blend-overlay opacity-20 ${isCollapsed ? 'scale-x-[-1] scale-y-[-1] origin-top' : 'scale-x-[-1] scale-y-[-1] origin-top-right rotate-6'}`}
-                style={{ backgroundImage: 'url(/dragon.png)' }}
+                className={`absolute inset-x-0 h-[50%] bg-blue-600 transition-all duration-700 ease-in-out opacity-10 
+                ${isCollapsed ? '-top-12 scale-x-[-1] scale-y-[-1] origin-top' : '-top-16 scale-x-[-1] scale-y-[-1] origin-top-right rotate-3'}`}
+                style={{ 
+                    maskImage: 'url(/dragon.png)',
+                    WebkitMaskImage: 'url(/dragon.png)',
+                    maskSize: 'contain',
+                    WebkitMaskSize: 'contain',
+                    maskPosition: 'top center',
+                    WebkitMaskPosition: 'top center',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskRepeat: 'no-repeat'
+                }}
             ></div>
 
-            {/* 2. Le Gardien du Bas (Montant) */}
+            {/* 2. Le Gardien du Bas (Montant - REMONTÉ PLUS HAUT) */}
              <div 
-                className={`absolute bottom-0 inset-x-0 h-[55%] bg-no-repeat bg-contain bg-bottom transition-all duration-700 ease-in-out mix-blend-overlay opacity-20 ${isCollapsed ? 'scale-100 origin-bottom' : 'scale-110 origin-bottom-left -rotate-6'}`}
-                 style={{ backgroundImage: 'url(/dragon.png)' }}
+                className={`absolute inset-x-0 h-[50%] bg-blue-600 transition-all duration-700 ease-in-out opacity-10 
+                ${isCollapsed ? 'bottom-16 scale-100 origin-bottom' : 'bottom-24 scale-110 origin-bottom-left -rotate-3'}`}
+                 style={{ 
+                    maskImage: 'url(/dragon.png)',
+                    WebkitMaskImage: 'url(/dragon.png)',
+                    maskSize: 'contain',
+                    WebkitMaskSize: 'contain',
+                    maskPosition: 'bottom center',
+                    WebkitMaskPosition: 'bottom center',
+                    maskRepeat: 'no-repeat',
+                    WebkitMaskRepeat: 'no-repeat'
+                }}
             ></div>
-
-            {/* 3. Gradient subtil au centre pour s'assurer que le menu reste parfaitement lisible */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0B1120]/60 to-transparent"></div>
+            
+            {/* Gradient pour la lisibilité */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0B1120]/10 via-[#0B1120]/40 to-[#0B1120]/10"></div>
         </div>
 
         {/* Header */}
