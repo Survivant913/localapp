@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from './supabaseClient'; 
+import { supabase } from '../supabaseClient'; // Vérifie bien ce chemin (../ ou ./)
 import { Loader2, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
@@ -26,21 +26,38 @@ export default function Login() {
   return (
     <div className="min-h-screen w-full bg-[#020617] flex flex-col items-center justify-center p-4 font-sans text-slate-200 relative overflow-hidden selection:bg-indigo-500/30">
       
-      {/* Effets de fond (Lueurs) */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
+      {/* --- FOND DRAGON GÉANT (Ancré & Discret) --- */}
+      {/* On utilise un z-0 pour qu'il soit derrière tout. On force la couleur Indigo pour éviter le "gris dégueulasse". */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none overflow-hidden">
+         <div 
+            className="w-[120vh] h-[120vh] bg-indigo-600 transition-all duration-1000 opacity-[0.08]" 
+            style={{
+                maskImage: 'url(/dragon.png)',
+                WebkitMaskImage: 'url(/dragon.png)',
+                maskSize: 'contain',
+                WebkitMaskSize: 'contain',
+                maskPosition: 'center',
+                WebkitMaskPosition: 'center',
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+            }}
+         />
+      </div>
 
-      {/* Carte Large pour le titre Arabe */}
+      {/* Effets de lueurs supplémentaires par-dessus le dragon pour l'ambiance */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none z-0" />
+
+      {/* Carte de Connexion (z-10 pour passer DEVANT le dragon) */}
       <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-700 relative z-10">
         
         {/* Carte Glassmorphism */}
-        <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-10 shadow-2xl shadow-black/50 ring-1 ring-white/5">
+        <div className="backdrop-blur-xl bg-slate-950/40 border border-white/[0.08] rounded-3xl p-8 md:p-10 shadow-2xl shadow-black/80 ring-1 ring-white/5">
             
-            {/* En-tête Épuré */}
+            {/* En-tête */}
             <div className="text-center mb-10 mt-2">
                 <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm whitespace-nowrap">
-                    Mon Espace Personnel
-                 
+                    أهلاً بك في مساحتك الشخصية
                 </h1>
             </div>
 
@@ -55,7 +72,7 @@ export default function Login() {
                         placeholder="Identifiant"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white placeholder-slate-600 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all text-sm shadow-inner"
+                        className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white placeholder-slate-600 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all text-sm shadow-inner"
                         required
                     />
                 </div>
@@ -70,7 +87,7 @@ export default function Login() {
                         placeholder="Mot de passe"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-slate-950/50 border border-slate-800 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white placeholder-slate-600 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all text-sm shadow-inner"
+                        className="w-full bg-slate-950/60 border border-slate-800 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-white placeholder-slate-600 rounded-xl pl-12 pr-4 py-3.5 outline-none transition-all text-sm shadow-inner"
                         required
                     />
                 </div>
@@ -91,29 +108,12 @@ export default function Login() {
             </form>
         </div>
 
-        {/* Footer Signature & Logo Dragon */}
-        <div className="mt-10 flex flex-col items-center gap-6 opacity-60 hover:opacity-100 transition-opacity duration-500 cursor-default">
-            
-            {/* Ligne de séparation */}
+        {/* Footer Signature (Plus de logo ici, il est en fond géant) */}
+        <div className="mt-8 flex flex-col items-center gap-4 opacity-40 hover:opacity-80 transition-opacity duration-500 cursor-default">
             <div className="h-px w-24 bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
-            
             <p className="text-[10px] text-slate-400 font-medium tracking-[0.2em] uppercase">
                 Created by Henni Mohammed Al Amine
             </p>
-
-            {/* MODIFICATION : TAILLE TITANESQUE (2.5x plus gros) */}
-            <div className="relative group mt-2">
-                {/* Lueur agrandie pour matcher la nouvelle taille */}
-                <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
-                
-                {/* Image passée de w-16 (64px) à w-40 (160px) */}
-                <img 
-                    src="/dragon.png" 
-                    alt="Dragon Logo" 
-                    className="w-40 h-40 object-contain relative z-10 drop-shadow-2xl grayscale hover:grayscale-0 transition-all duration-500"
-                />
-            </div>
-
         </div>
 
       </div>
