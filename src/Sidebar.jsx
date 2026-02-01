@@ -85,7 +85,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - REMPLISSAGE TOTAL --- */}
+        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - ZOOM MANUEL --- */}
         <div 
             className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ${isCollapsed ? 'opacity-0' : 'opacity-10'}`}
         >
@@ -94,14 +94,14 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'cover', // MODIFIÉ : 'cover' remplit tout l'espace
-                    WebkitMaskSize: 'cover',
-                    maskPosition: 'center center', // MODIFIÉ : Centrage parfait
-                    WebkitMaskPosition: 'center center',
+                    maskSize: 'contain', // Retour à 'contain' pour garder les proportions
+                    WebkitMaskSize: 'contain',
+                    maskPosition: 'center',
+                    WebkitMaskPosition: 'center',
                     maskRepeat: 'no-repeat',
                     WebkitMaskRepeat: 'no-repeat',
-                    // On enlève le transform complexe pour laisser 'cover' faire le travail de remplissage
-                    transform: 'scale(1.05)' 
+                    // ZOOM MASSIF MANUAL (x3) et légère rotation pour le style
+                    transform: 'scale(3) rotate(-5deg)' 
                 }}
             />
         </div>
