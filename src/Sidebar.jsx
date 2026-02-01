@@ -83,18 +83,26 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 bg-[#0B1120] text-slate-400 transform transition-all duration-300 ease-in-out border-r border-slate-800/60 flex flex-col shadow-2xl
+        fixed inset-y-0 left-0 z-50 bg-[#0B1120] text-slate-400 transform transition-all duration-300 ease-in-out border-r border-slate-800/60 flex flex-col shadow-2xl overflow-hidden
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} 
         md:translate-x-0 md:static
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
+        {/* --- FOND TATOUAGE DRAGON (S'ADAPTE AU THÈME) --- */}
+        <div className="absolute bottom-0 right-0 pointer-events-none opacity-5 z-0">
+            <svg width="400" height="400" viewBox="0 0 200 200" className="text-blue-600 fill-current transform rotate-12 translate-x-10 translate-y-10">
+                <path d="M40,160 C20,140 10,100 40,60 C60,30 100,20 140,40 C170,60 180,100 160,140 C140,170 100,180 60,160 Q100,100 140,100 Q100,140 40,160 M60,80 Q80,60 100,80 Q120,100 100,120 Q80,140 60,120 Q40,100 60,80 M120,40 Q140,20 160,40 Q180,60 160,80 Q140,100 120,80 Q100,60 120,40 M20,120 Q40,100 60,120 Q80,140 60,160 Q40,180 20,160 Q0,140 20,120" />
+                <path d="M100,10 L110,30 L130,20 L120,40 L140,50 L120,60 L130,80 L110,70 L100,90 L90,70 L70,80 L80,60 L60,50 L80,40 L70,20 L90,30 Z" />
+            </svg>
+        </div>
+
         {/* Header */}
-        <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60`}>
+        <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60 relative z-10`}>
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-600 rounded-full shadow-[0_0_8px_rgba(37,99,235,0.6)]"></div>
-              {labels?.appName || 'Freelance Cockpit'}
+              {labels?.appName || 'Mon Espace'}
             </h1>
           )}
 
@@ -112,7 +120,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         </div>
 
         {/* Navigation */}
-        <nav className={`flex-1 py-6 space-y-1 custom-scrollbar ${isCollapsed ? 'px-2' : 'px-4'} overflow-y-auto overflow-x-hidden`}>
+        <nav className={`flex-1 py-6 space-y-1 custom-scrollbar ${isCollapsed ? 'px-2' : 'px-4'} overflow-y-auto overflow-x-hidden relative z-10`}>
           {menuItems.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -171,7 +179,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         </nav>
 
         {/* Footer & Logout */}
-        <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120]">
+        <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120] relative z-10">
           <div className={`flex gap-2 mb-4 ${isCollapsed ? 'flex-col items-center' : ''}`}>
             
             <button 
