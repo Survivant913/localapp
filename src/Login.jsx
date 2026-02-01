@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient'; // Attention au chemin d'import selon ta structure (parfois ./ parfois ../)
+import { supabase } from './supabaseClient'; // J'ai remis ton chemin d'origine './' pour éviter les bugs
 import { Loader2, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
@@ -30,14 +30,15 @@ export default function Login() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* MODIFICATION 1 : Élargissement de la carte (max-w-[460px]) pour que le titre tienne sur une ligne */}
-      <div className="w-full max-w-[460px] animate-in fade-in zoom-in duration-700 relative z-10">
+      {/* MODIF 1 : Largeur passée à max-w-[500px] (c'est large !) pour que le titre arabe tienne sur une ligne */}
+      <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-700 relative z-10">
         
         {/* Carte Glassmorphism */}
         <div className="backdrop-blur-2xl bg-white/[0.03] border border-white/[0.08] rounded-3xl p-8 md:p-10 shadow-2xl shadow-black/50 ring-1 ring-white/5">
             
             {/* En-tête Épuré */}
             <div className="text-center mb-10 mt-2">
+                {/* whitespace-nowrap force le texte à rester sur une ligne */}
                 <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm whitespace-nowrap">
                     أهلاً بك في مساحتك الشخصية
                 </h1>
@@ -90,24 +91,26 @@ export default function Login() {
             </form>
         </div>
 
-        {/* Footer Signature & Logo */}
+        {/* Footer Signature & Logo Dragon */}
         <div className="mt-12 flex flex-col items-center gap-5 opacity-50 hover:opacity-100 transition-opacity duration-500 cursor-default">
             
-            {/* Ligne de séparation stylisée */}
+            {/* Ligne de séparation */}
             <div className="h-px w-24 bg-gradient-to-r from-transparent via-slate-600 to-transparent"></div>
             
             <p className="text-[10px] text-slate-400 font-medium tracking-[0.2em] uppercase">
                 Created by Henni Mohammed Al Amine
             </p>
 
-            {/* MODIFICATION 2 : Intégration du Logo V2 avec effet Glow */}
+            {/* MODIF 2 : Le Dragon (dragon.png) */}
             <div className="relative group mt-2">
-                {/* Lueur derrière le logo */}
-                <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
+                {/* Petite lueur bleue derrière le dragon pour le faire ressortir du fond noir */}
+                <div className="absolute inset-0 bg-blue-600 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
+                
+                {/* L'image : Assure-toi que c'est bien dragon.png dans le dossier public */}
                 <img 
-                    src="/logo-v2.png" 
-                    alt="Logo" 
-                    className="w-14 h-14 object-contain relative z-10 drop-shadow-2xl grayscale hover:grayscale-0 transition-all duration-500"
+                    src="/dragon.png" 
+                    alt="Dragon Logo" 
+                    className="w-16 h-16 object-contain relative z-10 drop-shadow-2xl grayscale hover:grayscale-0 transition-all duration-500"
                 />
             </div>
 
