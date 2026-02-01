@@ -88,9 +88,9 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-3">
               {/* --- LE LOGO DRAGON --- */}
-              {/* Remplace la pastille bleue par le dragon, mais garde la couleur bleue du thème via le masque */}
+              {/* Ajustement de la taille : w-10 h-10 (40px) au lieu de w-8 h-8 (32px) */}
               <div 
-                className="w-8 h-8 bg-blue-600 shrink-0 transition-colors duration-300"
+                className="w-10 h-10 bg-blue-600 shrink-0 transition-colors duration-300"
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
