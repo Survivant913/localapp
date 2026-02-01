@@ -85,29 +85,24 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - ÉTIREMENT TOTAL --- */}
-        <div 
-            className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ${isCollapsed ? 'opacity-0' : 'opacity-10'}`}
-        >
-            <div 
-                className="w-full h-full bg-blue-600 transition-colors duration-300"
-                style={{
-                    maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)',
-                    
-                    // --- MODIFICATION CLÉ ---
-                    maskSize: '100% 100%', // Force l'image à toucher les 4 bords (étirement)
-                    WebkitMaskSize: '100% 100%',
-                    
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat',
-                    
-                    // On garde une échelle neutre (1) pour voir l'image entière dans son cadre
-                    transform: 'scale(1)' 
-                }}
-            />
+        {/* --- NOUVEAU FOND CRÉATIF : DOUBLE DRAGON TRIBAL (HAUT & BAS) --- */}
+        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+            
+            {/* Dragon Tribal du Haut */}
+            <div className={`absolute top-0 left-0 right-0 h-[40%] opacity-[0.07] transition-all duration-500 ${isCollapsed ? '-translate-y-10 scale-110' : 'translate-y-0 scale-100'}`}>
+                 <svg viewBox="0 0 600 300" className="w-full h-full text-blue-600 fill-current" preserveAspectRatio="xMidYTop meet">
+                    <path d="M300,0 C350,50 450,20 500,80 C550,140 520,200 480,220 C440,240 380,200 350,150 C320,100 350,50 300,50 C250,50 280,100 250,150 C220,200 160,240 120,220 C80,200 50,140 100,80 C150,20 250,50 300,0 Z M100,100 C80,120 60,100 80,80 C100,60 120,80 100,100 M500,100 C520,120 540,100 520,80 C500,60 480,80 500,100 M200,180 C180,200 150,180 170,150 C190,120 220,150 200,180 M400,180 C420,200 450,180 430,150 C410,120 380,150 400,180" />
+                    <path d="M280,20 C260,40 220,30 240,60 C260,90 300,80 320,60 C340,40 300,20 280,20" opacity="0.8"/>
+                </svg>
+            </div>
+
+            {/* Dragon Tribal du Bas */}
+            <div className={`absolute bottom-0 left-0 right-0 h-[50%] opacity-[0.07] transition-all duration-500 ${isCollapsed ? 'translate-y-10 scale-110' : 'translate-y-0 scale-100'}`}>
+                 <svg viewBox="0 0 600 400" className="w-full h-full text-blue-600 fill-current" preserveAspectRatio="xMidYBottom meet">
+                    <path d="M300,400 C250,350 150,380 100,320 C50,260 80,200 120,180 C160,160 220,200 250,250 C280,300 250,350 300,350 C350,350 320,300 350,250 C380,200 440,160 480,180 C520,200 550,260 500,320 C450,380 350,350 300,400 Z M50,300 C30,280 10,300 30,320 C50,340 70,320 50,300 M550,300 C570,280 590,300 570,320 C550,340 530,320 550,300 M150,220 C130,200 100,220 120,250 C140,280 170,250 150,220 M450,220 C470,200 500,220 480,250 C460,280 430,250 450,220" />
+                     <path d="M280,380 C260,360 220,370 240,340 C260,310 300,320 320,340 C340,360 300,380 280,380" opacity="0.8"/>
+                </svg>
+            </div>
         </div>
 
         {/* Header */}
