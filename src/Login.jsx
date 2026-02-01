@@ -39,7 +39,7 @@ export default function Login() {
             {/* En-tête Épuré */}
             <div className="text-center mb-10 mt-2">
                 <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-sm whitespace-nowrap">
-                    أهلاً بك في مساحتك الشخصية
+                Mon Espace Personnel
                 </h1>
             </div>
 
