@@ -90,7 +90,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
               {/* --- LE LOGO DRAGON --- */}
               {/* Ajustement de la taille : w-10 h-10 (40px) au lieu de w-8 h-8 (32px) */}
               <div 
-                className="w-10 h-10 bg-blue-600 shrink-0 transition-colors duration-300"
+                className="w-13 h-13 bg-blue-600 shrink-0 transition-colors duration-300"
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
