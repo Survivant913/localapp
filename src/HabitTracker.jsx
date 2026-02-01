@@ -232,18 +232,7 @@ export default function HabitTracker({ data, updateData }) {
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
             {/* HEADER DESIGN ULTRA-CLEAN */}
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shrink-0 z-30">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 rotate-3">
-                        <Activity size={26} />
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white">Habitudes</h2>
-                        <div className="flex items-center gap-2 mt-1">
-                           <TrendingUp size={14} className="text-emerald-500" />
-                           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Consistency Engine</span>
-                        </div>
-                    </div>
-                </div>
+
                 
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
                     <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
