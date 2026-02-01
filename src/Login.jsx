@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient'; 
+import { supabase } from './supabaseClient'; // CORRECTION ICI : ./ et pas ../
 import { Loader2, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function Login() {
@@ -91,7 +91,7 @@ export default function Login() {
         </div>
 
         {/* Footer Signature & Logo Dragon */}
-        <div className="mt-10 flex flex-col items-center gap-6 cursor-default">
+        <div className="mt-10 flex flex-col items-center gap-8 cursor-default pointer-events-none">
             
             {/* Ligne de séparation */}
             <div className="h-px w-24 bg-gradient-to-r from-transparent via-slate-700 to-transparent"></div>
@@ -100,22 +100,19 @@ export default function Login() {
                 Created by Henni Mohammed Al Amine
             </p>
 
-            {/* MODIFICATION CRITIQUE : Masque CSS au lieu d'une image */}
-            {/* - Couleur : bg-indigo-500 (Bleu/Violet stylé) */}
-            {/* - Pas de hover */}
-            {/* - Discret : opacity-30 */}
+            {/* LE DRAGON : INDIGO, DISCRET, ANCRÉ (Masque CSS) */}
             <div 
-                className="w-44 h-44 bg-indigo-500 transition-all duration-500"
+                className="w-40 h-40 bg-indigo-500 transition-all duration-500"
                 style={{
                     maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)', // Compatible Chrome/Safari
+                    WebkitMaskImage: 'url(/dragon.png)',
                     maskSize: 'contain',
                     WebkitMaskSize: 'contain',
                     maskPosition: 'center',
                     WebkitMaskPosition: 'center',
                     maskRepeat: 'no-repeat',
                     WebkitMaskRepeat: 'no-repeat',
-                    opacity: 0.3 // Réglage de la discrétion (0.3 = 30%)
+                    opacity: 0.15 // Très discret (15% d'opacité) pour faire "filigrane"
                 }}
             ></div>
 
