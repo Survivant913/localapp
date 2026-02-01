@@ -85,7 +85,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         ${isCollapsed ? 'w-20' : 'w-72'}
       `}>
         
-        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - ZOOM MANUEL --- */}
+        {/* --- TECHNIQUE DU MASQUE CSS (POCHOIR) - ÉTIREMENT TOTAL --- */}
         <div 
             className={`absolute inset-0 z-0 pointer-events-none transition-all duration-700 ${isCollapsed ? 'opacity-0' : 'opacity-10'}`}
         >
@@ -94,14 +94,18 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'contain', // Retour à 'contain' pour garder les proportions
-                    WebkitMaskSize: 'contain',
+                    
+                    // --- MODIFICATION CLÉ ---
+                    maskSize: '100% 100%', // Force l'image à toucher les 4 bords (étirement)
+                    WebkitMaskSize: '100% 100%',
+                    
                     maskPosition: 'center',
                     WebkitMaskPosition: 'center',
                     maskRepeat: 'no-repeat',
                     WebkitMaskRepeat: 'no-repeat',
-                    // ZOOM MASSIF MANUAL (x3) et légère rotation pour le style
-                    transform: 'scale(3) rotate(-5deg)' 
+                    
+                    // On garde une échelle neutre (1) pour voir l'image entière dans son cadre
+                    transform: 'scale(1)' 
                 }}
             />
         </div>
