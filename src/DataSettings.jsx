@@ -7,7 +7,8 @@ import {
 
 export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
     // --- ETATS LOCAUX ---
-    const [appName, setAppName] = useState(data.customLabels?.appName || 'Freelance Cockpit');
+    // MODIFICATION 1 : 'Mon Espace' par défaut ici
+    const [appName, setAppName] = useState(data.customLabels?.appName || 'Mon Espace');
     
     const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'blue');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
@@ -30,7 +31,8 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
 
     // --- SYNCHRONISATION INITIALE (Lecture Polyglotte) ---
     useEffect(() => {
-        if (data.customLabels) setAppName(data.customLabels.appName || 'Freelance Cockpit');
+        // MODIFICATION 2 : 'Mon Espace' par défaut ici aussi pour la synchro
+        if (data.customLabels) setAppName(data.customLabels.appName || 'Mon Espace');
         if (data.settings) {
             setAccentColor(data.settings.accentColor || 'blue');
             setGrayShade(data.settings.grayShade || 'slate');
@@ -38,16 +40,17 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         
         if (data.profile) {
             // Ici, on est "intelligent" : on cherche la donnée peu importe comment elle est nommée
+            // MODIFICATION 3 : Utilisation de ?? au lieu de || pour éviter le bug du "Zombie" (champ vide qui revient)
             setCompanyData({
                 user_name: data.customLabels?.userName || '', 
-                company_name: data.profile.company_name || data.profile.companyName || '',
+                company_name: data.profile.company_name ?? data.profile.companyName ?? '',
                 siret: data.profile.siret || '',
                 tva_number: data.profile.tva_number || '',
                 address: data.profile.address || '',
-                // On cherche email_contact OU email
-                email: data.profile.email_contact || data.profile.email || '',
-                // On cherche phone_contact OU phone
-                phone: data.profile.phone_contact || data.profile.phone || '',
+                // On utilise ?? pour que si email_contact est "" (vide), il le garde vide au lieu de chercher le suivant
+                email: data.profile.email_contact ?? data.profile.email ?? '',
+                // Idem pour le téléphone
+                phone: data.profile.phone_contact ?? data.profile.phone ?? '',
                 iban: data.profile.iban || '',
                 bic: data.profile.bic || '',
                 logo: data.profile.logo || ''
@@ -75,7 +78,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             settings: { 
                 ...data.settings, 
                 accentColor, 
-                grayShade    
+                grayShade     
             },
             profile: { 
                 ...data.profile, 
