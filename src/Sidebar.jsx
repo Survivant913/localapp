@@ -88,9 +88,9 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-3">
               {/* --- LE LOGO DRAGON --- */}
-              {/* Ajustement final : w-12 h-12 (48px) pour une présence forte */}
+              {/* Ajustement final : w-14 h-14 (56px) - Taille Max avant saturation */}
               <div 
-                className="w-12 h-12 bg-blue-600 shrink-0 transition-colors duration-300"
+                className="w-14 h-14 bg-blue-600 shrink-0 transition-colors duration-300"
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
