@@ -327,9 +327,6 @@ export default function Dashboard({ data, updateData, setView }) {
 
                         {/* CENTRE : TITRE (SANS BONJOUR) */}
                         <div className="text-center">
-                            <h2 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-white mb-1 tracking-tighter italic uppercase">
-                                Tableau de Bord
-                            </h2>
                             <p className="text-blue-600 dark:text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">{todayDate}</p>
                         </div>
 
