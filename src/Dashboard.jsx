@@ -1,10 +1,80 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
-  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft
+  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
+  // Nouveaux imports pour les habitudes
+  Repeat, RotateCcw, Check
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
+
+// --- COMPOSANT HABIT STRIP (NOUVEAU) ---
+const HabitStrip = ({ habits, updateHabit, setView }) => {
+    // 1. Filtrage Logique
+    const todayIndex = new Date().getDay(); // 0 = Dimanche, 1 = Lundi...
+    const todayHabits = useMemo(() => {
+        if (!Array.isArray(habits)) return [];
+        return habits.filter(h => {
+            // Est-ce prévu aujourd'hui ?
+            const daysMap = { 'Dim': 0, 'Lun': 1, 'Mar': 2, 'Mer': 3, 'Jeu': 4, 'Ven': 5, 'Sam': 6 };
+            const isScheduledToday = h.frequency.some(d => daysMap[d] === todayIndex);
+            
+            // Est-ce déjà fait aujourd'hui ?
+            const lastDate = h.history && h.history.length > 0 ? new Date(h.history[h.history.length - 1]) : null;
+            const isDoneToday = lastDate && new Date().toDateString() === lastDate.toDateString();
+            
+            return isScheduledToday && !isDoneToday;
+        });
+    }, [habits]);
+
+    // 2. Gestion Rotation Locale (Deck)
+    const [rotatedIds, setRotatedIds] = useState([]); // Liste des IDs qu'on a "passés"
+
+    // On trie : d'abord ceux pas encore passés, ensuite ceux passés (à la fin)
+    const visibleHabits = useMemo(() => {
+        const notRotated = todayHabits.filter(h => !rotatedIds.includes(h.id));
+        const rotated = todayHabits.filter(h => rotatedIds.includes(h.id));
+        return [...notRotated, ...rotated];
+    }, [todayHabits, rotatedIds]);
+
+    const handlePass = (id, e) => {
+        e.stopPropagation();
+        setRotatedIds(prev => [...prev, id]); // On l'ajoute à la liste des "passés"
+    };
+
+    const handleCheck = (habit, e) => {
+        e.stopPropagation();
+        const todayStr = new Date().toISOString();
+        const newHistory = [...(habit.history || []), todayStr];
+        updateHabit({ ...habit, history: newHistory, streak: (habit.streak || 0) + 1 });
+    };
+
+    if (visibleHabits.length === 0) return null; // Rien à afficher
+
+    return (
+        <div className="flex gap-4 overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
+            {visibleHabits.slice(0, 6).map(h => (
+                <div key={h.id} className="snap-center shrink-0 w-32 h-32 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between p-3 group relative overflow-hidden transition-all hover:border-slate-300 dark:hover:border-slate-600">
+                    <div className="flex justify-between items-start">
+                        <span className="p-1.5 bg-slate-50 dark:bg-slate-700 rounded-lg text-lg">{h.icon || '✨'}</span>
+                        <button onClick={(e) => handlePass(h.id, e)} className="text-slate-300 hover:text-slate-500 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors" title="Plus tard">
+                            <RotateCcw size={12}/>
+                        </button>
+                    </div>
+                    <p className="font-bold text-xs text-slate-700 dark:text-slate-200 line-clamp-2 leading-tight">{h.name}</p>
+                    <button onClick={(e) => handleCheck(h, e)} className="w-full py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-[10px] font-black uppercase tracking-wider hover:opacity-80 transition-opacity flex items-center justify-center gap-1">
+                        <Check size={10}/> Fait
+                    </button>
+                </div>
+            ))}
+            {todayHabits.length > 6 && (
+                <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    <span className="text-slate-400 font-black text-xs rotate-90 whitespace-nowrap">VOIR TOUT</span>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
 const SparkLine = ({ data, height = 50 }) => {
@@ -60,6 +130,7 @@ export default function Dashboard({ data, updateData, setView }) {
     const todos = Array.isArray(data.todos) ? data.todos : [];
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const notes = Array.isArray(data.notes) ? data.notes : [];
+    const habits = Array.isArray(data.habits) ? data.habits : []; // NOUVEAU
     
     const budget = data.budget || {};
     const transactions = Array.isArray(budget.transactions) ? budget.transactions : [];
@@ -252,6 +323,12 @@ export default function Dashboard({ data, updateData, setView }) {
         updateData({ ...data, todos: newTodos });
     };
 
+    // --- NOUVEAU HELPER POUR LES HABITUDES ---
+    const updateHabit = (updatedHabit) => {
+        const newHabits = habits.map(h => h.id === updatedHabit.id ? updatedHabit : h);
+        updateData({ ...data, habits: newHabits }, { table: 'habits', id: updatedHabit.id, action: 'update', data: { history: updatedHabit.history, streak: updatedHabit.streak } });
+    };
+
     const getAccountBalanceForProject = (accId) => {
         return transactions
             .filter(t => String(t.accountId || t.account_id) === String(accId))
@@ -294,7 +371,6 @@ export default function Dashboard({ data, updateData, setView }) {
     const todayDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
-        /* --- CHANGEMENT : w-full pour pleine largeur --- */
         <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
                 <FocusProjectModal 
@@ -497,6 +573,13 @@ export default function Dashboard({ data, updateData, setView }) {
                             </div>
                         ))}
                     </div>
+
+                    {/* --- ZONE HABITUDES --- */}
+                    {habits.length > 0 && (
+                        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-[2rem] border border-slate-100 dark:border-slate-800 p-4 shadow-sm">
+                            <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                        </div>
+                    )}
                 </div>
 
                 {/* COLONNE DROITE : AGENDA + URGENCES */}
@@ -553,7 +636,6 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                         <div className="space-y-4 relative z-10">
                             {urgentTodos.length === 0 ? (
-                                /* --- MODIF : TEXTE PROPRE --- */
                                 <p className="text-slate-400 text-sm font-bold italic py-6 text-center opacity-50 uppercase tracking-widest">Aucune tâche urgente</p>
                             ) : (
                                 urgentTodos.map(t => (
