@@ -5,7 +5,9 @@ import {
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Eye
+  Maximize2, Minimize2, Eye, 
+  // Nouveaux imports pour la taille
+  Type as TypeIcon, RotateCcw 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -28,7 +30,10 @@ export default function JournalManager({ data, updateData }) {
     const [isZenMode, setIsZenMode] = useState(false); 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Etats Menus
     const [showColorPalette, setShowColorPalette] = useState(false);
+    const [showSizeMenu, setShowSizeMenu] = useState(false); // NOUVEAU
     
     // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
@@ -250,6 +255,14 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand('styleWithCSS', false, true);
         document.execCommand(cmd, false, val);
         if (cmd === 'hiliteColor') setShowColorPalette(false);
+        setShowSizeMenu(false); // Ferme les menus
+    };
+
+    // NOUVEAU : Changement de taille (Sélection)
+    const changeFontSizeSelection = (size) => {
+        if (editorRef.current) editorRef.current.focus();
+        document.execCommand('fontSize', false, size); // Utilise les tailles HTML 1-7
+        setShowSizeMenu(false);
     };
 
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
@@ -438,7 +451,7 @@ export default function JournalManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* ÉDITEUR PRINCIPAL - CORRECTION LARGEUR ICI */}
+            {/* ÉDITEUR PRINCIPAL */}
             <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-white dark:bg-slate-950' : 'bg-white dark:bg-black'} relative min-w-0 transition-colors duration-500`}>
                 
                 {activePageId ? (
@@ -458,6 +471,47 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
                                 <ToolbarButton cmd="strikeThrough" icon={Strikethrough} title="Barré" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                                
+                                {/* NOUVEAU MENU TAILLE DE POLICE */}
+                                <div className="relative group">
+                                    <button 
+                                        onMouseDown={(e) => { e.preventDefault(); setShowSizeMenu(!showSizeMenu); setShowColorPalette(false); }}
+                                        className={`flex items-center gap-1 p-2 rounded transition-colors ${showSizeMenu ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                        title="Taille de texte"
+                                    >
+                                        <TypeIcon size={18}/> <ChevronDown size={12}/>
+                                    </button>
+                                    
+                                    {showSizeMenu && (
+                                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[60] min-w-[120px] overflow-hidden animate-in fade-in zoom-in-95 p-1">
+                                            {[
+                                                { label: 'Petit', val: '2' },
+                                                { label: 'Normal', val: '3' },
+                                                { label: 'Grand', val: '5' },
+                                                { label: 'Titre', val: '7' },
+                                            ].map((size) => (
+                                                <button 
+                                                    key={size.val}
+                                                    onMouseDown={(e) => { 
+                                                        e.preventDefault(); 
+                                                        changeFontSizeSelection(size.val);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 rounded-lg"
+                                                >
+                                                    {size.label}
+                                                </button>
+                                            ))}
+                                            <div className="h-px bg-slate-100 dark:bg-slate-700 my-1"></div>
+                                            <button 
+                                                onMouseDown={(e) => { e.preventDefault(); document.execCommand('removeFormat', false, null); setShowSizeMenu(false); }}
+                                                className="w-full text-left px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
+                                            >
+                                                <RotateCcw size={12}/> Reset
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="relative">
                                     <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                     {showColorPalette && (
@@ -502,8 +556,8 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            {/* MODIF ICI : Suppression de max-w-2xl/3xl, utilisation de max-w-5xl et 7xl pour plus de largeur */}
-                            <div className={`${isZenMode ? 'max-w-7xl px-12 md:px-20' : 'max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700`}>
+                            {/* ICI : J'AI MIS max-w-none AU LIEU DE max-w-3xl pour corriger le centrage */}
+                            <div className={`${isZenMode ? 'max-w-2xl' : 'w-full max-w-none'} mx-auto px-10 py-16 min-h-full transition-all duration-700`}>
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button 
