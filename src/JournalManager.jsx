@@ -5,7 +5,7 @@ import {
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Eye
+  Maximize2, Minimize2, Eye, Minus, ZoomIn // Ajout d'icônes pour la taille
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -30,6 +30,9 @@ export default function JournalManager({ data, updateData }) {
     const [isSaving, setIsSaving] = useState(false);
     const [showColorPalette, setShowColorPalette] = useState(false);
     
+    // NOUVEAU : État pour la taille de la police (défaut 16px)
+    const [fontSize, setFontSize] = useState(16);
+
     // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
     const [pageTitle, setPageTitle] = useState('');
@@ -42,6 +45,9 @@ export default function JournalManager({ data, updateData }) {
     // --- 1. CHARGEMENT INITIAL ---
     useEffect(() => {
         fetchData();
+        // Récupérer la préférence de taille si elle existe (Optionnel, sinon défaut 16)
+        const savedSize = localStorage.getItem('journal_font_size');
+        if (savedSize) setFontSize(parseInt(savedSize));
     }, []);
 
     const fetchData = async () => {
@@ -237,11 +243,17 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- FAVORIS ---
     const toggleFavorite = async (page) => {
         const newStatus = !page.is_favorite;
         setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
         await supabase.from('journal_pages').update({ is_favorite: newStatus }).eq('id', page.id);
+    };
+
+    // --- GESTION DE LA TAILLE DE POLICE ---
+    const changeFontSize = (delta) => {
+        const newSize = Math.max(12, Math.min(32, fontSize + delta));
+        setFontSize(newSize);
+        localStorage.setItem('journal_font_size', newSize);
     };
 
     // --- ÉDITEUR : COMMANDES ---
@@ -265,7 +277,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION ---
+    // --- IMPRESSION AMÉLIORÉE (WYSIWYG) ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -273,6 +285,7 @@ export default function JournalManager({ data, updateData }) {
         const title = titleRef.current ? titleRef.current.value : pageTitle;
         const date = format(new Date(), 'd MMMM yyyy', { locale: fr });
 
+        // On injecte la taille de police choisie dans le style d'impression
         printWindow.document.write(`
             <html>
             <head>
@@ -280,10 +293,10 @@ export default function JournalManager({ data, updateData }) {
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
                     * { color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    body { font-family: 'Merriweather', serif; line-height: 1.8; background: #fff !important; max-width: 800px; margin: 0 auto; padding: 40px; }
-                    h1 { font-size: 2.5em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
-                    .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
-                    .content { font-size: 1.1em; text-align: justify; }
+                    body { font-family: 'Merriweather', serif; line-height: 1.6; background: #fff !important; margin: 0; padding: 20mm; font-size: ${fontSize}px; }
+                    h1 { font-size: 2em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
+                    .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.8em; }
+                    .content { text-align: justify; }
                     blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
@@ -313,7 +326,7 @@ export default function JournalManager({ data, updateData }) {
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
 
 
-    // --- VUE DASHBOARD ---
+    // --- VUE DASHBOARD (INTACTE) ---
     if (!activeNotebookId) {
         return (
             <div className="h-full w-full bg-slate-50 dark:bg-slate-950 p-8 overflow-y-auto">
@@ -438,25 +451,32 @@ export default function JournalManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* ÉDITEUR PRINCIPAL - CORRECTION LARGEUR ICI */}
-            <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-white dark:bg-slate-950' : 'bg-white dark:bg-black'} relative min-w-0 transition-colors duration-500`}>
+            {/* ÉDITEUR PRINCIPAL - CORRECTION "MODE PAGE A4" */}
+            <div className={`flex-1 flex flex-col relative min-w-0 transition-colors duration-500 ${isZenMode ? 'bg-slate-100 dark:bg-black' : 'bg-slate-100 dark:bg-slate-950'}`}>
                 
                 {activePageId ? (
                     <>
                         {/* BARRE D'OUTILS */}
                         {!isZenMode ? (
-                            <div className="border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem]">
+                            <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-slate-900 z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
                                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
-                                <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal (Reset)" />
+                                <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <ToolbarButton cmd="formatBlock" val="<h2>" icon={Heading} title="Grand Titre" />
                                 <ToolbarButton cmd="formatBlock" val="<h3>" icon={Type} title="Sous-titre" />
-                                <ToolbarButton cmd="formatBlock" val="<blockquote>" icon={Quote} title="Citation" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <ToolbarButton cmd="bold" icon={Bold} title="Gras" />
                                 <ToolbarButton cmd="italic" icon={Italic} title="Italique" />
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
-                                <ToolbarButton cmd="strikeThrough" icon={Strikethrough} title="Barré" />
+                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                                
+                                {/* NOUVEAU : SÉLECTEUR DE TAILLE DE POLICE */}
+                                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-1">
+                                    <button onClick={() => changeFontSize(-2)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="Réduire police"><Minus size={14}/></button>
+                                    <span className="text-xs font-bold w-8 text-center text-slate-700 dark:text-white select-none">{fontSize}px</span>
+                                    <button onClick={() => changeFontSize(2)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="Agrandir police"><Plus size={14}/></button>
+                                </div>
+
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <div className="relative">
                                     <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
@@ -491,31 +511,55 @@ export default function JournalManager({ data, updateData }) {
                                 </div>
                             </div>
                         ) : (
-                            <div className="absolute top-6 right-10 z-50 animate-in fade-in slide-in-from-top-4 duration-500">
+                            <div className="absolute top-6 right-10 z-50 animate-in fade-in slide-in-from-top-4 duration-500 print:hidden">
                                 <button 
                                     onClick={() => setIsZenMode(false)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-full text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-lg border border-slate-200 dark:border-slate-700"
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-black transition-all shadow-lg"
                                 >
                                     <Minimize2 size={14}/> Quitter le mode Focus
                                 </button>
                             </div>
                         )}
 
-                        <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            {/* MODIF ICI : Suppression de max-w-2xl/3xl, utilisation de max-w-5xl et 7xl pour plus de largeur */}
-                            <div className={`${isZenMode ? 'max-w-7xl px-12 md:px-20' : 'max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700`}>
-                                <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
+                        <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''} flex justify-center py-8`}>
+                            {/* MODIF MAJEURE : CONTENEUR PAGE A4 (WYSIWYG) */}
+                            <div 
+                                className="bg-white text-slate-900 shadow-xl transition-all duration-300 print:shadow-none print:m-0"
+                                style={{
+                                    width: '210mm', // Largeur exacte A4
+                                    minHeight: '297mm', // Hauteur min A4
+                                    padding: '20mm', // Marges standard A4
+                                    fontSize: `${fontSize}px` // Taille dynamique
+                                }}
+                            >
+                                <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between print:hidden">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button 
                                         onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
                                     >
                                         <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
-                                        <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
                                     </button>
                                 </div>
-                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
-                                <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className={`prose dark:prose-invert max-w-none outline-none min-h-[50vh] ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-600 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all`} placeholder="Écrivez vos pensées ici..."></div>
+                                
+                                <input 
+                                    ref={titleRef} 
+                                    type="text" 
+                                    defaultValue={pageTitle} 
+                                    onBlur={() => saveCurrentPage(true)} 
+                                    className="w-full text-4xl font-black bg-transparent outline-none mb-8 text-slate-900 placeholder:text-slate-300 leading-tight border-b border-transparent focus:border-slate-200 transition-colors pb-2" 
+                                    placeholder="Titre..."
+                                />
+                                
+                                <div 
+                                    ref={editorRef} 
+                                    contentEditable 
+                                    onInput={() => saveCurrentPage(false)} 
+                                    onBlur={() => saveCurrentPage(true)} 
+                                    className="prose max-w-none outline-none leading-relaxed text-slate-800 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 min-h-[500px]" 
+                                    placeholder="Commencez à écrire..."
+                                    style={{ fontSize: 'inherit' }} // Hérite de la taille définie sur le parent
+                                ></div>
                             </div>
                         </div>
                     </>
@@ -526,12 +570,11 @@ export default function JournalManager({ data, updateData }) {
             
             <style>{`
                 .prose blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; margin-left: 0; color: #64748b; font-style: italic; background: #f9f9f9; padding: 10px 1em; border-radius: 4px; }
-                .dark .prose blockquote { background: #1e293b; border-color: #334155; color: #94a3b8; }
                 .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose li { margin-bottom: 0.25em; }
-                .prose h2 { font-size: 1.8em !important; font-weight: 800 !important; margin-top: 1.5em !important; }
-                .prose h3 { font-size: 1.4em !important; font-weight: 700 !important; margin-top: 1.2em !important; }
+                .prose h2 { font-size: 1.5em !important; font-weight: 800 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
+                .prose h3 { font-size: 1.2em !important; font-weight: 700 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
                 .prose span[style*="background-color"] { color: black !important; padding: 0 2px; border-radius: 2px; }
                 
                 /* Masquage scrollbar en mode Zen */
