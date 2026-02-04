@@ -2,33 +2,28 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 // On importe le paquet complet pour la sélection dynamique
 import * as Icons from 'lucide-react';
-// On importe individuellement les composants utilisés dans l'interface (hors icônes dynamiques)
+// On importe UNIQUEMENT ce qu'on utilise vraiment pour éviter l'erreur Vercel
 import { 
-  Plus, Trash2, Check, X, BarChart2, 
+  Plus, Trash2, Check, BarChart2, 
   Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, List, CheckCircle2,
   Sparkles
 } from 'lucide-react';
 
-// --- LISTE D'ICÔNES PREMIUM (NOMS EXACTS LUCIDE) ---
+// --- LISTE D'ICÔNES PREMIUM ---
 const PREMIUM_ICONS = [
-    // Sport & Santé
     "Activity", "HeartPulse", "Dumbbell", "Bike", "Footprints", "GlassWater", "Apple", "Pill", "BedDouble",
-    // Travail & Focus
     "Briefcase", "Laptop", "Code", "PenTool", "BookOpen", "BrainCircuit", "Target", "AlarmClock",
-    // Argent
     "Wallet", "PiggyBank", "CreditCard", "TrendingUp", "DollarSign",
-    // Loisirs & Vie
     "Music", "Camera", "Gamepad2", "Plane", "Coffee", "Home", "ShoppingCart", "Utensils", "Sun", "Moon", "Leaf"
 ];
 
-// --- COMPOSANT D'ICÔNE DYNAMIQUE (SÉCURISÉ) ---
+// --- COMPOSANT D'ICÔNE DYNAMIQUE SÉCURISÉ ---
 const DynamicIcon = ({ name, size = 24, className = "" }) => {
     if (!name) return null;
-    // On met une majuscule au cas où (sécurité)
     const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
     const IconComponent = Icons[pascalName] || Icons[name];
     
-    if (!IconComponent) return <span className="text-xs">?</span>; // Fallback si icône introuvable
+    if (!IconComponent) return <span className="text-xs">?</span>; 
     return <IconComponent size={size} className={className} />;
 };
 
@@ -56,7 +51,7 @@ const COLOR_MAP = {
     'bg-gray-400': 'text-gray-400'
 };
 
-export default function HabitTracker({ data, updateData }) {
+export default function HabitTracker({ }) {
     const [activeTab, setActiveTab] = useState('daily'); 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [statRange, setStatRange] = useState(7); 
