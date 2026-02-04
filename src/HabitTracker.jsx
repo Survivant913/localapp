@@ -356,10 +356,6 @@ export default function HabitTracker({ }) {
                             <div className="space-y-12">
                                 {uncategorizedVisibleHabits.length > 0 && (
                                     <div className="animate-in fade-in duration-700">
-                                        <h4 className="font-black text-sm uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center gap-2">
-                                            <Sparkles size={16} className="text-amber-500"/>
-                                            Essentiels (Sans Domaine)
-                                        </h4>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {uncategorizedVisibleHabits.map(h => (
                                                  <HabitCard 
@@ -409,7 +405,7 @@ export default function HabitTracker({ }) {
                 {activeTab === 'stats' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                            <h3 className="text-2xl font-black dark:text-white flex items-center gap-3"><Trophy className="text-amber-500"/> Performances</h3>
+                           
                             <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner">
                                 {[7, 30, 90].map(d => (
                                     <button key={d} onClick={() => setStatRange(d)} className={`px-5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
