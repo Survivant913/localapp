@@ -197,7 +197,7 @@ export default function App() {
    return () => { supabase.removeChannel(calendarChannel); };
  }, [session]);
 
- // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE ---
+ // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE (CORRIGÉ POUR ÉVITER LES CONFLITS) ---
  useEffect(() => {
    const colorKey = data.settings?.accentColor || 'blue';
    
@@ -210,15 +210,20 @@ export default function App() {
    const theme = THEME_COLORS[colorKey];
    if (!theme) return;
 
+   // MODIFICATION CRITIQUE : On ne surcharge QUE les éléments principaux (Boutons, Liens actifs).
+   // On NE TOUCHE PAS aux teintes claires (50, 100, 200) ni aux textes secondaires pour ne pas casser le calendrier.
    const css = `
      .bg-blue-600 { background-color: ${theme.primary} !important; }
      .hover\\:bg-blue-700:hover { background-color: ${theme.hover} !important; }
      .text-blue-600 { color: ${theme.text} !important; }
-     .text-blue-500 { color: ${theme.textLight} !important; }
-     .bg-blue-50 { background-color: ${theme.light} !important; }
-     .border-blue-200 { border-color: ${theme.border} !important; }
-     .bg-blue-100 { background-color: ${theme.badge} !important; }
-     .text-blue-700 { color: ${theme.hover} !important; }
+     
+     /* Les lignes ci-dessous sont retirées pour éviter le bug d'affichage (texte blanc sur fond blanc) */
+     /* .text-blue-500 { color: ${theme.textLight} !important; } */
+     /* .bg-blue-50 { background-color: ${theme.light} !important; } */
+     /* .border-blue-200 { border-color: ${theme.border} !important; } */
+     /* .bg-blue-100 { background-color: ${theme.badge} !important; } */
+     /* .text-blue-700 { color: ${theme.hover} !important; } */
+     
      .focus\\:border-blue-500:focus { border-color: ${theme.textLight} !important; }
      .ring-blue-500 { --tw-ring-color: ${theme.textLight} !important; }
    `;

@@ -10,6 +10,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     // MODIFICATION 1 : 'Mon Espace' par défaut ici
     const [appName, setAppName] = useState(data.customLabels?.appName || 'Mon Espace');
     
+    // Sécurisation : on s'assure qu'une couleur est toujours définie (défaut 'blue')
     const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'blue');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
 
@@ -72,16 +73,17 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
 
     // --- SAUVEGARDE (Écriture Polyglotte) ---
     const handleSaveProfile = () => {
+        // SÉCURITÉ : On s'assure que les objets existent avec || {} pour éviter les crashs si data est incomplet
         const newSettings = {
             ...data,
-            customLabels: { ...data.customLabels, appName, userName: companyData.user_name },
+            customLabels: { ...(data.customLabels || {}), appName, userName: companyData.user_name },
             settings: { 
-                ...data.settings, 
-                accentColor, 
-                grayShade     
+                ...(data.settings || {}), 
+                accentColor: accentColor || 'blue', // Force une couleur par défaut si vide
+                grayShade: grayShade || 'slate'
             },
             profile: { 
-                ...data.profile, 
+                ...(data.profile || {}), 
                 // 1. Format Base de Données (Snake Case) - Pour App.jsx et Supabase
                 company_name: companyData.company_name,
                 email_contact: companyData.email,
