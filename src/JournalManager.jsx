@@ -5,7 +5,7 @@ import {
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Minus, ZoomIn, Scissors, Type as TypeIcon // TypeIcon pour la taille
+  Maximize2, Minimize2, Scissors, RotateCcw // Icône Reset
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -251,27 +251,35 @@ export default function JournalManager({ data, updateData }) {
         if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // LOGIQUE DE CHANGEMENT DE TAILLE (SELECTION UNIQUEMENT)
-    const changeFontSizeSelection = (delta) => {
-        if (!editorRef.current) return;
-        document.execCommand('styleWithCSS', false, true);
-        // Utilisation des tailles HTML 1-7
-        // On récupère la taille actuelle approximative ou on applique une taille relative
-        // Comme execCommand est limité, on va utiliser fontSize avec des valeurs 1-7
-        // Pour simplifier, on propose 3 tailles : Petit (2), Normal (3), Grand (5), Très Grand (7)
-        let newSize = 3;
-        if (delta > 0) newSize = 5; // Agrandir
-        if (delta < 0) newSize = 2; // Réduire
-        if (delta > 1) newSize = 7; // Titre
-        
-        document.execCommand('fontSize', false, newSize);
+    // NOUVEAU : Application précise de la taille
+    const applyFontSize = (size) => {
+        if (editorRef.current) editorRef.current.focus();
+        // On utilise font size 1-7 pour la compatibilité, ou on insert un span
+        // Pour faire simple et robuste : on utilise insertHTML avec un span
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const span = document.createElement("span");
+            span.style.fontSize = size;
+            const range = selection.getRangeAt(0);
+            range.surroundContents(span);
+        }
     };
 
-    // Fonction spéciale pour insérer un saut de page
+    // NOUVEAU : Reset du formatage
+    const resetFormat = () => {
+        if (editorRef.current) editorRef.current.focus();
+        document.execCommand('removeFormat', false, null);
+        document.execCommand('fontSize', false, 3); // Retour taille normale (approx 16px)
+    };
+
+    // NOUVEAU : Saut de page VISUEL (Gap gris)
     const insertPageBreak = () => {
         if (editorRef.current) editorRef.current.focus();
-        // Insertion d'un HR avec une classe spécifique qui force le saut de page à l'impression
-        const html = '<div class="page-break-marker">--- SAUT DE PAGE ---</div><br/>';
+        // On insère un div qui simule l'espace entre deux feuilles
+        const html = `
+            <div contenteditable="false" class="page-gap" title="Saut de page"></div>
+            <p><br/></p>
+        `;
         document.execCommand('insertHTML', false, html);
     };
 
@@ -289,7 +297,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION AMÉLIORÉE (WYSIWYG) ---
+    // --- IMPRESSION (WYSIWYG) ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -309,14 +317,15 @@ export default function JournalManager({ data, updateData }) {
                     .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.8em; }
                     .content { text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
                     .content img { max-width: 100%; }
+                    
+                    /* Masquer le gap gris à l'impression, mais forcer le saut de page */
+                    .page-gap { display: none !important; }
+                    .page-gap + * { page-break-before: always; }
+
                     blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; color: #000 !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
-                    li { margin-bottom: 5px; }
                     span[style*="background-color"] { color: #000 !important; -webkit-print-color-adjust: exact; }
-                    
-                    /* Gestion du Saut de Page à l'impression */
-                    .page-break-marker { display: none; page-break-after: always; break-after: page; }
                 </style>
             </head>
             <body>
@@ -478,19 +487,31 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <ToolbarButton cmd="formatBlock" val="<h2>" icon={Heading} title="Grand Titre" />
-                                <ToolbarButton cmd="formatBlock" val="<h3>" icon={TypeIcon} title="Sous-titre" />
+                                <ToolbarButton cmd="formatBlock" val="<h3>" icon={Type} title="Sous-titre" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <ToolbarButton cmd="bold" icon={Bold} title="Gras" />
                                 <ToolbarButton cmd="italic" icon={Italic} title="Italique" />
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 
-                                {/* SÉLECTEUR DE TAILLE (SELECTION UNIQUEMENT) */}
-                                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-1">
-                                    <button onClick={() => changeFontSizeSelection(-1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="Réduire sélection"><Minus size={14}/></button>
-                                    <span className="text-xs font-bold w-12 text-center text-slate-700 dark:text-white select-none">Taille</span>
-                                    <button onClick={() => changeFontSizeSelection(1)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="Agrandir sélection"><Plus size={14}/></button>
+                                {/* SÉLECTEUR DE TAILLE (Menu Déroulant) */}
+                                <div className="relative group">
+                                    <button className="flex items-center gap-1 p-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                        <TypeIcon size={14}/> Taille <ChevronDown size={12}/>
+                                    </button>
+                                    <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 hidden group-hover:block min-w-[100px] overflow-hidden">
+                                        {[12, 14, 16, 18, 24, 30].map(size => (
+                                            <button 
+                                                key={size}
+                                                onMouseDown={(e) => { e.preventDefault(); applyFontSize(size + 'px'); }}
+                                                className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200"
+                                            >
+                                                {size}px
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
+                                <ToolbarButton icon={RotateCcw} action={resetFormat} title="Réinitialiser le style" />
 
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <div className="relative">
@@ -520,7 +541,7 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="justifyRight" icon={AlignRight} title="Droite" />
                                 <div className="flex-1"></div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={insertPageBreak} className="p-2 text-slate-500 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Insérer Saut de Page"><Scissors size={18}/></button>
+                                    <button onClick={insertPageBreak} className="p-2 text-slate-500 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Insérer Saut de Page (Coupure)"><Scissors size={18}/></button>
                                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                     <button onClick={() => setIsZenMode(true)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
                                     <button onClick={handlePrint} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Imprimer"><Printer size={18}/></button>
@@ -541,16 +562,16 @@ export default function JournalManager({ data, updateData }) {
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''} flex justify-center py-8 bg-slate-200 dark:bg-black`}>
                             {/* CONTENEUR PAGE A4 */}
                             <div 
-                                className="bg-white text-black shadow-2xl transition-all duration-300 print:shadow-none print:m-0"
+                                className="bg-white text-slate-900 shadow-2xl transition-all duration-300 print:shadow-none print:m-0"
                                 style={{
                                     width: '210mm', 
                                     minHeight: '297mm', 
                                     padding: '20mm',
-                                    fontSize: '16px',
+                                    fontSize: '16px', // Taille de base
                                     boxSizing: 'border-box',
                                     overflowWrap: 'break-word',
                                     wordWrap: 'break-word',
-                                    color: 'black'
+                                    color: 'black' // Force le noir
                                 }}
                             >
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between print:hidden">
@@ -601,28 +622,25 @@ export default function JournalManager({ data, updateData }) {
                 .prose h3 { font-size: 1.2em !important; font-weight: 700 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
                 .prose span[style*="background-color"] { color: black !important; padding: 0 2px; border-radius: 2px; }
                 
-                /* STYLE DU SAUT DE PAGE */
-                .page-break-marker { 
-                    border-top: 1px dashed #ccc; 
-                    margin: 30px 0; 
-                    position: relative; 
-                    height: 1px; 
-                    color: #aaa;
-                    text-align: center;
-                    font-size: 10px;
-                    overflow: visible;
-                }
-                .page-break-marker::after {
-                    content: '--- SAUT DE PAGE ---';
-                    background: white;
-                    padding: 0 10px;
+                /* STYLE DU SAUT DE PAGE (GAP VISUEL) */
+                .page-gap { 
+                    background: #f1f5f9; /* Couleur gris clair pour imiter le fond du bureau */
+                    height: 30px;
+                    margin-left: -20mm; /* Annule le padding du conteneur pour toucher les bords */
+                    margin-right: -20mm;
+                    margin-top: 30px;
+                    margin-bottom: 30px;
+                    border-top: 1px solid #cbd5e1;
+                    border-bottom: 1px solid #cbd5e1;
+                    box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.1);
                     position: relative;
-                    top: -8px;
+                    user-select: none;
                 }
 
                 @media print {
-                    .page-break-marker { display: block; page-break-after: always; border: none; margin: 0; height: 0; content: ''; }
-                    .page-break-marker::after { display: none; }
+                    .page-gap { display: none !important; }
+                    /* Force le saut de page réel à l'impression après l'élément qui suit le gap */
+                    .page-gap + * { page-break-before: always; }
                 }
 
                 .custom-scrollbar-none::-webkit-scrollbar { display: none; }
