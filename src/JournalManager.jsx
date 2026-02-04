@@ -25,7 +25,7 @@ export default function JournalManager({ data, updateData }) {
     // UI
     const [searchQuery, setSearchQuery] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [isZenMode, setIsZenMode] = useState(false); // NOUVEAU
+    const [isZenMode, setIsZenMode] = useState(false); 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showColorPalette, setShowColorPalette] = useState(false);
@@ -198,7 +198,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- SUPPRESSION (LOGIQUE ANTI-ORPHELINS PRÉSERVÉE) ---
+    // --- SUPPRESSION ---
     const deleteItem = async (id, type) => {
         const confirmMsg = type === 'page' 
             ? "Supprimer cette page ?" 
@@ -237,7 +237,7 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
-    // --- FAVORIS PRÉSERVÉS ---
+    // --- FAVORIS ---
     const toggleFavorite = async (page) => {
         const newStatus = !page.is_favorite;
         setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
@@ -265,7 +265,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION PRÉSERVÉE ---
+    // --- IMPRESSION ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -354,7 +354,7 @@ export default function JournalManager({ data, updateData }) {
     // --- VUE CONTENU ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* SIDEBAR (Masquée en mode Zen) */}
+            {/* SIDEBAR */}
             <div className={`${(isSidebarOpen && !isZenMode) ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
                     <div className="relative mb-3">
@@ -431,19 +431,19 @@ export default function JournalManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* DIVISEUR (Masqué en mode Zen) */}
+            {/* DIVISEUR */}
             {!isZenMode && (
                 <div className="flex flex-col items-center py-4 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-4 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer transition-colors" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
                     <div className="w-1 h-8 bg-slate-300 dark:bg-slate-700 rounded-full my-auto"></div>
                 </div>
             )}
 
-            {/* ÉDITEUR PRINCIPAL */}
+            {/* ÉDITEUR PRINCIPAL - CORRECTION LARGEUR ICI */}
             <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-white dark:bg-slate-950' : 'bg-white dark:bg-black'} relative min-w-0 transition-colors duration-500`}>
                 
                 {activePageId ? (
                     <>
-                        {/* BARRE D'OUTILS (Masquée en mode Zen) */}
+                        {/* BARRE D'OUTILS */}
                         {!isZenMode ? (
                             <div className="border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem]">
                                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
@@ -491,7 +491,6 @@ export default function JournalManager({ data, updateData }) {
                                 </div>
                             </div>
                         ) : (
-                            /* BOUTON QUITTER ZEN (Flottant) */
                             <div className="absolute top-6 right-10 z-50 animate-in fade-in slide-in-from-top-4 duration-500">
                                 <button 
                                     onClick={() => setIsZenMode(false)}
@@ -503,7 +502,8 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            <div className={`${isZenMode ? 'max-w-2xl' : 'max-w-3xl'} mx-auto px-10 py-16 min-h-full transition-all duration-700`}>
+                            {/* MODIF ICI : Suppression de max-w-2xl/3xl, utilisation de max-w-5xl et 7xl pour plus de largeur */}
+                            <div className={`${isZenMode ? 'max-w-7xl px-12 md:px-20' : 'max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700`}>
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button 
@@ -514,7 +514,7 @@ export default function JournalManager({ data, updateData }) {
                                         <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
                                     </button>
                                 </div>
-                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-4xl' : 'text-5xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
+                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
                                 <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className={`prose dark:prose-invert max-w-none outline-none min-h-[50vh] ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-600 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all`} placeholder="Écrivez vos pensées ici..."></div>
                             </div>
                         </div>
