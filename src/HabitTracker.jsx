@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, Trash2, Check, X, Activity, BarChart2, Calendar, 
-  Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, LayoutGrid, List, CheckCircle2, TrendingUp
+  Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, LayoutGrid, List, CheckCircle2, TrendingUp,
+  Smile, Sparkles
 } from 'lucide-react';
 
 // --- UTILITAIRES (INTACTS) ---
@@ -50,6 +51,7 @@ export default function HabitTracker({ data, updateData }) {
         try {
             setLoading(true);
             const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
+            // On sélectionne aussi l'icon si dispo, sinon le système gère sans
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
             const d = new Date(); d.setDate(d.getDate() - 365);
@@ -120,12 +122,18 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.filter(h => h.category_id !== id));
     };
 
-    const addHabit = async (name, categoryId, daysOfWeek) => {
-        const { data: newHab } = await supabase.from('habits').insert({ 
+    // MODIF : Ajout du paramètre icon
+    const addHabit = async (name, categoryId, daysOfWeek, icon) => {
+        const payload = { 
             name, 
-            category_id: categoryId,
+            category_id: categoryId || null, // Permet null (pas de domaine)
             days_of_week: daysOfWeek 
-        }).select().single();
+        };
+        // Si ta DB a une colonne icon, on l'ajoute, sinon on le met dans le nom ou on gère autrement
+        // Ici on suppose que tu as ajouté la colonne ou qu'on utilise le nom
+        if(icon) payload.icon = icon; 
+
+        const { data: newHab } = await supabase.from('habits').insert(payload).select().single();
         if (newHab) setHabits([...habits, newHab]);
     };
 
@@ -135,7 +143,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES (INTACT) ---
+    // --- MOTEUR DE STATISTIQUES (AMÉLIORÉ POUR ORPHELINS) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -150,6 +158,7 @@ export default function HabitTracker({ data, updateData }) {
             });
         }
 
+        // 1. Stats par Domaine
         const domainStats = categories.map(cat => {
             const catHabits = habits.filter(h => h.category_id === cat.id);
             if (catHabits.length === 0) return null;
@@ -174,10 +183,40 @@ export default function HabitTracker({ data, updateData }) {
 
             return {
                 ...cat,
+                type: 'category',
                 percent: totalPossible === 0 ? 0 : Math.round((totalDone / totalPossible) * 100)
             };
         }).filter(Boolean);
 
+        // 2. Stats pour les Habitudes Orphelines (Sans domaine)
+        const orphanHabits = habits.filter(h => !h.category_id && !h.is_archived);
+        const orphanStats = orphanHabits.map(h => {
+            let totalPossible = 0;
+            let totalDone = 0;
+
+            dates.forEach(d => {
+                const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
+                const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+                const isScheduled = scheduledDays.includes(d.dayIndex);
+
+                if (isDone) {
+                    totalDone++;
+                    totalPossible++;
+                } else if (isScheduled) {
+                    totalPossible++;
+                }
+            });
+
+            return {
+                id: h.id,
+                name: h.name,
+                icon: h.icon,
+                type: 'habit',
+                percent: totalPossible === 0 ? 0 : Math.round((totalDone / totalPossible) * 100)
+            };
+        });
+
+        // 3. Consistance Globale
         const consistencyData = dates.map(dObj => {
             let activeHabitsCount = 0;
             let doneCount = 0;
@@ -199,7 +238,7 @@ export default function HabitTracker({ data, updateData }) {
             return Math.round((doneCount / activeHabitsCount) * 100);
         });
 
-        return { domainStats, consistencyData, dates: dates.map(d => d.str) };
+        return { domainStats, orphanStats, consistencyData, dates: dates.map(d => d.str) };
     }, [statRange, categories, habits, logs]);
 
     // --- NAVIGATION DATES (INTACTE) ---
@@ -219,9 +258,16 @@ export default function HabitTracker({ data, updateData }) {
         return scheduledDays.includes(currentDayIndex);
     });
     
+    // Séparation pour l'affichage : Orphelins vs Catégorisés
+    const uncategorizedVisibleHabits = visibleHabits.filter(h => !h.category_id);
+    const categorizedVisibleHabits = categories.map(cat => ({
+        ...cat,
+        habits: visibleHabits.filter(h => h.category_id === cat.id)
+    })).filter(c => c.habits.length > 0);
+    
     const activeHabitsForManagement = habits.filter(h => !h.is_archived);
 
-    // --- CALCULS DE PROGRESSION QUOTIDIENNE (NOUVEAU POUR UI) ---
+    // --- CALCULS DE PROGRESSION QUOTIDIENNE ---
     const dailyProgress = useMemo(() => {
         if (visibleHabits.length === 0) return 0;
         const done = visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length;
@@ -232,8 +278,6 @@ export default function HabitTracker({ data, updateData }) {
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
             {/* HEADER DESIGN ULTRA-CLEAN */}
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shrink-0 z-30">
-
-                
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
                     <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                         <CheckCircle2 size={18}/> AUJOURD'HUI
@@ -247,11 +291,12 @@ export default function HabitTracker({ data, updateData }) {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 md:px-12 py-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-8 custom-scrollbar">
                 
-                {/* VUE QUOTIDIENNE REVISITÉE */}
+                {/* VUE QUOTIDIENNE REVISITÉE & ÉLARGIE */}
                 {activeTab === 'daily' && (
-                    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    // MODIF : max-w-full pour prendre plus de place
+                    <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         
                         {/* WIDGET DE PROGRESSION DU JOUR */}
                         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col md:flex-row items-center gap-10">
@@ -267,80 +312,84 @@ export default function HabitTracker({ data, updateData }) {
                             <div className="flex-1 text-center md:text-left">
                                 <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
                                     <button onClick={() => changeDate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400"><ChevronLeft size={20}/></button>
-                                    <h3 className="font-black text-2xl capitalize dark:text-white">
+                                    <h3 className="font-black text-3xl capitalize dark:text-white">
                                         {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                                     </h3>
                                     <button onClick={() => changeDate(1)} className={`p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400 ${isToday ? 'invisible' : ''}`} disabled={isToday}><ChevronRight size={20}/></button>
                                 </div>
-                                <p className="text-slate-500 font-medium">Vous avez complété {visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length} tâches sur {visibleHabits.length} prévues.</p>
-                                {dailyProgress === 100 && <div className="mt-3 inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest"><Trophy size={14}/> Journée Parfaite !</div>}
+                                <p className="text-slate-500 font-medium text-lg">Focus du jour : {visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length} / {visibleHabits.length} tâches accomplies.</p>
                             </div>
                         </div>
 
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-20 gap-4">
                                 <Loader2 className="animate-spin text-blue-600 w-12 h-12"/>
-                                <span className="text-sm font-bold text-slate-400 uppercase tracking-tighter">Sync en cours...</span>
                             </div>
                         ) : visibleHabits.length === 0 ? (
                             <div className="text-center py-24 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
                                 <Zap className="text-slate-200 dark:text-slate-700 mx-auto mb-6" size={64}/>
                                 <h3 className="text-xl font-black text-slate-700 dark:text-slate-300">Aucune habitude programmée</h3>
-                                <p className="text-slate-400 mt-2">C'est une journée off ? Profitez-en pour recharger vos batteries.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {categories.map(cat => {
-                                    const catHabits = visibleHabits.filter(h => h.category_id === cat.id);
-                                    if (catHabits.length === 0) return null;
-                                    const catDone = catHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length;
-                                    const catPercent = Math.round((catDone / catHabits.length) * 100);
-
-                                    return (
-                                        <div key={cat.id} className="space-y-4 animate-in fade-in duration-700">
-                                            <div className="flex items-center justify-between px-2">
-                                                <h4 className="font-black text-xs uppercase tracking-[0.2em] text-slate-400 flex items-center gap-3">
-                                                    <span className={`w-2 h-2 rounded-full ${cat.color || 'bg-blue-500'}`}></span>
-                                                    {cat.name}
-                                                </h4>
-                                                <span className="text-[10px] font-black text-slate-400">{catDone}/{catHabits.length}</span>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {catHabits.map(h => {
-                                                    const isDone = logs.some(l => l.habit_id === h.id && l.date === dateStr);
-                                                    const isProcessing = processingHabits.has(h.id);
-                                                    return (
-                                                        <div 
-                                                            key={h.id} 
-                                                            onClick={() => !isProcessing && toggleHabit(h.id)}
-                                                            className={`group flex items-center justify-between p-5 rounded-3xl border-2 transition-all duration-300 cursor-pointer select-none active:scale-[0.98] ${isDone ? 'bg-white dark:bg-slate-900 border-emerald-500/30 shadow-lg shadow-emerald-500/5' : 'bg-white dark:bg-slate-900 border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm'}`}
-                                                        >
-                                                            <div className="flex items-center gap-4">
-                                                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600'}`}>
-                                                                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : isDone ? <Check size={20} strokeWidth={3} /> : <Zap size={18} />}
-                                                                </div>
-                                                                <span className={`text-base font-bold transition-all ${isDone ? 'text-slate-400 dark:text-slate-500 line-through opacity-60' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                                    {h.name}
-                                                                </span>
-                                                            </div>
-                                                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 dark:border-slate-700 text-transparent group-hover:border-blue-400'}`}>
-                                                                <Check size={12} strokeWidth={4} />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                            <div className="space-y-12">
+                                {/* 1. HABITUDES ORPHELINES (SANS DOMAINE) - TOUT EN HAUT */}
+                                {uncategorizedVisibleHabits.length > 0 && (
+                                    <div className="animate-in fade-in duration-700">
+                                        <h4 className="font-black text-sm uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center gap-2">
+                                            <Sparkles size={16} className="text-amber-500"/>
+                                            Essentiels (Sans Domaine)
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {uncategorizedVisibleHabits.map(h => (
+                                                 <HabitCard 
+                                                    key={h.id} 
+                                                    habit={h} 
+                                                    isDone={logs.some(l => l.habit_id === h.id && l.date === dateStr)} 
+                                                    isProcessing={processingHabits.has(h.id)} 
+                                                    onToggle={() => toggleHabit(h.id)}
+                                                    colorClass="border-amber-500/30 shadow-amber-500/5"
+                                                    iconColor="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                                                />
+                                            ))}
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                )}
+
+                                {/* 2. HABITUDES PAR CATÉGORIE */}
+                                {categorizedVisibleHabits.map(cat => (
+                                    <div key={cat.id} className="animate-in fade-in duration-700">
+                                        <div className="flex items-center justify-between px-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                            <h4 className="font-black text-lg text-slate-700 dark:text-white flex items-center gap-3">
+                                                <span className={`w-3 h-3 rounded-full ${cat.color || 'bg-blue-500'}`}></span>
+                                                {cat.name}
+                                            </h4>
+                                            <span className="text-xs font-black bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500">
+                                                {cat.habits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length}/{cat.habits.length}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {cat.habits.map(h => (
+                                                <HabitCard 
+                                                    key={h.id} 
+                                                    habit={h} 
+                                                    isDone={logs.some(l => l.habit_id === h.id && l.date === dateStr)} 
+                                                    isProcessing={processingHabits.has(h.id)} 
+                                                    onToggle={() => toggleHabit(h.id)}
+                                                    // On peut passer la couleur de la catégorie si on veut
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* VUE ANALYSE (VISUELS AMÉLIORÉS) */}
+                {/* VUE ANALYSE (VISUELS AMÉLIORÉS & ÉLARGIE) */}
                 {activeTab === 'stats' && (
-                    <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500">
+                    // MODIF : max-w-full
+                    <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                             <h3 className="text-2xl font-black dark:text-white flex items-center gap-3"><Trophy className="text-amber-500"/> Performances</h3>
                             <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner">
@@ -350,11 +399,13 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
+                        {/* GRAPHIQUE PRINCIPAL - PLEINE LARGEUR */}
                         <div className="bg-white dark:bg-slate-900 p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
-                            <div className="h-80 w-full flex items-end justify-between gap-2">
+                            <div className="h-96 w-full flex items-end justify-between gap-1 md:gap-3">
                                 {stats.consistencyData.map((val, i) => (
                                     <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
-                                        <div className={`w-full rounded-t-xl transition-all duration-700 ease-out hover:brightness-110 ${val >= 80 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : val >= 50 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : val > 0 ? 'bg-slate-300 dark:bg-slate-700' : 'bg-slate-100 dark:bg-slate-800 h-2'}`} style={{ height: val > 0 ? `${Math.max(val, 5)}%` : '8px' }}></div>
+                                        <div className={`w-full rounded-t-lg md:rounded-t-xl transition-all duration-700 ease-out hover:brightness-110 ${val >= 80 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : val >= 50 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : val > 0 ? 'bg-slate-300 dark:bg-slate-700' : 'bg-slate-100 dark:bg-slate-800 h-2'}`} style={{ height: val > 0 ? `${Math.max(val, 5)}%` : '8px' }}></div>
+                                        {/* Tooltip */}
                                         <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
                                             <div className="bg-slate-900 text-white text-[10px] px-3 py-2 rounded-lg shadow-2xl whitespace-nowrap font-black uppercase tracking-tighter">
                                                 {new Date(stats.dates[i]).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})} <span className="ml-2 text-blue-400">{val}%</span>
@@ -364,20 +415,17 @@ export default function HabitTracker({ data, updateData }) {
                                     </div>
                                 ))}
                             </div>
-                            <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                <span>{new Date(stats.dates[0]).toLocaleDateString()}</span>
-                                <span>Historique de Complétion</span>
-                                <span>Aujourd'hui</span>
-                            </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        {/* GRILLE D'ANALYSE (DOMAINES + HABITUDES ORPHELINES) */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                            {/* 1. Affichage des Domaines */}
                             {stats.domainStats.map(cat => {
                                 const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
                                 return (
-                                    <div key={cat.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center">{cat.name}</span>
-                                        <div className="relative w-24 h-24 flex items-center justify-center">
+                                    <div key={'cat-'+cat.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center truncate w-full">{cat.name}</span>
+                                        <div className="relative w-24 h-24 flex items-center justify-center group-hover:scale-110 transition-transform">
                                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                                                 <path className="text-slate-100 dark:text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
                                                 <path className={`${cat.percent >= 100 ? 'text-emerald-500' : textColor} transition-all duration-1000 ease-in-out`} strokeDasharray={`${cat.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
@@ -387,6 +435,24 @@ export default function HabitTracker({ data, updateData }) {
                                     </div>
                                 );
                             })}
+
+                            {/* 2. Affichage des Habitudes Orphelines (Bulle individuelle sans domaine) */}
+                            {stats.orphanStats.map(hab => (
+                                <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
+                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-4 text-center truncate w-full flex justify-center items-center gap-1">
+                                         {hab.icon && <span className="text-sm">{hab.icon}</span>}
+                                         {hab.name}
+                                     </span>
+                                     <div className="relative w-20 h-20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                            <path className="text-slate-100 dark:text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                            <path className={`${hab.percent >= 100 ? 'text-amber-500' : 'text-slate-400'} transition-all duration-1000 ease-in-out`} strokeDasharray={`${hab.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                        </svg>
+                                        <span className="absolute text-sm font-black dark:text-white text-slate-600">{hab.percent}%</span>
+                                     </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
@@ -426,7 +492,10 @@ export default function HabitTracker({ data, updateData }) {
                                 {activeHabitsForManagement.map(h => (
                                     <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
                                         <div>
-                                            <div className="font-bold text-slate-700 dark:text-slate-200">{h.name}</div>
+                                            <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                                {h.icon && <span>{h.icon}</span>}
+                                                {h.name}
+                                            </div>
                                             <div className="flex gap-1 mt-2">
                                                 {['D','L','M','M','J','V','S'].map((d, i) => (
                                                     <span key={i} className={`text-[8px] w-4 h-4 flex items-center justify-center rounded-md font-black ${(h.days_of_week||[0,1,2,3,4,5,6]).includes(i) ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'text-slate-300 dark:text-slate-600'}`}>{d}</span>
@@ -434,7 +503,7 @@ export default function HabitTracker({ data, updateData }) {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <Badge text={categories.find(c => c.id === h.category_id)?.name || 'N/A'} />
+                                            <Badge text={categories.find(c => c.id === h.category_id)?.name || 'Sans Domaine'} color={!h.category_id ? 'bg-amber-100 text-amber-600' : ''} />
                                             <button onClick={() => deleteHabit(h.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"><Trash2 size={16}/></button>
                                         </div>
                                     </div>
@@ -449,8 +518,49 @@ export default function HabitTracker({ data, updateData }) {
     );
 }
 
+// COMPOSANT CARTE ESTHÉTIQUE
+function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColor }) {
+    return (
+        <div 
+            onClick={() => !isProcessing && onToggle()}
+            className={`
+                group relative flex items-center justify-between p-6 rounded-3xl border-2 transition-all duration-300 cursor-pointer select-none active:scale-[0.98] overflow-hidden
+                ${isDone 
+                    ? 'bg-white dark:bg-slate-900 border-emerald-500/30 shadow-xl shadow-emerald-500/10' 
+                    : `bg-white dark:bg-slate-900 border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-lg hover:shadow-2xl ${colorClass || ''}`
+                }
+            `}
+        >
+            {/* Effet de fond subtil si validé */}
+            {isDone && <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none"></div>}
+
+            <div className="flex items-center gap-5 relative z-10">
+                <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center text-2xl transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110 rotate-3' : `${iconColor || 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600 group-hover:scale-110'}`}`}>
+                    {isProcessing ? <Loader2 size={24} className="animate-spin" /> : (habit.icon || (isDone ? <Check size={28} strokeWidth={3} /> : <Zap size={24} />))}
+                </div>
+                <div>
+                     <span className={`text-lg font-bold block transition-all ${isDone ? 'text-slate-400 dark:text-slate-500 line-through opacity-60' : 'text-slate-800 dark:text-slate-100'}`}>
+                        {habit.name}
+                    </span>
+                    <span className="text-xs font-medium text-slate-400 group-hover:text-blue-500 transition-colors">
+                        {isDone ? 'Complété' : 'À faire aujourd\'hui'}
+                    </span>
+                </div>
+            </div>
+            
+            <div className={`relative z-10 w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white scale-110' : 'border-slate-200 dark:border-slate-700 text-transparent group-hover:border-blue-400'}`}>
+                <Check size={16} strokeWidth={4} />
+            </div>
+        </div>
+    );
+}
+
 function HabitCreator({ categories, onAdd }) {
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
+    const [selectedIcon, setSelectedIcon] = useState('');
+
+    // Liste d'emojis par défaut pour le logo
+    const COMMON_ICONS = ["💧", "🏃", "📚", "🧘", "💊", "💤", "💻", "🎨", "💰", "🥗", "🚫", "🎸"];
 
     const toggleDay = (dayIndex) => {
         if (selectedDays.includes(dayIndex)) {
@@ -464,30 +574,63 @@ function HabitCreator({ categories, onAdd }) {
         e.preventDefault();
         const name = e.target.habName.value;
         const catId = e.target.habCat.value;
-        if(name && catId) { 
-            onAdd(name, catId, selectedDays); 
+        // On permet catId vide
+        if(name) { 
+            onAdd(name, catId, selectedDays, selectedIcon); 
             e.target.reset(); 
             setSelectedDays([0,1,2,3,4,5,6]); 
+            setSelectedIcon('');
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-4">
-            <div className="flex gap-2">
-                <input name="habName" placeholder="Nouvel objectif..." className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold" required/>
-                <select name="habCat" className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold" required>
-                    <option value="">Domaine...</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <button type="submit" className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all"><Plus size={20}/></button>
-            </div>
-            
-            <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fréquence</span>
-                <div className="flex gap-1">
-                    {['D','L','M','M','J','V','S'].map((d, i) => (
-                        <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 ${selectedDays.includes(i) ? 'bg-blue-600 text-white shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>{d}</button>
-                    ))}
+        <form onSubmit={handleSubmit} className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-6">
+            <div className="space-y-4">
+                {/* LIGNE 1 : NOM + DOMAINE */}
+                <div className="flex gap-2">
+                    <input name="habName" placeholder="Nouvelle habitude..." className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" required/>
+                    <select name="habCat" className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold w-1/3">
+                        <option value="">Sans Domaine</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                </div>
+
+                {/* LIGNE 2 : SÉLECTION DU LOGO */}
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir un Logo</span>
+                    <div className="flex flex-wrap gap-2">
+                        {COMMON_ICONS.map(icon => (
+                            <button 
+                                key={icon} 
+                                type="button" 
+                                onClick={() => setSelectedIcon(icon === selectedIcon ? '' : icon)}
+                                className={`w-10 h-10 text-xl rounded-xl transition-all ${selectedIcon === icon ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-white dark:bg-slate-700 hover:bg-slate-200'}`}
+                            >
+                                {icon}
+                            </button>
+                        ))}
+                        <input 
+                            type="text" 
+                            placeholder="Autre..." 
+                            maxLength={2} 
+                            value={selectedIcon}
+                            onChange={(e) => setSelectedIcon(e.target.value)}
+                            className="w-20 px-2 rounded-xl text-center bg-white dark:bg-slate-700 border-none outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+
+                {/* LIGNE 3 : FREQUENCE + BOUTON */}
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-4">Fréquence</span>
+                        <div className="flex gap-1">
+                            {['D','L','M','M','J','V','S'].map((d, i) => (
+                                <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 ${selectedDays.includes(i) ? 'bg-blue-600 text-white shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>{d}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <button type="submit" className="p-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95"><Plus size={24}/></button>
                 </div>
             </div>
         </form>
