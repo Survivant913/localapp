@@ -617,7 +617,6 @@ function HabitCreator({ categories, onAdd }) {
                 </div>
 
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir une Icône (Premium)</span>
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
                         {PREMIUM_ICONS.map(iconName => (
                             <button 
