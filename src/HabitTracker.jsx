@@ -121,23 +121,21 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.filter(h => h.category_id !== id));
     };
 
-    // CORRECTION ICI : Gestion explicite du NULL pour categoryId
     const addHabit = async (name, categoryId, daysOfWeek, icon) => {
+        // Préparation propre des données
         const payload = { 
             name, 
-            // Si categoryId est une chaine vide "", on envoie null, sinon l'ID
-            category_id: categoryId === "" ? null : categoryId, 
-            days_of_week: daysOfWeek 
+            category_id: (categoryId === "" || categoryId === "null") ? null : categoryId, 
+            days_of_week: daysOfWeek,
+            // On envoie l'icône seulement si elle n'est pas vide
+            icon: icon || null 
         };
-        
-        // Ajout de l'icône si présente
-        if(icon) payload.icon = icon; 
 
         const { data: newHab, error } = await supabase.from('habits').insert(payload).select().single();
         
         if (error) {
             console.error("Erreur ajout habitude:", error);
-            alert("Erreur lors de la création. Vérifiez que votre base de données accepte les habitudes sans catégorie.");
+            alert(`Erreur: ${error.message}. Avez-vous ajouté la colonne 'icon' dans Supabase ?`);
         } else if (newHab) {
             setHabits([...habits, newHab]);
         }
@@ -194,7 +192,7 @@ export default function HabitTracker({ data, updateData }) {
             };
         }).filter(Boolean);
 
-        // 2. Stats pour les Habitudes Orphelines (Sans domaine)
+        // 2. Stats pour les Habitudes Orphelines
         const orphanHabits = habits.filter(h => !h.category_id && !h.is_archived);
         const orphanStats = orphanHabits.map(h => {
             let totalPossible = 0;
@@ -264,7 +262,6 @@ export default function HabitTracker({ data, updateData }) {
         return scheduledDays.includes(currentDayIndex);
     });
     
-    // Séparation pour l'affichage : Orphelins vs Catégorisés
     const uncategorizedVisibleHabits = visibleHabits.filter(h => !h.category_id);
     const categorizedVisibleHabits = categories.map(cat => ({
         ...cat,
@@ -273,7 +270,6 @@ export default function HabitTracker({ data, updateData }) {
     
     const activeHabitsForManagement = habits.filter(h => !h.is_archived);
 
-    // --- CALCULS DE PROGRESSION QUOTIDIENNE ---
     const dailyProgress = useMemo(() => {
         if (visibleHabits.length === 0) return 0;
         const done = visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length;
@@ -299,11 +295,8 @@ export default function HabitTracker({ data, updateData }) {
 
             <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-8 custom-scrollbar">
                 
-                {/* VUE QUOTIDIENNE */}
                 {activeTab === 'daily' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        
-                        {/* WIDGET DE PROGRESSION */}
                         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col md:flex-row items-center gap-10">
                             <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
@@ -337,7 +330,6 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         ) : (
                             <div className="space-y-12">
-                                {/* 1. HABITUDES ORPHELINES (SANS DOMAINE) */}
                                 {uncategorizedVisibleHabits.length > 0 && (
                                     <div className="animate-in fade-in duration-700">
                                         <h4 className="font-black text-sm uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center gap-2">
@@ -360,7 +352,6 @@ export default function HabitTracker({ data, updateData }) {
                                     </div>
                                 )}
 
-                                {/* 2. HABITUDES PAR CATÉGORIE */}
                                 {categorizedVisibleHabits.map(cat => (
                                     <div key={cat.id} className="animate-in fade-in duration-700">
                                         <div className="flex items-center justify-between px-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -390,7 +381,6 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE ANALYSE */}
                 {activeTab === 'stats' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -402,7 +392,6 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GRAPHIQUE PRINCIPAL */}
                         <div className="bg-white dark:bg-slate-900 p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
                             <div className="h-96 w-full flex items-end justify-between gap-1 md:gap-3">
                                 {stats.consistencyData.map((val, i) => (
@@ -419,9 +408,7 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GRILLE D'ANALYSE */}
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                            {/* Domaines */}
                             {stats.domainStats.map(cat => {
                                 const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
                                 return (
@@ -438,7 +425,6 @@ export default function HabitTracker({ data, updateData }) {
                                 );
                             })}
 
-                            {/* Habitudes Orphelines */}
                             {stats.orphanStats.map(hab => (
                                 <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
                                      <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
@@ -459,7 +445,6 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE REGLAGES */}
                 {activeTab === 'settings' && (
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-500">
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -557,6 +542,8 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
 }
 
 function HabitCreator({ categories, onAdd }) {
+    const [name, setName] = useState('');
+    const [categoryId, setCategoryId] = useState('');
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
     const [selectedIcon, setSelectedIcon] = useState('');
 
@@ -572,13 +559,10 @@ function HabitCreator({ categories, onAdd }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const name = e.target.habName.value;
-        const catId = e.target.habCat.value;
-        
-        // CORRECTION HTML: Si catId est vide, on l'envoie quand même
         if(name) { 
-            onAdd(name, catId, selectedDays, selectedIcon); 
-            e.target.reset(); 
+            onAdd(name, categoryId, selectedDays, selectedIcon); 
+            setName('');
+            setCategoryId('');
             setSelectedDays([0,1,2,3,4,5,6]); 
             setSelectedIcon('');
         }
@@ -588,9 +572,18 @@ function HabitCreator({ categories, onAdd }) {
         <form onSubmit={handleSubmit} className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-6">
             <div className="space-y-4">
                 <div className="flex gap-2">
-                    <input name="habName" placeholder="Nouvelle habitude..." className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" required/>
-                    {/* CORRECTION HTML: Suppression de 'required' ici */}
-                    <select name="habCat" className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold w-1/3">
+                    <input 
+                        value={name} 
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Nouvelle habitude..." 
+                        className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" 
+                        required
+                    />
+                    <select 
+                        value={categoryId} 
+                        onChange={(e) => setCategoryId(e.target.value)}
+                        className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold w-1/3"
+                    >
                         <option value="">Sans Domaine</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
