@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-// CORRECTION ICI : ./ au lieu de ../ si le fichier est à la racine de src
+// CHEMIN CORRIGÉ : ./ car on est à la racine de src
 import { supabase } from './supabaseClient';
 import * as Icons from 'lucide-react';
 import { 
@@ -8,7 +8,6 @@ import {
   Sparkles
 } from 'lucide-react';
 
-// --- LISTE D'ICÔNES PREMIUM ---
 const PREMIUM_ICONS = [
     "Activity", "HeartPulse", "Dumbbell", "Bike", "Footprints", "GlassWater", "Apple", "Pill", "BedDouble",
     "Briefcase", "Laptop", "Code", "PenTool", "BookOpen", "BrainCircuit", "Target", "AlarmClock",
@@ -20,7 +19,6 @@ const DynamicIcon = ({ name, size = 24, className = "" }) => {
     if (!name) return null;
     const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
     const IconComponent = Icons[pascalName] || Icons[name];
-    
     if (!IconComponent) return <span className="text-xs">?</span>; 
     return <IconComponent size={size} className={className} />;
 };
@@ -133,9 +131,18 @@ export default function HabitTracker({ }) {
 
     const deleteCategory = async (id) => {
         if (!window.confirm("⚠️ ATTENTION : Supprimer cette catégorie effacera DÉFINITIVEMENT toutes les habitudes et l'historique associés. Continuer ?")) return;
-        await supabase.from('habit_categories').delete().eq('id', id);
+        
+        // Suppression locale
         setCategories(categories.filter(c => c.id !== id));
         setHabits(habits.filter(h => h.category_id !== id));
+
+        // Suppression DB (Logs d'abord, puis habitudes, puis catégorie)
+        const habitsToDelete = habits.filter(h => h.category_id === id).map(h => h.id);
+        if (habitsToDelete.length > 0) {
+            await supabase.from('habit_logs').delete().in('habit_id', habitsToDelete);
+            await supabase.from('habits').delete().eq('category_id', id);
+        }
+        await supabase.from('habit_categories').delete().eq('id', id);
     };
 
     const addHabit = async (name, categoryId, daysOfWeek, icon) => {
@@ -150,16 +157,23 @@ export default function HabitTracker({ }) {
         
         if (error) {
             console.error("Erreur ajout habitude:", error);
-            alert(`Erreur: ${error.message}. Vérifiez la colonne 'icon' dans Supabase.`);
+            alert(`Erreur: ${error.message}.`);
         } else if (newHab) {
             setHabits([...habits, newHab]);
         }
     };
 
+    // --- MODIFICATION : SUPPRESSION RÉELLE (HARD DELETE) ---
     const deleteHabit = async (id) => {
-        if (!window.confirm("Archiver cette habitude ? Elle disparaîtra du quotidien mais restera dans l'historique.")) return;
-        await supabase.from('habits').update({ is_archived: true }).eq('id', id);
-        setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
+        if (!window.confirm("Supprimer DÉFINITIVEMENT cette habitude et tout son historique ?")) return;
+        
+        // Mise à jour de l'interface immédiatement
+        setHabits(habits.filter(h => h.id !== id));
+        setLogs(logs.filter(l => l.habit_id !== id)); // On enlève aussi les logs de la mémoire locale
+
+        // Suppression en base de données
+        await supabase.from('habit_logs').delete().eq('habit_id', id);
+        await supabase.from('habits').delete().eq('id', id);
     };
 
     const stats = useMemo(() => {
@@ -205,7 +219,7 @@ export default function HabitTracker({ }) {
             };
         }).filter(Boolean);
 
-        const orphanHabits = habits.filter(h => !h.category_id && !h.is_archived);
+        const orphanHabits = habits.filter(h => !h.category_id);
         const orphanStats = orphanHabits.map(h => {
             let totalPossible = 0;
             let totalDone = 0;
@@ -244,7 +258,7 @@ export default function HabitTracker({ }) {
                 if (isDone) {
                     doneCount++;
                     activeHabitsCount++;
-                } else if (isScheduled && !h.is_archived) {
+                } else if (isScheduled) {
                     activeHabitsCount++;
                 }
             });
@@ -267,7 +281,6 @@ export default function HabitTracker({ }) {
     const currentDayIndex = selectedDate.getDay();
 
     const visibleHabits = habits.filter(h => {
-        if (h.is_archived) return false;
         const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
         return scheduledDays.includes(currentDayIndex);
     });
@@ -278,7 +291,7 @@ export default function HabitTracker({ }) {
         habits: visibleHabits.filter(h => h.category_id === cat.id)
     })).filter(c => c.habits.length > 0);
     
-    const activeHabitsForManagement = habits.filter(h => !h.is_archived);
+    const activeHabitsForManagement = habits;
 
     const dailyProgress = useMemo(() => {
         if (visibleHabits.length === 0) return 0;
