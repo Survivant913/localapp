@@ -5,7 +5,7 @@ import {
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Scissors, RotateCcw // Icône Reset
+  Maximize2, Minimize2, Scissors, RotateCcw, Minus, ZoomIn, Type as TypeIcon 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -30,6 +30,8 @@ export default function JournalManager({ data, updateData }) {
     const [isSaving, setIsSaving] = useState(false);
     const [showColorPalette, setShowColorPalette] = useState(false);
     
+    const [fontSize, setFontSize] = useState(16);
+
     // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
     const [pageTitle, setPageTitle] = useState('');
@@ -42,6 +44,8 @@ export default function JournalManager({ data, updateData }) {
     // --- 1. CHARGEMENT INITIAL ---
     useEffect(() => {
         fetchData();
+        const savedSize = localStorage.getItem('journal_font_size');
+        if (savedSize) setFontSize(parseInt(savedSize));
     }, []);
 
     const fetchData = async () => {
@@ -103,8 +107,6 @@ export default function JournalManager({ data, updateData }) {
         if (!activePageId) {
             setPageContent('');
             setPageTitle('');
-            if (titleRef.current) titleRef.current.value = '';
-            if (editorRef.current) editorRef.current.innerHTML = '';
             return;
         }
 
@@ -112,6 +114,7 @@ export default function JournalManager({ data, updateData }) {
         if (page) {
             setPageContent(page.content || '');
             setPageTitle(page.title || 'Sans titre');
+            // On force la mise à jour directe des refs si le composant est déjà monté
             if (titleRef.current) titleRef.current.value = page.title || 'Sans titre';
             if (editorRef.current) editorRef.current.innerHTML = page.content || '';
         }
@@ -238,6 +241,7 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const toggleFavorite = async (page) => {
+        if (!page) return;
         const newStatus = !page.is_favorite;
         setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
         await supabase.from('journal_pages').update({ is_favorite: newStatus }).eq('id', page.id);
@@ -251,31 +255,31 @@ export default function JournalManager({ data, updateData }) {
         if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // NOUVEAU : Application précise de la taille
     const applyFontSize = (size) => {
         if (editorRef.current) editorRef.current.focus();
-        // On utilise font size 1-7 pour la compatibilité, ou on insert un span
-        // Pour faire simple et robuste : on utilise insertHTML avec un span
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
             const span = document.createElement("span");
             span.style.fontSize = size;
             const range = selection.getRangeAt(0);
+            
+            if (range.collapsed) {
+                // Si rien n'est sélectionné, on n'applique pas (ou on pourrait insérer un span vide)
+                return; 
+            }
+            
             range.surroundContents(span);
         }
     };
 
-    // NOUVEAU : Reset du formatage
     const resetFormat = () => {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('removeFormat', false, null);
-        document.execCommand('fontSize', false, 3); // Retour taille normale (approx 16px)
+        document.execCommand('fontSize', false, 3);
     };
 
-    // NOUVEAU : Saut de page VISUEL (Gap gris)
     const insertPageBreak = () => {
         if (editorRef.current) editorRef.current.focus();
-        // On insère un div qui simule l'espace entre deux feuilles
         const html = `
             <div contenteditable="false" class="page-gap" title="Saut de page"></div>
             <p><br/></p>
@@ -297,7 +301,7 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION (WYSIWYG) ---
+    // --- IMPRESSION ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
@@ -317,11 +321,8 @@ export default function JournalManager({ data, updateData }) {
                     .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.8em; }
                     .content { text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
                     .content img { max-width: 100%; }
-                    
-                    /* Masquer le gap gris à l'impression, mais forcer le saut de page */
                     .page-gap { display: none !important; }
                     .page-gap + * { page-break-before: always; }
-
                     blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; color: #000 !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
@@ -339,7 +340,7 @@ export default function JournalManager({ data, updateData }) {
         printWindow.document.close();
     };
 
-    // --- LOGIQUE D'AFFICHAGE ---
+    // --- VARIABLES D'AFFICHAGE ---
     const favoritePages = allPages.filter(p => p.is_favorite);
     const rootFolders = allFolders.filter(f => !f.parent_id); 
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
@@ -348,9 +349,11 @@ export default function JournalManager({ data, updateData }) {
     const searchPages = allPages.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
+    
+    // VARIABLE DE SÉCURITÉ POUR ÉVITER L'ÉCRAN BLANC
+    const currentPage = allPages.find(p => p.id === activePageId);
 
-
-    // --- VUE DASHBOARD (INTACTE) ---
+    // --- VUE DASHBOARD ---
     if (!activeNotebookId) {
         return (
             <div className="h-full w-full bg-slate-50 dark:bg-slate-950 p-8 overflow-y-auto">
@@ -359,13 +362,11 @@ export default function JournalManager({ data, updateData }) {
                         <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Mes Carnets</h2>
                         <button onClick={() => createItem('root')} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white dark:bg-white dark:text-black rounded-xl font-bold hover:opacity-90 transition-opacity"><FolderPlus size={18}/> Nouveau Carnet</button>
                     </div>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                         <div onClick={() => createItem('root')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 min-h-[180px] group transition-all">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Plus size={24} className="text-slate-400"/></div>
                             <span className="font-bold text-slate-500">Ajouter</span>
                         </div>
-
                         {rootFolders.map(nb => (
                             <div key={nb.id} onClick={() => { setActiveNotebookId(nb.id); setCurrentFolderId(nb.id); }} className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-500 cursor-pointer transition-all min-h-[180px] flex flex-col justify-between relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-slate-100 to-transparent dark:from-slate-800 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
@@ -391,7 +392,6 @@ export default function JournalManager({ data, updateData }) {
     // --- VUE CONTENU ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            {/* SIDEBAR */}
             <div className={`${(isSidebarOpen && !isZenMode) ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
                     <div className="relative mb-3">
@@ -468,19 +468,16 @@ export default function JournalManager({ data, updateData }) {
                 </div>
             </div>
 
-            {/* DIVISEUR */}
             {!isZenMode && (
                 <div className="flex flex-col items-center py-4 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-4 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer transition-colors" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
                     <div className="w-1 h-8 bg-slate-300 dark:bg-slate-700 rounded-full my-auto"></div>
                 </div>
             )}
 
-            {/* ÉDITEUR PRINCIPAL */}
             <div className={`flex-1 flex flex-col relative min-w-0 transition-colors duration-500 ${isZenMode ? 'bg-slate-200 dark:bg-black' : 'bg-slate-100 dark:bg-slate-950'}`}>
-                
                 {activePageId ? (
-                    <>
-                        {/* BARRE D'OUTILS */}
+                    // CLÉ MAGIQUE POUR FORCER LE RAFRAICHISSEMENT
+                    <div className="flex-1 flex flex-col h-full" key={activePageId}>
                         {!isZenMode ? (
                             <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-slate-900 z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
                                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
@@ -494,7 +491,6 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 
-                                {/* SÉLECTEUR DE TAILLE (Menu Déroulant) */}
                                 <div className="relative group">
                                     <button className="flex items-center gap-1 p-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                                         <TypeIcon size={14}/> Taille <ChevronDown size={12}/>
@@ -550,70 +546,30 @@ export default function JournalManager({ data, updateData }) {
                             </div>
                         ) : (
                             <div className="absolute top-6 right-10 z-50 animate-in fade-in slide-in-from-top-4 duration-500 print:hidden">
-                                <button 
-                                    onClick={() => setIsZenMode(false)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-black transition-all shadow-lg"
-                                >
-                                    <Minimize2 size={14}/> Quitter le mode Focus
-                                </button>
+                                <button onClick={() => setIsZenMode(false)} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-black transition-all shadow-lg"><Minimize2 size={14}/> Quitter le mode Focus</button>
                             </div>
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''} flex justify-center py-8 bg-slate-200 dark:bg-black`}>
-                            {/* CONTENEUR PAGE A4 */}
-                            <div 
-                                className="bg-white text-slate-900 shadow-2xl transition-all duration-300 print:shadow-none print:m-0"
-                                style={{
-                                    width: '210mm', 
-                                    minHeight: '297mm', 
-                                    padding: '20mm',
-                                    fontSize: '16px', // Taille de base
-                                    boxSizing: 'border-box',
-                                    overflowWrap: 'break-word',
-                                    wordWrap: 'break-word',
-                                    color: 'black' // Force le noir
-                                }}
-                            >
+                            <div className="bg-white text-slate-900 shadow-2xl transition-all duration-300 print:shadow-none print:m-0" style={{ width: '210mm', minHeight: '297mm', padding: '20mm', fontSize: '16px', boxSizing: 'border-box', overflowWrap: 'break-word', wordWrap: 'break-word', color: 'black' }}>
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between print:hidden">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
-                                    <button 
-                                        onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}
-                                    >
-                                        <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
+                                    <button onClick={() => toggleFavorite(currentPage)} className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${currentPage?.is_favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}>
+                                        <Star size={16} className={currentPage?.is_favorite ? 'fill-amber-500' : ''}/>
                                     </button>
                                 </div>
-                                
-                                <input 
-                                    ref={titleRef} 
-                                    type="text" 
-                                    defaultValue={pageTitle} 
-                                    onBlur={() => saveCurrentPage(true)} 
-                                    className="w-full text-4xl font-black bg-transparent outline-none mb-8 text-black placeholder:text-slate-300 leading-tight border-b border-transparent focus:border-slate-200 transition-colors pb-2" 
-                                    placeholder="Titre..."
-                                />
-                                
-                                <div 
-                                    ref={editorRef} 
-                                    contentEditable 
-                                    onInput={() => saveCurrentPage(false)} 
-                                    onBlur={() => saveCurrentPage(true)} 
-                                    className="prose max-w-none outline-none leading-relaxed text-black empty:before:content-[attr(placeholder)] empty:before:text-slate-300 min-h-[500px]" 
-                                    placeholder="Commencez à écrire..."
-                                    style={{ color: 'black' }} 
-                                ></div>
+                                <input ref={titleRef} type="text" defaultValue={currentPage?.title || ''} onBlur={() => saveCurrentPage(true)} className="w-full text-4xl font-black bg-transparent outline-none mb-8 text-black placeholder:text-slate-300 leading-tight border-b border-transparent focus:border-slate-200 transition-colors pb-2" placeholder="Titre..."/>
+                                <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className="prose max-w-none outline-none leading-relaxed text-black empty:before:content-[attr(placeholder)] empty:before:text-slate-300 min-h-[500px]" placeholder="Commencez à écrire..." style={{ color: 'black' }}></div>
                             </div>
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><Book size={48} className="opacity-20"/></div><p className="text-xl font-medium">Sélectionnez une page</p><p className="text-sm opacity-60 mt-2">ou créez-en une nouvelle pour commencer</p></div>
                 )}
             </div>
             
             <style>{`
-                /* CORRECTION COULEUR FORCEE NOIRE */
                 .prose, .prose * { color: black !important; }
-                
                 .prose blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; margin-left: 0; color: #444 !important; font-style: italic; background: #f9f9f9; padding: 10px 1em; border-radius: 4px; }
                 .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
@@ -622,27 +578,15 @@ export default function JournalManager({ data, updateData }) {
                 .prose h3 { font-size: 1.2em !important; font-weight: 700 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
                 .prose span[style*="background-color"] { color: black !important; padding: 0 2px; border-radius: 2px; }
                 
-                /* STYLE DU SAUT DE PAGE (GAP VISUEL) */
+                /* GAP VISUEL (Saut de page) */
                 .page-gap { 
-                    background: #f1f5f9; /* Couleur gris clair pour imiter le fond du bureau */
-                    height: 30px;
-                    margin-left: -20mm; /* Annule le padding du conteneur pour toucher les bords */
-                    margin-right: -20mm;
-                    margin-top: 30px;
-                    margin-bottom: 30px;
-                    border-top: 1px solid #cbd5e1;
-                    border-bottom: 1px solid #cbd5e1;
-                    box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.1);
-                    position: relative;
-                    user-select: none;
+                    background: #f1f5f9; height: 30px; margin-left: -20mm; margin-right: -20mm; margin-top: 30px; margin-bottom: 30px;
+                    border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.1); position: relative; user-select: none;
                 }
-
                 @media print {
                     .page-gap { display: none !important; }
-                    /* Force le saut de page réel à l'impression après l'élément qui suit le gap */
                     .page-gap + * { page-break-before: always; }
                 }
-
                 .custom-scrollbar-none::-webkit-scrollbar { display: none; }
                 .custom-scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
