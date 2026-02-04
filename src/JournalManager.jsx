@@ -5,7 +5,7 @@ import {
   Heading, Type, Underline, Strikethrough,
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Eye, Text as TextIcon, RotateCcw
+  Maximize2, Minimize2, Eye
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -29,9 +29,6 @@ export default function JournalManager({ data, updateData }) {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showColorPalette, setShowColorPalette] = useState(false);
-    
-    // NOUVEAU : État pour le menu taille de police
-    const [showSizeMenu, setShowSizeMenu] = useState(false);
     
     // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
@@ -255,14 +252,6 @@ export default function JournalManager({ data, updateData }) {
         if (cmd === 'hiliteColor') setShowColorPalette(false);
     };
 
-    // NOUVEAU : Fonction pour changer la taille de la sélection
-    const changeFontSizeSelection = (size) => {
-        if (editorRef.current) editorRef.current.focus();
-        // Utilise les tailles HTML standard (1 à 7) pour compatibilité maximale
-        document.execCommand('fontSize', false, size);
-        setShowSizeMenu(false);
-    };
-
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
         <button 
             onMouseDown={(e) => { 
@@ -449,7 +438,7 @@ export default function JournalManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* ÉDITEUR PRINCIPAL */}
+            {/* ÉDITEUR PRINCIPAL - CORRECTION LARGEUR ICI */}
             <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-white dark:bg-slate-950' : 'bg-white dark:bg-black'} relative min-w-0 transition-colors duration-500`}>
                 
                 {activePageId ? (
@@ -469,50 +458,8 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
                                 <ToolbarButton cmd="strikeThrough" icon={Strikethrough} title="Barré" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                
-                                {/* NOUVEAU MENU TAILLE (AVEC ÉTAT D'OUVERTURE CORRIGÉ) */}
                                 <div className="relative">
-                                    <button 
-                                        onMouseDown={(e) => { e.preventDefault(); setShowSizeMenu(!showSizeMenu); setShowColorPalette(false); }}
-                                        className={`flex items-center gap-1 p-2 rounded transition-colors ${showSizeMenu ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                                        title="Taille de texte"
-                                    >
-                                        <TextIcon size={18}/> <ChevronDown size={12}/>
-                                    </button>
-                                    
-                                    {showSizeMenu && (
-                                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[60] min-w-[120px] overflow-hidden animate-in fade-in zoom-in-95 p-1">
-                                            <div className="text-[10px] uppercase font-bold text-slate-400 px-3 py-1">Taille</div>
-                                            {[
-                                                { label: 'Petit', val: '2' },
-                                                { label: 'Normal', val: '3' },
-                                                { label: 'Grand', val: '5' },
-                                                { label: 'Titre', val: '7' },
-                                            ].map((size) => (
-                                                <button 
-                                                    key={size.val}
-                                                    onMouseDown={(e) => { 
-                                                        e.preventDefault(); 
-                                                        changeFontSizeSelection(size.val);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 rounded-lg"
-                                                >
-                                                    {size.label}
-                                                </button>
-                                            ))}
-                                            <div className="h-px bg-slate-100 dark:bg-slate-700 my-1"></div>
-                                            <button 
-                                                onMouseDown={(e) => { e.preventDefault(); changeFontSizeSelection('3'); document.execCommand('removeFormat', false, null); setShowSizeMenu(false); }}
-                                                className="w-full text-left px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
-                                            >
-                                                <RotateCcw size={12}/> Reset Style
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="relative">
-                                    <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette); setShowSizeMenu(false);}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
+                                    <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
                                     {showColorPalette && (
                                         <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-[60] min-w-max animate-in fade-in zoom-in-95">
                                             {[
@@ -555,8 +502,8 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            {/* MODIF : Ajout de padding-bottom énorme (pb-96) pour que "rien en dessous" ne soit plus un problème */}
-                            <div className={`${isZenMode ? 'max-w-2xl' : 'max-w-3xl'} mx-auto px-10 py-16 min-h-full transition-all duration-700 pb-96`}>
+                            {/* MODIF ICI : Suppression de max-w-2xl/3xl, utilisation de max-w-5xl et 7xl pour plus de largeur */}
+                            <div className={`${isZenMode ? 'max-w-7xl px-12 md:px-20' : 'max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700`}>
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button 
@@ -567,7 +514,7 @@ export default function JournalManager({ data, updateData }) {
                                         <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
                                     </button>
                                 </div>
-                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-4xl' : 'text-5xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
+                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
                                 <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className={`prose dark:prose-invert max-w-none outline-none min-h-[50vh] ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-600 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all`} placeholder="Écrivez vos pensées ici..."></div>
                             </div>
                         </div>
