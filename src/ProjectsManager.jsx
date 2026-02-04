@@ -164,7 +164,6 @@ export default function ProjectsManager({ data, updateData }) {
     const labelClass = "block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2";
 
     return (
-        // MODIF : Largeur maximale étendue pour le design "Dashboard"
         <div className="space-y-10 fade-in w-full max-w-[1920px] mx-auto p-6 md:p-10 pb-24">
             
             {focusedProject && (
@@ -281,9 +280,6 @@ export default function ProjectsManager({ data, updateData }) {
                     return (
                         <div key={project.id} className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden transition-all hover:shadow-2xl hover:border-blue-200 dark:hover:border-slate-700 group relative flex flex-col">
                             
-                            {/* BOUTON FOCUS FLOTTANT */}
-                            <button onClick={(e) => { e.stopPropagation(); setFocusedProject(project); }} className="absolute top-6 right-20 text-gray-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 z-10 transition-colors" title="Mode Focus"> <Maximize2 size={22} /> </button>
-                            
                             {/* EN-TÊTE DE LA CARTE */}
                             <div className="p-8 cursor-pointer bg-gradient-to-b from-gray-50 to-white dark:from-slate-800 dark:to-slate-900" onClick={() => toggleExpand(project.id)}>
                                 <div className="flex justify-between items-start mb-8">
@@ -314,13 +310,22 @@ export default function ProjectsManager({ data, updateData }) {
                                         </div>
                                     </div>
                                     
-                                    {/* Actions */}
+                                    {/* Actions Intégrées (Capsule) */}
                                     <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700"> 
-                                        <button onClick={(e) => { e.stopPropagation(); startEditProject(project); }} className="text-gray-400 hover:text-blue-600 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit size={18} /></button> 
+                                        {/* MODIF: Bouton Focus intégré ici */}
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setFocusedProject(project); }} 
+                                            className="text-gray-400 hover:text-indigo-600 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                            title="Mode Focus"
+                                        >
+                                            <Maximize2 size={18} />
+                                        </button>
+
+                                        <button onClick={(e) => { e.stopPropagation(); startEditProject(project); }} className="text-gray-400 dark:text-gray-500 hover:text-blue-500 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit size={18} /></button> 
                                         {deletingProjectId === project.id ? ( 
                                             <button onClick={(e) => { e.stopPropagation(); confirmDeleteProject(project.id); }} className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 animate-in fade-in">Confirmer</button> 
                                         ) : ( 
-                                            <button onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={18} /></button> 
+                                            <button onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }} className="text-gray-400 dark:text-gray-500 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={18} /></button> 
                                         )} 
                                         <div className="w-px h-6 bg-gray-200 dark:bg-slate-700 mx-1"></div>
                                         <div className="p-2 text-gray-300 dark:text-slate-600">
