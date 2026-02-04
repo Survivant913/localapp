@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from './supabaseClient';
+import { supabase } from '../supabaseClient';
 import { 
   Plus, Trash2, Check, X, Activity, BarChart2, Calendar, 
   Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, LayoutGrid, List, CheckCircle2, TrendingUp,
@@ -51,7 +51,6 @@ export default function HabitTracker({ data, updateData }) {
         try {
             setLoading(true);
             const { data: cats } = await supabase.from('habit_categories').select('*').order('name');
-            // On sélectionne aussi l'icon si dispo, sinon le système gère sans
             const { data: habs } = await supabase.from('habits').select('*').order('created_at');
             
             const d = new Date(); d.setDate(d.getDate() - 365);
@@ -122,19 +121,26 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.filter(h => h.category_id !== id));
     };
 
-    // MODIF : Ajout du paramètre icon
+    // CORRECTION ICI : Gestion explicite du NULL pour categoryId
     const addHabit = async (name, categoryId, daysOfWeek, icon) => {
         const payload = { 
             name, 
-            category_id: categoryId || null, // Permet null (pas de domaine)
+            // Si categoryId est une chaine vide "", on envoie null, sinon l'ID
+            category_id: categoryId === "" ? null : categoryId, 
             days_of_week: daysOfWeek 
         };
-        // Si ta DB a une colonne icon, on l'ajoute, sinon on le met dans le nom ou on gère autrement
-        // Ici on suppose que tu as ajouté la colonne ou qu'on utilise le nom
+        
+        // Ajout de l'icône si présente
         if(icon) payload.icon = icon; 
 
-        const { data: newHab } = await supabase.from('habits').insert(payload).select().single();
-        if (newHab) setHabits([...habits, newHab]);
+        const { data: newHab, error } = await supabase.from('habits').insert(payload).select().single();
+        
+        if (error) {
+            console.error("Erreur ajout habitude:", error);
+            alert("Erreur lors de la création. Vérifiez que votre base de données accepte les habitudes sans catégorie.");
+        } else if (newHab) {
+            setHabits([...habits, newHab]);
+        }
     };
 
     const deleteHabit = async (id) => {
@@ -143,7 +149,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES (AMÉLIORÉ POUR ORPHELINS) ---
+    // --- MOTEUR DE STATISTIQUES ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -241,7 +247,7 @@ export default function HabitTracker({ data, updateData }) {
         return { domainStats, orphanStats, consistencyData, dates: dates.map(d => d.str) };
     }, [statRange, categories, habits, logs]);
 
-    // --- NAVIGATION DATES (INTACTE) ---
+    // --- NAVIGATION DATES ---
     const changeDate = (days) => {
         const newDate = new Date(selectedDate);
         newDate.setDate(newDate.getDate() + days);
@@ -276,7 +282,7 @@ export default function HabitTracker({ data, updateData }) {
 
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-            {/* HEADER DESIGN ULTRA-CLEAN */}
+            {/* HEADER */}
             <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shrink-0 z-30">
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
                     <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
@@ -293,12 +299,11 @@ export default function HabitTracker({ data, updateData }) {
 
             <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-8 custom-scrollbar">
                 
-                {/* VUE QUOTIDIENNE REVISITÉE & ÉLARGIE */}
+                {/* VUE QUOTIDIENNE */}
                 {activeTab === 'daily' && (
-                    // MODIF : max-w-full pour prendre plus de place
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         
-                        {/* WIDGET DE PROGRESSION DU JOUR */}
+                        {/* WIDGET DE PROGRESSION */}
                         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col md:flex-row items-center gap-10">
                             <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
@@ -332,7 +337,7 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         ) : (
                             <div className="space-y-12">
-                                {/* 1. HABITUDES ORPHELINES (SANS DOMAINE) - TOUT EN HAUT */}
+                                {/* 1. HABITUDES ORPHELINES (SANS DOMAINE) */}
                                 {uncategorizedVisibleHabits.length > 0 && (
                                     <div className="animate-in fade-in duration-700">
                                         <h4 className="font-black text-sm uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center gap-2">
@@ -375,7 +380,6 @@ export default function HabitTracker({ data, updateData }) {
                                                     isDone={logs.some(l => l.habit_id === h.id && l.date === dateStr)} 
                                                     isProcessing={processingHabits.has(h.id)} 
                                                     onToggle={() => toggleHabit(h.id)}
-                                                    // On peut passer la couleur de la catégorie si on veut
                                                 />
                                             ))}
                                         </div>
@@ -386,9 +390,8 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE ANALYSE (VISUELS AMÉLIORÉS & ÉLARGIE) */}
+                {/* VUE ANALYSE */}
                 {activeTab === 'stats' && (
-                    // MODIF : max-w-full
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                             <h3 className="text-2xl font-black dark:text-white flex items-center gap-3"><Trophy className="text-amber-500"/> Performances</h3>
@@ -399,13 +402,12 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GRAPHIQUE PRINCIPAL - PLEINE LARGEUR */}
+                        {/* GRAPHIQUE PRINCIPAL */}
                         <div className="bg-white dark:bg-slate-900 p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
                             <div className="h-96 w-full flex items-end justify-between gap-1 md:gap-3">
                                 {stats.consistencyData.map((val, i) => (
                                     <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
                                         <div className={`w-full rounded-t-lg md:rounded-t-xl transition-all duration-700 ease-out hover:brightness-110 ${val >= 80 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : val >= 50 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : val > 0 ? 'bg-slate-300 dark:bg-slate-700' : 'bg-slate-100 dark:bg-slate-800 h-2'}`} style={{ height: val > 0 ? `${Math.max(val, 5)}%` : '8px' }}></div>
-                                        {/* Tooltip */}
                                         <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
                                             <div className="bg-slate-900 text-white text-[10px] px-3 py-2 rounded-lg shadow-2xl whitespace-nowrap font-black uppercase tracking-tighter">
                                                 {new Date(stats.dates[i]).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})} <span className="ml-2 text-blue-400">{val}%</span>
@@ -417,9 +419,9 @@ export default function HabitTracker({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* GRILLE D'ANALYSE (DOMAINES + HABITUDES ORPHELINES) */}
+                        {/* GRILLE D'ANALYSE */}
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                            {/* 1. Affichage des Domaines */}
+                            {/* Domaines */}
                             {stats.domainStats.map(cat => {
                                 const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
                                 return (
@@ -436,7 +438,7 @@ export default function HabitTracker({ data, updateData }) {
                                 );
                             })}
 
-                            {/* 2. Affichage des Habitudes Orphelines (Bulle individuelle sans domaine) */}
+                            {/* Habitudes Orphelines */}
                             {stats.orphanStats.map(hab => (
                                 <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
                                      <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
@@ -457,7 +459,7 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
-                {/* VUE REGLAGES (INTACTE) */}
+                {/* VUE REGLAGES */}
                 {activeTab === 'settings' && (
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-500">
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -531,7 +533,6 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
                 }
             `}
         >
-            {/* Effet de fond subtil si validé */}
             {isDone && <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none"></div>}
 
             <div className="flex items-center gap-5 relative z-10">
@@ -559,7 +560,6 @@ function HabitCreator({ categories, onAdd }) {
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
     const [selectedIcon, setSelectedIcon] = useState('');
 
-    // Liste d'emojis par défaut pour le logo
     const COMMON_ICONS = ["💧", "🏃", "📚", "🧘", "💊", "💤", "💻", "🎨", "💰", "🥗", "🚫", "🎸"];
 
     const toggleDay = (dayIndex) => {
@@ -574,7 +574,8 @@ function HabitCreator({ categories, onAdd }) {
         e.preventDefault();
         const name = e.target.habName.value;
         const catId = e.target.habCat.value;
-        // On permet catId vide
+        
+        // CORRECTION HTML: Si catId est vide, on l'envoie quand même
         if(name) { 
             onAdd(name, catId, selectedDays, selectedIcon); 
             e.target.reset(); 
@@ -586,16 +587,15 @@ function HabitCreator({ categories, onAdd }) {
     return (
         <form onSubmit={handleSubmit} className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-6">
             <div className="space-y-4">
-                {/* LIGNE 1 : NOM + DOMAINE */}
                 <div className="flex gap-2">
                     <input name="habName" placeholder="Nouvelle habitude..." className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" required/>
+                    {/* CORRECTION HTML: Suppression de 'required' ici */}
                     <select name="habCat" className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold w-1/3">
                         <option value="">Sans Domaine</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
 
-                {/* LIGNE 2 : SÉLECTION DU LOGO */}
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir un Logo</span>
                     <div className="flex flex-wrap gap-2">
@@ -620,7 +620,6 @@ function HabitCreator({ categories, onAdd }) {
                     </div>
                 </div>
 
-                {/* LIGNE 3 : FREQUENCE + BOUTON */}
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex items-center justify-between">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-4">Fréquence</span>
