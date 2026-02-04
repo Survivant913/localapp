@@ -6,7 +6,6 @@ import {
   ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
   PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
   Maximize2, Minimize2, Eye, 
-  // Nouveaux imports pour la taille
   Type as TypeIcon, RotateCcw 
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
@@ -33,7 +32,7 @@ export default function JournalManager({ data, updateData }) {
     
     // Etats Menus
     const [showColorPalette, setShowColorPalette] = useState(false);
-    const [showSizeMenu, setShowSizeMenu] = useState(false); // NOUVEAU
+    const [showSizeMenu, setShowSizeMenu] = useState(false);
     
     // Contenu Editeur
     const [pageContent, setPageContent] = useState('');
@@ -255,10 +254,10 @@ export default function JournalManager({ data, updateData }) {
         document.execCommand('styleWithCSS', false, true);
         document.execCommand(cmd, false, val);
         if (cmd === 'hiliteColor') setShowColorPalette(false);
-        setShowSizeMenu(false); // Ferme les menus
+        setShowSizeMenu(false); // Ferme le menu taille si ouvert
     };
 
-    // NOUVEAU : Changement de taille (Sélection)
+    // Changement de taille (Sélection)
     const changeFontSizeSelection = (size) => {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('fontSize', false, size); // Utilise les tailles HTML 1-7
@@ -556,8 +555,8 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            {/* ICI : J'AI MIS max-w-none AU LIEU DE max-w-3xl pour corriger le centrage */}
-                            <div className={`${isZenMode ? 'max-w-2xl' : 'w-full max-w-none'} mx-auto px-10 py-16 min-h-full transition-all duration-700`}>
+                            {/* CORRECTION LARGEUR (max-w-full ou max-w-5xl/7xl) + PADDING BOTTOM */}
+                            <div className={`${isZenMode ? 'w-full max-w-7xl px-12 md:px-20' : 'w-full max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700 pb-96`}>
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button 
