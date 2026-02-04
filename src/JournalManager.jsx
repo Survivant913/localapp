@@ -28,7 +28,10 @@ export default function JournalManager({ data, updateData }) {
     const [isZenMode, setIsZenMode] = useState(false); 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // NOUVEAUX ÉTATS POUR LES MENUS (Pour éviter qu'ils disparaissent)
     const [showColorPalette, setShowColorPalette] = useState(false);
+    const [showSizeMenu, setShowSizeMenu] = useState(false);
     
     const [fontSize, setFontSize] = useState(16);
 
@@ -114,7 +117,6 @@ export default function JournalManager({ data, updateData }) {
         if (page) {
             setPageContent(page.content || '');
             setPageTitle(page.title || 'Sans titre');
-            // On force la mise à jour directe des refs si le composant est déjà monté
             if (titleRef.current) titleRef.current.value = page.title || 'Sans titre';
             if (editorRef.current) editorRef.current.innerHTML = page.content || '';
         }
@@ -252,36 +254,33 @@ export default function JournalManager({ data, updateData }) {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('styleWithCSS', false, true);
         document.execCommand(cmd, false, val);
-        if (cmd === 'hiliteColor') setShowColorPalette(false);
+        setShowColorPalette(false);
+        setShowSizeMenu(false); // Fermer les menus après action
     };
 
+    // Fonction Taille de police corrigée
     const applyFontSize = (size) => {
         if (editorRef.current) editorRef.current.focus();
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0) {
-            const span = document.createElement("span");
-            span.style.fontSize = size;
-            const range = selection.getRangeAt(0);
-            
-            if (range.collapsed) {
-                // Si rien n'est sélectionné, on n'applique pas (ou on pourrait insérer un span vide)
-                return; 
-            }
-            
-            range.surroundContents(span);
-        }
+        // On crée un span avec la taille spécifiée
+        // L'astuce est d'utiliser execCommand pour insérer du HTML propre si possible, 
+        // ou d'utiliser font-size CSS
+        const span = `<span style="font-size: ${size};">${window.getSelection().toString()}</span>`;
+        document.execCommand('insertHTML', false, span);
+        setShowSizeMenu(false);
     };
 
     const resetFormat = () => {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('removeFormat', false, null);
-        document.execCommand('fontSize', false, 3);
+        setShowSizeMenu(false);
     };
 
+    // SAUT DE PAGE VISUEL (CORRIGÉ)
     const insertPageBreak = () => {
         if (editorRef.current) editorRef.current.focus();
+        // Un DIV gris qui simule l'espace entre deux feuilles A4
         const html = `
-            <div contenteditable="false" class="page-gap" title="Saut de page"></div>
+            <div contenteditable="false" class="page-gap"></div>
             <p><br/></p>
         `;
         document.execCommand('insertHTML', false, html);
@@ -321,8 +320,10 @@ export default function JournalManager({ data, updateData }) {
                     .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.8em; }
                     .content { text-align: justify; word-wrap: break-word; overflow-wrap: break-word; }
                     .content img { max-width: 100%; }
+                    /* Le gap est caché à l'impression, mais force une nouvelle page */
                     .page-gap { display: none !important; }
                     .page-gap + * { page-break-before: always; }
+                    
                     blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; color: #000 !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
@@ -340,7 +341,6 @@ export default function JournalManager({ data, updateData }) {
         printWindow.document.close();
     };
 
-    // --- VARIABLES D'AFFICHAGE ---
     const favoritePages = allPages.filter(p => p.is_favorite);
     const rootFolders = allFolders.filter(f => !f.parent_id); 
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
@@ -350,7 +350,6 @@ export default function JournalManager({ data, updateData }) {
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
     
-    // VARIABLE DE SÉCURITÉ POUR ÉVITER L'ÉCRAN BLANC
     const currentPage = allPages.find(p => p.id === activePageId);
 
     // --- VUE DASHBOARD ---
@@ -392,6 +391,7 @@ export default function JournalManager({ data, updateData }) {
     // --- VUE CONTENU ---
     return (
         <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            {/* SIDEBAR */}
             <div className={`${(isSidebarOpen && !isZenMode) ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
                     <div className="relative mb-3">
@@ -476,7 +476,6 @@ export default function JournalManager({ data, updateData }) {
 
             <div className={`flex-1 flex flex-col relative min-w-0 transition-colors duration-500 ${isZenMode ? 'bg-slate-200 dark:bg-black' : 'bg-slate-100 dark:bg-slate-950'}`}>
                 {activePageId ? (
-                    // CLÉ MAGIQUE POUR FORCER LE RAFRAICHISSEMENT
                     <div className="flex-1 flex flex-col h-full" key={activePageId}>
                         {!isZenMode ? (
                             <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-slate-900 z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
@@ -491,23 +490,32 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 
-                                <div className="relative group">
-                                    <button className="flex items-center gap-1 p-2 text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                {/* MENU TAILLE (AVEC TOGGLE ET CLIC) */}
+                                <div className="relative">
+                                    <button 
+                                        onMouseDown={(e) => { e.preventDefault(); setShowSizeMenu(!showSizeMenu); }}
+                                        className={`flex items-center gap-1 p-2 text-xs font-bold border rounded-lg transition-colors ${showSizeMenu ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'}`}
+                                    >
                                         <TypeIcon size={14}/> Taille <ChevronDown size={12}/>
                                     </button>
-                                    <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 hidden group-hover:block min-w-[100px] overflow-hidden">
-                                        {[12, 14, 16, 18, 24, 30].map(size => (
-                                            <button 
-                                                key={size}
-                                                onMouseDown={(e) => { e.preventDefault(); applyFontSize(size + 'px'); }}
-                                                className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200"
-                                            >
-                                                {size}px
+                                    {showSizeMenu && (
+                                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 min-w-[100px] overflow-hidden animate-in fade-in zoom-in-95">
+                                            {[12, 14, 16, 18, 20, 24, 30].map(size => (
+                                                <button 
+                                                    key={size}
+                                                    onMouseDown={(e) => { e.preventDefault(); applyFontSize(size + 'px'); }}
+                                                    className="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200"
+                                                >
+                                                    {size}px
+                                                </button>
+                                            ))}
+                                            <div className="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+                                            <button onMouseDown={(e) => { e.preventDefault(); resetFormat(); }} className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-500 text-xs font-bold flex items-center gap-2">
+                                                <RotateCcw size={12}/> Reset
                                             </button>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <ToolbarButton icon={RotateCcw} action={resetFormat} title="Réinitialiser le style" />
 
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                 <div className="relative">
@@ -537,7 +545,7 @@ export default function JournalManager({ data, updateData }) {
                                 <ToolbarButton cmd="justifyRight" icon={AlignRight} title="Droite" />
                                 <div className="flex-1"></div>
                                 <div className="flex items-center gap-2">
-                                    <button onClick={insertPageBreak} className="p-2 text-slate-500 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Insérer Saut de Page (Coupure)"><Scissors size={18}/></button>
+                                    <button onClick={insertPageBreak} className="p-2 text-slate-500 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Insérer Saut de Page"><Scissors size={18}/></button>
                                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                                     <button onClick={() => setIsZenMode(true)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
                                     <button onClick={handlePrint} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Imprimer"><Printer size={18}/></button>
@@ -551,7 +559,11 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''} flex justify-center py-8 bg-slate-200 dark:bg-black`}>
-                            <div className="bg-white text-slate-900 shadow-2xl transition-all duration-300 print:shadow-none print:m-0" style={{ width: '210mm', minHeight: '297mm', padding: '20mm', fontSize: '16px', boxSizing: 'border-box', overflowWrap: 'break-word', wordWrap: 'break-word', color: 'black' }}>
+                            {/* CONTENEUR PAGE A4 */}
+                            <div 
+                                className="bg-white text-slate-900 shadow-2xl transition-all duration-300 print:shadow-none print:m-0"
+                                style={{ width: '210mm', minHeight: '297mm', padding: '20mm', fontSize: '16px', boxSizing: 'border-box', overflowWrap: 'break-word', wordWrap: 'break-word', color: 'black', paddingBottom: '100px' }}
+                            >
                                 <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between print:hidden">
                                     <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                     <button onClick={() => toggleFavorite(currentPage)} className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${currentPage?.is_favorite ? 'bg-amber-100 text-amber-600' : 'text-slate-300 hover:text-slate-500'}`}>
@@ -573,16 +585,35 @@ export default function JournalManager({ data, updateData }) {
                 .prose blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; margin-left: 0; color: #444 !important; font-style: italic; background: #f9f9f9; padding: 10px 1em; border-radius: 4px; }
                 .prose ul { list-style-type: disc !important; padding-left: 1.5em !important; margin-bottom: 1em; }
                 .prose ol { list-style-type: decimal !important; padding-left: 1.5em !important; margin-bottom: 1em; }
-                .prose li { margin-bottom: 0.25em; }
-                .prose h2 { font-size: 1.5em !important; font-weight: 800 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
-                .prose h3 { font-size: 1.2em !important; font-weight: 700 !important; margin-top: 1em !important; margin-bottom: 0.5em; }
                 .prose span[style*="background-color"] { color: black !important; padding: 0 2px; border-radius: 2px; }
                 
-                /* GAP VISUEL (Saut de page) */
+                /* GAP VISUEL (Saut de page) - Gros bloc gris */
                 .page-gap { 
-                    background: #f1f5f9; height: 30px; margin-left: -20mm; margin-right: -20mm; margin-top: 30px; margin-bottom: 30px;
-                    border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.1); position: relative; user-select: none;
+                    background: #e2e8f0; /* Gris plus visible */
+                    height: 40px; 
+                    margin-left: -20mm; 
+                    margin-right: -20mm; 
+                    margin-top: 40px; 
+                    margin-bottom: 40px;
+                    border-top: 1px solid #cbd5e1; 
+                    border-bottom: 1px solid #cbd5e1; 
+                    box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.1); 
+                    position: relative; 
+                    user-select: none;
                 }
+                /* Petit texte "Saut de page" au milieu */
+                .page-gap::after {
+                    content: 'SAUT DE PAGE';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: #94a3b8;
+                    letter-spacing: 2px;
+                }
+
                 @media print {
                     .page-gap { display: none !important; }
                     .page-gap + * { page-break-before: always; }
