@@ -236,12 +236,9 @@ export default function PlanningManager({ data, updateData }) {
         const finalEmail = isRec ? '' : eventForm.invitedEmail;
         const invitedEmails = finalEmail ? finalEmail.split(',').map(e => e.trim().toLowerCase()).filter(Boolean) : [];
 
-        // Modification ici : on passe explicitement la couleur
-        const eventColor = eventForm.color || 'blue'; 
-
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
-            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventColor, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay, invited_email: finalEmail, status: 'accepted', organizer_email: data.profile?.email };
+            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay, invited_email: finalEmail, status: 'accepted', organizer_email: data.profile?.email };
             let newEvts = [];
             for (let i = 0; i < (eventForm.recurrence ? (parseInt(eventForm.recurrenceWeeks) || 1) : 1); i++) {
                 newEvts.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
@@ -259,9 +256,9 @@ export default function PlanningManager({ data, updateData }) {
         }
 
         if (eventForm.recurrenceGroupId) {
-            setPendingUpdate({ newStart, newEnd, ...eventForm, color: eventColor, invitedEmail: finalEmail }); setConfirmMode('ask_update'); setIsCreating(true); 
+            setPendingUpdate({ newStart, newEnd, ...eventForm, invitedEmail: finalEmail }); setConfirmMode('ask_update'); setIsCreating(true); 
         } else {
-            applyUpdate(eventForm.id, newStart, newEnd, { ...eventForm, color: eventColor, invitedEmail: finalEmail }, 'single');
+            applyUpdate(eventForm.id, newStart, newEnd, { ...eventForm, invitedEmail: finalEmail }, 'single');
         }
     };
 
@@ -283,8 +280,7 @@ export default function PlanningManager({ data, updateData }) {
         }
         updateData({ ...data, calendar_events: updated });
         const toSave = updated.filter(ev => String(ev.id) === String(targetId) || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
-        // On s'assure que la couleur est bien sauvegardée en base
-        toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, color: formData.color, organizer_email: data.profile?.email }).eq('id', ev.id).then());
+        toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
         setConfirmMode(null); setIsCreating(false);
     };
 
@@ -359,7 +355,7 @@ export default function PlanningManager({ data, updateData }) {
                                               onDrop={e => { e.preventDefault(); if (draggedItem?.data.is_all_day) { const st = setMinutes(setHours(day, 0), 0); const et = setMinutes(setHours(day, 23), 59); updateData({ ...data, calendar_events: events.map(ev => String(ev.id) === String(draggedItem.data.id) ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); } setDraggedItem(null); }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const isOwner = item.data.user_id === data.profile?.id;
-                                                    const colorClass = item.data.color === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : item.data.color === 'gray' ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 border-l-slate-500' : 'bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 border-l-blue-500';
+                                                    const colorClass = (item.data.color || 'blue') === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : (item.data.color || 'blue') === 'gray' ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 border-l-slate-500' : 'bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 border-l-blue-500';
                                                     const isPending = (item.data.my_status || item.data.status) === 'pending' && !isOwner;
                                                     return (<div key={item.data.id} draggable={isOwner} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
@@ -373,7 +369,14 @@ export default function PlanningManager({ data, updateData }) {
                                                     const isOwner = dataItem.user_id === data.profile?.id;
                                                     const isPending = (dataItem.my_status || dataItem.status) === 'pending' && !isOwner;
                                                     const isDeclined = (dataItem.my_status || dataItem.status) === 'declined';
-                                                    const colorClass = dataItem.color === 'green' ? 'bg-white dark:bg-slate-800 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' : dataItem.color === 'gray' ? 'bg-white dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300' : 'bg-white dark:bg-slate-800 border-l-blue-600 text-blue-900 dark:text-blue-100';
+                                                    
+                                                    // MODIFICATION ICI : On applique le background coloré au lieu du blanc
+                                                    const colorClass = (dataItem.color || 'blue') === 'green' 
+                                                        ? 'bg-emerald-100 dark:bg-emerald-900/50 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' 
+                                                        : (dataItem.color || 'blue') === 'gray' 
+                                                            ? 'bg-slate-100 dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300' 
+                                                            : 'bg-blue-100 dark:bg-blue-900/50 border-l-blue-600 text-blue-900 dark:text-blue-100';
+                                                    
                                                     return (
                                                         <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm border border-gray-200 dark:border-slate-700 border-l-4 ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-blue-500"/>}{dataItem.title}</span>
