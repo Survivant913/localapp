@@ -15,6 +15,9 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
         return habits.filter(h => {
+            // SÉCURITÉ ANTI-CRASH : On vérifie que frequency existe et est un tableau
+            if (!h.frequency || !Array.isArray(h.frequency)) return false;
+
             // Est-ce prévu aujourd'hui ?
             const daysMap = { 'Dim': 0, 'Lun': 1, 'Mar': 2, 'Mer': 3, 'Jeu': 4, 'Ven': 5, 'Sam': 6 };
             const isScheduledToday = h.frequency.some(d => daysMap[d] === todayIndex);
