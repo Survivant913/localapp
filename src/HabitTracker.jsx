@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../supabaseClient';
-// On importe le paquet complet pour la sélection dynamique
+// CORRECTION ICI : ./ au lieu de ../ si le fichier est à la racine de src
+import { supabase } from './supabaseClient';
 import * as Icons from 'lucide-react';
-// On importe UNIQUEMENT ce qu'on utilise vraiment pour éviter l'erreur Vercel
 import { 
   Plus, Trash2, Check, BarChart2, 
   Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, List, CheckCircle2,
@@ -17,7 +16,6 @@ const PREMIUM_ICONS = [
     "Music", "Camera", "Gamepad2", "Plane", "Coffee", "Home", "ShoppingCart", "Utensils", "Sun", "Moon", "Leaf"
 ];
 
-// --- COMPOSANT D'ICÔNE DYNAMIQUE SÉCURISÉ ---
 const DynamicIcon = ({ name, size = 24, className = "" }) => {
     if (!name) return null;
     const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
