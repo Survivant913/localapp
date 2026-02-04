@@ -56,6 +56,7 @@ export default function App() {
    goals: [], goal_milestones: [], 
    journal_folders: [], journal_pages: [],
    calendar_events: [], 
+   habits: [], // AJOUT : Initialisation de habits
    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'blue' }, customLabels: {},
    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
@@ -337,7 +338,9 @@ export default function App() {
         .select('*')
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
        supabase.from('todo_lists').select('*'),
-       supabase.from('event_participants').select('*') 
+       supabase.from('event_participants').select('*'),
+       // AJOUT : CHARGEMENT DES HABITUDES
+       supabase.from('habits').select('*') 
      ]);
 
      const [
@@ -349,7 +352,9 @@ export default function App() {
        { data: journal_folders }, { data: journal_pages },
        { data: calendar_events },
        { data: todo_lists },
-       { data: all_participants }
+       { data: all_participants },
+       // AJOUT : RÉCUPÉRATION HABITUDES
+       { data: habits }
      ] = results;
 
      let newDBTransactions = [];
@@ -469,6 +474,8 @@ export default function App() {
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
+       // AJOUT : INJECTION DES HABITUDES DANS DATA
+       habits: habits || [],
        calendar_events: (calendar_events || []).map(ev => {
           const parts = (all_participants || []).filter(p => String(p.event_id) === String(ev.id));
           const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
@@ -566,6 +573,8 @@ export default function App() {
          recurrence_group_id: e.recurrence_group_id, is_all_day: e.is_all_day,
          invited_email: e.invited_email, status: e.status, organizer_email: e.organizer_email || user.email 
      }));
+     // AJOUT : SAUVEGARDE DES HABITUDES
+     await upsertInBatches('habits', data.habits, 50, h => ({ id: h.id, user_id: user.id, name: h.name, frequency: h.frequency, history: h.history, streak: h.streak, icon: h.icon }));
 
      const bases = data.budget.planner.safetyBases;
      const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
