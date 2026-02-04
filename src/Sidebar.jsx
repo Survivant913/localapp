@@ -58,7 +58,10 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'habits', label: 'Suivi Habitudes', icon: Activity },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
-    { id: 'clients', label: 'Clients', icon: Users },
+    
+    // --- MASQUÉ TEMPORAIREMENT (Code préservé) ---
+    // { id: 'clients', label: 'Clients', icon: Users },
+    
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
     { id: 'journal', label: 'Carnet', icon: Book },
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
