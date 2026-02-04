@@ -1,48 +1,35 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-// MODIF : On importe TOUTES les icônes pour pouvoir les utiliser dynamiquement
+// On importe le paquet complet pour la sélection dynamique
 import * as Icons from 'lucide-react';
+// On importe individuellement les composants utilisés dans l'interface (hors icônes dynamiques)
 import { 
-  Plus, Trash2, Check, X, Activity, BarChart2, Calendar, 
-  Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, LayoutGrid, List, CheckCircle2, TrendingUp,
+  Plus, Trash2, Check, X, BarChart2, 
+  Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, List, CheckCircle2,
   Sparkles
 } from 'lucide-react';
 
-// --- LISTE D'ICÔNES PREMIUM POUR LE SÉLECTEUR ---
+// --- LISTE D'ICÔNES PREMIUM (NOMS EXACTS LUCIDE) ---
 const PREMIUM_ICONS = [
-    // Santé / Sport
-    "Activity", "HeartPulse", "Dumbbell", "Bike", "Footprints", "Yoga", "BedDouble", "GlassWater", "Apple", "Salad", "Pill",
-    // Travail / Productivité
-    "Briefcase", "Laptop", "Code", "PenTool", "BookOpen", "BrainCircuit", "Focus", "Target", "ListTodo", "CalendarCheck", "AlarmClock",
-    // Finance
-    "Wallet", "PiggyBank", "Coins", "CreditCard", "DollarSign", "TrendingUp",
-    // Créatif / Loisirs
-    "Palette", "Music", "Guitar", "Camera", "Gamepade2", "Plane", "Tent", "Sun", "Moon",
-    // Maison / Quotidien
-    "Home", "ShoppingCart", "Utensils", "ShowerHead", "Shirt", "Trash2", "Leaf", "Droplet",
-    // Social / Mental
-    "Users", "MessageCircle", "Smile", "Brain", "BookHeart", "Coffee"
+    // Sport & Santé
+    "Activity", "HeartPulse", "Dumbbell", "Bike", "Footprints", "GlassWater", "Apple", "Pill", "BedDouble",
+    // Travail & Focus
+    "Briefcase", "Laptop", "Code", "PenTool", "BookOpen", "BrainCircuit", "Target", "AlarmClock",
+    // Argent
+    "Wallet", "PiggyBank", "CreditCard", "TrendingUp", "DollarSign",
+    // Loisirs & Vie
+    "Music", "Camera", "Gamepad2", "Plane", "Coffee", "Home", "ShoppingCart", "Utensils", "Sun", "Moon", "Leaf"
 ];
 
-// --- UTILITAIRES ---
-
-// MODIF : Petit composant pour afficher une icône Lucide dynamiquement via son nom
+// --- COMPOSANT D'ICÔNE DYNAMIQUE (SÉCURISÉ) ---
 const DynamicIcon = ({ name, size = 24, className = "" }) => {
     if (!name) return null;
-    // On récupère le composant d'icône depuis la librairie Lucide
-    const IconComponent = Icons[name];
-    // Si l'icône existe, on l'affiche, sinon rien (sécurité pour les vieux emojis)
-    if (!IconComponent) return null; 
+    // On met une majuscule au cas où (sécurité)
+    const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
+    const IconComponent = Icons[pascalName] || Icons[name];
+    
+    if (!IconComponent) return <span className="text-xs">?</span>; // Fallback si icône introuvable
     return <IconComponent size={size} className={className} />;
-};
-
-const COLOR_MAP = {
-    'bg-blue-500': 'text-blue-500',
-    'bg-green-500': 'text-green-500',
-    'bg-purple-500': 'text-purple-500',
-    'bg-orange-500': 'text-orange-500',
-    'bg-red-500': 'text-red-500',
-    'bg-gray-400': 'text-gray-400'
 };
 
 const Badge = ({ color, text }) => (
@@ -58,6 +45,15 @@ const getLocalYYYYMMDD = (dateObj) => {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+};
+
+const COLOR_MAP = {
+    'bg-blue-500': 'text-blue-500',
+    'bg-green-500': 'text-green-500',
+    'bg-purple-500': 'text-purple-500',
+    'bg-orange-500': 'text-orange-500',
+    'bg-red-500': 'text-red-500',
+    'bg-gray-400': 'text-gray-400'
 };
 
 export default function HabitTracker({ data, updateData }) {
@@ -161,7 +157,7 @@ export default function HabitTracker({ data, updateData }) {
         
         if (error) {
             console.error("Erreur ajout habitude:", error);
-            alert(`Erreur: ${error.message}.`);
+            alert(`Erreur: ${error.message}. Vérifiez la colonne 'icon' dans Supabase.`);
         } else if (newHab) {
             setHabits([...habits, newHab]);
         }
@@ -173,7 +169,6 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES (INTACT) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -449,7 +444,6 @@ export default function HabitTracker({ data, updateData }) {
                                 );
                             })}
 
-                            {/* MODIF : Utilisation de DynamicIcon pour les orphelins */}
                             {stats.orphanStats.map(hab => (
                                 <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
                                      <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
@@ -505,7 +499,6 @@ export default function HabitTracker({ data, updateData }) {
                                 {activeHabitsForManagement.map(h => (
                                     <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
                                         <div>
-                                            {/* MODIF : Utilisation de DynamicIcon pour la liste */}
                                             <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                                                 <DynamicIcon name={h.icon} size={18} className="text-blue-500" />
                                                 {h.name}
@@ -532,7 +525,6 @@ export default function HabitTracker({ data, updateData }) {
     );
 }
 
-// COMPOSANT CARTE ESTHÉTIQUE
 function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColor }) {
     return (
         <div 
@@ -549,7 +541,6 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
 
             <div className="flex items-center gap-5 relative z-10">
                 <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110 rotate-3' : `${iconColor || 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600 group-hover:scale-110'}`}`}>
-                    {/* MODIF : Logique d'affichage de l'icône Premium */}
                     {isProcessing ? (
                         <Loader2 size={24} className="animate-spin" />
                     ) : isDone ? (
@@ -577,12 +568,11 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
     );
 }
 
-// MODIF : Mise à jour du Créateur pour utiliser les icônes Premium
 function HabitCreator({ categories, onAdd }) {
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
-    const [selectedIcon, setSelectedIcon] = useState(''); // Stocke désormais le NOM de l'icône Lucide
+    const [selectedIcon, setSelectedIcon] = useState('');
 
     const toggleDay = (dayIndex) => {
         if (selectedDays.includes(dayIndex)) {
@@ -624,7 +614,6 @@ function HabitCreator({ categories, onAdd }) {
                     </select>
                 </div>
 
-                {/* MODIF : Nouveau sélecteur d'icônes Premium */}
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir une Icône (Premium)</span>
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
