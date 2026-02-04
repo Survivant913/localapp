@@ -1,12 +1,40 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
+// MODIF : On importe TOUTES les icônes pour pouvoir les utiliser dynamiquement
+import * as Icons from 'lucide-react';
 import { 
   Plus, Trash2, Check, X, Activity, BarChart2, Calendar, 
   Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, LayoutGrid, List, CheckCircle2, TrendingUp,
-  Smile, Sparkles
+  Sparkles
 } from 'lucide-react';
 
-// --- UTILITAIRES (INTACTS) ---
+// --- LISTE D'ICÔNES PREMIUM POUR LE SÉLECTEUR ---
+const PREMIUM_ICONS = [
+    // Santé / Sport
+    "Activity", "HeartPulse", "Dumbbell", "Bike", "Footprints", "Yoga", "BedDouble", "GlassWater", "Apple", "Salad", "Pill",
+    // Travail / Productivité
+    "Briefcase", "Laptop", "Code", "PenTool", "BookOpen", "BrainCircuit", "Focus", "Target", "ListTodo", "CalendarCheck", "AlarmClock",
+    // Finance
+    "Wallet", "PiggyBank", "Coins", "CreditCard", "DollarSign", "TrendingUp",
+    // Créatif / Loisirs
+    "Palette", "Music", "Guitar", "Camera", "Gamepade2", "Plane", "Tent", "Sun", "Moon",
+    // Maison / Quotidien
+    "Home", "ShoppingCart", "Utensils", "ShowerHead", "Shirt", "Trash2", "Leaf", "Droplet",
+    // Social / Mental
+    "Users", "MessageCircle", "Smile", "Brain", "BookHeart", "Coffee"
+];
+
+// --- UTILITAIRES ---
+
+// MODIF : Petit composant pour afficher une icône Lucide dynamiquement via son nom
+const DynamicIcon = ({ name, size = 24, className = "" }) => {
+    if (!name) return null;
+    // On récupère le composant d'icône depuis la librairie Lucide
+    const IconComponent = Icons[name];
+    // Si l'icône existe, on l'affiche, sinon rien (sécurité pour les vieux emojis)
+    if (!IconComponent) return null; 
+    return <IconComponent size={size} className={className} />;
+};
 
 const COLOR_MAP = {
     'bg-blue-500': 'text-blue-500',
@@ -122,12 +150,10 @@ export default function HabitTracker({ data, updateData }) {
     };
 
     const addHabit = async (name, categoryId, daysOfWeek, icon) => {
-        // Préparation propre des données
         const payload = { 
             name, 
             category_id: (categoryId === "" || categoryId === "null") ? null : categoryId, 
             days_of_week: daysOfWeek,
-            // On envoie l'icône seulement si elle n'est pas vide
             icon: icon || null 
         };
 
@@ -135,7 +161,7 @@ export default function HabitTracker({ data, updateData }) {
         
         if (error) {
             console.error("Erreur ajout habitude:", error);
-            alert(`Erreur: ${error.message}. Avez-vous ajouté la colonne 'icon' dans Supabase ?`);
+            alert(`Erreur: ${error.message}.`);
         } else if (newHab) {
             setHabits([...habits, newHab]);
         }
@@ -147,7 +173,7 @@ export default function HabitTracker({ data, updateData }) {
         setHabits(habits.map(h => h.id === id ? { ...h, is_archived: true } : h));
     };
 
-    // --- MOTEUR DE STATISTIQUES ---
+    // --- MOTEUR DE STATISTIQUES (INTACT) ---
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0); 
@@ -162,7 +188,6 @@ export default function HabitTracker({ data, updateData }) {
             });
         }
 
-        // 1. Stats par Domaine
         const domainStats = categories.map(cat => {
             const catHabits = habits.filter(h => h.category_id === cat.id);
             if (catHabits.length === 0) return null;
@@ -192,7 +217,6 @@ export default function HabitTracker({ data, updateData }) {
             };
         }).filter(Boolean);
 
-        // 2. Stats pour les Habitudes Orphelines
         const orphanHabits = habits.filter(h => !h.category_id && !h.is_archived);
         const orphanStats = orphanHabits.map(h => {
             let totalPossible = 0;
@@ -220,7 +244,6 @@ export default function HabitTracker({ data, updateData }) {
             };
         });
 
-        // 3. Consistance Globale
         const consistencyData = dates.map(dObj => {
             let activeHabitsCount = 0;
             let doneCount = 0;
@@ -245,7 +268,6 @@ export default function HabitTracker({ data, updateData }) {
         return { domainStats, orphanStats, consistencyData, dates: dates.map(d => d.str) };
     }, [statRange, categories, habits, logs]);
 
-    // --- NAVIGATION DATES ---
     const changeDate = (days) => {
         const newDate = new Date(selectedDate);
         newDate.setDate(newDate.getDate() + days);
@@ -295,6 +317,7 @@ export default function HabitTracker({ data, updateData }) {
 
             <div className="flex-1 overflow-y-auto px-4 md:px-8 lg:px-12 py-8 custom-scrollbar">
                 
+                {/* VUE QUOTIDIENNE */}
                 {activeTab === 'daily' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col md:flex-row items-center gap-10">
@@ -381,6 +404,7 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
+                {/* VUE ANALYSE */}
                 {activeTab === 'stats' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -425,11 +449,12 @@ export default function HabitTracker({ data, updateData }) {
                                 );
                             })}
 
+                            {/* MODIF : Utilisation de DynamicIcon pour les orphelins */}
                             {stats.orphanStats.map(hab => (
                                 <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
                                      <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
-                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-4 text-center truncate w-full flex justify-center items-center gap-1">
-                                         {hab.icon && <span className="text-sm">{hab.icon}</span>}
+                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-4 text-center truncate w-full flex justify-center items-center gap-2">
+                                         <DynamicIcon name={hab.icon} size={14} className="text-amber-500" />
                                          {hab.name}
                                      </span>
                                      <div className="relative w-20 h-20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -445,6 +470,7 @@ export default function HabitTracker({ data, updateData }) {
                     </div>
                 )}
 
+                {/* VUE REGLAGES */}
                 {activeTab === 'settings' && (
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-500">
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -479,8 +505,9 @@ export default function HabitTracker({ data, updateData }) {
                                 {activeHabitsForManagement.map(h => (
                                     <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
                                         <div>
+                                            {/* MODIF : Utilisation de DynamicIcon pour la liste */}
                                             <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                                {h.icon && <span>{h.icon}</span>}
+                                                <DynamicIcon name={h.icon} size={18} className="text-blue-500" />
                                                 {h.name}
                                             </div>
                                             <div className="flex gap-1 mt-2">
@@ -521,8 +548,17 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
             {isDone && <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none"></div>}
 
             <div className="flex items-center gap-5 relative z-10">
-                <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center text-2xl transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110 rotate-3' : `${iconColor || 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600 group-hover:scale-110'}`}`}>
-                    {isProcessing ? <Loader2 size={24} className="animate-spin" /> : (habit.icon || (isDone ? <Check size={28} strokeWidth={3} /> : <Zap size={24} />))}
+                <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110 rotate-3' : `${iconColor || 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600 group-hover:scale-110'}`}`}>
+                    {/* MODIF : Logique d'affichage de l'icône Premium */}
+                    {isProcessing ? (
+                        <Loader2 size={24} className="animate-spin" />
+                    ) : isDone ? (
+                        <Check size={28} strokeWidth={3} />
+                    ) : habit.icon ? (
+                        <DynamicIcon name={habit.icon} size={24} />
+                    ) : (
+                        <Zap size={24} />
+                    )}
                 </div>
                 <div>
                      <span className={`text-lg font-bold block transition-all ${isDone ? 'text-slate-400 dark:text-slate-500 line-through opacity-60' : 'text-slate-800 dark:text-slate-100'}`}>
@@ -541,13 +577,12 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
     );
 }
 
+// MODIF : Mise à jour du Créateur pour utiliser les icônes Premium
 function HabitCreator({ categories, onAdd }) {
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
-    const [selectedIcon, setSelectedIcon] = useState('');
-
-    const COMMON_ICONS = ["💧", "🏃", "📚", "🧘", "💊", "💤", "💻", "🎨", "💰", "🥗", "🚫", "🎸"];
+    const [selectedIcon, setSelectedIcon] = useState(''); // Stocke désormais le NOM de l'icône Lucide
 
     const toggleDay = (dayIndex) => {
         if (selectedDays.includes(dayIndex)) {
@@ -589,27 +624,21 @@ function HabitCreator({ categories, onAdd }) {
                     </select>
                 </div>
 
+                {/* MODIF : Nouveau sélecteur d'icônes Premium */}
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir un Logo</span>
-                    <div className="flex flex-wrap gap-2">
-                        {COMMON_ICONS.map(icon => (
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Choisir une Icône (Premium)</span>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                        {PREMIUM_ICONS.map(iconName => (
                             <button 
-                                key={icon} 
+                                key={iconName} 
                                 type="button" 
-                                onClick={() => setSelectedIcon(icon === selectedIcon ? '' : icon)}
-                                className={`w-10 h-10 text-xl rounded-xl transition-all ${selectedIcon === icon ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-white dark:bg-slate-700 hover:bg-slate-200'}`}
+                                onClick={() => setSelectedIcon(iconName === selectedIcon ? '' : iconName)}
+                                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${selectedIcon === iconName ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-blue-500'}`}
+                                title={iconName}
                             >
-                                {icon}
+                                <DynamicIcon name={iconName} size={20} />
                             </button>
                         ))}
-                        <input 
-                            type="text" 
-                            placeholder="Autre..." 
-                            maxLength={2} 
-                            value={selectedIcon}
-                            onChange={(e) => setSelectedIcon(e.target.value)}
-                            className="w-20 px-2 rounded-xl text-center bg-white dark:bg-slate-700 border-none outline-none focus:ring-2 focus:ring-blue-500"
-                        />
                     </div>
                 </div>
 
