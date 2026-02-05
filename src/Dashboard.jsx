@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-// AJOUT : Import global des icônes pour l'affichage dynamique
+// AJOUT : Import de supabase pour la synchronisation parfaite avec le Tracker
+import { supabase } from './supabaseClient';
 import * as AllIcons from 'lucide-react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
@@ -9,61 +10,59 @@ import {
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
-// --- AJOUT : COMPOSANT DYNAMIC ICON (Pour afficher les logos correctement) ---
+// --- COMPOSANT DYNAMIC ICON ---
 const DynamicIcon = ({ name, size = 18, className = "" }) => {
     if (!name) return <span className="text-lg">✨</span>;
-    // Conversion première lettre majuscule au cas où
     const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
     const IconComponent = AllIcons[pascalName] || AllIcons[name];
     if (!IconComponent) return <span className="text-xs">{name}</span>; 
     return <IconComponent size={size} className={className} />;
 };
 
-// --- COMPOSANT HABIT STRIP (CORRIGÉ : Logos + Scroll Infini) ---
+// --- COMPOSANT HABIT STRIP (CORRIGÉ : Scroll Fixe + Synchro DB) ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
-    // 1. Filtrage Logique
-    const todayIndex = new Date().getDay(); // 0 = Dimanche, 1 = Lundi...
+    const todayIndex = new Date().getDay(); 
     
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
         return habits.filter(h => {
             // SÉCURITÉ ANTI-CRASH
             if (!h.frequency || !Array.isArray(h.frequency)) {
-                 // Tentative de fallback sur days_of_week si frequency est vide
                  if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                     return h.days_of_week.includes(todayIndex) && !(h.history && h.history.length > 0 && new Date(h.history[h.history.length - 1]).toDateString() === new Date().toDateString());
+                     // Vérification si déjà fait (compatible format Tracker YYYY-MM-DD)
+                     const lastDateStr = h.history && h.history.length > 0 ? h.history[h.history.length - 1] : null;
+                     // On compare les dates locales
+                     const todayStr = new Date().toLocaleDateString('fr-CA'); // Format YYYY-MM-DD local
+                     
+                     // Si l'historique contient la date d'aujourd'hui (format complet ou court)
+                     let isDoneToday = false;
+                     if(lastDateStr) {
+                         const lastDate = new Date(lastDateStr);
+                         const today = new Date();
+                         isDoneToday = lastDate.toDateString() === today.toDateString() || lastDateStr.includes(todayStr);
+                     }
+
+                     return h.days_of_week.includes(todayIndex) && !isDoneToday;
                  }
                  return false;
             }
 
-            // MAPPING ROBUSTE (Accepte "Lun", "Lundi", "lun", "Mon", etc.)
             let isScheduledToday = false;
             
-            // Cas 1 : Format numérique (venant de HabitTracker)
             if (h.days_of_week && Array.isArray(h.days_of_week)) {
                 isScheduledToday = h.days_of_week.includes(todayIndex);
             } 
-            // Cas 2 : Format texte (Legacy)
             else {
                 isScheduledToday = h.frequency.some(d => {
                     if (!d) return false;
                     const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
-                    const map = { 
-                        'dim': 0, 'sun': 0,
-                        'lun': 1, 'mon': 1,
-                        'mar': 2, 'tue': 2,
-                        'mer': 3, 'wed': 3,
-                        'jeu': 4, 'thu': 4,
-                        'ven': 5, 'fri': 5,
-                        'sam': 6, 'sat': 6
-                    };
+                    const map = { 'dim': 0, 'sun': 0, 'lun': 1, 'mon': 1, 'mar': 2, 'tue': 2, 'mer': 3, 'wed': 3, 'jeu': 4, 'thu': 4, 'ven': 5, 'fri': 5, 'sam': 6, 'sat': 6 };
                     return map[norm] === todayIndex;
                 });
             }
             
             if (!isScheduledToday) return false;
 
-            // Est-ce déjà fait aujourd'hui ?
             const lastDate = h.history && h.history.length > 0 ? new Date(h.history[h.history.length - 1]) : null;
             const isDoneToday = lastDate && new Date().toDateString() === lastDate.toDateString();
             
@@ -71,10 +70,8 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         });
     }, [habits, todayIndex]);
 
-    // 2. Gestion Rotation Locale (Deck)
-    const [rotatedIds, setRotatedIds] = useState([]); // Liste des IDs qu'on a "passés"
+    const [rotatedIds, setRotatedIds] = useState([]); 
 
-    // On trie : d'abord ceux pas encore passés, ensuite ceux passés (à la fin)
     const visibleHabits = useMemo(() => {
         const notRotated = todayHabits.filter(h => !rotatedIds.includes(h.id));
         const rotated = todayHabits.filter(h => rotatedIds.includes(h.id));
@@ -83,14 +80,36 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
 
     const handlePass = (id, e) => {
         e.stopPropagation();
-        setRotatedIds(prev => [...prev, id]); // On l'ajoute à la liste des "passés"
+        // CORRECTION SCROLL : On enlève le focus du bouton pour éviter que l'écran ne saute
+        if (e.currentTarget) e.currentTarget.blur();
+        setRotatedIds(prev => [...prev, id]);
     };
 
-    const handleCheck = (habit, e) => {
+    const handleCheck = async (habit, e) => {
         e.stopPropagation();
-        const todayStr = new Date().toISOString();
-        const newHistory = [...(habit.history || []), todayStr];
+        
+        // 1. FORMAT DATE COMPATIBLE TRACKER (YYYY-MM-DD)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`; 
+
+        // 2. MISE À JOUR VISUELLE IMMÉDIATE (Optimiste)
+        // On sauvegarde aussi l'ISO complet pour que le Dashboard le détecte "Done" immédiatement
+        const newHistory = [...(habit.history || []), new Date().toISOString()];
         updateHabit({ ...habit, history: newHistory, streak: (habit.streak || 0) + 1 });
+
+        // 3. SAUVEGARDE DB SECRÈTE (Pour que le Tracker le voie)
+        try {
+            await supabase.from('habit_logs').insert({
+                habit_id: habit.id,
+                date: todayStr,
+                completed: true
+            });
+        } catch (err) {
+            console.error("Erreur sync log:", err);
+        }
     };
 
     if (visibleHabits.length === 0) {
@@ -106,11 +125,9 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
 
     return (
         <div className="flex gap-4 overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
-            {/* MODIFICATION : Suppression du .slice(0, 6) pour afficher TOUTES les habitudes */}
             {visibleHabits.map(h => (
                 <div key={h.id} className="snap-center shrink-0 w-32 h-32 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between p-3 group relative overflow-hidden transition-all hover:border-slate-300 dark:hover:border-slate-600">
                     <div className="flex justify-between items-start">
-                        {/* MODIFICATION : Utilisation de DynamicIcon au lieu d'afficher le texte brut */}
                         <span className="p-1.5 bg-slate-50 dark:bg-slate-700 rounded-lg text-lg text-blue-500">
                             <DynamicIcon name={h.icon} size={20} />
                         </span>
@@ -124,7 +141,6 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                     </button>
                 </div>
             ))}
-            {/* Le bouton VOIR TOUT apparaît maintenant à la toute fin du scroll si besoin */}
             <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                 <span className="text-slate-400 font-black text-xs rotate-90 whitespace-nowrap">GERER</span>
             </div>
@@ -135,24 +151,13 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
 // --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
 const SparkLine = ({ data, height = 50 }) => {
     if (!data || !Array.isArray(data) || data.length < 2) return null;
-    
     let min = Math.min(...data);
     let max = Math.max(...data);
-    
-    if (min > 0) min = 0; 
-    if (max < 0) max = 0;
-    
+    if (min > 0) min = 0; if (max < 0) max = 0;
     const range = max - min || 1;
     const width = 100;
-    
     const getY = (val) => height - ((val - min) / range) * height;
-
-    const points = data.map((val, i) => {
-        const x = (i / (data.length - 1)) * width;
-        const y = getY(val);
-        return `${x},${y}`;
-    }).join(' ');
-    
+    const points = data.map((val, i) => `${(i / (data.length - 1)) * width},${getY(val)}`).join(' ');
     const zeroOffset = Math.max(0, Math.min(1, (max - 0) / range));
     const gradientId = "spark-grad-" + Math.random().toString(36).substr(2, 9);
 
@@ -186,7 +191,7 @@ export default function Dashboard({ data, updateData, setView }) {
     const todos = Array.isArray(data.todos) ? data.todos : [];
     const projects = Array.isArray(data.projects) ? data.projects : [];
     const notes = Array.isArray(data.notes) ? data.notes : [];
-    const habits = Array.isArray(data.habits) ? data.habits : []; // NOUVEAU
+    const habits = Array.isArray(data.habits) ? data.habits : []; 
     
     const budget = data.budget || {};
     const transactions = Array.isArray(budget.transactions) ? budget.transactions : [];
@@ -196,7 +201,7 @@ export default function Dashboard({ data, updateData, setView }) {
     
     const labels = data.customLabels || {};
 
-    // --- 1. FILTRES INTELLIGENTS (CORRIGÉS) ---
+    // --- FILTRES ---
     const isRelevantItem = (item) => {
         if (dashboardFilter === 'total') return true;
         const accId = String(item.accountId || item.account_id);
@@ -216,22 +221,16 @@ export default function Dashboard({ data, updateData, setView }) {
             if (type === 'transfer') return 0; 
             return -amount;
         }
-
         if (type === 'transfer') {
             if (targetId === String(dashboardFilter)) return amount; 
             if (accId === String(dashboardFilter)) return -amount;   
             return 0;
         }
-
         if (type === 'income') return amount;
         return -amount;
     };
 
-    // --- 2. CALCULS DE SOLDE ---
-    const currentBalanceRaw = transactions
-        .filter(t => isRelevantItem(t))
-        .reduce((acc, t) => acc + getFinancialImpact(t), 0);
-    
+    const currentBalanceRaw = transactions.filter(t => isRelevantItem(t)).reduce((acc, t) => acc + getFinancialImpact(t), 0);
     const currentBalance = Math.round(currentBalanceRaw * 100) / 100;
 
     const renderAmount = (val, withSign = false) => {
@@ -245,58 +244,41 @@ export default function Dashboard({ data, updateData, setView }) {
         return (val < 0 ? '-' : '') + formatted;
     };
 
-    // --- NOUVEAU : CALCUL PRÉVISION FIN DE MOIS ---
     const getProjectedEndOfMonth = () => {
         const today = new Date();
-        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); // Dernier jour du mois
+        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0); 
         let projected = currentBalance;
-
-        // 1. Ajouter les opérations planifiées (Scheduled) d'ici la fin du mois
         scheduled.forEach(s => {
             if (s.status === 'pending' && isRelevantItem(s)) {
                 const sDate = new Date(s.date);
-                if (sDate >= today && sDate <= lastDayOfMonth) {
-                    projected += getFinancialImpact(s);
-                }
+                if (sDate >= today && sDate <= lastDayOfMonth) projected += getFinancialImpact(s);
             }
         });
-
-        // 2. Ajouter les récurrentes (Recurring) d'ici la fin du mois
         recurring.forEach(r => {
             if (isRelevantItem(r) && r.nextDueDate) {
                 const rDate = new Date(r.nextDueDate);
-                if (rDate >= today && rDate <= lastDayOfMonth) {
-                    projected += getFinancialImpact(r);
-                }
+                if (rDate >= today && rDate <= lastDayOfMonth) projected += getFinancialImpact(r);
             }
         });
-
         return projected;
     };
     const projectedBalance = getProjectedEndOfMonth();
-    const balanceDiff = projectedBalance - currentBalance; // Différence pour savoir si ça monte ou descend
+    const balanceDiff = projectedBalance - currentBalance; 
 
-    // Graphique Performant
     const getSparklineData = () => {
         try {
             const days = 30; 
             const history = [];
             let tempBalance = currentBalance;
-            
             const dailyChanges = {};
             const relevantTransactions = transactions.filter(t => isRelevantItem(t));
-            
             relevantTransactions.forEach(t => {
-                const d = new Date(t.date);
-                d.setHours(0,0,0,0);
+                const d = new Date(t.date); d.setHours(0,0,0,0);
                 const key = d.getTime();
                 const impact = getFinancialImpact(t);
                 dailyChanges[key] = (dailyChanges[key] || 0) + impact;
             });
-
-            let currentDateCursor = new Date();
-            currentDateCursor.setHours(0,0,0,0); 
-
+            let currentDateCursor = new Date(); currentDateCursor.setHours(0,0,0,0); 
             for (let i = 0; i < days; i++) {
                 history.unshift(Number(tempBalance.toFixed(2)));
                 const key = currentDateCursor.getTime();
@@ -306,68 +288,46 @@ export default function Dashboard({ data, updateData, setView }) {
             return history;
         } catch (e) { return [0, 0]; }
     };
-    
     const sparkData = getSparklineData();
 
-    // --- 3. CALCUL "À VENIR" ---
     const getUpcomingEvents = () => {
         try {
-            const today = new Date();
-            today.setHours(0,0,0,0);
+            const today = new Date(); today.setHours(0,0,0,0);
             let events = [];
-
             scheduled.forEach(s => {
                 if(s.status === 'pending') {
                     if (!isRelevantItem(s)) return;
                     events.push({ type: 'scheduled', date: new Date(s.date), data: s, id: `s-${s.id}` });
                 }
             });
-
             recurring.forEach(r => {
                 if (!isRelevantItem(r)) return;
                 let nextDate = r.nextDueDate ? new Date(r.nextDueDate) : new Date();
                 events.push({ type: 'recurring', date: nextDate, data: r, id: `r-${r.id}` });
             });
-
-            return events
-                .filter(e => !isNaN(e.date.getTime()) && e.date >= today)
-                .sort((a, b) => a.date - b.date)
-                .slice(0, 3);
+            return events.filter(e => !isNaN(e.date.getTime()) && e.date >= today).sort((a, b) => a.date - b.date).slice(0, 3);
         } catch (e) { return []; }
     };
     const upcomingList = getUpcomingEvents();
 
-    // --- 4. AUTRES HELPERS ---
     const getNextCalendarEvents = () => {
         try {
-            const now = new Date();
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            
-            const calEvents = (data.calendar_events || []).map(e => ({
-                id: e.id, title: e.title, start_time: e.start_time, is_todo: false,
-                is_all_day: e.is_all_day
-            }));
-
-            return calEvents
-                .filter(e => {
-                    const evtDate = new Date(e.start_time);
-                    if (e.is_all_day) return evtDate >= today;
-                    return evtDate > now;
-                })
-                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-                .slice(0, 4);
+            const now = new Date(); const today = new Date(); today.setHours(0,0,0,0);
+            const calEvents = (data.calendar_events || []).map(e => ({ id: e.id, title: e.title, start_time: e.start_time, is_todo: false, is_all_day: e.is_all_day }));
+            return calEvents.filter(e => {
+                const evtDate = new Date(e.start_time);
+                if (e.is_all_day) return evtDate >= today;
+                return evtDate > now;
+            }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time)).slice(0, 4);
         } catch (e) { return []; }
     };
     const nextCalendarEvents = getNextCalendarEvents();
 
-    // --- NOUVEAU : FONCTION COMPTEUR JOURS (AGENDA) ---
     const getDayCounterLabel = (dateStr) => {
         const today = new Date(); today.setHours(0,0,0,0);
         const target = new Date(dateStr); target.setHours(0,0,0,0);
         const diffTime = target - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
         if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100 dark:bg-emerald-900/30 dark:text-emerald-400' };
         if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' };
         if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
@@ -379,28 +339,21 @@ export default function Dashboard({ data, updateData, setView }) {
         updateData({ ...data, todos: newTodos });
     };
 
-    // --- NOUVEAU HELPER POUR LES HABITUDES ---
     const updateHabit = (updatedHabit) => {
         const newHabits = habits.map(h => h.id === updatedHabit.id ? updatedHabit : h);
         updateData({ ...data, habits: newHabits }, { table: 'habits', id: updatedHabit.id, action: 'update', data: { history: updatedHabit.history, streak: updatedHabit.streak } });
     };
 
     const getAccountBalanceForProject = (accId) => {
-        return transactions
-            .filter(t => String(t.accountId || t.account_id) === String(accId))
-            .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+        return transactions.filter(t => String(t.accountId || t.account_id) === String(accId)).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
     };
 
     const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
-    
-    const activeProjects = projects
-        .filter(p => p.status !== 'done' && p.status !== 'on_hold')
-        .sort((a, b) => {
-            const weightA = priorityWeight[a.priority] || 0;
-            const weightB = priorityWeight[b.priority] || 0;
-            return weightB - weightA; 
-        })
-        .slice(0, 3);
+    const activeProjects = projects.filter(p => p.status !== 'done' && p.status !== 'on_hold').sort((a, b) => {
+        const weightA = priorityWeight[a.priority] || 0;
+        const weightB = priorityWeight[b.priority] || 0;
+        return weightB - weightA; 
+    }).slice(0, 3);
 
     const handleAutoFocus = () => {
         const active = projects.filter(p => p.status !== 'done' && p.status !== 'on_hold');
@@ -429,40 +382,23 @@ export default function Dashboard({ data, updateData, setView }) {
     return (
         <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
-                <FocusProjectModal 
-                    project={focusedProject} 
-                    onClose={() => setFocusedProject(null)} 
-                    updateProject={updateProjectFromFocus} 
-                    accounts={accounts} 
-                    availableForProjects={currentBalance} 
-                    getAccountBalance={getAccountBalanceForProject} 
-                />
+                <FocusProjectModal project={focusedProject} onClose={() => setFocusedProject(null)} updateProject={updateProjectFromFocus} accounts={accounts} availableForProjects={currentBalance} getAccountBalance={getAccountBalanceForProject} />
             )}
 
-            {/* HEADER - MODERNE, SLIM & BOUTONS À DROITE */}
+            {/* HEADER */}
             <div className="flex flex-col lg:flex-row gap-6">
                 <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-4 md:p-6 rounded-[2.5rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-center relative overflow-hidden group">
                     <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-3 items-center relative z-10 w-full">
-                        {/* GAUCHE : FILTRE */}
                         <div className="flex justify-start">
-                            <select 
-                                value={dashboardFilter} 
-                                onChange={(e) => setDashboardFilter(e.target.value)} 
-                                className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm"
-                            >
+                            <select value={dashboardFilter} onChange={(e) => setDashboardFilter(e.target.value)} className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm">
                                 <option value="total">GLOBAL</option>
                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                             </select>
                         </div>
-
-                        {/* CENTRE : TITRE (SANS BONJOUR) */}
                         <div className="text-center">
                             <p className="text-blue-600 dark:text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">{todayDate}</p>
                         </div>
-
-                        {/* DROITE : ACTIONS SLIM */}
                         <div className="flex justify-end gap-2">
                             <button onClick={() => setView('budget')} className="p-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all"><Plus size={16}/></button>
                             <button onClick={() => setView('todo')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><CheckSquare size={16}/></button>
@@ -474,7 +410,6 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* METRICS ROW */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* CARTE SOLDE MAJESTUEUSE */}
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
                     <div className="relative z-10 flex justify-between items-start mb-10">
                         <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
@@ -483,28 +418,18 @@ export default function Dashboard({ data, updateData, setView }) {
                         </button>
                     </div>
                     <div className="relative z-10 mb-8">
-                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">
-                            {renderAmount(currentBalance)}
-                        </h3>
-                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center md:text-left">
-                           TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}
-                        </p>
-                        
+                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">{renderAmount(currentBalance)}</h3>
+                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center md:text-left">TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}</p>
                         {!isPrivacyMode && (
                             <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-700">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter opacity-70">Projeté fin de mois :</span>
-                                <span className={`text-xs font-black ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                                    {renderAmount(projectedBalance)}
-                                </span>
+                                <span className={`text-xs font-black ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{renderAmount(projectedBalance)}</span>
                             </div>
                         )}
                     </div>
-                    <div className="h-20 w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-4 border border-slate-100 dark:border-slate-800/50">
-                        <SparkLine data={sparkData} height={50} />
-                    </div>
+                    <div className="h-20 w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-4 border border-slate-100 dark:border-slate-800/50"><SparkLine data={sparkData} height={50} /></div>
                 </div>
 
-                {/* CARTE À VENIR - FIXED RECURRING LABEL */}
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
                     <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
@@ -528,7 +453,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{e.data.description}</p>
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
                                                     <span>{e.date.toLocaleDateString()}</span>
-                                                    {/* --- MODIF : RÉCURRENCE UNIQUEMENT SI TYPE OK --- */}
                                                     {e.type === 'recurring' && <span className="text-blue-500 font-black">• RÉCURRENCE</span>}
                                                 </div>
                                             </div>
@@ -544,10 +468,8 @@ export default function Dashboard({ data, updateData, setView }) {
                 </div>
             </div>
 
-            {/* MAIN CONTENT GRID - LOGIQUE PROJET RÉTABLIE */}
+            {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                
-                {/* PROJETS ACTIFS - LOGIQUE 100% CONSERVÉE */}
                 <div className="lg:col-span-8 space-y-8">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
@@ -557,7 +479,6 @@ export default function Dashboard({ data, updateData, setView }) {
                             </h3>
                             <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all">FOCUS</button>
                         </div>
-                        
                         <div className="space-y-4">
                             {activeProjects.length === 0 ? (
                                 <p className="text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase">Aucun projet actif</p>
@@ -589,8 +510,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* --- LA GRILLE DE LOGIQUE PROJET RÉTABLIE (COURBE BUDGET) --- */}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                                                 <div className="space-y-1">
                                                     <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
@@ -638,9 +557,8 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
                 </div>
 
-                {/* COLONNE DROITE : AGENDA + URGENCES */}
+                {/* COLONNE DROITE */}
                 <div className="lg:col-span-4 space-y-8">
-                    {/* WIDGET AGENDA */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl group transition-all" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
@@ -678,11 +596,8 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     </div>
 
-                    {/* URGENCES - RÉTABLIES ET SANS CRASH */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
-                        <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500">
-                           <Flag size={80} className="-rotate-12"/>
-                        </div>
+                        <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500"><Flag size={80} className="-rotate-12"/></div>
                         <div className="flex justify-between items-center mb-8 relative z-10">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
                                 <div className="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-xl text-rose-600"><Flag size={20}/></div>
