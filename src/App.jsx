@@ -313,6 +313,13 @@ export default function App() {
 
      if (!userEmail) { isLoaded.current = false; setLoading(false); return; }
 
+     // DATE AUJOURD'HUI FORMAT YYYY-MM-DD POUR LOGS
+     const todayObj = new Date();
+     const year = todayObj.getFullYear();
+     const month = String(todayObj.getMonth() + 1).padStart(2, '0');
+     const day = String(todayObj.getDate()).padStart(2, '0');
+     const todayIsoDate = `${year}-${month}-${day}`;
+
      const results = await Promise.all([
        supabase.from('profiles').select('*').single(),
        supabase.from('todos').select('*'),
@@ -339,8 +346,9 @@ export default function App() {
         .or(`user_id.eq.${userId},invited_email.ilike.%${userEmail}%`),
        supabase.from('todo_lists').select('*'),
        supabase.from('event_participants').select('*'),
-       // AJOUT : CHARGEMENT DES HABITUDES
-       supabase.from('habits').select('*') 
+       // AJOUT : CHARGEMENT DES HABITUDES ET DES LOGS DU JOUR
+       supabase.from('habits').select('*'),
+       supabase.from('habit_logs').select('*').eq('date', todayIsoDate)
      ]);
 
      const [
@@ -353,8 +361,9 @@ export default function App() {
        { data: calendar_events },
        { data: todo_lists },
        { data: all_participants },
-       // AJOUT : RÉCUPÉRATION HABITUDES
-       { data: habits }
+       // AJOUT : RÉCUPÉRATION HABITUDES & LOGS
+       { data: habits },
+       { data: daily_logs }
      ] = results;
 
      let newDBTransactions = [];
@@ -474,15 +483,24 @@ export default function App() {
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-       // AJOUT : INJECTION DES HABITUDES DANS DATA
-       habits: habits || [],
+       
+       // CORRECTION CRITIQUE : Fusion des habitudes avec les logs du jour pour le Dashboard
+       habits: (habits || []).map(h => {
+           const isDoneToday = daily_logs && daily_logs.some(l => l.habit_id === h.id);
+           if (isDoneToday) {
+               // On simule une mise à jour de l'historique en mémoire pour que le Dashboard le voie
+               const currentHistory = h.history || [];
+               return { ...h, history: [...currentHistory, new Date().toISOString()] };
+           }
+           return h;
+       }),
+
        calendar_events: (calendar_events || []).map(ev => {
           const parts = (all_participants || []).filter(p => String(p.event_id) === String(ev.id));
           const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
           return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') };
        }).filter(ev => {
           const isOwner = ev.user_id === userId;
-          // Sécurité de visibilité initiale
           return isOwner || ev.my_status !== 'declined';
        }), 
        budget: {
@@ -574,7 +592,7 @@ export default function App() {
          invited_email: e.invited_email, status: e.status, organizer_email: e.organizer_email || user.email 
      }));
      // AJOUT : SAUVEGARDE DES HABITUDES
-     await upsertInBatches('habits', data.habits, 50, h => ({ id: h.id, user_id: user.id, name: h.name, frequency: h.frequency, history: h.history, streak: h.streak, icon: h.icon }));
+     await upsertInBatches('habits', data.habits, 50, h => ({ id: h.id, user_id: user.id, name: h.name, days_of_week: h.days_of_week, icon: h.icon }));
 
      const bases = data.budget.planner.safetyBases;
      const basesSQL = Object.keys(bases).map(accId => ({ user_id: user.id, account_id: accId, amount: bases[accId] }));
