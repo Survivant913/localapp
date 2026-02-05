@@ -1,14 +1,25 @@
 import { useState, useMemo } from 'react';
+// AJOUT : Import global des icônes pour l'affichage dynamique
+import * as AllIcons from 'lucide-react';
 import { 
   LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
   CheckSquare, StickyNote, Plus, FolderKanban, 
   Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
-  // Nouveaux imports pour les habitudes
   Repeat, RotateCcw, Check, Coffee
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
-// --- COMPOSANT HABIT STRIP (CORRIGÉ : Support des IDs numériques jours) ---
+// --- AJOUT : COMPOSANT DYNAMIC ICON (Pour afficher les logos correctement) ---
+const DynamicIcon = ({ name, size = 18, className = "" }) => {
+    if (!name) return <span className="text-lg">✨</span>;
+    // Conversion première lettre majuscule au cas où
+    const pascalName = name.charAt(0).toUpperCase() + name.slice(1);
+    const IconComponent = AllIcons[pascalName] || AllIcons[name];
+    if (!IconComponent) return <span className="text-xs">{name}</span>; 
+    return <IconComponent size={size} className={className} />;
+};
+
+// --- COMPOSANT HABIT STRIP (CORRIGÉ : Logos + Scroll Infini) ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
     // 1. Filtrage Logique
     const todayIndex = new Date().getDay(); // 0 = Dimanche, 1 = Lundi...
@@ -16,16 +27,24 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
         return habits.filter(h => {
-            // --- CORRECTION MAJEURE ICI ---
-            // On vérifie d'abord si c'est le format numérique (days_of_week: [1, 2]) utilisé par HabitTracker
-            // Sinon on tente le format texte (frequency: ['Lun'])
-            let isScheduledToday = false;
+            // SÉCURITÉ ANTI-CRASH
+            if (!h.frequency || !Array.isArray(h.frequency)) {
+                 // Tentative de fallback sur days_of_week si frequency est vide
+                 if (h.days_of_week && Array.isArray(h.days_of_week)) {
+                     return h.days_of_week.includes(todayIndex) && !(h.history && h.history.length > 0 && new Date(h.history[h.history.length - 1]).toDateString() === new Date().toDateString());
+                 }
+                 return false;
+            }
 
+            // MAPPING ROBUSTE (Accepte "Lun", "Lundi", "lun", "Mon", etc.)
+            let isScheduledToday = false;
+            
+            // Cas 1 : Format numérique (venant de HabitTracker)
             if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                // Cas 1 : Format standard [0, 1, 2...]
                 isScheduledToday = h.days_of_week.includes(todayIndex);
-            } else if (h.frequency && Array.isArray(h.frequency)) {
-                // Cas 2 : Format Legacy Texte (au cas où)
+            } 
+            // Cas 2 : Format texte (Legacy)
+            else {
                 isScheduledToday = h.frequency.some(d => {
                     if (!d) return false;
                     const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
@@ -41,9 +60,9 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                     return map[norm] === todayIndex;
                 });
             }
-
-            if (!isScheduledToday) return false;
             
+            if (!isScheduledToday) return false;
+
             // Est-ce déjà fait aujourd'hui ?
             const lastDate = h.history && h.history.length > 0 ? new Date(h.history[h.history.length - 1]) : null;
             const isDoneToday = lastDate && new Date().toDateString() === lastDate.toDateString();
@@ -74,7 +93,6 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         updateHabit({ ...habit, history: newHistory, streak: (habit.streak || 0) + 1 });
     };
 
-    // CORRECTION VISUELLE : Si rien à afficher, on renvoie un message au lieu de NULL (sinon case vide)
     if (visibleHabits.length === 0) {
         return (
             <div className="flex items-center justify-center gap-3 py-2 opacity-50">
@@ -88,10 +106,14 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
 
     return (
         <div className="flex gap-4 overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
-            {visibleHabits.slice(0, 6).map(h => (
+            {/* MODIFICATION : Suppression du .slice(0, 6) pour afficher TOUTES les habitudes */}
+            {visibleHabits.map(h => (
                 <div key={h.id} className="snap-center shrink-0 w-32 h-32 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between p-3 group relative overflow-hidden transition-all hover:border-slate-300 dark:hover:border-slate-600">
                     <div className="flex justify-between items-start">
-                        <span className="p-1.5 bg-slate-50 dark:bg-slate-700 rounded-lg text-lg">{h.icon || '✨'}</span>
+                        {/* MODIFICATION : Utilisation de DynamicIcon au lieu d'afficher le texte brut */}
+                        <span className="p-1.5 bg-slate-50 dark:bg-slate-700 rounded-lg text-lg text-blue-500">
+                            <DynamicIcon name={h.icon} size={20} />
+                        </span>
                         <button onClick={(e) => handlePass(h.id, e)} className="text-slate-300 hover:text-slate-500 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors" title="Plus tard">
                             <RotateCcw size={12}/>
                         </button>
@@ -102,11 +124,10 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                     </button>
                 </div>
             ))}
-            {todayHabits.length > 6 && (
-                <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                    <span className="text-slate-400 font-black text-xs rotate-90 whitespace-nowrap">VOIR TOUT</span>
-                </div>
-            )}
+            {/* Le bouton VOIR TOUT apparaît maintenant à la toute fin du scroll si besoin */}
+            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <span className="text-slate-400 font-black text-xs rotate-90 whitespace-nowrap">GERER</span>
+            </div>
         </div>
     );
 };
