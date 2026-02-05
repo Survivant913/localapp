@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
-// --- COMPOSANT HABIT STRIP (CORRIGÉ & ROBUSTE) ---
+// --- COMPOSANT HABIT STRIP (CORRIGÉ : Support des IDs numériques jours) ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
     // 1. Filtrage Logique
     const todayIndex = new Date().getDay(); // 0 = Dimanche, 1 = Lundi...
@@ -16,31 +16,39 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
         return habits.filter(h => {
-            // SÉCURITÉ ANTI-CRASH : On vérifie que frequency existe et est un tableau
-            if (!h.frequency || !Array.isArray(h.frequency)) return false;
+            // --- CORRECTION MAJEURE ICI ---
+            // On vérifie d'abord si c'est le format numérique (days_of_week: [1, 2]) utilisé par HabitTracker
+            // Sinon on tente le format texte (frequency: ['Lun'])
+            let isScheduledToday = false;
 
-            // MAPPING ROBUSTE (Accepte "Lun", "Lundi", "lun", "Mon", etc.)
-            const isScheduledToday = h.frequency.some(d => {
-                if (!d) return false;
-                // On normalise : minuscule et 3 premières lettres
-                const norm = d.toLowerCase().trim().substring(0, 3); 
-                const map = { 
-                    'dim': 0, 'sun': 0,
-                    'lun': 1, 'mon': 1,
-                    'mar': 2, 'tue': 2,
-                    'mer': 3, 'wed': 3,
-                    'jeu': 4, 'thu': 4,
-                    'ven': 5, 'fri': 5,
-                    'sam': 6, 'sat': 6
-                };
-                return map[norm] === todayIndex;
-            });
+            if (h.days_of_week && Array.isArray(h.days_of_week)) {
+                // Cas 1 : Format standard [0, 1, 2...]
+                isScheduledToday = h.days_of_week.includes(todayIndex);
+            } else if (h.frequency && Array.isArray(h.frequency)) {
+                // Cas 2 : Format Legacy Texte (au cas où)
+                isScheduledToday = h.frequency.some(d => {
+                    if (!d) return false;
+                    const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
+                    const map = { 
+                        'dim': 0, 'sun': 0,
+                        'lun': 1, 'mon': 1,
+                        'mar': 2, 'tue': 2,
+                        'mer': 3, 'wed': 3,
+                        'jeu': 4, 'thu': 4,
+                        'ven': 5, 'fri': 5,
+                        'sam': 6, 'sat': 6
+                    };
+                    return map[norm] === todayIndex;
+                });
+            }
+
+            if (!isScheduledToday) return false;
             
             // Est-ce déjà fait aujourd'hui ?
             const lastDate = h.history && h.history.length > 0 ? new Date(h.history[h.history.length - 1]) : null;
             const isDoneToday = lastDate && new Date().toDateString() === lastDate.toDateString();
             
-            return isScheduledToday && !isDoneToday;
+            return !isDoneToday;
         });
     }, [habits, todayIndex]);
 
