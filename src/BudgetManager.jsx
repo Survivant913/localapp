@@ -125,7 +125,13 @@ export default function BudgetManager({ data, updateData }) {
 
         recurringList.forEach(r => {
             if (r.endDate && parseLocalDate(r.endDate) < today) return;
-            if (r.dayOfMonth > currentDay && r.dayOfMonth <= lastDay) {
+            
+            // --- FIX CORRECTION FEVRIER ---
+            // On s'assure que si le paiement est le 30 et le mois finit le 28, on prend le 28.
+            const effectiveDay = Math.min(r.dayOfMonth, lastDay);
+
+            // On vérifie si ce jour "effectif" est dans le futur pour ce mois-ci
+            if (effectiveDay > currentDay) {
                 const amt = parseFloat(r.amount || 0);
                 if (r.type === 'transfer') {
                     if (forecastAccount === 'total') return;
