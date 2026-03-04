@@ -570,21 +570,31 @@ export default function Dashboard({ data, updateData, setView }) {
                             {nextCalendarEvents.length === 0 ? (
                                 <p className="text-slate-400 text-sm font-bold italic py-8 uppercase opacity-50 tracking-widest text-center">Calendrier vierge</p>
                             ) : (
-                                nextCalendarEvents.map(evt => {
+                                nextCalendarEvents.map((evt, index) => {
                                     const d = new Date(evt.start_time);
                                     const dayLabel = getDayCounterLabel(evt.start_time);
+                                    const isToday = dayLabel.text === 'Auj.';
+                                    const isNext = index === 0;
+
                                     return (
-                                        <div key={`${evt.type}-${evt.id}`} className="flex gap-5 items-center p-4 rounded-3xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer group/item shadow-sm">
+                                        <div key={`${evt.type}-${evt.id}`} className={`relative overflow-hidden flex gap-5 items-center p-4 rounded-3xl transition-all cursor-pointer group/item shadow-sm ${isNext ? 'bg-indigo-50/50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : isToday ? 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                            
+                                            {/* BARRE LUMINEUSE POUR LE PROCHAIN */}
+                                            {isNext && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>}
+                                            
                                             <div className={`flex flex-col items-center justify-center w-14 h-14 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-2xl border shrink-0 transition-transform group-hover/item:scale-110 shadow-sm shadow-indigo-500/5`}>
                                                 <span className="text-[10px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
                                                 <span className="text-xl font-black leading-none mt-1">{d.getDate()}</span>
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${dayLabel.color} shadow-sm`}>{dayLabel.text}</span>
+                                                    <p className={`text-sm font-black truncate tracking-tighter ${isNext ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-800 dark:text-white'}`}>{evt.title}</p>
+                                                    <div className="flex items-center gap-1">
+                                                        {isNext && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-indigo-500 text-white shadow-sm uppercase tracking-widest animate-pulse">Prochain</span>}
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${dayLabel.color} shadow-sm`}>{dayLabel.text}</span>
+                                                    </div>
                                                 </div>
-                                                <p className="text-[11px] font-bold text-slate-400 uppercase mt-1 flex items-center gap-1">
+                                                <p className={`text-[11px] font-bold uppercase mt-1 flex items-center gap-1 ${isNext ? 'text-indigo-500/80 dark:text-indigo-400/80' : 'text-slate-400'}`}>
                                                     {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                                                     {evt.is_todo && <CheckCircle2 size={10} className="text-orange-500"/>}
                                                 </p>
