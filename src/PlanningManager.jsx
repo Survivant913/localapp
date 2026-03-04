@@ -440,61 +440,74 @@ export default function PlanningManager({ data, updateData }) {
             {selectedEvent && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
-                        <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => setSelectedEvent(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X size={20} className="text-slate-400"/></button></div>
-                        
-                        {(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
-                            <div className="space-y-6">
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
+                        {confirmMode === 'ask_delete' || confirmMode === 'ask_cancel_series' ? (
+                            <div className="text-center space-y-4">
+                                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><Trash2 size={24}/></div>
+                                <h3 className="font-bold text-lg dark:text-white">{confirmMode === 'ask_delete' ? 'Supprimer la récurrence ?' : 'Quitter la récurrence ?'}</h3>
                                 <div className="grid gap-3">
-                                    {selectedEvent.data.recurrence_group_id ? (
-                                        <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter toute la série</button><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">Juste ce jour</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">Refuser tout</button></>
-                                    ) : (
-                                        <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter l'invitation</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Ban size={18}/> Refuser</button></>
-                                    )}
+                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, false) : handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white">Juste celui-là</button>
+                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, true) : handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700">Toute la série</button>
+                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
-                                <div className="mb-6 space-y-4">
-                                    <div className="flex items-center gap-2 text-xs text-slate-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
-                                    
-                                    {selectedEvent.data.invited_email && (
-                                        <div className="flex flex-col gap-2 border-t border-slate-100 dark:border-slate-700 pt-4">
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Participants :</div>
-                                            <div className="space-y-2">
-                                                {selectedEvent.data.invited_email.split(',').map((email, idx) => {
-                                                    const cleanEmail = email.trim().toLowerCase();
-                                                    const part = (selectedEvent.data.participants || []).find(p => p.user_email.toLowerCase() === cleanEmail);
-                                                    const status = part ? part.status : 'pending';
-                                                    
-                                                    return (
-                                                        <div key={idx} className="flex items-center justify-between group/user">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`p-1 rounded-full ${status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                                        {status === 'accepted' ? <Check size={10}/> : status === 'declined' ? <X size={10}/> : <Clock size={10}/>}
-                                                                </div>
-                                                                <span className={`text-[11px] font-medium truncate max-w-[150px] ${status === 'declined' ? 'line-through text-slate-400' : 'dark:text-slate-300'}`}>{cleanEmail}</span>
-                                                            </div>
-                                                            {selectedEvent.data.user_id === data.profile?.id && (
-                                                                <button onClick={() => handleUninviteSingle(selectedEvent.data, cleanEmail)} className="opacity-0 group-hover/user:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all" title="Retirer l'invité">
-                                                                        <UserX size={14}/>
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
+                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X size={20} className="text-slate-400"/></button></div>
+                                
+                                {(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
+                                        <div className="grid gap-3">
+                                            {selectedEvent.data.recurrence_group_id ? (
+                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter toute la série</button><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">Juste ce jour</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">Refuser tout</button></>
+                                            ) : (
+                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter l'invitation</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Ban size={18}/> Refuser</button></>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="flex gap-3">
-                                    {/* VERROU : Seul l'organisateur peut modifier */}
-                                    {selectedEvent.data.user_id === data.profile?.id && (
-                                        <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"><Pencil size={16}/> Modifier</button>
-                                    )}
-                                    <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Trash2 size={18}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Quitter'}</button>
-                                </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                        <div className="mb-6 space-y-4">
+                                            <div className="flex items-center gap-2 text-xs text-slate-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
+                                            
+                                            {selectedEvent.data.invited_email && (
+                                                <div className="flex flex-col gap-2 border-t border-slate-100 dark:border-slate-700 pt-4">
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Participants :</div>
+                                                    <div className="space-y-2">
+                                                        {selectedEvent.data.invited_email.split(',').map((email, idx) => {
+                                                            const cleanEmail = email.trim().toLowerCase();
+                                                            const part = (selectedEvent.data.participants || []).find(p => p.user_email.toLowerCase() === cleanEmail);
+                                                            const status = part ? part.status : 'pending';
+                                                            
+                                                            return (
+                                                                <div key={idx} className="flex items-center justify-between group/user">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className={`p-1 rounded-full ${status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                            {status === 'accepted' ? <Check size={10}/> : status === 'declined' ? <X size={10}/> : <Clock size={10}/>}
+                                                                        </div>
+                                                                        <span className={`text-[11px] font-medium truncate max-w-[150px] ${status === 'declined' ? 'line-through text-slate-400' : 'dark:text-slate-300'}`}>{cleanEmail}</span>
+                                                                    </div>
+                                                                    {selectedEvent.data.user_id === data.profile?.id && (
+                                                                        <button onClick={() => handleUninviteSingle(selectedEvent.data, cleanEmail)} className="opacity-0 group-hover/user:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all" title="Retirer l'invité">
+                                                                            <UserX size={14}/>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-3">
+                                            {selectedEvent.data.user_id === data.profile?.id && (
+                                                <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"><Pencil size={16}/> Modifier</button>
+                                            )}
+                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Trash2 size={18}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Quitter'}</button>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
