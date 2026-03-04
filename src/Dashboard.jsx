@@ -577,10 +577,13 @@ export default function Dashboard({ data, updateData, setView }) {
                                     const isNext = index === 0;
 
                                     return (
-                                        <div key={`${evt.type}-${evt.id}`} className={`relative overflow-hidden flex gap-5 items-center p-4 rounded-3xl transition-all cursor-pointer group/item shadow-sm ${isNext ? 'bg-indigo-50/50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : isToday ? 'bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                        <div key={`${evt.type}-${evt.id}`} className={`relative overflow-hidden flex gap-5 items-center p-4 rounded-3xl transition-all cursor-pointer group/item shadow-sm ${isNext ? 'bg-indigo-50/50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : isToday ? 'bg-white dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm hover:shadow-md hover:ring-slate-300 dark:hover:ring-slate-600' : 'hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent'}`}>
                                             
                                             {/* BARRE LUMINEUSE POUR LE PROCHAIN */}
                                             {isNext && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>}
+                                            
+                                            {/* BARRE DISCRÈTE POUR LE RESTE D'AUJOURD'HUI */}
+                                            {!isNext && isToday && <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300 dark:bg-slate-600"></div>}
                                             
                                             <div className={`flex flex-col items-center justify-center w-14 h-14 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-2xl border shrink-0 transition-transform group-hover/item:scale-110 shadow-sm shadow-indigo-500/5`}>
                                                 <span className="text-[10px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
