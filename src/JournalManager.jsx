@@ -292,7 +292,22 @@ export default function JournalManager({ data, updateData }) {
                 <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
                 <style>
                     * { color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    body { font-family: 'Merriweather', serif; line-height: 1.8; background: #fff !important; max-width: 800px; margin: 0 auto; padding: 40px; }
+                    
+                    /* Configuration pour l'impression A4 */
+                    @page {
+                        size: A4;
+                        margin: 2cm; /* Marges d'impression standards */
+                    }
+                    
+                    body { 
+                        font-family: 'Merriweather', serif; 
+                        line-height: 1.8; 
+                        background: #fff !important; 
+                        max-width: 100%; /* Prend toute la page A4 */
+                        margin: 0; 
+                        padding: 0; 
+                    }
+                    
                     h1 { font-size: 2.5em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
                     .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
                     .content { font-size: 1.1em; text-align: justify; }
@@ -301,6 +316,10 @@ export default function JournalManager({ data, updateData }) {
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
                     span[style*="background-color"] { color: #000 !important; -webkit-print-color-adjust: exact; }
+                    
+                    /* Eviter les coupures disgracieuses lors de l'impression */
+                    h2, h3, h4 { page-break-after: avoid; }
+                    p, blockquote { page-break-inside: avoid; }
                 </style>
             </head>
             <body>
@@ -451,13 +470,13 @@ export default function JournalManager({ data, updateData }) {
             )}
 
             {/* ÉDITEUR PRINCIPAL */}
-            <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-white dark:bg-slate-950' : 'bg-white dark:bg-black'} relative min-w-0 transition-colors duration-500`}>
+            <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-slate-100 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-900'} relative min-w-0 transition-colors duration-500`}>
                 
                 {activePageId ? (
                     <>
                         {/* BARRE D'OUTILS */}
                         {!isZenMode ? (
-                            <div className="border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem]">
+                            <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
                                 <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
                                 <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal (Reset)" />
                                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
@@ -539,7 +558,7 @@ export default function JournalManager({ data, updateData }) {
                                 <div className="flex-1"></div>
                                 <div className="flex items-center gap-2">
                                     <button onClick={() => setIsZenMode(true)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
-                                    <button onClick={handlePrint} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors" title="Imprimer"><Printer size={18}/></button>
+                                    <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Imprimer"><Printer size={18}/></button>
                                     <div className="text-xs text-slate-400 font-mono w-16 text-right">{isSaving ? <Loader2 size={12} className="animate-spin inline"/> : 'Prêt'}</div>
                                 </div>
                             </div>
@@ -555,25 +574,44 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            {/* CORRECTION LARGEUR (max-w-full ou max-w-5xl/7xl) + PADDING BOTTOM */}
-                            <div className={`${isZenMode ? 'w-full max-w-7xl px-12 md:px-20' : 'w-full max-w-5xl px-8 md:px-12'} mx-auto py-16 min-h-full transition-all duration-700 pb-96`}>
-                                <div className="text-xs text-slate-400 mb-6 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
-                                    <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
-                                    <button 
-                                        onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
-                                    >
-                                        <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
-                                        <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
-                                    </button>
+                            {/* CONTENEUR TYPE "PAGE A4" */}
+                            <div className={`mx-auto transition-all duration-700 py-12 ${isZenMode ? 'w-full max-w-7xl' : 'w-full max-w-4xl px-4'}`}>
+                                
+                                <div className="bg-white dark:bg-black shadow-xl border border-slate-200 dark:border-slate-800 rounded-lg min-h-[1122px] px-12 md:px-20 py-16 relative a4-page-container">
+                                    
+                                    <div className="text-xs text-slate-400 mb-8 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
+                                        <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
+                                        <button 
+                                            onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
+                                        >
+                                            <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
+                                            <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
+                                        </button>
+                                    </div>
+                                    
+                                    <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre de la page..."/>
+                                    
+                                    <div 
+                                        ref={editorRef} 
+                                        contentEditable 
+                                        onInput={() => saveCurrentPage(false)} 
+                                        onBlur={() => saveCurrentPage(true)} 
+                                        className={`prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all`} 
+                                        placeholder="Commencez à écrire ici..."
+                                    ></div>
+
                                 </div>
-                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre..."/>
-                                <div ref={editorRef} contentEditable onInput={() => saveCurrentPage(false)} onBlur={() => saveCurrentPage(true)} className={`prose dark:prose-invert max-w-none outline-none min-h-[50vh] ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-600 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all`} placeholder="Écrivez vos pensées ici..."></div>
+
                             </div>
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><Book size={48} className="opacity-20"/></div><p className="text-xl font-medium">Sélectionnez une page</p><p className="text-sm opacity-60 mt-2">ou créez-en une nouvelle pour commencer</p></div>
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 bg-white dark:bg-slate-950">
+                        <div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><Book size={48} className="opacity-20"/></div>
+                        <p className="text-xl font-medium">Sélectionnez une page</p>
+                        <p className="text-sm opacity-60 mt-2">ou créez-en une nouvelle pour commencer</p>
+                    </div>
                 )}
             </div>
             
@@ -590,6 +628,43 @@ export default function JournalManager({ data, updateData }) {
                 /* Masquage scrollbar en mode Zen */
                 .custom-scrollbar-none::-webkit-scrollbar { display: none; }
                 .custom-scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+                /* MAGIE DES PAGES A4 */
+                /* 1122px est la hauteur standard d'un format A4 en pixels (à 96 DPI) */
+                .a4-page-container {
+                    background-image: linear-gradient(to bottom, transparent 1120px, #e2e8f0 1120px, #e2e8f0 1122px);
+                    background-size: 100% 1122px;
+                    background-position: 0 0;
+                    /* Ajout d'une petite ombre portée pour donner l'impression de feuilles empilées aux coupures */
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 -2px 10px rgba(0,0,0,0.02);
+                }
+                .dark .a4-page-container {
+                    background-image: linear-gradient(to bottom, transparent 1120px, #334155 1120px, #334155 1122px);
+                }
+                
+                /* Ajout visuel d'un numéro de page approximatif sur le bord droit */
+                .a4-page-container::after {
+                    content: "✂ - - - - - - - - - Coupure d'impression - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ";
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    background-image: linear-gradient(to bottom, transparent 1105px, rgba(148, 163, 184, 0.3) 1105px, transparent 1122px);
+                    background-size: 100% 1122px;
+                    background-repeat: repeat-y;
+                    color: rgba(148, 163, 184, 0.5);
+                    font-size: 10px;
+                    line-height: 2235px; /* Aligné juste au dessus de la ligne */
+                    text-align: center;
+                    letter-spacing: 4px;
+                    overflow: hidden;
+                }
+                .dark .a4-page-container::after {
+                    color: rgba(71, 85, 105, 0.5);
+                    background-image: linear-gradient(to bottom, transparent 1105px, rgba(71, 85, 105, 0.3) 1105px, transparent 1122px);
+                }
             `}</style>
         </div>
     );
