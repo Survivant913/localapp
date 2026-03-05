@@ -34,12 +34,12 @@ export default function JournalManager({ data, updateData }) {
     const [showColorPalette, setShowColorPalette] = useState(false);
     const [showSizeMenu, setShowSizeMenu] = useState(false);
     
-    // Contenu Editeur par blocs (Pages)
-    const [pageBlocks, setPageBlocks] = useState([{ id: 'default', html: '' }]);
+    // Contenu Editeur
+    const [pageContent, setPageContent] = useState('');
     const [pageTitle, setPageTitle] = useState('');
     
     // Refs
-    const pagesContainerRef = useRef(null);
+    const editorRef = useRef(null);
     const titleRef = useRef(null);
     const saveTimeoutRef = useRef(null);
 
@@ -105,9 +105,13 @@ export default function JournalManager({ data, updateData }) {
     // --- 3. CHARGEMENT PAGE ---
     useEffect(() => {
         if (!activePageId) {
-            setPageBlocks([{ id: 'default', html: '' }]);
+            setPageContent('');
             setPageTitle('');
             if (titleRef.current) titleRef.current.value = '';
+            if (editorRef.current) {
+                editorRef.current.innerHTML = '';
+                editorRef.current.removeAttribute('data-init');
+            }
             return;
         }
 
@@ -116,55 +120,25 @@ export default function JournalManager({ data, updateData }) {
             setPageTitle(page.title || 'Sans titre');
             if (titleRef.current) titleRef.current.value = page.title || 'Sans titre';
             
-            // Séparation intelligente des pages (rétrocompatibilité avec les anciens documents)
-            const separator = '<div class="page-break" style="page-break-after: always;"></div>';
-            let htmlChunks = page.content ? page.content.split(separator) : [''];
-            if (htmlChunks.length === 0) htmlChunks = [''];
+            // Nettoyage de l'ancien système de blocs pour revenir à un format fluide
+            let cleanContent = page.content || '';
+            cleanContent = cleanContent.replace(/<div class="page-break"[^>]*><\/div>/g, '<br><br>');
             
-            setPageBlocks(htmlChunks.map((html, i) => ({ id: `p-${activePageId}-${i}`, html })));
+            setPageContent(cleanContent);
+            
+            // Forcer la mise à jour de l'éditeur lors du changement de page
+            if (editorRef.current) {
+                editorRef.current.innerHTML = cleanContent;
+                editorRef.current.setAttribute('data-init', activePageId);
+            }
         }
     }, [activePageId]);
-
-    // --- NOUVEAU : GESTION DES BLOCS (PAGES A4) ---
-    const addPageBlock = () => {
-        if (pagesContainerRef.current) {
-            // On sauvegarde l'état actuel du DOM avant d'ajouter une page
-            const pageNodes = pagesContainerRef.current.querySelectorAll('.page-content-block');
-            const htmlArray = Array.from(pageNodes).map(node => node.innerHTML);
-            const currentBlocks = htmlArray.map((html, i) => ({ id: pageBlocks[i]?.id || `p-${Date.now()}-${i}`, html }));
-            
-            setPageBlocks([...currentBlocks, { id: `p-${Date.now()}-new`, html: '' }]);
-            setTimeout(() => saveCurrentPage(true), 100);
-        }
-    };
-
-    const deletePageBlock = (indexToRemove) => {
-        if (pageBlocks.length <= 1) return;
-        if (!window.confirm("Supprimer cette page ? Tout son contenu sera effacé définitivement.")) return;
-        
-        if (pagesContainerRef.current) {
-            const pageNodes = pagesContainerRef.current.querySelectorAll('.page-content-block');
-            const htmlArray = Array.from(pageNodes).map(node => node.innerHTML);
-            let currentBlocks = htmlArray.map((html, i) => ({ id: pageBlocks[i]?.id || `p-${Date.now()}-${i}`, html }));
-            
-            currentBlocks = currentBlocks.filter((_, i) => i !== indexToRemove);
-            setPageBlocks(currentBlocks);
-            setTimeout(() => saveCurrentPage(true), 100);
-        }
-    };
 
     // --- 4. SAUVEGARDE ---
     const saveCurrentPage = async (force = false) => {
         if (!activePageId) return;
         
-        let content = '';
-        if (pagesContainerRef.current) {
-            // On rassemble toutes les feuilles et on les colle avec la balise de saut de page pour l'impression
-            const pageNodes = pagesContainerRef.current.querySelectorAll('.page-content-block');
-            const htmlArray = Array.from(pageNodes).map(node => node.innerHTML);
-            content = htmlArray.join('<div class="page-break" style="page-break-after: always;"></div>');
-        }
-        
+        const content = editorRef.current ? editorRef.current.innerHTML : pageContent;
         const title = titleRef.current ? titleRef.current.value : pageTitle;
         
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -244,7 +218,7 @@ export default function JournalManager({ data, updateData }) {
     // --- SUPPRESSION ---
     const deleteItem = async (id, type) => {
         const confirmMsg = type === 'page' 
-            ? "Supprimer ce document en entier ?" 
+            ? "Supprimer ce document ?" 
             : "Supprimer ce dossier et TOUT son contenu (sous-dossiers et pages) ? Cette action est irréversible.";
             
         if (!window.confirm(confirmMsg)) return;
@@ -289,7 +263,7 @@ export default function JournalManager({ data, updateData }) {
 
     // --- ÉDITEUR : COMMANDES ---
     const execCmd = (cmd, val = null) => {
-        // Important : Pas de .focus() forcé pour ne pas perdre la page active
+        if (editorRef.current) editorRef.current.focus();
         document.execCommand('styleWithCSS', false, true);
         document.execCommand(cmd, false, val);
         if (cmd === 'hiliteColor') setShowColorPalette(false);
@@ -297,6 +271,7 @@ export default function JournalManager({ data, updateData }) {
     };
 
     const changeFontSizeSelection = (size) => {
+        if (editorRef.current) editorRef.current.focus();
         document.execCommand('fontSize', false, size); 
         setShowSizeMenu(false);
     };
@@ -304,7 +279,7 @@ export default function JournalManager({ data, updateData }) {
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
         <button 
             onMouseDown={(e) => { 
-                e.preventDefault(); // Garde le focus sur la page en cours d'édition
+                e.preventDefault(); 
                 execCmd(cmd, val); 
             }}
             className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 rounded transition-colors"
@@ -314,19 +289,11 @@ export default function JournalManager({ data, updateData }) {
         </button>
     );
 
-    // --- IMPRESSION ---
+    // --- IMPRESSION PARFAITE A4 ---
     const handlePrint = () => {
         if (!activePageId) return;
         const printWindow = window.open('', '_blank');
-        
-        let content = '';
-        if (pagesContainerRef.current) {
-            const pageNodes = pagesContainerRef.current.querySelectorAll('.page-content-block');
-            const htmlArray = Array.from(pageNodes).map(node => node.innerHTML);
-            // On force le saut de page physique pour l'imprimante
-            content = htmlArray.join('<div style="page-break-after: always;"></div>');
-        }
-
+        const content = editorRef.current ? editorRef.current.innerHTML : pageContent;
         const title = titleRef.current ? titleRef.current.value : pageTitle;
         const date = format(new Date(), 'd MMMM yyyy', { locale: fr });
 
@@ -339,27 +306,31 @@ export default function JournalManager({ data, updateData }) {
                     * { color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     
                     @page {
-                        size: A4;
-                        margin: 2cm; 
+                        size: A4 portrait;
+                        margin: 20mm 15mm; 
                     }
                     
                     body { 
                         font-family: 'Merriweather', serif; 
-                        line-height: 1.8; 
+                        line-height: 1.6; 
                         background: #fff !important; 
-                        max-width: 100%; 
                         margin: 0; 
                         padding: 0; 
+                        font-size: 11pt;
                     }
                     
-                    h1 { font-size: 2.5em; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
-                    .meta { color: #333 !important; font-style: italic; margin-bottom: 10px; font-size: 0.9em; }
-                    .content { font-size: 1.1em; text-align: justify; }
-                    blockquote { border-left: 5px solid #333 !important; padding: 15px 20px !important; margin: 25px 0 !important; background: #f0f0f0 !important; font-style: italic !important; display: block !important; }
+                    h1 { font-size: 24pt; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 30px; }
+                    .meta { color: #555 !important; font-style: italic; margin-bottom: 10px; font-size: 9pt; text-align: right; }
+                    .content { text-align: justify; }
+                    
+                    blockquote { border-left: 4px solid #333 !important; padding: 10px 15px !important; margin: 20px 0 !important; background: #f9f9f9 !important; font-style: italic !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
-                    span[style*="background-color"] { color: #000 !important; -webkit-print-color-adjust: exact; }
+                    
+                    /* Règle vitale pour que le texte se coupe bien entre les pages */
+                    p, li, blockquote { page-break-inside: avoid; }
+                    h1, h2, h3, h4 { page-break-after: avoid; margin-top: 20px; }
                 </style>
             </head>
             <body>
@@ -382,6 +353,7 @@ export default function JournalManager({ data, updateData }) {
     const searchPages = allPages.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
+
 
     // --- VUE DASHBOARD ---
     if (!activeNotebookId) {
@@ -612,64 +584,33 @@ export default function JournalManager({ data, updateData }) {
                         )}
 
                         <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            <div ref={pagesContainerRef} className={`mx-auto transition-all duration-700 py-12 space-y-12 ${isZenMode ? 'w-full max-w-7xl px-8' : 'w-full px-4 md:px-12 max-w-4xl'}`}>
+                            <div className={`mx-auto transition-all duration-700 py-12 ${isZenMode ? 'w-full max-w-7xl px-8' : 'w-full px-4 md:px-12 max-w-4xl'}`}>
                                 
-                                {pageBlocks.map((block, index) => (
-                                    <div key={block.id} className="page-block-container relative group/page flex flex-col bg-white dark:bg-black shadow-xl border border-slate-200 dark:border-slate-800 rounded-lg w-full transition-all">
-                                        
-                                        {/* HEADER DE LA PREMIÈRE PAGE */}
-                                        {index === 0 && (
-                                            <div className="px-12 md:px-20 pt-16 pb-6">
-                                                <div className="text-xs text-slate-400 mb-8 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
-                                                    <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
-                                                    <button 
-                                                        onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
-                                                    >
-                                                        <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
-                                                        <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
-                                                    </button>
-                                                </div>
-                                                <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
-                                            </div>
-                                        )}
-                                        
-                                        {/* ZONE D'ÉDITION : MODIFICATION ICI (ref custom pour éviter l'effacement par React) */}
-                                        <div 
-                                            className={`page-content-block prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all flex-1 ${index === 0 ? 'px-12 md:px-20 pb-16' : 'p-12 md:p-20'}`}
-                                            contentEditable 
-                                            suppressContentEditableWarning={true}
-                                            onInput={() => saveCurrentPage(false)} 
-                                            onBlur={() => saveCurrentPage(true)} 
-                                            ref={(el) => {
-                                                if (el && el.getAttribute('data-init') !== 'true') {
-                                                    el.innerHTML = block.html;
-                                                    el.setAttribute('data-init', 'true');
-                                                }
-                                            }}
-                                            placeholder={index === 0 ? "Commencez à écrire ici..." : "Suite du texte..."}
-                                        ></div>
-
-                                        {/* INDICATEUR NUMÉRO DE PAGE */}
-                                        <div className="absolute bottom-4 left-0 w-full text-center text-xs text-slate-400 font-mono opacity-50 select-none pointer-events-none">
-                                            - Page {index + 1} -
-                                        </div>
-
-                                        {/* BOUTON SUPPRIMER PAGE */}
-                                        {pageBlocks.length > 1 && (
-                                            <button onClick={() => deletePageBlock(index)} className="absolute top-4 right-4 p-2 bg-red-50 dark:bg-red-900/30 text-red-500 rounded-lg opacity-0 group-hover/page:opacity-100 transition-opacity" title="Supprimer cette page">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
+                                <div className="bg-white dark:bg-black shadow-2xl border border-slate-200 dark:border-slate-800 rounded-lg min-h-[1122px] px-12 md:px-20 py-16 relative flex flex-col transition-all">
+                                    <div className="text-xs text-slate-400 mb-8 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
+                                        <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
+                                        <button 
+                                            onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
+                                        >
+                                            <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
+                                            <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
+                                        </button>
                                     </div>
-                                ))}
-
-                                {/* BOUTON AJOUTER PAGE */}
-                                <div className="flex justify-center pt-4 pb-32">
-                                    <button onClick={addPageBlock} className="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm text-slate-600 dark:text-slate-300 font-bold text-sm flex items-center gap-2 hover:border-blue-500 hover:text-blue-600 transition-all group">
-                                        <Plus size={18} className="group-hover:scale-110 transition-transform" /> Ajouter une nouvelle page
-                                    </button>
+                                    
+                                    <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
+                                    
+                                    <div 
+                                        ref={editorRef} 
+                                        contentEditable 
+                                        suppressContentEditableWarning={true}
+                                        onInput={() => saveCurrentPage(false)} 
+                                        onBlur={() => saveCurrentPage(true)} 
+                                        className={`prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all flex-1`}
+                                        placeholder="Commencez à écrire ici..."
+                                    ></div>
                                 </div>
+                                
                             </div>
                         </div>
                     </>
@@ -695,11 +636,6 @@ export default function JournalManager({ data, updateData }) {
                 /* Masquage scrollbar en mode Zen */
                 .custom-scrollbar-none::-webkit-scrollbar { display: none; }
                 .custom-scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
-
-                /* FORME EXACTE DE LA PAGE A4 */
-                .page-block-container {
-                    min-height: 1122px; /* Hauteur A4 approximative à l'écran */
-                }
             `}</style>
         </div>
     );
