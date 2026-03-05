@@ -634,14 +634,19 @@ export default function JournalManager({ data, updateData }) {
                                             </div>
                                         )}
                                         
-                                        {/* ZONE D'ÉDITION */}
+                                        {/* ZONE D'ÉDITION : MODIFICATION ICI (ref custom pour éviter l'effacement par React) */}
                                         <div 
                                             className={`page-content-block prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all flex-1 ${index === 0 ? 'px-12 md:px-20 pb-16' : 'p-12 md:p-20'}`}
                                             contentEditable 
                                             suppressContentEditableWarning={true}
                                             onInput={() => saveCurrentPage(false)} 
                                             onBlur={() => saveCurrentPage(true)} 
-                                            dangerouslySetInnerHTML={{ __html: block.html }}
+                                            ref={(el) => {
+                                                if (el && el.getAttribute('data-init') !== 'true') {
+                                                    el.innerHTML = block.html;
+                                                    el.setAttribute('data-init', 'true');
+                                                }
+                                            }}
                                             placeholder={index === 0 ? "Commencez à écrire ici..." : "Suite du texte..."}
                                         ></div>
 
