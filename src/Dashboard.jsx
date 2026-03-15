@@ -19,7 +19,7 @@ const DynamicIcon = ({ name, size = 18, className = "" }) => {
     return <IconComponent size={size} className={className} />;
 };
 
-// --- COMPOSANT HABIT STRIP (CORRIGÉ : Scroll Fixe + Synchro DB) ---
+// --- COMPOSANT HABIT STRIP (AMÉLIORÉ : Design Premium & Animation de masquage) ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayIndex = new Date().getDay(); 
     
@@ -29,12 +29,9 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
             // SÉCURITÉ ANTI-CRASH
             if (!h.frequency || !Array.isArray(h.frequency)) {
                  if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                     // Vérification si déjà fait (compatible format Tracker YYYY-MM-DD)
                      const lastDateStr = h.history && h.history.length > 0 ? h.history[h.history.length - 1] : null;
-                     // On compare les dates locales
                      const todayStr = new Date().toLocaleDateString('fr-CA'); // Format YYYY-MM-DD local
                      
-                     // Si l'historique contient la date d'aujourd'hui (format complet ou court)
                      let isDoneToday = false;
                      if(lastDateStr) {
                          const lastDate = new Date(lastDateStr);
@@ -48,7 +45,6 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
             }
 
             let isScheduledToday = false;
-            
             if (h.days_of_week && Array.isArray(h.days_of_week)) {
                 isScheduledToday = h.days_of_week.includes(todayIndex);
             } 
@@ -70,37 +66,34 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         });
     }, [habits, todayIndex]);
 
-    const [rotatedIds, setRotatedIds] = useState([]); 
-
-    const visibleHabits = useMemo(() => {
-        const notRotated = todayHabits.filter(h => !rotatedIds.includes(h.id));
-        const rotated = todayHabits.filter(h => rotatedIds.includes(h.id));
-        return [...notRotated, ...rotated];
-    }, [todayHabits, rotatedIds]);
+    // ÉTATS POUR L'ANIMATION DE MASQUAGE
+    const [hidingIds, setHidingIds] = useState([]);
+    const [hiddenIds, setHiddenIds] = useState([]); 
 
     const handlePass = (id, e) => {
         e.stopPropagation();
-        // CORRECTION SCROLL : On enlève le focus du bouton pour éviter que l'écran ne saute
         if (e.currentTarget) e.currentTarget.blur();
-        setRotatedIds(prev => [...prev, id]);
+        
+        // Déclenche l'animation
+        setHidingIds(prev => [...prev, id]);
+        
+        // Supprime le composant après l'animation (300ms)
+        setTimeout(() => {
+            setHiddenIds(prev => [...prev, id]);
+        }, 300);
     };
 
     const handleCheck = async (habit, e) => {
         e.stopPropagation();
-        
-        // 1. FORMAT DATE COMPATIBLE TRACKER (YYYY-MM-DD)
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`; 
 
-        // 2. MISE À JOUR VISUELLE IMMÉDIATE (Optimiste)
-        // On sauvegarde aussi l'ISO complet pour que le Dashboard le détecte "Done" immédiatement
         const newHistory = [...(habit.history || []), new Date().toISOString()];
         updateHabit({ ...habit, history: newHistory, streak: (habit.streak || 0) + 1 });
 
-        // 3. SAUVEGARDE DB SECRÈTE (Pour que le Tracker le voie)
         try {
             await supabase.from('habit_logs').insert({
                 habit_id: habit.id,
@@ -112,11 +105,13 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         }
     };
 
-    if (visibleHabits.length === 0) {
+    const activeHabits = todayHabits.filter(h => !hiddenIds.includes(h.id));
+
+    if (activeHabits.length === 0) {
         return (
-            <div className="flex items-center justify-center gap-3 py-2 opacity-50">
-                <Coffee size={20} className="text-slate-400"/>
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
+            <div className="flex items-center justify-center gap-3 py-6 opacity-50">
+                <Coffee size={24} className="text-slate-400"/>
+                <span className="text-sm font-black text-slate-500 uppercase tracking-widest">
                     {todayHabits.length === 0 ? "Repos aujourd'hui" : "Tout est fait !"}
                 </span>
             </div>
@@ -124,25 +119,32 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     }
 
     return (
-        <div className="flex gap-4 overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
-            {visibleHabits.map(h => (
-                <div key={h.id} className="snap-center shrink-0 w-32 h-32 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col justify-between p-3 group relative overflow-hidden transition-all hover:border-slate-300 dark:hover:border-slate-600">
-                    <div className="flex justify-between items-start">
-                        <span className="p-1.5 bg-slate-50 dark:bg-slate-700 rounded-lg text-lg text-blue-500">
-                            <DynamicIcon name={h.icon} size={20} />
-                        </span>
-                        <button onClick={(e) => handlePass(h.id, e)} className="text-slate-300 hover:text-slate-500 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors" title="Plus tard">
-                            <RotateCcw size={12}/>
+        <div className="flex overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
+            {activeHabits.map(h => {
+                const isHiding = hidingIds.includes(h.id);
+                return (
+                    <div 
+                        key={h.id} 
+                        className={`snap-center shrink-0 flex flex-col justify-between group relative overflow-hidden transition-all duration-300 ease-out
+                        ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-32 mr-4 opacity-100 scale-100 h-32 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/80 rounded-2xl border border-slate-200/60 dark:border-slate-700 shadow-sm p-3 hover:border-blue-300 dark:hover:border-blue-500/50 hover:shadow-md hover:-translate-y-1'}`}
+                    >
+                        <div className="flex justify-between items-start min-w-[104px]">
+                            <span className="p-2 bg-blue-50/80 dark:bg-blue-900/30 rounded-[10px] text-lg text-blue-600 dark:text-blue-400 shadow-inner">
+                                <DynamicIcon name={h.icon} size={20} />
+                            </span>
+                            <button onClick={(e) => handlePass(h.id, e)} className="text-slate-300 hover:text-rose-500 p-1.5 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" title="Masquer pour aujourd'hui">
+                                <EyeOff size={14}/>
+                            </button>
+                        </div>
+                        <p className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight min-w-[104px] mt-2 mb-2">{h.name}</p>
+                        <button onClick={(e) => handleCheck(h, e)} className="w-full py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm min-w-[104px]">
+                            <Check size={12} strokeWidth={3}/> Fait
                         </button>
                     </div>
-                    <p className="font-bold text-xs text-slate-700 dark:text-slate-200 line-clamp-2 leading-tight">{h.name}</p>
-                    <button onClick={(e) => handleCheck(h, e)} className="w-full py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black rounded-lg text-[10px] font-black uppercase tracking-wider hover:opacity-80 transition-opacity flex items-center justify-center gap-1">
-                        <Check size={10}/> Fait
-                    </button>
-                </div>
-            ))}
-            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                <span className="text-slate-400 font-black text-xs rotate-90 whitespace-nowrap">GERER</span>
+                );
+            })}
+            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
+                <span className="text-slate-400 font-black text-[10px] -rotate-90 whitespace-nowrap tracking-widest uppercase">Gérer</span>
             </div>
         </div>
     );
@@ -471,6 +473,17 @@ export default function Dashboard({ data, updateData, setView }) {
             {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 space-y-8">
+                    
+                    {/* --- ZONE HABITUDES --- */}
+                    {habits.length > 0 && (
+                        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-[2.5rem] border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest mb-4 ml-2">
+                                <Activity size={20} className="text-blue-500"/> Routines du jour
+                            </h3>
+                            <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                        </div>
+                    )}
+
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
@@ -548,13 +561,6 @@ export default function Dashboard({ data, updateData, setView }) {
                             </div>
                         ))}
                     </div>
-
-                    {/* --- ZONE HABITUDES --- */}
-                    {habits.length > 0 && (
-                        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-[2rem] border border-slate-100 dark:border-slate-800 p-4 shadow-sm">
-                            <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
-                        </div>
-                    )}
                 </div>
 
                 {/* COLONNE DROITE */}
