@@ -136,7 +136,6 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                                 <EyeOff size={14}/>
                             </button>
                         </div>
-                        {/* MODIFICATION ICI : text-[10px], line-clamp-3, et marge my-1 pour laisser respirer le texte */}
                         <p className="font-bold text-[10px] text-slate-800 dark:text-slate-200 line-clamp-3 leading-snug min-w-[104px] my-1 flex-1 flex items-center">{h.name}</p>
                         
                         <button onClick={(e) => handleCheck(h, e)} className="w-full py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm min-w-[104px] shrink-0">
@@ -486,6 +485,18 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     )}
 
+                    {/* --- ZONE NOTES ÉPINGLÉES --- */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        {pinnedNotes.map(n => (
+                            <div key={n.id} className={`p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all shadow-sm`} onClick={() => setView('notes')}>
+                                <div className="absolute top-6 right-8 opacity-20"><StickyNote size={28}/></div>
+                                <h4 className="font-black text-xl mb-4 tracking-tighter uppercase">{n.title}</h4>
+                                <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* --- ZONE PROJETS ACTIFS --- */}
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
@@ -552,16 +563,6 @@ export default function Dashboard({ data, updateData, setView }) {
                                 })
                             )}
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                        {pinnedNotes.map(n => (
-                            <div key={n.id} className={`p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all shadow-sm`} onClick={() => setView('notes')}>
-                                <div className="absolute top-6 right-8 opacity-20"><StickyNote size={28}/></div>
-                                <h4 className="font-black text-xl mb-4 tracking-tighter uppercase">{n.title}</h4>
-                                <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
-                            </div>
-                        ))}
                     </div>
                 </div>
 
