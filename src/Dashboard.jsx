@@ -136,8 +136,10 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                                 <EyeOff size={14}/>
                             </button>
                         </div>
-                        <p className="font-bold text-xs text-slate-800 dark:text-slate-200 line-clamp-2 leading-tight min-w-[104px] mt-2 mb-2">{h.name}</p>
-                        <button onClick={(e) => handleCheck(h, e)} className="w-full py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm min-w-[104px]">
+                        {/* MODIFICATION ICI : text-[10px], line-clamp-3, et marge my-1 pour laisser respirer le texte */}
+                        <p className="font-bold text-[10px] text-slate-800 dark:text-slate-200 line-clamp-3 leading-snug min-w-[104px] my-1 flex-1 flex items-center">{h.name}</p>
+                        
+                        <button onClick={(e) => handleCheck(h, e)} className="w-full py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm min-w-[104px] shrink-0">
                             <Check size={12} strokeWidth={3}/> Fait
                         </button>
                     </div>
