@@ -8,7 +8,8 @@ import {
 import { supabase } from './supabaseClient';
 
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // MODIFICATION ICI : useState(true) pour que la sidebar soit fermée au démarrage
+  const [isCollapsed, setIsCollapsed] = useState(true);
   
   // --- CHRONO SECONDES ---
   const [sessionSeconds, setSessionSeconds] = useState(0);
