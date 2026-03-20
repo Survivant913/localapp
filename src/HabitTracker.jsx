@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 // CHEMIN CORRIGÉ : ./ car on est à la racine de src
 import { supabase } from './supabaseClient';
 import * as Icons from 'lucide-react';
 import { 
-  Plus, Trash2, Check, BarChart2, 
-  Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, List, CheckCircle2,
-  Sparkles
+    Plus, Trash2, Check, BarChart2, 
+    Settings, Target, ChevronLeft, ChevronRight, Zap, Trophy, Loader2, List, CheckCircle2,
+    Sparkles, Edit2, RotateCcw
 } from 'lucide-react';
 
 const PREMIUM_ICONS = [
@@ -57,6 +57,9 @@ export default function HabitTracker({ }) {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [processingHabits, setProcessingHabits] = useState(new Set());
+
+    // NOUVEAU : ÉTAT D'ÉDITION
+    const [editingHabit, setEditingHabit] = useState(null);
 
     useEffect(() => {
         loadHabitData();
@@ -145,6 +148,7 @@ export default function HabitTracker({ }) {
         await supabase.from('habit_categories').delete().eq('id', id);
     };
 
+    // --- LOGIQUE AMÉLIORÉE : AJOUT / MODIFICATION ---
     const addHabit = async (name, categoryId, daysOfWeek, icon) => {
         const payload = { 
             name, 
@@ -153,27 +157,47 @@ export default function HabitTracker({ }) {
             icon: icon || null 
         };
 
-        const { data: newHab, error } = await supabase.from('habits').insert(payload).select().single();
-        
-        if (error) {
-            console.error("Erreur ajout habitude:", error);
-            alert(`Erreur: ${error.message}.`);
-        } else if (newHab) {
-            setHabits([...habits, newHab]);
+        if (editingHabit) {
+            // MODIFICATION D'UNE HABITUDE EXISTANTE
+            const { data: updatedHab, error } = await supabase.from('habits').update(payload).eq('id', editingHabit.id).select().single();
+            if (error) {
+                console.error("Erreur mise à jour:", error);
+                alert(`Erreur: ${error.message}`);
+            } else if (updatedHab) {
+                setHabits(habits.map(h => h.id === editingHabit.id ? updatedHab : h));
+                setEditingHabit(null); // On sort du mode édition
+            }
+        } else {
+            // CRÉATION NOUVELLE HABITUDE (Original)
+            const { data: newHab, error } = await supabase.from('habits').insert(payload).select().single();
+            if (error) {
+                console.error("Erreur ajout habitude:", error);
+                alert(`Erreur: ${error.message}.`);
+            } else if (newHab) {
+                setHabits([...habits, newHab]);
+            }
         }
     };
 
-    // --- MODIFICATION : SUPPRESSION RÉELLE (HARD DELETE) ---
+    const startEditingHabit = (habit) => {
+        setEditingHabit(habit);
+        // Le formulaire d'ajout va récupérer cet état pour se pré-remplir
+    };
+
+    // --- SUPPRESSION / RESET ---
     const deleteHabit = async (id) => {
         if (!window.confirm("Supprimer DÉFINITIVEMENT cette habitude et tout son historique ?")) return;
-        
-        // Mise à jour de l'interface immédiatement
         setHabits(habits.filter(h => h.id !== id));
-        setLogs(logs.filter(l => l.habit_id !== id)); // On enlève aussi les logs de la mémoire locale
-
-        // Suppression en base de données
+        setLogs(logs.filter(l => l.habit_id !== id)); 
         await supabase.from('habit_logs').delete().eq('habit_id', id);
         await supabase.from('habits').delete().eq('id', id);
+        if (editingHabit && editingHabit.id === id) setEditingHabit(null);
+    };
+
+    const resetHabitHistory = async (id) => {
+        if (!window.confirm("Voulez-vous vraiment remettre l'historique de cette habitude à ZÉRO ? Cela effacera tous les jours cochés, mais l'habitude restera.")) return;
+        setLogs(logs.filter(l => l.habit_id !== id));
+        await supabase.from('habit_logs').delete().eq('habit_id', id);
     };
 
     const stats = useMemo(() => {
@@ -405,10 +429,11 @@ export default function HabitTracker({ }) {
                 {activeTab === 'stats' && (
                     <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                           
-                            <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner">
-                                {[7, 30, 90].map(d => (
-                                    <button key={d} onClick={() => setStatRange(d)} className={`px-5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
+                            
+                            <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner flex-wrap">
+                                {/* AJOUT NOUVELLES DURÉES */}
+                                {[7, 15, 30, 45, 60, 90, 180, 365].map(d => (
+                                    <button key={d} onClick={() => setStatRange(d)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
                                 ))}
                             </div>
                         </div>
@@ -466,7 +491,7 @@ export default function HabitTracker({ }) {
                     </div>
                 )}
 
-                {/* VUE REGLAGES */}
+                {/* VUE REGLAGES (MODIFIÉE POUR INCLURE LES BOUTONS ÉDITER/REMETTRE À ZÉRO) */}
                 {activeTab === 'settings' && (
                     <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-500">
                         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -499,7 +524,7 @@ export default function HabitTracker({ }) {
                             <h3 className="font-black text-xl mb-8 dark:text-white flex items-center gap-3"><Target size={22} className="text-emerald-500"/> Catalogue Habitudes</h3>
                             <div className="space-y-3 mb-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                 {activeHabitsForManagement.map(h => (
-                                    <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
+                                    <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group">
                                         <div>
                                             <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                                                 <DynamicIcon name={h.icon} size={18} className="text-blue-500" />
@@ -511,14 +536,23 @@ export default function HabitTracker({ }) {
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <Badge text={categories.find(c => c.id === h.category_id)?.name || 'Sans Domaine'} color={!h.category_id ? 'bg-amber-100 text-amber-600' : ''} />
-                                            <button onClick={() => deleteHabit(h.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"><Trash2 size={16}/></button>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                            {/* NOUVEAUX BOUTONS ACTIONS */}
+                                            <button onClick={() => resetHabitHistory(h.id)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-all" title="Remettre à zéro l'historique"><RotateCcw size={16}/></button>
+                                            <button onClick={() => startEditingHabit(h)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all" title="Modifier"><Edit2 size={16}/></button>
+                                            <button onClick={() => deleteHabit(h.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all" title="Supprimer complètement"><Trash2 size={16}/></button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            <HabitCreator categories={categories} onAdd={addHabit} />
+                            
+                            {/* COMPOSANT HABITCREATOR avec les props nécessaires */}
+                            <HabitCreator 
+                                categories={categories} 
+                                onAdd={addHabit} 
+                                editingHabit={editingHabit} 
+                                onCancelEdit={() => setEditingHabit(null)} 
+                            />
                         </div>
                     </div>
                 )}
@@ -570,11 +604,22 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
     );
 }
 
-function HabitCreator({ categories, onAdd }) {
+// --- FORMULAIRE MODIFIÉ POUR SUPPORTER L'ÉDITION ---
+function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
     const [selectedIcon, setSelectedIcon] = useState('');
+
+    // Si on clique sur "Éditer", on pré-remplit les champs
+    useEffect(() => {
+        if (editingHabit) {
+            setName(editingHabit.name);
+            setCategoryId(editingHabit.category_id || '');
+            setSelectedDays(editingHabit.days_of_week || [0,1,2,3,4,5,6]);
+            setSelectedIcon(editingHabit.icon || '');
+        }
+    }, [editingHabit]);
 
     const toggleDay = (dayIndex) => {
         if (selectedDays.includes(dayIndex)) {
@@ -596,13 +641,14 @@ function HabitCreator({ categories, onAdd }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="pt-8 border-t border-slate-100 dark:border-slate-800 space-y-6">
+        <form onSubmit={handleSubmit} className={`pt-8 border-t space-y-6 ${editingHabit ? 'border-amber-400 dark:border-amber-600' : 'border-slate-100 dark:border-slate-800'}`}>
+            {editingHabit && <div className="text-xs font-black text-amber-500 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-md w-fit">Mode Modification</div>}
             <div className="space-y-4">
                 <div className="flex gap-2">
                     <input 
                         value={name} 
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Nouvelle habitude..." 
+                        placeholder="Nom de l'habitude..." 
                         className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" 
                         required
                     />
@@ -641,7 +687,14 @@ function HabitCreator({ categories, onAdd }) {
                             ))}
                         </div>
                     </div>
-                    <button type="submit" className="p-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95"><Plus size={24}/></button>
+                    {editingHabit ? (
+                        <div className="flex gap-2">
+                            <button type="button" onClick={onCancelEdit} className="p-4 bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-300 transition-all font-black text-xs uppercase tracking-widest">Annuler</button>
+                            <button type="submit" className="px-6 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 shadow-xl shadow-emerald-500/30 transition-all font-black text-xs uppercase tracking-widest">Sauver</button>
+                        </div>
+                    ) : (
+                        <button type="submit" className="p-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95"><Plus size={24}/></button>
+                    )}
                 </div>
             </div>
         </form>
