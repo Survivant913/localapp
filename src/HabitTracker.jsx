@@ -187,8 +187,12 @@ export default function HabitTracker({ }) {
     // --- SUPPRESSION / RESET ---
     const deleteHabit = async (id) => {
         if (!window.confirm("Supprimer DÉFINITIVEMENT cette habitude et tout son historique ?")) return;
+        
+        // Mise à jour de l'interface immédiatement
         setHabits(habits.filter(h => h.id !== id));
-        setLogs(logs.filter(l => l.habit_id !== id)); 
+        setLogs(logs.filter(l => l.habit_id !== id)); // On enlève aussi les logs de la mémoire locale
+
+        // Suppression en base de données
         await supabase.from('habit_logs').delete().eq('habit_id', id);
         await supabase.from('habits').delete().eq('id', id);
         if (editingHabit && editingHabit.id === id) setEditingHabit(null);
@@ -431,8 +435,8 @@ export default function HabitTracker({ }) {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                             
                             <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner flex-wrap">
-                                {/* AJOUT NOUVELLES DURÉES */}
-                                {[7, 15, 30, 45, 60, 90, 180, 365].map(d => (
+                                {/* MODIFICATION ICI : Nouvelles durées limitées à 60 maximum */}
+                                {[7, 10, 15, 21, 30, 40, 50, 60].map(d => (
                                     <button key={d} onClick={() => setStatRange(d)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
                                 ))}
                             </div>
