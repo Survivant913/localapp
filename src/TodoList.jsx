@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { 
-  CheckCircle2, Circle, Plus, Trash2, Calendar, Flag, 
-  Filter, CheckSquare, AlertCircle, X, ListTodo,
-  LayoutDashboard, List, ChevronRight, Clock, Hash, ArrowRight,
-  GripVertical, ChevronLeft, PanelLeftClose, PanelLeftOpen
+    CheckCircle2, Circle, Plus, Trash2, Calendar, Flag, 
+    Filter, CheckSquare, AlertCircle, X, ListTodo,
+    LayoutDashboard, List, ChevronRight, Clock, Hash, ArrowRight,
+    GripVertical, ChevronLeft, PanelLeftClose, PanelLeftOpen,
+    Edit2
 } from 'lucide-react';
 
 export default function TodoList({ data, updateData }) {
@@ -18,8 +19,11 @@ export default function TodoList({ data, updateData }) {
     const [activeListId, setActiveListId] = useState('default');
     const [isAddingList, setIsAddingList] = useState(false);
     const [newListTitle, setNewListTitle] = useState('');
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Menu rétractable (Logique intacte)
-    const [draggingTaskId, setDraggingTaskId] = useState(null); // Pour le Drag & Drop
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); 
+    const [draggingTaskId, setDraggingTaskId] = useState(null); 
+
+    // --- NOUVEL ÉTAT : MODIFICATION DE TÂCHE ---
+    const [editingTaskId, setEditingTaskId] = useState(null);
 
     const isDark = data.settings?.theme === 'dark';
 
@@ -63,27 +67,47 @@ export default function TodoList({ data, updateData }) {
         setDraggingTaskId(null);
     };
 
-    // --- ACTIONS (LOGIQUE ORIGINALE PRÉSERVÉE) ---
-    const addTask = (e) => {
+    // --- LOGIQUE AJOUT ET MODIFICATION ---
+    const handleSaveTask = (e) => {
         e.preventDefault();
         if (!newTaskText.trim()) return;
 
-        const newTodo = {
-            id: Date.now(),
-            text: newTaskText,
-            completed: false,
-            priority: newTaskPriority,
-            deadline: newTaskDeadline || null,
-            createdAt: new Date().toISOString(),
-            listId: activeListId,
-            list_id: activeListId,
-            status: 'todo'
-        };
+        if (editingTaskId) {
+            // Mode Édition
+            const updatedTodos = todos.map(t =>
+                t.id === editingTaskId ? { ...t, text: newTaskText, priority: newTaskPriority, deadline: newTaskDeadline || null } : t
+            );
+            const target = updatedTodos.find(t => t.id === editingTaskId);
+            updateData({ ...data, todos: updatedTodos }, { table: 'todos', id: editingTaskId, data: { text: target.text, priority: target.priority, deadline: target.deadline }, action: 'update' });
+            setEditingTaskId(null);
+        } else {
+            // Mode Ajout (Original)
+            const newTodo = {
+                id: Date.now(),
+                text: newTaskText,
+                completed: false,
+                priority: newTaskPriority,
+                deadline: newTaskDeadline || null,
+                createdAt: new Date().toISOString(),
+                listId: activeListId,
+                list_id: activeListId,
+                status: 'todo'
+            };
+            updateData({ ...data, todos: [newTodo, ...todos] }, { table: 'todos', data: newTodo, action: 'insert' }); 
+        }
 
-        updateData({ ...data, todos: [newTodo, ...todos] }, { table: 'todos', data: newTodo, action: 'insert' }); 
+        // Reset du formulaire
         setNewTaskText('');
         setNewTaskPriority('medium');
         setNewTaskDeadline('');
+    };
+
+    // Lancer la modification
+    const startEditing = (todo) => {
+        setEditingTaskId(todo.id);
+        setNewTaskText(todo.text);
+        setNewTaskPriority(todo.priority || 'medium');
+        setNewTaskDeadline(todo.deadline || '');
     };
 
     const toggleTodo = (id) => {
@@ -216,7 +240,7 @@ export default function TodoList({ data, updateData }) {
                 </div>
             </aside>
 
-            {/* MAIN (PLEINE LARGEUR ACTIVÉE) */}
+            {/* MAIN */}
             <main className="flex-1 flex flex-col overflow-hidden w-full">
                 <header className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex items-center gap-6">
@@ -241,17 +265,37 @@ export default function TodoList({ data, updateData }) {
 
                 <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-24 custom-scrollbar">
                     
-                    {/* FORMULAIRE (PLEINE LARGEUR) */}
+                    {/* FORMULAIRE (MODIFIÉ POUR PRENDRE EN CHARGE L'ÉDITION) */}
                     <div className="mb-8 w-full">
-                        <form onSubmit={addTask} className={`rounded-2xl border p-2 shadow-xl transition-all ${isDark ? 'bg-slate-900/40 border-white/5 focus-within:border-indigo-500/50' : 'bg-white border-slate-200 focus-within:border-indigo-400'}`}>
+                        <form onSubmit={handleSaveTask} className={`rounded-2xl border p-2 shadow-xl transition-all ${isDark ? 'bg-slate-900/40 border-white/5 focus-within:border-indigo-500/50' : 'bg-white border-slate-200 focus-within:border-indigo-400'} ${editingTaskId ? 'ring-2 ring-indigo-500 border-transparent' : ''}`}>
                             <div className="flex items-center gap-3 px-4 py-2">
-                                <input type="text" placeholder="Ajouter une tâche..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} className="flex-1 bg-transparent border-none outline-none text-lg py-2" />
-                                <button type="submit" className="p-3 bg-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"><Plus size={20} /></button>
+                                <input 
+                                    type="text" 
+                                    placeholder={editingTaskId ? "Modifier la tâche..." : "Ajouter une tâche..."} 
+                                    value={newTaskText} 
+                                    onChange={(e) => setNewTaskText(e.target.value)} 
+                                    className="flex-1 bg-transparent border-none outline-none text-lg py-2" 
+                                />
+                                {editingTaskId && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setEditingTaskId(null); setNewTaskText(''); setNewTaskPriority('medium'); setNewTaskDeadline(''); }} 
+                                        className="p-3 text-slate-400 hover:text-red-500 transition-all"
+                                        title="Annuler"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                )}
+                                <button 
+                                    type="submit" 
+                                    className={`p-3 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg ${editingTaskId ? 'bg-green-500 shadow-green-500/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}
+                                >
+                                    {editingTaskId ? <CheckCircle2 size={20} /> : <Plus size={20} />}
+                                </button>
                             </div>
                             <div className={`flex items-center gap-4 px-4 pb-2 border-t pt-3 ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] font-black text-slate-500 uppercase">Priorité</span>
-                                    {/* FIX DARK MODE : classes bg-slate-900 et text-white sur les options */}
                                     <select value={newTaskPriority} onChange={e => setNewTaskPriority(e.target.value)} className="bg-transparent text-[10px] font-bold outline-none uppercase cursor-pointer dark:text-white">
                                         <option value="low" className="dark:bg-slate-900 dark:text-white">Basse</option>
                                         <option value="medium" className="dark:bg-slate-900 dark:text-white">Moyenne</option>
@@ -292,14 +336,17 @@ export default function TodoList({ data, updateData }) {
                                                 {todo.deadline && <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1"><Clock size={10}/> {new Date(todo.deadline).toLocaleDateString()}</span>}
                                             </div>
                                         </div>
-                                        <button onClick={() => deleteTodo(todo.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
+                                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+                                            <button onClick={() => startEditing(todo)} className="p-2 text-slate-400 hover:text-blue-500 transition-all"><Edit2 size={18}/></button>
+                                            <button onClick={() => deleteTodo(todo.id)} className="p-2 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
+                                        </div>
                                     </div>
                                 );
                             })}
                         </div>
                     )}
 
-                    {/* VUE KANBAN (INTACTE) */}
+                    {/* VUE KANBAN (LARGEUR ADAPTATIVE CORRIGÉE) */}
                     {viewMode === 'kanban' && (
                         <div className="flex gap-6 h-full overflow-x-auto no-scrollbar min-h-[550px] pb-10">
                             {[
@@ -309,7 +356,7 @@ export default function TodoList({ data, updateData }) {
                             ].map(column => (
                                 <div 
                                     key={column.id} 
-                                    className="w-80 shrink-0 flex flex-col"
+                                    className="flex-1 min-w-[280px] flex flex-col" 
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, column.id)}
                                 >
@@ -332,7 +379,17 @@ export default function TodoList({ data, updateData }) {
                                                         <GripVertical size={16} className="text-slate-500" />
                                                     </div>
 
-                                                    <div className="pl-4">
+                                                    {/* Ajout des boutons Edit et Sup sur le Kanban */}
+                                                    <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity z-10">
+                                                        <button onClick={(e) => { e.stopPropagation(); startEditing(todo); }} className={`p-1.5 rounded-md transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-blue-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-blue-600'}`} title="Modifier">
+                                                            <Edit2 size={14}/>
+                                                        </button>
+                                                        <button onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }} className={`p-1.5 rounded-md transition-colors ${isDark ? 'bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-red-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-red-600'}`} title="Supprimer">
+                                                            <Trash2 size={14}/>
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="pl-4 pr-12">
                                                         <p className="text-sm font-bold mb-3 leading-tight">{todo.text}</p>
                                                         <div className="flex justify-between items-center">
                                                             <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${priorityConfig[todo.priority].bg} ${priorityConfig[todo.priority].color}`}>
