@@ -435,8 +435,8 @@ export default function HabitTracker({ }) {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                             
                             <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner flex-wrap">
-                                {/* MODIFICATION ICI : Nouvelles durées limitées à 60 maximum */}
-                                {[7, 10, 15, 21, 30, 40, 50, 60].map(d => (
+                                {/* MODIFICATION ICI : Ajout du 4, limite max à 60 */}
+                                {[4, 7, 10, 15, 21, 30, 40, 50, 60].map(d => (
                                     <button key={d} onClick={() => setStatRange(d)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
                                 ))}
                             </div>
