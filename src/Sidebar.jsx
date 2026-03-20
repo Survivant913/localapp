@@ -54,7 +54,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'workspace', label: 'Workspace', icon: Box }, 
     { id: 'chat', label: 'Messages', icon: MessageSquare, badge: unreadCount },
     { id: 'planning', label: 'Agenda', icon: CalendarRange },
-    { id: 'calendar', label: 'Calendrier Financier', icon: Calendar }, 
+    { id: 'calendar', label: 'Calendrier Financier / Deadline', icon: Calendar }, 
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'habits', label: 'Suivi Habitudes', icon: Activity },
