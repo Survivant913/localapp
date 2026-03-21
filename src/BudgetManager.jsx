@@ -127,10 +127,8 @@ export default function BudgetManager({ data, updateData }) {
             if (r.endDate && parseLocalDate(r.endDate) < today) return;
             
             // --- FIX CORRECTION FEVRIER ---
-            // On s'assure que si le paiement est le 30 et le mois finit le 28, on prend le 28.
             const effectiveDay = Math.min(r.dayOfMonth, lastDay);
 
-            // On vérifie si ce jour "effectif" est dans le futur pour ce mois-ci
             if (effectiveDay > currentDay) {
                 const amt = parseFloat(r.amount || 0);
                 if (r.type === 'transfer') {
@@ -326,13 +324,12 @@ export default function BudgetManager({ data, updateData }) {
     const addTransaction = () => {
         if(!amount || !desc) return;
         let newTransactions = [];
-        // Utilisation de getNoonDate pour la transaction immédiate
         const commonData = { id: Date.now(), amount: parseAmount(amount), date: getNoonDate(), archived: false };
         
-        let dbActionData = null; // Pour la sauvegarde DB
+        let dbActionData = null; 
 
         if (type === 'transfer') {
-            if (selectedAccountId === targetAccountId) { alert("Comptes identiques !"); return; }
+            if (selectedAccountId === targetAccountId) { alert("Veuillez sélectionner deux comptes différents pour un virement."); return; }
             const sourceName = accounts.find(a => a.id === selectedAccountId)?.name;
             const targetName = accounts.find(a => a.id === targetAccountId)?.name;
             
@@ -340,15 +337,12 @@ export default function BudgetManager({ data, updateData }) {
             const t2 = { ...commonData, id: Date.now() + 1, type: 'income', description: `Virement reçu de ${sourceName} : ${desc}`, accountId: targetAccountId };
             
             newTransactions.push(t1, t2);
-            // Note: Pour un transfert, on ne force pas l'insert immédiat complexe (trop de logique), on laisse le timer 3s (moins critique)
-            // Ou on pourrait envoyer t1, mais t2 serait en retard. On accepte le timer pour les transferts.
         } else {
             const t = { ...commonData, type, description: desc, accountId: selectedAccountId };
             newTransactions.push(t);
             dbActionData = { table: 'transactions', data: { ...t, account_id: t.accountId }, action: 'insert' };
         }
         
-        // Si c'est une dépense/revenu simple -> Sauvegarde Immédiate
         updateData(
             { ...data, budget: { ...budgetData, transactions: [...newTransactions, ...transactionsList] } },
             dbActionData
@@ -358,10 +352,17 @@ export default function BudgetManager({ data, updateData }) {
 
     const addScheduled = () => { 
         if(!amount || !desc || !scheduleDate) return; 
+        if (type === 'transfer' && selectedAccountId === targetAccountId) {
+            alert("Veuillez sélectionner deux comptes différents pour un virement.");
+            return;
+        }
+
         const newSch = { 
             id: Date.now(), type, amount: parseAmount(amount), description: desc, 
-            date: scheduleDate, // Date format YYYY-MM-DD (Safe)
-            status: 'pending', accountId: selectedAccountId, targetAccountId: type === 'transfer' ? targetAccountId : null 
+            date: scheduleDate, 
+            status: 'pending', accountId: selectedAccountId, 
+            targetAccountId: type === 'transfer' ? targetAccountId : null,
+            target_account_id: type === 'transfer' ? targetAccountId : null // HACK SÉCURITÉ POUR APP.JSX
         }; 
         
         updateData(
@@ -373,6 +374,10 @@ export default function BudgetManager({ data, updateData }) {
     
     const addRecurring = () => { 
         if(!amount || !desc) return;
+        if (type === 'transfer' && selectedAccountId === targetAccountId) {
+            alert("Veuillez sélectionner deux comptes différents pour un virement.");
+            return;
+        }
         
         const today = new Date();
         const currentDay = today.getDate();
@@ -389,7 +394,6 @@ export default function BudgetManager({ data, updateData }) {
         const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
         const dayToSet = Math.min(targetDay, daysInTargetMonth);
         
-        // DATE SECURISEE MIDI
         const initialNextDate = new Date(targetYear, targetMonth, dayToSet, 12, 0, 0);
 
         const newRec = { 
@@ -401,6 +405,7 @@ export default function BudgetManager({ data, updateData }) {
             endDate: recurEndDate || null, 
             accountId: selectedAccountId, 
             targetAccountId: type === 'transfer' ? targetAccountId : null, 
+            target_account_id: type === 'transfer' ? targetAccountId : null, // HACK SÉCURITÉ POUR APP.JSX
             nextDueDate: initialNextDate.toISOString() 
         }; 
         
@@ -418,7 +423,6 @@ export default function BudgetManager({ data, updateData }) {
     };
     
     const archiveTransaction = (id) => { 
-        // L'archivage est une modif simple, on laisse le timer ou on peut forcer l'update
         const newTransactions = transactionsList.map(t => t.id === id ? { ...t, archived: !t.archived } : t); 
         const target = newTransactions.find(t => t.id === id);
         updateData(
@@ -429,8 +433,6 @@ export default function BudgetManager({ data, updateData }) {
     
     const savePlannerBase = () => { 
         const newBases = { ...planner.safetyBases, [plannerTargetId]: parseAmount(plannerBaseInput) || 0 }; 
-        // Sauvegarde complexe (table différente), on laisse le timer global gérer ou on utilise un upsert custom dans App.jsx
-        // Pour simplifier, on laisse le timer ici car c'est moins critique
         updateData({ ...data, budget: { ...budgetData, planner: { ...planner, safetyBases: newBases } } }); 
     };
 
@@ -453,16 +455,14 @@ export default function BudgetManager({ data, updateData }) {
         if (direction === 'up' && index > 0) { [items[index], items[index - 1]] = [items[index - 1], items[index]]; } 
         else if (direction === 'down' && index < items.length - 1) { [items[index], items[index + 1]] = [items[index + 1], items[index]]; } 
         updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items } } }); 
-        // Le déplacement d'ordre est purement local/visuel, le timer suffit.
     };
 
     const buyPlannerItem = (item) => { 
         if(window.confirm(`Confirmer l'achat de "${item.name}" pour ${formatCurrency(item.cost)} ?`)) { 
-            // 1. Créer la transaction
             const newTransaction = { 
                 id: Date.now(), 
                 amount: item.cost, 
-                date: getNoonDate(), // DATE SECURISEE MIDI
+                date: getNoonDate(), 
                 archived: false, 
                 type: 'expense', 
                 description: `Achat planifié : ${item.name}`, 
@@ -472,10 +472,6 @@ export default function BudgetManager({ data, updateData }) {
             const newTransactions = [newTransaction, ...transactionsList]; 
             const newItems = planner.items.filter(i => i.id !== item.id); 
             
-            // NOTE : Ici on envoie 2 actions en 1 : Suppression de l'item + Ajout de la transaction.
-            // Notre système `updateData` ne gère qu'une seule action DB immédiate.
-            // On priorise la suppression de l'item pour éviter les doublons d'achat.
-            // La transaction sera sauvegardée par le timer de 3s (backup).
             updateData(
                 { ...data, budget: { ...budgetData, transactions: newTransactions, planner: { ...planner, items: newItems } } }, 
                 { table: 'planner_items', id: item.id, action: 'delete' } 
@@ -494,7 +490,6 @@ export default function BudgetManager({ data, updateData }) {
     const visibleScheduled = scheduledList.filter(s => s.status === 'pending');
 
     return (
-        // --- CHANGEMENT : w-full à la place de max-w-4xl mx-auto ---
         <div className="space-y-6 fade-in w-full pb-20">
             {/* 1. CARTES DU HAUT */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -623,7 +618,6 @@ export default function BudgetManager({ data, updateData }) {
                                     <p className="text-gray-400 text-sm text-center py-4">Aucune transaction.</p>
                                 )}
 
-                                {/* --- AJOUT : Conteneur de scroll interne --- */}
                                 <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                     <ul className="space-y-3 mb-4">
                                         {displayedTransactions.map(t => (
