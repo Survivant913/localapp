@@ -3,10 +3,10 @@ import { useState, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import * as AllIcons from 'lucide-react';
 import { 
-  LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
-  CheckSquare, StickyNote, Plus, FolderKanban, 
-  Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
-  Repeat, RotateCcw, Check, Coffee, Activity
+    LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
+    CheckSquare, StickyNote, Plus, FolderKanban, 
+    Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
+    Repeat, RotateCcw, Check, Coffee, Activity
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 
@@ -19,7 +19,7 @@ const DynamicIcon = ({ name, size = 18, className = "" }) => {
     return <IconComponent size={size} className={className} />;
 };
 
-// --- COMPOSANT HABIT STRIP (AMÉLIORÉ : Design Premium & Animation de masquage) ---
+// --- COMPOSANT HABIT STRIP ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayIndex = new Date().getDay(); 
     
@@ -151,32 +151,77 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     );
 };
 
-// --- COMPOSANT SPARKLINE (Graphique Mini - Optimisé) ---
-const SparkLine = ({ data, height = 50 }) => {
-    if (!data || !Array.isArray(data) || data.length < 2) return null;
-    let min = Math.min(...data);
-    let max = Math.max(...data);
-    if (min > 0) min = 0; if (max < 0) max = 0;
-    const range = max - min || 1;
-    const width = 100;
-    const getY = (val) => height - ((val - min) / range) * height;
-    const points = data.map((val, i) => `${(i / (data.length - 1)) * width},${getY(val)}`).join(' ');
-    const zeroOffset = Math.max(0, Math.min(1, (max - 0) / range));
-    const gradientId = "spark-grad-" + Math.random().toString(36).substr(2, 9);
+// --- NOUVEAU COMPOSANT PREMIUM CHART (Graphique Lissé avec Prévision) ---
+const PremiumChart = ({ data, height = 80 }) => {
+    if (!data || !data.past || !data.future) return null;
+    const allPoints = [...data.past, data.current, ...data.future];
+    if (allPoints.length < 2) return null;
+
+    let min = Math.min(...allPoints);
+    let max = Math.max(...allPoints);
+    // Petit padding visuel pour éviter de toucher les bords
+    if (min === max) { min -= 10; max += 10; }
+    
+    const range = max - min;
+    const width = 200;
+    
+    // Ratio visuel : 60% pour le passé (plus aéré), 40% pour le futur (compressé comme demandé)
+    const pastWidthRatio = 0.6;
+    
+    // Fonction Y inversée (0 est en haut du SVG) avec padding de 10px
+    const getY = (val) => height - 5 - ((val - min) / range) * (height - 10);
+
+    const pastLength = data.past.length;
+    const futureLength = data.future.length;
+
+    // Calcul des coordonnées pour la partie Passé (Solide)
+    const pastPointsStr = data.past.map((val, i) => {
+        const x = (i / pastLength) * (width * pastWidthRatio);
+        return `${x},${getY(val)}`;
+    }).join(' ') + ` ${width * pastWidthRatio},${getY(data.current)}`;
+
+    // Calcul des coordonnées pour la partie Future (Pointillée)
+    const futurePointsStr = `${width * pastWidthRatio},${getY(data.current)} ` + data.future.map((val, i) => {
+        const x = (width * pastWidthRatio) + ((i + 1) / futureLength) * (width * (1 - pastWidthRatio));
+        return `${x},${getY(val)}`;
+    }).join(' ');
+
+    const todayX = width * pastWidthRatio;
+    const todayY = getY(data.current);
+
+    const gradientId = "premium-grad-" + Math.random().toString(36).substr(2, 9);
+    // Le polygone de remplissage s'arrête exactement à "Aujourd'hui"
+    const fillPolygon = `0,${height} ${pastPointsStr} ${todayX},${height}`;
 
     return (
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
             <defs>
                 <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity="1" />
-                    <stop offset={`${zeroOffset * 100}%`} stopColor="#10b981" stopOpacity="1" />
-                    <stop offset={`${zeroOffset * 100}%`} stopColor="#ef4444" stopOpacity="1" />
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity="1" />
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
                 </linearGradient>
             </defs>
-            <line x1="0" y1={getY(0)} x2="100" y2={getY(0)} stroke="currentColor" className="text-gray-300 dark:text-slate-600" strokeWidth="0.5" strokeDasharray="2" opacity="0.8" />
-            <polyline fill="none" stroke={`url(#${gradientId})`} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={100} cy={getY(data[data.length-1])} r="3" fill={data[data.length-1] >= 0 ? "#10b981" : "#ef4444"} className="animate-pulse" vectorEffect="non-scaling-stroke"/>
+
+            {/* Remplissage uniquement sous la courbe passée */}
+            <polygon points={fillPolygon} fill={`url(#${gradientId})`} />
+
+            {/* Ligne du 0€ si on passe en négatif (repère visuel discret) */}
+            {min < 0 && max > 0 && (
+                <line x1="0" y1={getY(0)} x2={width} y2={getY(0)} stroke="currentColor" className="text-slate-300 dark:text-slate-700" strokeWidth="0.5" strokeDasharray="2" opacity="0.8" />
+            )}
+
+            {/* Ligne Verticale "Aujourd'hui" */}
+            <line x1={todayX} y1="0" x2={todayX} y2={height} stroke="currentColor" className="text-blue-500/30 dark:text-blue-400/30" strokeWidth="1" strokeDasharray="2 2" />
+
+            {/* Courbe Future (Prévision) - Compressée, Pointillée, Teinte différente */}
+            <polyline fill="none" stroke="currentColor" className="text-slate-400 dark:text-slate-500" strokeWidth="1.5" strokeDasharray="3 3" points={futurePointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Courbe Passée (Réel) - Solide et lisse */}
+            <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" points={pastPointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Marqueur "Aujourd'hui" lumineux */}
+            <circle cx={todayX} cy={todayY} r="3" className="fill-white dark:fill-slate-900 stroke-blue-500" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={todayX} cy={todayY} r="1.5" className="fill-blue-500 animate-pulse" vectorEffect="non-scaling-stroke" />
         </svg>
     );
 };
@@ -268,30 +313,84 @@ export default function Dashboard({ data, updateData, setView }) {
     const projectedBalance = getProjectedEndOfMonth();
     const balanceDiff = projectedBalance - currentBalance; 
 
-    const getSparklineData = () => {
+    // --- ALGORITHME DU GRAPHIQUE PREMIUM (30J PASSÉ + AUJOURD'HUI + 30J FUTUR) ---
+    const getPremiumSparklineData = () => {
         try {
-            const days = 30; 
-            const history = [];
-            let tempBalance = currentBalance;
-            const dailyChanges = {};
+            const pastDays = 30;
+            const futureDays = 30;
+            const pastHistory = [];
+            const futureHistory = [];
+
+            // 1. Calcul du passé
+            let tempBalancePast = currentBalance;
+            const dailyChangesPast = {};
             const relevantTransactions = transactions.filter(t => isRelevantItem(t));
+            
             relevantTransactions.forEach(t => {
                 const d = new Date(t.date); d.setHours(0,0,0,0);
                 const key = d.getTime();
                 const impact = getFinancialImpact(t);
-                dailyChanges[key] = (dailyChanges[key] || 0) + impact;
+                dailyChangesPast[key] = (dailyChangesPast[key] || 0) + impact;
             });
-            let currentDateCursor = new Date(); currentDateCursor.setHours(0,0,0,0); 
-            for (let i = 0; i < days; i++) {
-                history.unshift(Number(tempBalance.toFixed(2)));
-                const key = currentDateCursor.getTime();
-                tempBalance -= (dailyChanges[key] || 0);
-                currentDateCursor.setDate(currentDateCursor.getDate() - 1);
+            
+            let cursorPast = new Date(); cursorPast.setHours(0,0,0,0); 
+            for (let i = 0; i < pastDays; i++) {
+                pastHistory.unshift(Number(tempBalancePast.toFixed(2)));
+                const key = cursorPast.getTime();
+                tempBalancePast -= (dailyChangesPast[key] || 0);
+                cursorPast.setDate(cursorPast.getDate() - 1);
             }
-            return history;
-        } catch (e) { return [0, 0]; }
+
+            // 2. Calcul du futur (Simulation)
+            let tempBalanceFuture = currentBalance;
+            let cursorFuture = new Date(); cursorFuture.setHours(0,0,0,0);
+            
+            for (let i = 1; i <= futureDays; i++) {
+                cursorFuture.setDate(cursorFuture.getDate() + 1);
+                const checkDate = new Date(cursorFuture);
+                let dailyChange = 0;
+
+                // Ajout des dépenses/revenus planifiés
+                scheduled.forEach(s => {
+                    if (s.status === 'pending' && isRelevantItem(s)) {
+                        const sDate = new Date(s.date);
+                        if (sDate.getFullYear() === checkDate.getFullYear() && sDate.getMonth() === checkDate.getMonth() && sDate.getDate() === checkDate.getDate()) {
+                            dailyChange += getFinancialImpact(s);
+                        }
+                    }
+                });
+
+                // Ajout des dépenses/revenus récurrents
+                recurring.forEach(r => {
+                    if (!isRelevantItem(r)) return;
+                    if (r.endDate && new Date(r.endDate) < checkDate) return;
+                    
+                    const daysInMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0).getDate();
+                    // On gère r.dayOfMonth ou r.day_of_month avec une sécurité
+                    const effectiveDay = Math.min(r.dayOfMonth || r.day_of_month || 1, daysInMonth);
+                    
+                    if (checkDate.getDate() === effectiveDay) {
+                        dailyChange += getFinancialImpact(r);
+                    }
+                });
+
+                tempBalanceFuture += dailyChange;
+                futureHistory.push(Number(tempBalanceFuture.toFixed(2)));
+            }
+
+            return { 
+                past: pastHistory, 
+                current: Number(currentBalance.toFixed(2)), 
+                future: futureHistory 
+            };
+        } catch (e) { 
+            return { past: [0], current: 0, future: [0] }; 
+        }
     };
-    const sparkData = getSparklineData();
+    
+    const premiumData = getPremiumSparklineData();
+    // On extrait le solde final simulé à J+30
+    const forecast30Days = premiumData.future[premiumData.future.length - 1] || currentBalance;
 
     const getUpcomingEvents = () => {
         try {
@@ -420,9 +519,11 @@ export default function Dashboard({ data, updateData, setView }) {
                             {isPrivacyMode ? <EyeOff size={22}/> : <Eye size={22}/>}
                         </button>
                     </div>
-                    <div className="relative z-10 mb-8">
+                    <div className="relative z-10 mb-6">
                         <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">{renderAmount(currentBalance)}</h3>
                         <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center md:text-left">TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}</p>
+                        
+                        {/* L'ancien petit encart a été gardé pour la cohérence, mais la vraie star est en dessous */}
                         {!isPrivacyMode && (
                             <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-700">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter opacity-70">Projeté fin de mois :</span>
@@ -430,7 +531,24 @@ export default function Dashboard({ data, updateData, setView }) {
                             </div>
                         )}
                     </div>
-                    <div className="h-20 w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-4 border border-slate-100 dark:border-slate-800/50"><SparkLine data={sparkData} height={50} /></div>
+                    
+                    {/* LE NOUVEAU GRAPHIQUE PREMIUM */}
+                    <div className="w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800/50 relative group/chart">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Passé (30J)</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full ring-1 ring-blue-100 dark:ring-blue-900/50">Aujourd'hui</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Prévu (+30J)</span>
+                        </div>
+                        <div className="h-20 w-full">
+                            <PremiumChart data={premiumData} height={80} />
+                        </div>
+                        {/* Info Bulle de projection (S'affiche au survol du graphique) */}
+                        {!isPrivacyMode && (
+                            <div className="absolute -top-3 right-4 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-xl shadow-xl pointer-events-none z-20">
+                                Projection à 30J : <span className={forecast30Days >= currentBalance ? 'text-emerald-400 dark:text-emerald-600' : 'text-rose-400 dark:text-rose-600'}>{renderAmount(forecast30Days)}</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
