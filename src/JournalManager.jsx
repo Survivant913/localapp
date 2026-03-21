@@ -99,6 +99,26 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     }, [data?.journal_folders, data?.journal_pages]); 
 
+    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR (NOUVEAU) ---
+    useEffect(() => {
+        if (!activePageId || isSaving) return;
+        const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
+        if (pageFromServer && editorRef.current) {
+            // Si le contenu affiché est différent du contenu en DB (venant de l'autre personne)
+            if (editorRef.current.innerHTML !== pageFromServer.content) {
+                // On ne met à jour que si on n'a pas le focus ou si le contenu est radicalement différent
+                if (document.activeElement !== editorRef.current) {
+                    editorRef.current.innerHTML = pageFromServer.content || '';
+                    setPageContent(pageFromServer.content || '');
+                }
+            }
+            if (pageFromServer.title !== pageTitle) {
+                setPageTitle(pageFromServer.title || '');
+                if (titleRef.current) titleRef.current.value = pageFromServer.title || '';
+            }
+        }
+    }, [allPages, activePageId]);
+
     // --- 2. NAVIGATION ---
     useEffect(() => {
         if (!currentFolderId) {
@@ -448,26 +468,34 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                             <span className="font-bold text-slate-500">Ajouter</span>
                         </div>
 
-                        {rootFolders.map(nb => (
-                            <div key={nb.id} onClick={() => { setActiveNotebookId(nb.id); setCurrentFolderId(nb.id); }} className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-500 cursor-pointer transition-all min-h-[180px] flex flex-col justify-between relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-slate-100 to-transparent dark:from-slate-800 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
-                                <div>
-                                    <div className="flex justify-between items-start mb-4 relative z-10">
-                                        <Book size={24} className="text-indigo-600 dark:text-indigo-400"/>
-                                        <div className="flex gap-1">
-                                            {/* NOUVEAU BOUTON PARTAGER */}
-                                            <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
-                                            <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                        {rootFolders.map(nb => {
+                            // SÉCURITÉ : On vérifie si on est le propriétaire (data.profile?.id ou via auth)
+                            const isOwner = nb.user_id === data?.profile?.id;
+                            
+                            return (
+                                <div key={nb.id} onClick={() => { setActiveNotebookId(nb.id); setCurrentFolderId(nb.id); }} className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-500 cursor-pointer transition-all min-h-[180px] flex flex-col justify-between relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-slate-100 to-transparent dark:from-slate-800 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
+                                    <div>
+                                        <div className="flex justify-between items-start mb-4 relative z-10">
+                                            <Book size={24} className="text-indigo-600 dark:text-indigo-400"/>
+                                            <div className="flex gap-1">
+                                                {/* BOUTON PARTAGER : Visible UNIQUEMENT par le propriétaire */}
+                                                {isOwner && (
+                                                    <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
+                                                )}
+                                                <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                            </div>
                                         </div>
+                                        <h3 className="font-bold text-xl text-slate-800 dark:text-white line-clamp-2">{nb.name}</h3>
+                                        {!isOwner && <span className="text-[9px] font-black uppercase text-indigo-500 tracking-widest bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded mt-2 inline-block">Partagé avec moi</span>}
                                     </div>
-                                    <h3 className="font-bold text-xl text-slate-800 dark:text-white line-clamp-2">{nb.name}</h3>
+                                    <div className="text-xs text-slate-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-4">
+                                        <span>{new Date(nb.created_at).toLocaleDateString()}</span>
+                                        <span className="flex items-center gap-1 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">Ouvrir <ArrowLeft size={12} className="rotate-180"/></span>
+                                    </div>
                                 </div>
-                                <div className="text-xs text-slate-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-4">
-                                    <span>{new Date(nb.created_at).toLocaleDateString()}</span>
-                                    <span className="flex items-center gap-1 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">Ouvrir <ArrowLeft size={12} className="rotate-180"/></span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
