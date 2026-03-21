@@ -91,10 +91,9 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60 relative z-10`}>
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-3">
-              {/* --- LE LOGO DRAGON --- */}
-              {/* Ajustement final : w-14 h-14 (56px) - Taille Max avant saturation */}
+              {/* --- LE LOGO DRAGON (Rendu ultra-discret) --- */}
               <div 
-                className="w-14 h-14 bg-blue-600 shrink-0 transition-colors duration-300"
+                className="w-10 h-10 bg-white opacity-20 shrink-0 transition-colors duration-300"
                 style={{
                     maskImage: 'url(/dragon.png)',
                     WebkitMaskImage: 'url(/dragon.png)',
@@ -182,8 +181,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         </nav>
 
         {/* Footer & Logout */}
-        <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120] relative z-10">
-          <div className={`flex gap-2 mb-4 ${isCollapsed ? 'flex-col items-center' : ''}`}>
+        <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120] relative z-10 flex flex-col gap-4">
+          <div className={`flex gap-2 ${isCollapsed ? 'flex-col items-center' : ''}`}>
             <button 
               onClick={handleLogout}
               className={`
@@ -209,13 +208,13 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           </div>
 
           {!isCollapsed && (
-            <div className="text-center pb-1 space-y-1">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-600 select-none opacity-60 hover:opacity-100 transition-opacity font-mono" title="Temps de session">
-                  <Clock size={10}/>
+            <div className="flex flex-col items-center justify-center pt-2 border-t border-slate-800/40 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-xs font-black text-blue-400 select-none tracking-widest bg-blue-900/10 px-3 py-1.5 rounded-lg border border-blue-900/30" title="Temps de session">
+                  <Clock size={14}/>
                   <span>{formatSessionTime()}</span>
               </div>
-              <p className="text-[10px] text-slate-600 font-medium hover:text-slate-500 transition-colors cursor-default select-none">
-                Created by Henni Mohammed Al Amine
+              <p className="text-[9px] text-slate-600 uppercase font-bold tracking-widest hover:text-slate-500 transition-colors cursor-default select-none">
+                Created by Henni
               </p>
             </div>
           )}
