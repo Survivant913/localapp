@@ -1,18 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
-  Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
-  Heading, Type, Underline, Strikethrough,
-  ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
-  PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
-  Maximize2, Minimize2, Eye, 
-  Type as TypeIcon, RotateCcw 
+    Book, Folder, FileText, ChevronRight, ChevronDown, Plus, 
+    Search, Trash2, Edit2, Bold, Italic, List, CheckSquare, 
+    Heading, Type, Underline, Strikethrough,
+    ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
+    PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
+    Maximize2, Minimize2, Eye, 
+    Type as TypeIcon, RotateCcw, Users // AJOUT DE L'ICÔNE USERS ICI
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-export default function JournalManager({ data, updateData }) {
+export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- ÉTATS DONNÉES ---
     const [allFolders, setAllFolders] = useState([]);
     const [allPages, setAllPages] = useState([]);
@@ -43,6 +43,12 @@ export default function JournalManager({ data, updateData }) {
     const titleRef = useRef(null);
     const saveTimeoutRef = useRef(null);
 
+    // --- ÉTATS PARTAGE (NOUVEAU) ---
+    const [shareModalFolder, setShareModalFolder] = useState(null);
+    const [folderShares, setFolderShares] = useState([]);
+    const [shareEmailInput, setShareEmailInput] = useState('');
+    const [isSharing, setIsSharing] = useState(false);
+
     // --- 1. CHARGEMENT INITIAL ---
     useEffect(() => {
         fetchData();
@@ -65,6 +71,33 @@ export default function JournalManager({ data, updateData }) {
             setIsLoading(false);
         }
     };
+
+    // --- SYNCHRONISATION TEMPS RÉEL (Depuis App.jsx - NOUVEAU) ---
+    useEffect(() => {
+        if (data?.journal_folders) {
+            setAllFolders(prev => {
+                const merged = [...prev];
+                data.journal_folders.forEach(df => {
+                    const idx = merged.findIndex(pf => String(pf.id) === String(df.id));
+                    if (idx === -1) merged.push(df);
+                    else merged[idx] = { ...merged[idx], ...df };
+                });
+                return merged;
+            });
+        }
+        if (data?.journal_pages) {
+            setAllPages(prev => {
+                const merged = [...prev];
+                data.journal_pages.forEach(dp => {
+                    const idx = merged.findIndex(pp => String(pp.id) === String(dp.id));
+                    if (idx === -1) merged.push(dp);
+                    // Sécurité vitale : On n'écrase pas la page si on est en train de taper dedans !
+                    else if (String(activePageId) !== String(dp.id)) merged[idx] = { ...merged[idx], ...dp }; 
+                });
+                return merged;
+            });
+        }
+    }, [data?.journal_folders, data?.journal_pages]); 
 
     // --- 2. NAVIGATION ---
     useEffect(() => {
@@ -254,6 +287,50 @@ export default function JournalManager({ data, updateData }) {
         }
     };
 
+    // --- LOGIQUE PARTAGE (NOUVEAU) ---
+    const openShareModal = async (folder, e) => {
+        e.stopPropagation();
+        setShareModalFolder(folder);
+        setIsSharing(true);
+        try {
+            const { data } = await supabase.from('journal_shares').select('*').eq('folder_id', folder.id);
+            setFolderShares(data || []);
+        } catch (err) {
+            console.error("Erreur chargement partages:", err);
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const addShare = async () => {
+        if (!shareEmailInput.trim()) return;
+        setIsSharing(true);
+        try {
+            const newShare = { folder_id: shareModalFolder.id, user_email: shareEmailInput.trim().toLowerCase() };
+            const { data, error } = await supabase.from('journal_shares').insert([newShare]).select();
+            if (error) throw error;
+            if (data) setFolderShares([...folderShares, data[0]]);
+            setShareEmailInput('');
+        } catch (err) {
+            console.error("Erreur partage:", err);
+            alert("Erreur lors du partage.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
+    const removeShare = async (shareId) => {
+        setIsSharing(true);
+        try {
+            await supabase.from('journal_shares').delete().eq('id', shareId);
+            setFolderShares(folderShares.filter(s => s.id !== shareId));
+        } catch (err) {
+            console.error("Erreur suppression partage:", err);
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     // --- FAVORIS ---
     const toggleFavorite = async (page) => {
         const newStatus = !page.is_favorite;
@@ -377,7 +454,11 @@ export default function JournalManager({ data, updateData }) {
                                 <div>
                                     <div className="flex justify-between items-start mb-4 relative z-10">
                                         <Book size={24} className="text-indigo-600 dark:text-indigo-400"/>
-                                        <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                        <div className="flex gap-1">
+                                            {/* NOUVEAU BOUTON PARTAGER */}
+                                            <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                        </div>
                                     </div>
                                     <h3 className="font-bold text-xl text-slate-800 dark:text-white line-clamp-2">{nb.name}</h3>
                                 </div>
@@ -389,6 +470,48 @@ export default function JournalManager({ data, updateData }) {
                         ))}
                     </div>
                 </div>
+
+                {/* NOUVELLE MODALE DE PARTAGE */}
+                {shareModalFolder && (
+                    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShareModalFolder(null)}>
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Users size={20} className="text-blue-500"/> Partager "{shareModalFolder.name}"
+                                </h3>
+                                <button onClick={() => setShareModalFolder(null)} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20}/></button>
+                            </div>
+                            
+                            <div className="flex gap-2 mb-6">
+                                <input 
+                                    type="email" 
+                                    placeholder="Email du collaborateur..." 
+                                    value={shareEmailInput} 
+                                    onChange={(e) => setShareEmailInput(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') addShare(); }}
+                                    className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-blue-500 bg-slate-50 dark:bg-slate-800 dark:text-white text-sm"
+                                />
+                                <button onClick={addShare} disabled={isSharing || !shareEmailInput.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2">
+                                    {isSharing ? <Loader2 size={16} className="animate-spin"/> : "Ajouter"}
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Accès actuels</h4>
+                                {folderShares.length === 0 ? (
+                                    <p className="text-sm text-slate-500 dark:text-slate-400 italic">Ce carnet est privé.</p>
+                                ) : (
+                                    folderShares.map(share => (
+                                        <div key={share.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{share.user_email}</span>
+                                            <button onClick={() => removeShare(share.id)} disabled={isSharing} className="text-slate-400 hover:text-red-500 p-1 transition-colors" title="Retirer l'accès"><Trash2 size={14}/></button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }

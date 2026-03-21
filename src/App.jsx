@@ -54,7 +54,7 @@ export default function App() {
  const [data, setData] = useState({
    todos: [], todoLists: [], projects: [], 
    goals: [], goal_milestones: [], 
-   journal_folders: [], journal_pages: [],
+   journal_folders: [], journal_pages: [], journal_shares: [], // AJOUT ICI
    calendar_events: [], 
    habits: [], // AJOUT : Initialisation de habits
    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
@@ -196,6 +196,57 @@ export default function App() {
      .subscribe();
 
    return () => { supabase.removeChannel(calendarChannel); };
+ }, [session]);
+
+ // --- GREFFE : ÉCOUTEUR TEMPS RÉEL JOURNAL (COLLABORATION) ---
+ useEffect(() => {
+    if (!session || !session.user) return;
+
+    const journalChannel = supabase.channel('journal-sync-master')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_pages' }, (payload) => {
+            setData(prev => {
+                let currentPages = [...prev.journal_pages];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentPages.some(p => String(p.id) === String(payload.new.id))) currentPages.push(payload.new);
+                } else if (payload.eventType === 'UPDATE') {
+                    const idx = currentPages.findIndex(p => String(p.id) === String(payload.new.id));
+                    if (idx !== -1) currentPages[idx] = payload.new;
+                    else currentPages.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentPages = currentPages.filter(p => String(p.id) !== String(payload.old.id));
+                }
+                return { ...prev, journal_pages: currentPages };
+            });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_folders' }, (payload) => {
+            setData(prev => {
+                let currentFolders = [...prev.journal_folders];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentFolders.some(f => String(f.id) === String(payload.new.id))) currentFolders.push(payload.new);
+                } else if (payload.eventType === 'UPDATE') {
+                    const idx = currentFolders.findIndex(f => String(f.id) === String(payload.new.id));
+                    if (idx !== -1) currentFolders[idx] = payload.new;
+                    else currentFolders.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentFolders = currentFolders.filter(f => String(f.id) !== String(payload.old.id));
+                }
+                return { ...prev, journal_folders: currentFolders };
+            });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_shares' }, (payload) => {
+            setData(prev => {
+                let currentShares = [...(prev.journal_shares || [])];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
+                }
+                return { ...prev, journal_shares: currentShares };
+            });
+        })
+        .subscribe();
+
+    return () => { supabase.removeChannel(journalChannel); };
  }, [session]);
 
  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE (CORRIGÉ POUR ÉVITER LES CONFLITS) ---
@@ -348,7 +399,8 @@ export default function App() {
        supabase.from('event_participants').select('*'),
        // AJOUT : CHARGEMENT DES HABITUDES ET DES LOGS DU JOUR
        supabase.from('habits').select('*'),
-       supabase.from('habit_logs').select('*').eq('date', todayIsoDate)
+       supabase.from('habit_logs').select('*').eq('date', todayIsoDate),
+       supabase.from('journal_shares').select('*') // AJOUT ICI
      ]);
 
      const [
@@ -363,7 +415,8 @@ export default function App() {
        { data: all_participants },
        // AJOUT : RÉCUPÉRATION HABITUDES & LOGS
        { data: habits },
-       { data: daily_logs }
+       { data: daily_logs },
+       { data: journal_shares } // AJOUT ICI
      ] = results;
 
      let newDBTransactions = [];
@@ -483,6 +536,7 @@ export default function App() {
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
+       journal_shares: journal_shares || [], // AJOUT ICI
        
        // CORRECTION CRITIQUE : Fusion des habitudes avec les logs du jour pour le Dashboard
        habits: (habits || []).map(h => {
@@ -582,8 +636,12 @@ export default function App() {
      await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
      await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite, category: g.category, priority: g.priority, motivation: g.motivation })); 
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
-     await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: user.id, name: f.name, parent_id: f.parent_id }));
-     await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
+     
+     // --- CORRECTION SAUVEGARDE POUR NE PAS VOLER LES DROITS ---
+     await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: f.user_id || user.id, name: f.name, parent_id: f.parent_id }));
+     await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: p.user_id || user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
+     await upsertInBatches('journal_shares', data.journal_shares, 50, s => ({ id: s.id, folder_id: s.folder_id, user_email: s.user_email }));
+     
      await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, name: v.name, status: v.status, created_at: v.created_at || new Date().toISOString() }));
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
          id: e.id, user_id: e.user_id || user.id, title: e.title, start_time: e.start_time, 
@@ -619,7 +677,7 @@ export default function App() {
      case 'notes': return <NotesManager data={data} updateData={updateData} />;
      case 'todo': return <TodoList data={data} updateData={updateData} />;
      case 'goals': return <GoalsManager data={data} updateData={updateData} />;
-     case 'journal': return <JournalManager data={data} updateData={updateData} />;
+     case 'journal': return <JournalManager data={data} updateData={updateData} currentUserEmail={session?.user?.email} />;
      case 'habits': return <HabitTracker data={data} updateData={updateData} />;
      case 'chat': return <ChatManager user={session.user} />; 
      case 'clients': return <ClientHub data={data} updateData={updateData} />;
