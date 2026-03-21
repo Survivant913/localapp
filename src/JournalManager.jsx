@@ -274,11 +274,22 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- SUPPRESSION ---
+    // --- SUPPRESSION AMÉLIORÉE (SUPPRIMER VS QUITTER) ---
     const deleteItem = async (id, type) => {
-        const confirmMsg = type === 'page' 
-            ? "Supprimer ce document ?" 
-            : "Supprimer ce dossier et TOUT son contenu (sous-dossiers et pages) ? Cette action est irréversible.";
+        const itemToDelete = type === 'page' ? allPages.find(p => p.id === id) : allFolders.find(f => f.id === id);
+        if (!itemToDelete) return;
+
+        // On vérifie si l'utilisateur actuel est le propriétaire
+        const isOwner = itemToDelete.user_id === data?.profile?.id;
+
+        let confirmMsg = "";
+        if (type === 'page') {
+            confirmMsg = "Supprimer ce document ?";
+        } else {
+            confirmMsg = isOwner 
+                ? "Supprimer ce dossier et TOUT son contenu (sous-dossiers et pages) ? Cette action est irréversible."
+                : "Quitter ce carnet ? Il disparaîtra de votre liste, mais restera intact chez le propriétaire.";
+        }
             
         if (!window.confirm(confirmMsg)) return;
 
@@ -288,20 +299,39 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(allPages.filter(p => p.id !== id));
                 if (activePageId === id) setActivePageId(null);
             } else {
-                const getAllDescendantIds = (parentId) => {
-                    let ids = [parentId];
-                    const children = allFolders.filter(f => f.parent_id === parentId);
-                    children.forEach(child => {
-                        ids = [...ids, ...getAllDescendantIds(child.id)];
-                    });
-                    return ids;
-                };
-                const idsToDelete = getAllDescendantIds(id);
-                await supabase.from('journal_pages').delete().in('folder_id', idsToDelete);
-                await supabase.from('journal_folders').delete().in('id', idsToDelete);
-                setAllFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
-                setAllPages(prev => prev.filter(p => !idsToDelete.includes(p.folder_id)));
-                if (idsToDelete.includes(currentFolderId) || idsToDelete.includes(activeNotebookId)) {
+                // LOGIQUE DOSSIER / CARNET
+                if (isOwner) {
+                    // SI PROPRIO : Suppression en cascade
+                    const getAllDescendantIds = (parentId) => {
+                        let ids = [parentId];
+                        const children = allFolders.filter(f => f.parent_id === parentId);
+                        children.forEach(child => {
+                            ids = [...ids, ...getAllDescendantIds(child.id)];
+                        });
+                        return ids;
+                    };
+                    const idsToDelete = getAllDescendantIds(id);
+                    await supabase.from('journal_pages').delete().in('folder_id', idsToDelete);
+                    await supabase.from('journal_folders').delete().in('id', idsToDelete);
+                    setAllFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
+                    setAllPages(prev => prev.filter(p => !idsToDelete.includes(p.folder_id)));
+                } else {
+                    // SI INVITÉ : On quitte juste le partage
+                    const shareToRemove = (data?.journal_shares || []).find(s => 
+                        String(s.folder_id) === String(id) && 
+                        s.user_email?.toLowerCase() === currentUserEmail?.toLowerCase()
+                    );
+                    
+                    if (shareToRemove) {
+                        await supabase.from('journal_shares').delete().eq('id', shareToRemove.id);
+                        // On filtre localement pour un effet immédiat
+                        setAllFolders(prev => prev.filter(f => f.id !== id));
+                        setAllPages(prev => prev.filter(p => p.folder_id !== id));
+                    }
+                }
+
+                // Nettoyage de la navigation si on était dedans
+                if (activeNotebookId === id || currentFolderId === id) {
                     setActiveNotebookId(null);
                     setCurrentFolderId(null);
                     setActivePageId(null);
@@ -309,7 +339,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             }
         } catch (err) {
             console.error("Erreur suppression:", err);
-            alert("Erreur lors de la suppression en cascade.");
+            alert("Erreur lors de l'opération.");
         }
     };
 
@@ -490,7 +520,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                                 {isOwner && (
                                                     <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
                                                 )}
-                                                <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={isOwner ? "Supprimer définitivement" : "Quitter ce carnet"}><Trash2 size={16}/></button>
                                             </div>
                                         </div>
                                         <h3 className="font-bold text-xl text-slate-800 dark:text-white line-clamp-2">{nb.name}</h3>
