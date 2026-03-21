@@ -90,7 +90,7 @@ export default function Login() {
             </form>
         </div>
 
-        {/* Footer Signature & Logo Dragon */}
+        {/* Footer Signature */}
         <div className="mt-10 flex flex-col items-center gap-8 cursor-default pointer-events-none">
             
             {/* Ligne de séparation */}
@@ -99,22 +99,6 @@ export default function Login() {
             <p className="text-[10px] text-slate-500 font-medium tracking-[0.2em] uppercase opacity-60">
                 Created by Henni Mohammed Al Amine
             </p>
-
-            {/* LE DRAGON : INDIGO, DISCRET, ANCRÉ (Masque CSS) */}
-            <div 
-                className="w-40 h-40 bg-indigo-500 transition-all duration-500"
-                style={{
-                    maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat',
-                    opacity: 0.15 // Très discret (15% d'opacité) pour faire "filigrane"
-                }}
-            ></div>
 
         </div>
 
