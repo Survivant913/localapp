@@ -90,29 +90,35 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 const merged = [...prev];
                 data.journal_pages.forEach(dp => {
                     const idx = merged.findIndex(pp => String(pp.id) === String(dp.id));
-                    if (idx === -1) merged.push(dp);
-                    // Sécurité vitale : On n'écrase pas la page si on est en train de taper dedans !
-                    else if (String(activePageId) !== String(dp.id)) merged[idx] = { ...merged[idx], ...dp }; 
+                    if (idx === -1) {
+                        merged.push(dp);
+                    } else {
+                        // MODIFICATION ICI : On autorise la mise à jour des données même si on est sur la page
+                        merged[idx] = { ...merged[idx], ...dp }; 
+                    }
                 });
                 return merged;
             });
         }
     }, [data?.journal_folders, data?.journal_pages]); 
 
-    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR (NOUVEAU) ---
+    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR (AFFINAGE) ---
     useEffect(() => {
+        // On ne met à jour l'éditeur que si on ne sauvegarde pas soi-même
         if (!activePageId || isSaving) return;
+        
         const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
         if (pageFromServer && editorRef.current) {
-            // Si le contenu affiché est différent du contenu en DB (venant de l'autre personne)
-            if (editorRef.current.innerHTML !== pageFromServer.content) {
-                // On ne met à jour que si on n'a pas le focus ou si le contenu est radicalement différent
-                if (document.activeElement !== editorRef.current) {
+            // RÈGLE D'OR : On n'écrase le texte que si l'utilisateur n'a pas son curseur dedans
+            // Cela permet de voir ce que l'autre écrit sans que ton propre curseur ne saute
+            if (document.activeElement !== editorRef.current) {
+                if (editorRef.current.innerHTML !== pageFromServer.content) {
                     editorRef.current.innerHTML = pageFromServer.content || '';
                     setPageContent(pageFromServer.content || '');
                 }
             }
-            if (pageFromServer.title !== pageTitle) {
+            // Pareil pour le titre
+            if (document.activeElement !== titleRef.current && pageFromServer.title !== pageTitle) {
                 setPageTitle(pageFromServer.title || '');
                 if (titleRef.current) titleRef.current.value = pageFromServer.title || '';
             }
@@ -469,7 +475,8 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                         </div>
 
                         {rootFolders.map(nb => {
-                            // SÉCURITÉ : On vérifie si on est le propriétaire (data.profile?.id ou via auth)
+                            // SÉCURITÉ : On vérifie si on est le propriétaire (via user_id du carnet)
+                            // On compare l'user_id du carnet avec le profile.id chargé dans data
                             const isOwner = nb.user_id === data?.profile?.id;
                             
                             return (
