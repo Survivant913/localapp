@@ -6,7 +6,7 @@ import {
     ArrowLeft, Star, Loader2, Calendar, Printer, FolderPlus, AlignLeft, AlignCenter,
     PanelLeft, Highlighter, Quote, AlignRight, AlignJustify, X, Home, Pilcrow,
     Maximize2, Minimize2, Eye, 
-    Type as TypeIcon, RotateCcw, Users // AJOUT DE L'ICÔNE USERS ICI
+    Type as TypeIcon, RotateCcw, Users
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
@@ -42,8 +42,9 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     const editorRef = useRef(null);
     const titleRef = useRef(null);
     const saveTimeoutRef = useRef(null);
+    const isDirtyRef = useRef(false); // NOUVEAU : Le détecteur anti-écrasement
 
-    // --- ÉTATS PARTAGE (NOUVEAU) ---
+    // --- ÉTATS PARTAGE ---
     const [shareModalFolder, setShareModalFolder] = useState(null);
     const [folderShares, setFolderShares] = useState([]);
     const [shareEmailInput, setShareEmailInput] = useState('');
@@ -72,7 +73,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- SYNCHRONISATION TEMPS RÉEL (Depuis App.jsx - NOUVEAU) ---
+    // --- SYNCHRONISATION TEMPS RÉEL ---
     useEffect(() => {
         if (data?.journal_folders) {
             setAllFolders(prev => {
@@ -93,7 +94,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     if (idx === -1) {
                         merged.push(dp);
                     } else {
-                        // MODIFICATION ICI : On autorise la mise à jour des données même si on est sur la page
                         merged[idx] = { ...merged[idx], ...dp }; 
                     }
                 });
@@ -102,28 +102,25 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     }, [data?.journal_folders, data?.journal_pages]); 
 
-    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR (AFFINAGE) ---
+    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR ---
     useEffect(() => {
-        // On ne met à jour l'éditeur que si on ne sauvegarde pas soi-même
         if (!activePageId || isSaving) return;
         
         const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
         if (pageFromServer && editorRef.current) {
-            // RÈGLE D'OR : On n'écrase le texte que si l'utilisateur n'a pas son curseur dedans
-            // Cela permet de voir ce que l'autre écrit sans que ton propre curseur ne saute
             if (document.activeElement !== editorRef.current) {
                 if (editorRef.current.innerHTML !== pageFromServer.content) {
                     editorRef.current.innerHTML = pageFromServer.content || '';
                     setPageContent(pageFromServer.content || '');
+                    isDirtyRef.current = false; // On vient de synchroniser, donc on est propre
                 }
             }
-            // Pareil pour le titre
             if (document.activeElement !== titleRef.current && pageFromServer.title !== pageTitle) {
                 setPageTitle(pageFromServer.title || '');
                 if (titleRef.current) titleRef.current.value = pageFromServer.title || '';
             }
         }
-    }, [allPages, activePageId]);
+    }, [allPages, activePageId, isSaving]);
 
     // --- 2. NAVIGATION ---
     useEffect(() => {
@@ -171,6 +168,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 editorRef.current.innerHTML = '';
                 editorRef.current.removeAttribute('data-init');
             }
+            isDirtyRef.current = false;
             return;
         }
 
@@ -179,13 +177,12 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             setPageTitle(page.title || 'Sans titre');
             if (titleRef.current) titleRef.current.value = page.title || 'Sans titre';
             
-            // Nettoyage de l'ancien système de blocs pour revenir à un format fluide
             let cleanContent = page.content || '';
             cleanContent = cleanContent.replace(/<div class="page-break"[^>]*><\/div>/g, '<br><br>');
             
             setPageContent(cleanContent);
+            isDirtyRef.current = false; // Remise à zéro lors de l'ouverture
             
-            // Forcer la mise à jour de l'éditeur lors du changement de page
             if (editorRef.current) {
                 editorRef.current.innerHTML = cleanContent;
                 editorRef.current.setAttribute('data-init', activePageId);
@@ -193,9 +190,26 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     }, [activePageId]);
 
-    // --- 4. SAUVEGARDE ---
+    // --- 4. SAUVEGARDE INTELLIGENTE (CORRIGÉE) ---
     const saveCurrentPage = async (force = false) => {
         if (!activePageId) return;
+
+        // PROTECTION ABSOLUE : Si l'utilisateur n'a rien tapé, on annule la sauvegarde 
+        // et on récupère de force ce que l'autre aurait pu écrire.
+        if (!isDirtyRef.current) {
+            if (force) {
+                const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
+                if (pageFromServer && editorRef.current && editorRef.current.innerHTML !== pageFromServer.content) {
+                    editorRef.current.innerHTML = pageFromServer.content || '';
+                    setPageContent(pageFromServer.content || '');
+                }
+                if (pageFromServer && titleRef.current && titleRef.current.value !== pageFromServer.title) {
+                    titleRef.current.value = pageFromServer.title || '';
+                    setPageTitle(pageFromServer.title || '');
+                }
+            }
+            return; 
+        }
         
         const content = editorRef.current ? editorRef.current.innerHTML : pageContent;
         const title = titleRef.current ? titleRef.current.value : pageTitle;
@@ -204,6 +218,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
 
         const performSave = async () => {
             setIsSaving(true);
+            isDirtyRef.current = false; // On indique que le brouillon est traité
             try {
                 await supabase.from('journal_pages').update({
                     title: title,
@@ -214,6 +229,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(prev => prev.map(p => p.id === activePageId ? { ...p, title, content, updated_at: new Date().toISOString() } : p));
             } catch (err) {
                 console.error("Erreur save:", err);
+                isDirtyRef.current = true; // Si erreur, on garde le mode "brouillon"
             } finally {
                 setIsSaving(false);
             }
@@ -274,12 +290,11 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- SUPPRESSION AMÉLIORÉE (SUPPRIMER VS QUITTER) ---
+    // --- SUPPRESSION ---
     const deleteItem = async (id, type) => {
         const itemToDelete = type === 'page' ? allPages.find(p => p.id === id) : allFolders.find(f => f.id === id);
         if (!itemToDelete) return;
 
-        // On vérifie si l'utilisateur actuel est le propriétaire
         const isOwner = itemToDelete.user_id === data?.profile?.id;
 
         let confirmMsg = "";
@@ -299,9 +314,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(allPages.filter(p => p.id !== id));
                 if (activePageId === id) setActivePageId(null);
             } else {
-                // LOGIQUE DOSSIER / CARNET
                 if (isOwner) {
-                    // SI PROPRIO : Suppression en cascade
                     const getAllDescendantIds = (parentId) => {
                         let ids = [parentId];
                         const children = allFolders.filter(f => f.parent_id === parentId);
@@ -316,7 +329,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     setAllFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
                     setAllPages(prev => prev.filter(p => !idsToDelete.includes(p.folder_id)));
                 } else {
-                    // SI INVITÉ : On quitte juste le partage
                     const shareToRemove = (data?.journal_shares || []).find(s => 
                         String(s.folder_id) === String(id) && 
                         s.user_email?.toLowerCase() === currentUserEmail?.toLowerCase()
@@ -324,13 +336,11 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     
                     if (shareToRemove) {
                         await supabase.from('journal_shares').delete().eq('id', shareToRemove.id);
-                        // On filtre localement pour un effet immédiat
                         setAllFolders(prev => prev.filter(f => f.id !== id));
                         setAllPages(prev => prev.filter(p => p.folder_id !== id));
                     }
                 }
 
-                // Nettoyage de la navigation si on était dedans
                 if (activeNotebookId === id || currentFolderId === id) {
                     setActiveNotebookId(null);
                     setCurrentFolderId(null);
@@ -343,7 +353,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- LOGIQUE PARTAGE (NOUVEAU) ---
+    // --- LOGIQUE PARTAGE ---
     const openShareModal = async (folder, e) => {
         e.stopPropagation();
         setShareModalFolder(folder);
@@ -387,7 +397,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- FAVORIS ---
     const toggleFavorite = async (page) => {
         const newStatus = !page.is_favorite;
         setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
@@ -401,12 +410,16 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         document.execCommand(cmd, false, val);
         if (cmd === 'hiliteColor') setShowColorPalette(false);
         setShowSizeMenu(false); 
+        isDirtyRef.current = true; // S'assure que le style est sauvegardé !
+        saveCurrentPage(false);
     };
 
     const changeFontSizeSelection = (size) => {
         if (editorRef.current) editorRef.current.focus();
         document.execCommand('fontSize', false, size); 
         setShowSizeMenu(false);
+        isDirtyRef.current = true;
+        saveCurrentPage(false);
     };
 
     const ToolbarButton = ({ icon: Icon, cmd, val, title }) => (
@@ -438,30 +451,15 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 <style>
                     * { color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                     
-                    @page {
-                        size: A4 portrait;
-                        margin: 20mm 15mm; 
-                    }
-                    
-                    body { 
-                        font-family: 'Merriweather', serif; 
-                        line-height: 1.6; 
-                        background: #fff !important; 
-                        margin: 0; 
-                        padding: 0; 
-                        font-size: 11pt;
-                    }
-                    
+                    @page { size: A4 portrait; margin: 20mm 15mm; }
+                    body { font-family: 'Merriweather', serif; line-height: 1.6; background: #fff !important; margin: 0; padding: 0; font-size: 11pt; }
                     h1 { font-size: 24pt; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 30px; }
                     .meta { color: #555 !important; font-style: italic; margin-bottom: 10px; font-size: 9pt; text-align: right; }
                     .content { text-align: justify; }
-                    
                     blockquote { border-left: 4px solid #333 !important; padding: 10px 15px !important; margin: 20px 0 !important; background: #f9f9f9 !important; font-style: italic !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
                     li { margin-bottom: 5px; }
-                    
-                    /* Règle vitale pour que le texte se coupe bien entre les pages */
                     p, li, blockquote { page-break-inside: avoid; }
                     h1, h2, h3, h4 { page-break-after: avoid; margin-top: 20px; }
                 </style>
@@ -487,7 +485,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
 
-
     // --- VUE DASHBOARD ---
     if (!activeNotebookId) {
         return (
@@ -505,10 +502,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                         </div>
 
                         {rootFolders.map(nb => {
-                            // SÉCURITÉ : On vérifie si on est le propriétaire (via user_id du carnet)
-                            // On compare l'user_id du carnet avec le profile.id chargé dans data
                             const isOwner = nb.user_id === data?.profile?.id;
-                            
                             return (
                                 <div key={nb.id} onClick={() => { setActiveNotebookId(nb.id); setCurrentFolderId(nb.id); }} className="group bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg hover:border-indigo-500 cursor-pointer transition-all min-h-[180px] flex flex-col justify-between relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-slate-100 to-transparent dark:from-slate-800 rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
@@ -516,7 +510,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                         <div className="flex justify-between items-start mb-4 relative z-10">
                                             <Book size={24} className="text-indigo-600 dark:text-indigo-400"/>
                                             <div className="flex gap-1">
-                                                {/* BOUTON PARTAGER : Visible UNIQUEMENT par le propriétaire */}
                                                 {isOwner && (
                                                     <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
                                                 )}
@@ -536,7 +529,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     </div>
                 </div>
 
-                {/* NOUVELLE MODALE DE PARTAGE */}
+                {/* MODALE DE PARTAGE */}
                 {shareModalFolder && (
                     <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShareModalFolder(null)}>
                         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -719,7 +712,13 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                             ))}
                                             <div className="h-px bg-slate-100 dark:bg-slate-700 my-1"></div>
                                             <button 
-                                                onMouseDown={(e) => { e.preventDefault(); document.execCommand('removeFormat', false, null); setShowSizeMenu(false); }}
+                                                onMouseDown={(e) => { 
+                                                    e.preventDefault(); 
+                                                    document.execCommand('removeFormat', false, null); 
+                                                    setShowSizeMenu(false);
+                                                    isDirtyRef.current = true;
+                                                    saveCurrentPage(false);
+                                                }}
                                                 className="w-full text-left px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
                                             >
                                                 <RotateCcw size={12}/> Reset
@@ -786,13 +785,18 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                         </button>
                                     </div>
                                     
-                                    <input ref={titleRef} type="text" defaultValue={pageTitle} onBlur={() => saveCurrentPage(true)} className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
+                                    {/* NOUVEAU: onChange met isDirtyRef à true */}
+                                    <input ref={titleRef} type="text" defaultValue={pageTitle} 
+                                        onChange={() => { isDirtyRef.current = true; saveCurrentPage(false); }} 
+                                        onBlur={() => saveCurrentPage(true)} 
+                                        className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
                                     
+                                    {/* NOUVEAU: onInput met isDirtyRef à true */}
                                     <div 
                                         ref={editorRef} 
                                         contentEditable 
                                         suppressContentEditableWarning={true}
-                                        onInput={() => saveCurrentPage(false)} 
+                                        onInput={() => { isDirtyRef.current = true; saveCurrentPage(false); }} 
                                         onBlur={() => saveCurrentPage(true)} 
                                         className={`prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all flex-1`}
                                         placeholder="Commencez à écrire ici..."
