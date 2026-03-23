@@ -54,7 +54,7 @@ export default function App() {
  const [data, setData] = useState({
    todos: [], todoLists: [], projects: [], 
    goals: [], goal_milestones: [], 
-   journal_folders: [], journal_pages: [], journal_shares: [], // AJOUT ICI
+   journal_folders: [], journal_pages: [], journal_shares: [], journal_favorites: [], // MODIFICATION ICI
    calendar_events: [], 
    habits: [], // AJOUT : Initialisation de habits
    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
@@ -244,6 +244,18 @@ export default function App() {
                 return { ...prev, journal_shares: currentShares };
             });
         })
+        // --- NOUVEAU : TEMPS RÉEL FAVORIS PERSONNELS ---
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_favorites' }, (payload) => {
+            setData(prev => {
+                let currentFavs = [...(prev.journal_favorites || [])];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentFavs.some(f => String(f.id) === String(payload.new.id))) currentFavs.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentFavs = currentFavs.filter(f => String(f.id) !== String(payload.old.id));
+                }
+                return { ...prev, journal_favorites: currentFavs };
+            });
+        })
         .subscribe();
 
     return () => { supabase.removeChannel(journalChannel); };
@@ -400,7 +412,8 @@ export default function App() {
        // AJOUT : CHARGEMENT DES HABITUDES ET DES LOGS DU JOUR
        supabase.from('habits').select('*'),
        supabase.from('habit_logs').select('*').eq('date', todayIsoDate),
-       supabase.from('journal_shares').select('*') // AJOUT ICI
+       supabase.from('journal_shares').select('*'),
+       supabase.from('journal_favorites').select('*') // MODIFICATION ICI : On charge les favoris
      ]);
 
      const [
@@ -416,7 +429,8 @@ export default function App() {
        // AJOUT : RÉCUPÉRATION HABITUDES & LOGS
        { data: habits },
        { data: daily_logs },
-       { data: journal_shares } // AJOUT ICI
+       { data: journal_shares },
+       { data: journal_favorites } // MODIFICATION ICI
      ] = results;
 
      let newDBTransactions = [];
@@ -536,7 +550,8 @@ export default function App() {
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
-       journal_shares: journal_shares || [], // AJOUT ICI
+       journal_shares: journal_shares || [], 
+       journal_favorites: journal_favorites || [], // MODIFICATION ICI
        
        // CORRECTION CRITIQUE : Fusion des habitudes avec les logs du jour pour le Dashboard
        habits: (habits || []).map(h => {

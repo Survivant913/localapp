@@ -42,13 +42,53 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     const editorRef = useRef(null);
     const titleRef = useRef(null);
     const saveTimeoutRef = useRef(null);
-    const isDirtyRef = useRef(false); // NOUVEAU : Le détecteur anti-écrasement
+    const isDirtyRef = useRef(false);
 
     // --- ÉTATS PARTAGE ---
     const [shareModalFolder, setShareModalFolder] = useState(null);
     const [folderShares, setFolderShares] = useState([]);
     const [shareEmailInput, setShareEmailInput] = useState('');
     const [isSharing, setIsSharing] = useState(false);
+
+    // --- NOUVEAU : FONCTIONS DE SÉCURITÉ & FAVORIS PERSONNELS ---
+    const isPageFavorite = (pageId) => {
+        return (data?.journal_favorites || []).some(f => String(f.page_id) === String(pageId));
+    };
+
+    const hasAccessToItem = (item) => {
+        if (!item) return false;
+        let currFolderId = item.folder_id || item.id;
+        let currFolder = allFolders.find(f => String(f.id) === String(currFolderId));
+        let safety = 0;
+        
+        while (currFolder && safety < 10) {
+            if (currFolder.user_id === data?.profile?.id) return true; // Le proprio a accès à tout
+            const isShared = (data?.journal_shares || []).some(s => 
+                String(s.folder_id) === String(currFolder.id) && 
+                s.user_email?.toLowerCase() === currentUserEmail?.toLowerCase()
+            );
+            if (isShared) return true; // L'invité a accès via ce dossier
+            currFolder = allFolders.find(f => String(f.id) === String(currFolder.parent_id));
+            safety++;
+        }
+        return false;
+    };
+
+    // --- NOUVEAU : ÉJECTION AUTOMATIQUE (TUEUR DE FANTÔMES) ---
+    useEffect(() => {
+        if (activeNotebookId && !hasAccessToItem({ id: activeNotebookId, folder_id: activeNotebookId })) {
+            setActiveNotebookId(null);
+            setCurrentFolderId(null);
+            setActivePageId(null);
+        }
+        if (activePageId) {
+            const page = allPages.find(p => p.id === activePageId);
+            if (page && !hasAccessToItem(page)) {
+                setActivePageId(null);
+            }
+        }
+    }, [data?.journal_shares, allPages, allFolders, activeNotebookId, activePageId, data?.profile?.id, currentUserEmail]);
+
 
     // --- 1. CHARGEMENT INITIAL ---
     useEffect(() => {
@@ -112,7 +152,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 if (editorRef.current.innerHTML !== pageFromServer.content) {
                     editorRef.current.innerHTML = pageFromServer.content || '';
                     setPageContent(pageFromServer.content || '');
-                    isDirtyRef.current = false; // On vient de synchroniser, donc on est propre
+                    isDirtyRef.current = false;
                 }
             }
             if (document.activeElement !== titleRef.current && pageFromServer.title !== pageTitle) {
@@ -181,7 +221,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             cleanContent = cleanContent.replace(/<div class="page-break"[^>]*><\/div>/g, '<br><br>');
             
             setPageContent(cleanContent);
-            isDirtyRef.current = false; // Remise à zéro lors de l'ouverture
+            isDirtyRef.current = false;
             
             if (editorRef.current) {
                 editorRef.current.innerHTML = cleanContent;
@@ -190,12 +230,10 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     }, [activePageId]);
 
-    // --- 4. SAUVEGARDE INTELLIGENTE (CORRIGÉE) ---
+    // --- 4. SAUVEGARDE INTELLIGENTE ---
     const saveCurrentPage = async (force = false) => {
         if (!activePageId) return;
 
-        // PROTECTION ABSOLUE : Si l'utilisateur n'a rien tapé, on annule la sauvegarde 
-        // et on récupère de force ce que l'autre aurait pu écrire.
         if (!isDirtyRef.current) {
             if (force) {
                 const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
@@ -218,7 +256,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
 
         const performSave = async () => {
             setIsSaving(true);
-            isDirtyRef.current = false; // On indique que le brouillon est traité
+            isDirtyRef.current = false;
             try {
                 await supabase.from('journal_pages').update({
                     title: title,
@@ -229,7 +267,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(prev => prev.map(p => p.id === activePageId ? { ...p, title, content, updated_at: new Date().toISOString() } : p));
             } catch (err) {
                 console.error("Erreur save:", err);
-                isDirtyRef.current = true; // Si erreur, on garde le mode "brouillon"
+                isDirtyRef.current = true;
             } finally {
                 setIsSaving(false);
             }
@@ -397,10 +435,26 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
+    // --- MODIFICATION : FAVORIS PERSONNELS ---
     const toggleFavorite = async (page) => {
-        const newStatus = !page.is_favorite;
-        setAllPages(prev => prev.map(p => p.id === page.id ? { ...p, is_favorite: newStatus } : p));
-        await supabase.from('journal_pages').update({ is_favorite: newStatus }).eq('id', page.id);
+        if (!page) return;
+        const isFav = isPageFavorite(page.id);
+        
+        if (isFav) {
+            const fav = (data?.journal_favorites || []).find(f => String(f.page_id) === String(page.id));
+            if (fav) {
+                // Optimiste
+                updateData({ ...data, journal_favorites: data.journal_favorites.filter(f => f.id !== fav.id) });
+                await supabase.from('journal_favorites').delete().eq('id', fav.id);
+            }
+        } else {
+            const newFav = { page_id: page.id, user_id: data?.profile?.id };
+            const { data: inserted } = await supabase.from('journal_favorites').insert([newFav]).select();
+            if (inserted && inserted.length > 0) {
+                // Optimiste
+                updateData({ ...data, journal_favorites: [...(data?.journal_favorites || []), inserted[0]] });
+            }
+        }
     };
 
     // --- ÉDITEUR : COMMANDES ---
@@ -410,7 +464,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         document.execCommand(cmd, false, val);
         if (cmd === 'hiliteColor') setShowColorPalette(false);
         setShowSizeMenu(false); 
-        isDirtyRef.current = true; // S'assure que le style est sauvegardé !
+        isDirtyRef.current = true;
         saveCurrentPage(false);
     };
 
@@ -475,8 +529,9 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         printWindow.document.close();
     };
 
-    // --- LOGIQUE D'AFFICHAGE ---
-    const favoritePages = allPages.filter(p => p.is_favorite);
+    // --- LOGIQUE D'AFFICHAGE SÉCURISÉE ---
+    // NOUVEAU: On n'affiche dans les favoris que les pages auxquelles on a REELLEMENT accès
+    const favoritePages = allPages.filter(p => isPageFavorite(p.id) && hasAccessToItem(p));
     const rootFolders = allFolders.filter(f => !f.parent_id); 
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
     const pagesInCurrent = allPages.filter(p => p.folder_id === currentFolderId);
@@ -644,7 +699,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                 <span className={`truncate text-sm ${activePageId === page.id ? 'font-bold text-indigo-900 dark:text-indigo-100' : 'text-slate-600 dark:text-slate-300'}`}>{page.title || 'Sans titre'}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                                {page.is_favorite && <Star size={12} className="text-amber-500 fill-amber-500"/>}
+                                {isPageFavorite(page.id) && <Star size={12} className="text-amber-500 fill-amber-500"/>}
                                 <div className="opacity-0 group-hover:opacity-100">
                                     <button onClick={(e) => { e.stopPropagation(); deleteItem(page.id, 'page'); }} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 rounded"><Trash2 size={12}/></button>
                                 </div>
@@ -778,20 +833,18 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                         <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
                                         <button 
                                             onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${allPages.find(p => p.id === activePageId)?.is_favorite ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
+                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${isPageFavorite(activePageId) ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
                                         >
-                                            <Star size={16} className={allPages.find(p => p.id === activePageId)?.is_favorite ? 'fill-amber-500' : ''}/>
-                                            <span className="text-[10px] font-bold uppercase">{allPages.find(p => p.id === activePageId)?.is_favorite ? 'Favori' : 'Favoris'}</span>
+                                            <Star size={16} className={isPageFavorite(activePageId) ? 'fill-amber-500' : ''}/>
+                                            <span className="text-[10px] font-bold uppercase">{isPageFavorite(activePageId) ? 'Favori' : 'Favoris'}</span>
                                         </button>
                                     </div>
                                     
-                                    {/* NOUVEAU: onChange met isDirtyRef à true */}
                                     <input ref={titleRef} type="text" defaultValue={pageTitle} 
                                         onChange={() => { isDirtyRef.current = true; saveCurrentPage(false); }} 
                                         onBlur={() => saveCurrentPage(true)} 
                                         className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
                                     
-                                    {/* NOUVEAU: onInput met isDirtyRef à true */}
                                     <div 
                                         ref={editorRef} 
                                         contentEditable 
