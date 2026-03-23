@@ -186,11 +186,8 @@ export default function App() {
                     participants: newParts, 
                     my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') 
                 };
-            }).filter(ev => {
-                // LOGIQUE CRITIQUE : Si je suis invité (pas proprio) et que j'ai refusé, l'événement saute instantanément
-                const isOwner = ev.user_id === userId;
-                return isOwner || ev.my_status !== 'declined';
             })
+            // LE .FILTER A ÉTÉ RETIRÉ ICI POUR GARDER EN MÉMOIRE LES REFUS
         }));
      })
      .subscribe();
@@ -568,10 +565,9 @@ export default function App() {
           const parts = (all_participants || []).filter(p => String(p.event_id) === String(ev.id));
           const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
           return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') };
-       }).filter(ev => {
-          const isOwner = ev.user_id === userId;
-          return isOwner || ev.my_status !== 'declined';
-       }), 
+       })
+       // LE .FILTER A ÉTÉ RETIRÉ ICI AUSSI,
+       ,
        budget: {
          accounts: validAccounts, 
          transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),

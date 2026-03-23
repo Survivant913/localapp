@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  ChevronLeft, ChevronRight, CheckCircle2, 
-  Plus, Repeat, Trash2, GripVertical, 
-  X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar, UserPlus, Check, Ban, Bell, Users, UserMinus, UserX
+    ChevronLeft, ChevronRight, CheckCircle2, 
+    Plus, Repeat, Trash2, GripVertical, 
+    X, Clock, AlertTriangle, Pencil, RotateCcw, Calendar, UserPlus, Check, Ban, Bell, Users, UserMinus, UserX
 } from 'lucide-react';
 import { 
-  format, addDays, startOfWeek, addWeeks, subWeeks, 
-  isSameDay, parseISO, getHours, getMinutes, 
-  setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
+    format, addDays, startOfWeek, addWeeks, subWeeks, 
+    isSameDay, parseISO, getHours, getMinutes, 
+    setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from './supabaseClient';
@@ -271,7 +271,8 @@ export default function PlanningManager({ data, updateData }) {
                     let s = parseISO(ev.start_time);
                     if (s.getDay() !== startObj.getDay()) { s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => String(e.id) === String(targetId)).start_time))) / 86400000)); }
                     let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
-                    return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay, invited_email: '', status: 'accepted' };
+                    // CORRECTION ICI : Ne pas écraser invited_email ni status
+                    return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay };
                 }
                 return ev;
             });
@@ -343,7 +344,14 @@ export default function PlanningManager({ data, updateData }) {
                             <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
                                 {weekDays.map((day, dayIndex) => {
                                     const isToday = isSameDay(day, new Date());
-                                    const rawEvents = events.filter(e => isSameDay(parseISO(e.start_time), day)).map(e => ({ data: e, startStr: e.start_time, endStr: e.end_time }));
+                                    // CORRECTION ICI : Ne pas afficher les événements refusés pour les invités
+                                    const rawEvents = events.filter(e => {
+                                        const isOwner = e.user_id === data.profile?.id;
+                                        const isDeclined = (e.my_status || e.status) === 'declined';
+                                        if (!isOwner && isDeclined) return false;
+                                        return isSameDay(parseISO(e.start_time), day);
+                                    }).map(e => ({ data: e, startStr: e.start_time, endStr: e.end_time }));
+                                    
                                     const layoutItems = getLayoutForDay(rawEvents);
                                     return (
                                         <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
@@ -370,7 +378,6 @@ export default function PlanningManager({ data, updateData }) {
                                                     const isPending = (dataItem.my_status || dataItem.status) === 'pending' && !isOwner;
                                                     const isDeclined = (dataItem.my_status || dataItem.status) === 'declined';
                                                     
-                                                    // MODIFICATION ICI : On applique le background coloré au lieu du blanc
                                                     const colorClass = (dataItem.color || 'blue') === 'green' 
                                                         ? 'bg-emerald-100 dark:bg-emerald-900/50 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' 
                                                         : (dataItem.color || 'blue') === 'gray' 
