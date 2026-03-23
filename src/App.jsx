@@ -638,9 +638,11 @@ export default function App() {
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
      
      // --- CORRECTION SAUVEGARDE POUR NE PAS VOLER LES DROITS ---
-     await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: f.user_id || user.id, name: f.name, parent_id: f.parent_id }));
-     await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: p.user_id || user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
-     await upsertInBatches('journal_shares', data.journal_shares, 50, s => ({ id: s.id, folder_id: s.folder_id, user_email: s.user_email }));
+     // SÉCURITÉ ANTI-ÉCRASEMENT : On commente ces 3 lignes. C'est JournalManager qui gère ses propres sauvegardes en direct.
+     // App.jsx n'a plus le droit d'écraser le journal avec ses anciennes données en arrière-plan.
+     // await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: f.user_id || user.id, name: f.name, parent_id: f.parent_id }));
+     // await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: p.user_id || user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
+     // await upsertInBatches('journal_shares', data.journal_shares, 50, s => ({ id: s.id, folder_id: s.folder_id, user_email: s.user_email }));
      
      await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, name: v.name, status: v.status, created_at: v.created_at || new Date().toISOString() }));
      await upsertInBatches('calendar_events', data.calendar_events, 50, e => ({ 
