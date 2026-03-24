@@ -391,7 +391,6 @@ export default function BudgetManager({ data, updateData }) {
         return { points: combined, min: minBal - padding, max: maxBal + padding, todayIndex: 30 };
     }, [transactionsList, recurringList, scheduledList, statsAccountId, currentTotalBalance, accounts]);
 
-    // --- HELPER : COURBE DE BÉZIER POUR LISSER LE GRAPHIQUE SVG ---
     const bezierCommand = (point, i, a) => {
         const line = (pointA, pointB) => {
             const lengthX = pointB[0] - pointA[0];
@@ -709,6 +708,8 @@ export default function BudgetManager({ data, updateData }) {
                     <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-scheduled' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Planifié</button>
                     <button onClick={() => {setActiveTab('add-recurring'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-recurring' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Récurrent</button>
                 </div>
+
+                {/* 3. CONTENU DYNAMIQUE DES ONGLETS */}
 
                 {/* --- VUE D'ENSEMBLE --- */}
                 {activeTab === 'dashboard' && (
@@ -1055,19 +1056,22 @@ export default function BudgetManager({ data, updateData }) {
                                             );
                                         })()}
                                     </svg>
-                                    <div className="absolute -bottom-6 left-0 text-[10px] text-gray-400 font-bold uppercase tracking-wider">-30 Jours</div>
-                                    <div className="absolute -bottom-6 right-0 text-[10px] text-gray-400 font-bold uppercase tracking-wider">+30 Jours (Prévu)</div>
-                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full shadow-sm">Aujourd'hui</div>
                                     
-                                    <div className="absolute top-0 left-0 text-[10px] text-gray-400 -translate-y-6 flex items-center gap-2">
+                                    {/* CORRECTION : L'espacement des libellés -30j / +30j */}
+                                    <div className="absolute -bottom-8 left-0 text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">-30 Jours</div>
+                                    <div className="absolute -bottom-8 right-0 text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">+30 Jours (Prévu)</div>
+                                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-black text-blue-600 dark:text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full shadow-sm border border-blue-100 dark:border-blue-800">Aujourd'hui</div>
+                                    
+                                    {/* CORRECTION : Le Mode Clair pour les axes */}
+                                    <div className="absolute top-0 left-0 text-[10px] text-slate-500 dark:text-gray-400 -translate-y-6 flex items-center gap-2">
                                         <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
                                         Max: {formatCurrency(evolutionChartData.max)}
                                     </div>
-                                    <div className="absolute top-1/2 left-0 text-[10px] text-gray-400 -translate-y-1/2 flex items-center gap-2 opacity-50">
+                                    <div className="absolute top-1/2 left-0 text-[10px] text-slate-500 dark:text-gray-400 -translate-y-1/2 flex items-center gap-2 opacity-50">
                                         <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
                                         {formatCurrency((evolutionChartData.max + evolutionChartData.min) / 2)}
                                     </div>
-                                    <div className="absolute bottom-0 left-0 text-[10px] text-gray-400 translate-y-4 flex items-center gap-2">
+                                    <div className="absolute bottom-0 left-0 text-[10px] text-slate-500 dark:text-gray-400 translate-y-4 flex items-center gap-2">
                                         <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
                                         Min: {formatCurrency(evolutionChartData.min)}
                                     </div>
@@ -1107,22 +1111,22 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* JAUGE RUNWAY */}
-                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl shadow-lg border border-slate-700 text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
-                                <div className="absolute -right-6 -top-6 opacity-10"><Battery size={120}/></div>
-                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
+                            {/* JAUGE RUNWAY (Corrigée pour le mode clair) */}
+                            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-6 rounded-xl shadow-sm dark:shadow-lg border border-gray-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                                <div className="absolute -right-6 -top-6 opacity-[0.03] dark:opacity-10 text-slate-900 dark:text-white"><Battery size={120}/></div>
+                                <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
                                 
-                                <div className="w-32 h-32 rounded-full border-8 border-slate-700 flex items-center justify-center mb-4 relative z-10"
+                                <div className="w-32 h-32 rounded-full border-8 border-slate-100 dark:border-slate-700 flex items-center justify-center mb-4 relative z-10"
                                      style={{ borderColor: analyticsData.runwayMonths < 1 ? '#ef4444' : analyticsData.runwayMonths < 3 ? '#f59e0b' : '#10b981' }}>
                                     <div className="flex flex-col items-center">
                                         <span className="text-4xl font-black">{analyticsData.runwayMonths === 999 ? '∞' : Math.floor(analyticsData.runwayMonths)}</span>
-                                        <span className="text-xs text-slate-400 uppercase font-bold tracking-widest">{analyticsData.runwayMonths === 999 ? 'Infini' : 'Mois'}</span>
+                                        <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold tracking-widest">{analyticsData.runwayMonths === 999 ? 'Infini' : 'Mois'}</span>
                                     </div>
                                 </div>
-                                <p className="text-sm text-slate-300 z-10">
-                                    Si vos revenus s'arrêtent, vous tenez <strong className="text-white">{analyticsData.runwayMonths === 999 ? 'indéfiniment' : `${Math.floor(analyticsData.runwayMonths)} mois`}</strong> au rythme actuel.
+                                <p className="text-sm text-slate-600 dark:text-slate-300 z-10">
+                                    Si vos revenus s'arrêtent, vous tenez <strong className="text-slate-900 dark:text-white">{analyticsData.runwayMonths === 999 ? 'indéfiniment' : `${Math.floor(analyticsData.runwayMonths)} mois`}</strong> au rythme actuel.
                                 </p>
-                                <p className="text-[10px] text-slate-500 mt-4 z-10 uppercase tracking-wide">Basé sur une dépense de {formatCurrency(analyticsData.monthlyBurnRate)} / mois</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-4 z-10 uppercase tracking-wide">Basé sur une dépense de {formatCurrency(analyticsData.monthlyBurnRate)} / mois</p>
                             </div>
 
                             {/* TOP 5 GOUFFRES */}
