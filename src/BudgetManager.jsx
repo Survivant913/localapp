@@ -1,9 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-  Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
-  ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
-  Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft
+    Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
+    ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
+    Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
+    // --- NOUVELLES ICÔNES POUR LES CATÉGORIES ET STATS ---
+    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
+
+// --- NOUVEAU : LISTE DES CATÉGORIES ---
+const CATEGORIES = [
+    { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30' },
+    { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30' },
+    { id: 'abos', label: 'Abonnements & Logiciels', icon: Repeat, color: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30' },
+    { id: 'transports', label: 'Transports & Essence', icon: Navigation, color: 'text-teal-500 bg-teal-100 dark:bg-teal-900/30' },
+    { id: 'sante', label: 'Santé & Mutuelle', icon: Heart, color: 'text-red-500 bg-red-100 dark:bg-red-900/30' },
+    { id: 'loisirs', label: 'Loisirs & Restaurants', icon: Coffee, color: 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30' },
+    { id: 'matos', label: 'Matériel Pro', icon: Laptop, color: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/30' },
+    { id: 'urssaf', label: 'URSSAF & Impôts', icon: Building, color: 'text-gray-500 bg-gray-100 dark:bg-slate-800' },
+    { id: 'frais_bancaires', label: 'Frais bancaires', icon: CreditCard, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800' },
+    { id: 'autre', label: 'Autre Dépense', icon: MoreHorizontal, color: 'text-slate-400 bg-slate-100 dark:bg-slate-800' },
+    { id: 'salaire', label: 'Revenu / Chiffre d\'Affaires', icon: Wallet, color: 'text-green-500 bg-green-100 dark:bg-green-900/30' }
+];
 
 export default function BudgetManager({ data, updateData }) {
     // --- 0. SÉCURITÉ ANTI-CRASH ---
@@ -34,6 +51,7 @@ export default function BudgetManager({ data, updateData }) {
     const [amount, setAmount] = useState('');
     const [desc, setDesc] = useState('');
     const [type, setType] = useState('expense');
+    const [category, setCategory] = useState('autre'); // --- NOUVEAU : État Catégorie
     const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
     const [targetAccountId, setTargetAccountId] = useState(accounts.length > 1 ? accounts[1].id : accounts[0]?.id);
     const [scheduleDate, setScheduleDate] = useState('');
@@ -54,10 +72,20 @@ export default function BudgetManager({ data, updateData }) {
     const [forecastAccount, setForecastAccount] = useState('total');
     const [historyLimit, setHistoryLimit] = useState(5);
 
+    // --- NOUVEAU : ÉTATS POUR LES STATISTIQUES ---
+    const [statsPeriod, setStatsPeriod] = useState(30);
+    const [statsAccountId, setStatsAccountId] = useState('total');
+
     useEffect(() => {
         const val = planner.safetyBases?.[plannerTargetId] || 0;
         setPlannerBaseInput(val === 0 ? '' : val);
     }, [plannerTargetId, planner.safetyBases]);
+
+    // --- NOUVEAU : CHANGER CATÉGORIE PAR DÉFAUT SELON LE TYPE ---
+    useEffect(() => {
+        if (type === 'income') setCategory('salaire');
+        else if (type === 'expense' && category === 'salaire') setCategory('autre');
+    }, [type]);
 
     // --- HELPERS ---
     const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
@@ -100,7 +128,7 @@ export default function BudgetManager({ data, updateData }) {
         // Ici, on gère juste l'affichage et la synchro visuelle si besoin.
     }, [scheduledList.length, recurringList.length]);
 
-    // --- 3. CALCULS ---
+    // --- 3. CALCULS INITIAUX ---
     const getBalanceForAccount = (accId) => {
         const bal = transactionsList
             .filter(t => String(t.accountId || (t.accountId ? t.accountId : accounts[0].id)) === String(accId))
@@ -287,6 +315,58 @@ export default function BudgetManager({ data, updateData }) {
         return monthsData;
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
+
+    // --- NOUVEAU : CALCULS DES STATISTIQUES ---
+    const analyticsData = useMemo(() => {
+        const today = new Date();
+        const pastDate = new Date();
+        pastDate.setDate(today.getDate() - statsPeriod);
+
+        const filteredTransactions = transactionsList.filter(t => {
+            const tDate = parseLocalDate(t.date);
+            if (tDate < pastDate || tDate > today) return false;
+            if (statsAccountId !== 'total' && String(t.accountId || accounts[0].id) !== String(statsAccountId)) return false;
+            return true;
+        });
+
+        let totalIn = 0;
+        let totalOut = 0;
+        const categoryTotals = {};
+
+        filteredTransactions.forEach(t => {
+            const amt = parseFloat(t.amount || 0);
+            if (t.type === 'income') {
+                totalIn += amt;
+            } else if (t.type === 'expense') {
+                totalOut += amt;
+                const cat = t.category || 'autre';
+                categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
+            }
+        });
+
+        // Distribution par catégories triées
+        const sortedCategories = Object.keys(categoryTotals)
+            .map(cat => {
+                const conf = CATEGORIES.find(c => c.id === cat) || CATEGORIES.find(c => c.id === 'autre');
+                return { id: cat, amount: categoryTotals[cat], ...conf };
+            })
+            .sort((a, b) => b.amount - a.amount);
+
+        // Top 5 des dépenses uniques
+        const top5 = filteredTransactions
+            .filter(t => t.type === 'expense')
+            .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+            .slice(0, 5);
+
+        // Calcul du "Runway" (Mois de survie)
+        const currentBalance = statsAccountId === 'total' ? currentTotalBalance : getBalanceForAccount(statsAccountId);
+        const monthlyBurnRate = statsPeriod > 0 ? (totalOut / statsPeriod) * 30 : 0;
+        const runwayMonths = monthlyBurnRate > 0 ? round2(currentBalance / monthlyBurnRate) : 999;
+
+        return { totalIn, totalOut, sortedCategories, top5, runwayMonths, currentBalance, monthlyBurnRate };
+    }, [transactionsList, statsPeriod, statsAccountId, currentTotalBalance, accounts]);
+
+
     // --- 4. ACTIONS (AVEC SAUVEGARDE IMMÉDIATE) ---
     
     // Date Helper : Force Midi (12:00:00) pour éviter les décalages UTC
@@ -321,10 +401,11 @@ export default function BudgetManager({ data, updateData }) {
         setEditingAccountId(null); 
     };
 
+    // --- MODIFICATION : AJOUT DE LA CATÉGORIE LORS DE L'ENREGISTREMENT ---
     const addTransaction = () => {
         if(!amount || !desc) return;
         let newTransactions = [];
-        const commonData = { id: Date.now(), amount: parseAmount(amount), date: getNoonDate(), archived: false };
+        const commonData = { id: Date.now(), amount: parseAmount(amount), date: getNoonDate(), archived: false, category };
         
         let dbActionData = null; 
 
@@ -358,11 +439,11 @@ export default function BudgetManager({ data, updateData }) {
         }
 
         const newSch = { 
-            id: Date.now(), type, amount: parseAmount(amount), description: desc, 
+            id: Date.now(), type, amount: parseAmount(amount), description: desc, category, // NOUVEAU
             date: scheduleDate, 
             status: 'pending', accountId: selectedAccountId, 
             targetAccountId: type === 'transfer' ? targetAccountId : null,
-            target_account_id: type === 'transfer' ? targetAccountId : null // HACK SÉCURITÉ POUR APP.JSX
+            target_account_id: type === 'transfer' ? targetAccountId : null 
         }; 
         
         updateData(
@@ -400,12 +481,12 @@ export default function BudgetManager({ data, updateData }) {
             id: Date.now(), 
             type, 
             amount: parseAmount(amount), 
-            description: desc, 
+            description: desc, category, // NOUVEAU
             dayOfMonth: targetDay, 
             endDate: recurEndDate || null, 
             accountId: selectedAccountId, 
             targetAccountId: type === 'transfer' ? targetAccountId : null, 
-            target_account_id: type === 'transfer' ? targetAccountId : null, // HACK SÉCURITÉ POUR APP.JSX
+            target_account_id: type === 'transfer' ? targetAccountId : null, 
             nextDueDate: initialNextDate.toISOString() 
         }; 
         
@@ -466,7 +547,8 @@ export default function BudgetManager({ data, updateData }) {
                 archived: false, 
                 type: 'expense', 
                 description: `Achat planifié : ${item.name}`, 
-                accountId: item.targetAccountId || accounts[0].id 
+                accountId: item.targetAccountId || accounts[0].id,
+                category: 'autre' // Achat planifié par défaut dans "Autre"
             }; 
             
             const newTransactions = [newTransaction, ...transactionsList]; 
@@ -527,6 +609,10 @@ export default function BudgetManager({ data, updateData }) {
                     <button onClick={() => setActiveTab('dashboard')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>Vue d'ensemble</button>
                     <button onClick={() => setActiveTab('accounts')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'accounts' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-b-2 border-orange-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><CreditCard size={16} /> Comptes</button>
                     <button onClick={() => setActiveTab('planner')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'planner' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PiggyBank size={16} /> Planificateur</button>
+                    
+                    {/* --- NOUVEAU : ONGLET ANALYSES --- */}
+                    <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'analytics' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-b-2 border-rose-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PieChart size={16} /> Analyses</button>
+                    
                     <button onClick={() => setActiveTab('forecast')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'forecast' ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border-b-2 border-teal-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><LineChart size={16} /> Prévisions</button>
                     <button onClick={() => {setActiveTab('add-transaction'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-transaction' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Transaction</button>
                     <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-scheduled' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Planifié</button>
@@ -550,7 +636,11 @@ export default function BudgetManager({ data, updateData }) {
                                         <p className="text-gray-400 text-sm text-center py-4">Rien de récurrent.</p>
                                     )}
                                     <ul className="space-y-3">
-                                        {recurringList.map(r => (
+                                        {recurringList.map(r => {
+                                            // Ajout icon catégorie pour historique
+                                            const catDef = CATEGORIES.find(c => c.id === r.category) || CATEGORIES.find(c => c.id === 'autre');
+                                            const CatIcon = catDef.icon;
+                                            return (
                                             <li key={r.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-1.5 rounded-full ${r.type === 'income' ? 'bg-green-100 text-green-600' : r.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
@@ -559,7 +649,9 @@ export default function BudgetManager({ data, updateData }) {
                                                     <div>
                                                         <span className="font-medium text-gray-700 dark:text-gray-200">{r.description}</span>
                                                         <div className="flex flex-col">
-                                                            <span className="text-xs text-gray-500 dark:text-gray-400">Le {r.dayOfMonth} du mois</span>
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                                                <CatIcon size={10}/> Le {r.dayOfMonth} du mois
+                                                            </span>
                                                             {r.endDate && <span className="text-[10px] text-orange-500">Jusqu'au {new Date(r.endDate).toLocaleDateString()}</span>}
                                                         </div>
                                                     </div>
@@ -569,7 +661,7 @@ export default function BudgetManager({ data, updateData }) {
                                                     <button onClick={() => deleteItem('recurring', r.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
                                                 </div>
                                             </li>
-                                        ))}
+                                        )})}
                                     </ul>
                                 </div>
 
@@ -582,7 +674,10 @@ export default function BudgetManager({ data, updateData }) {
                                         <p className="text-gray-400 text-sm text-center py-4">Rien de prévu.</p>
                                     )}
                                     <ul className="space-y-3">
-                                        {visibleScheduled.map(s => (
+                                        {visibleScheduled.map(s => {
+                                            const catDef = CATEGORIES.find(c => c.id === s.category) || CATEGORIES.find(c => c.id === 'autre');
+                                            const CatIcon = catDef.icon;
+                                            return (
                                             <li key={s.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-1.5 rounded-full ${s.type === 'income' ? 'bg-green-100 text-green-600' : s.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
@@ -590,7 +685,9 @@ export default function BudgetManager({ data, updateData }) {
                                                     </div>
                                                     <div>
                                                         <span className="font-medium text-gray-700 dark:text-gray-200">{s.description}</span>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">{parseLocalDate(s.date).toLocaleDateString()}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                                            <CatIcon size={10}/> {parseLocalDate(s.date).toLocaleDateString()}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
@@ -598,7 +695,7 @@ export default function BudgetManager({ data, updateData }) {
                                                     <button onClick={() => deleteItem('scheduled', s.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button>
                                                 </div>
                                             </li>
-                                        ))}
+                                        )})}
                                     </ul>
                                 </div>
                             </div>
@@ -609,7 +706,7 @@ export default function BudgetManager({ data, updateData }) {
                                     <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                                         <List size={18} className="text-blue-500"/> Historique
                                     </h3>
-                                    <button onClick={() => { setShowArchived(!showArchived); setHistoryLimit(5); }} className={`text-xs px-2 py-1 rounded border transition-colors ${showArchived ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                    <button onClick={() => { setShowArchived(!showArchived); setHistoryLimit(5); }} className={`text-xs px-2 py-1 rounded border transition-colors ${showArchived ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}>
                                         {showArchived ? 'Masquer archives' : 'Voir archives'}
                                     </button>
                                 </div>
@@ -620,13 +717,21 @@ export default function BudgetManager({ data, updateData }) {
 
                                 <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                     <ul className="space-y-3 mb-4">
-                                        {displayedTransactions.map(t => (
+                                        {displayedTransactions.map(t => {
+                                            const catDef = CATEGORIES.find(c => c.id === t.category) || CATEGORIES.find(c => c.id === 'autre');
+                                            const CatIcon = catDef.icon;
+                                            return (
                                             <li key={t.id} className={`flex justify-between items-center p-3 border-b border-gray-50 dark:border-slate-700 last:border-0 ${t.archived ? 'opacity-50 grayscale' : ''}`}>
-                                                <div>
-                                                    <span className="block font-medium text-gray-700 dark:text-gray-200 text-sm">{t.description} {t.archived && '(Archivé)'}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-gray-400">{parseLocalDate(t.date).toLocaleDateString()}</span>
-                                                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-full ${catDef.color}`}>
+                                                        <CatIcon size={14} />
+                                                    </div>
+                                                    <div>
+                                                        <span className="block font-medium text-gray-700 dark:text-gray-200 text-sm">{t.description} {t.archived && '(Archivé)'}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-400">{parseLocalDate(t.date).toLocaleDateString()}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
@@ -637,7 +742,7 @@ export default function BudgetManager({ data, updateData }) {
                                                     </div>
                                                 </div>
                                             </li>
-                                        ))}
+                                        )})}
                                     </ul>
                                 </div>
 
@@ -690,34 +795,6 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {/* --- PRÉVISIONS --- */}
-                {activeTab === 'forecast' && (
-                    <div className="p-6 bg-teal-50/30 dark:bg-teal-900/10">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><LineChart size={20} className="text-teal-600"/> Projection sur 1 an</h3>
-                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1 border border-teal-200 rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:border-teal-500">
-                                <option value="total">Total (Tous les comptes)</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {forecastData.map((data, index) => (
-                                <div key={index} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-teal-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="font-bold text-gray-700 dark:text-gray-200 capitalize">{data.label}</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${data.change >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{data.change >= 0 ? '+' : ''}{formatCurrency(data.change)}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-xs text-gray-400 uppercase tracking-wide">Solde fin de mois</span>
-                                        <span className={`text-2xl font-bold ${data.endBalance >= 0 ? 'text-gray-800 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(data.endBalance)}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center italic">* Cette projection est basée sur votre solde actuel, vos opérations récurrentes mensuelles et les opérations planifiées uniques.</p>
                     </div>
                 )}
 
@@ -806,32 +883,215 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 )}
 
+                {/* --- NOUVEAU : ONGLET ANALYSES ET STATISTIQUES --- */}
+                {activeTab === 'analytics' && (
+                    <div className="p-6 bg-rose-50/30 dark:bg-rose-900/10">
+                        {/* 1. BARRE DE CONTRÔLE */}
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-xl">
+                                <PieChart size={24} className="text-rose-600"/> Statistiques Financières
+                            </h3>
+                            <div className="flex flex-wrap gap-3">
+                                <select value={statsPeriod} onChange={(e) => setStatsPeriod(parseInt(e.target.value))} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm">
+                                    <option value={30}>30 derniers jours</option>
+                                    <option value={60}>60 derniers jours</option>
+                                    <option value={90}>90 derniers jours</option>
+                                    <option value={365}>Cette année</option>
+                                </select>
+                                <select value={statsAccountId} onChange={(e) => setStatsAccountId(e.target.value)} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm">
+                                    <option value="total">Total (Tous les comptes)</option>
+                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* 2. CASHFLOW (ENTRÉES VS SORTIES) */}
+                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col justify-center">
+                                <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Flux de trésorerie</h4>
+                                <div className="space-y-6">
+                                    <div>
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"><ArrowUpCircle size={16} className="text-green-500"/> Entrées</span>
+                                            <span className="font-bold text-green-600 text-xl">{formatCurrency(analyticsData.totalIn)}</span>
+                                        </div>
+                                        <div className="w-full h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-green-500 rounded-full" style={{ width: analyticsData.totalIn === 0 && analyticsData.totalOut === 0 ? '0%' : `${(analyticsData.totalIn / (analyticsData.totalIn + analyticsData.totalOut)) * 100}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-end mb-2">
+                                            <span className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"><ArrowDownCircle size={16} className="text-red-500"/> Sorties</span>
+                                            <span className="font-bold text-red-600 text-xl">{formatCurrency(analyticsData.totalOut)}</span>
+                                        </div>
+                                        <div className="w-full h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-red-500 rounded-full" style={{ width: analyticsData.totalIn === 0 && analyticsData.totalOut === 0 ? '0%' : `${(analyticsData.totalOut / (analyticsData.totalIn + analyticsData.totalOut)) * 100}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className={`mt-4 p-4 rounded-xl text-center border ${analyticsData.totalIn >= analyticsData.totalOut ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'}`}>
+                                        <p className="text-xs uppercase tracking-wide mb-1 font-bold opacity-70">Bilan sur {statsPeriod} jours</p>
+                                        <p className={`text-2xl font-black ${analyticsData.totalIn >= analyticsData.totalOut ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                                            {analyticsData.totalIn >= analyticsData.totalOut ? '+' : ''}{formatCurrency(analyticsData.totalIn - analyticsData.totalOut)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. JAUGE RUNWAY (AUTONOMIE) */}
+                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl shadow-lg border border-slate-700 text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                                <div className="absolute -right-6 -top-6 opacity-10"><Battery size={120}/></div>
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
+                                
+                                <div className="w-32 h-32 rounded-full border-8 border-slate-700 flex items-center justify-center mb-4 relative z-10"
+                                     style={{ borderColor: analyticsData.runwayMonths < 1 ? '#ef4444' : analyticsData.runwayMonths < 3 ? '#f59e0b' : '#10b981' }}>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-4xl font-black">{analyticsData.runwayMonths === 999 ? '∞' : Math.floor(analyticsData.runwayMonths)}</span>
+                                        <span className="text-xs text-slate-400 uppercase font-bold tracking-widest">{analyticsData.runwayMonths === 999 ? 'Infini' : 'Mois'}</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-300 z-10">
+                                    Si vos revenus s'arrêtent, vous tenez <strong className="text-white">{analyticsData.runwayMonths === 999 ? 'indéfiniment' : `${Math.floor(analyticsData.runwayMonths)} mois`}</strong> au rythme actuel.
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-4 z-10 uppercase tracking-wide">Basé sur une dépense de {formatCurrency(analyticsData.monthlyBurnRate)} / mois</p>
+                            </div>
+
+                            {/* 4. TOP 5 GOUFFRES */}
+                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+                                <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Top 5 Dépenses</h4>
+                                {analyticsData.top5.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-4">Aucune dépense sur la période.</p>
+                                ) : (
+                                    <ul className="space-y-4">
+                                        {analyticsData.top5.map((t, i) => {
+                                            const catDef = CATEGORIES.find(c => c.id === t.category) || CATEGORIES.find(c => c.id === 'autre');
+                                            const CatIcon = catDef.icon;
+                                            return (
+                                                <li key={t.id} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className={`p-2 rounded-full font-bold text-xs ${i === 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500 dark:bg-slate-700'}`}>#{i+1}</div>
+                                                        <div className="truncate">
+                                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{t.description}</p>
+                                                            <p className="text-xs text-gray-400 flex items-center gap-1"><CatIcon size={10}/> {catDef.label}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="font-bold text-red-600 shrink-0 ml-2">{formatCurrency(parseFloat(t.amount))}</span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* 5. RÉPARTITION PAR CATÉGORIE */}
+                            <div className="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+                                <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Répartition des sorties</h4>
+                                {analyticsData.totalOut === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-8">Aucune donnée à analyser.</p>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {analyticsData.sortedCategories.map(cat => {
+                                            const pct = (cat.amount / analyticsData.totalOut) * 100;
+                                            const CatIcon = cat.icon;
+                                            return (
+                                                <div key={cat.id} className="space-y-2">
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                            <div className={`p-1.5 rounded-lg ${cat.color}`}><CatIcon size={14}/></div>
+                                                            {cat.label}
+                                                        </span>
+                                                        <div className="text-right">
+                                                            <span className="block font-bold text-gray-800 dark:text-white">{formatCurrency(cat.amount)}</span>
+                                                            <span className="text-xs text-gray-400">{round2(pct)}%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full ${cat.color.split(' ')[0].replace('text-', 'bg-')}`} style={{ width: `${pct}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- PRÉVISIONS --- */}
+                {activeTab === 'forecast' && (
+                    <div className="p-6 bg-teal-50/30 dark:bg-teal-900/10">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><LineChart size={20} className="text-teal-600"/> Projection sur 1 an</h3>
+                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1 border border-teal-200 rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:border-teal-500">
+                                <option value="total">Total (Tous les comptes)</option>
+                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {forecastData.map((data, index) => (
+                                <div key={index} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-teal-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="font-bold text-gray-700 dark:text-gray-200 capitalize">{data.label}</span>
+                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${data.change >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{data.change >= 0 ? '+' : ''}{formatCurrency(data.change)}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-gray-400 uppercase tracking-wide">Solde fin de mois</span>
+                                        <span className={`text-2xl font-bold ${data.endBalance >= 0 ? 'text-gray-800 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(data.endBalance)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center italic">* Cette projection est basée sur votre solde actuel, vos opérations récurrentes mensuelles et les opérations planifiées uniques.</p>
+                    </div>
+                )}
+
+                {/* --- MODIFICATION : FORMULAIRES AVEC CATÉGORIES --- */}
                 {['add-transaction', 'add-scheduled', 'add-recurring'].includes(activeTab) && (
                     <div className="p-6 bg-gray-50 dark:bg-slate-800">
                         <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4">{activeTab === 'add-transaction' && "Transaction immédiate"}{activeTab === 'add-scheduled' && "Planifié"}{activeTab === 'add-recurring' && "Récurrent"}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="flex gap-2 p-1 bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 w-fit">
+                            <div className="flex gap-2 p-1 bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 w-fit h-fit">
                                 <button onClick={() => setType('expense')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'expense' ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200' : 'text-gray-500 dark:text-gray-400'}`}>Dépense</button>
                                 <button onClick={() => setType('income')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'income' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>Revenu</button>
                                 <button onClick={() => setType('transfer')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'transfer' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-500 dark:text-gray-400'}`}>Virement</button>
                             </div>
-                            <div>
-                                {type === 'transfer' ? (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">De</label>
-                                            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                            
+                            <div className="space-y-4">
+                                {/* SÉLECTEUR DE COMPTES */}
+                                <div>
+                                    {type === 'transfer' ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">De</label>
+                                                <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Vers</label>
+                                                <select value={targetAccountId} onChange={e => setTargetAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                            </div>
                                         </div>
+                                    ) : (
                                         <div className="space-y-1">
-                                            <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Vers</label>
-                                            <select value={targetAccountId} onChange={e => setTargetAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                            <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Compte cible</label>
+                                            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
                                         </div>
+                                    )}
+                                </div>
+
+                                {/* NOUVEAU : SÉLECTEUR DE CATÉGORIE */}
+                                {type !== 'transfer' && (
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Catégorie</label>
+                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">
+                                            {CATEGORIES.filter(c => type === 'income' ? c.id === 'salaire' || c.id === 'autre' : c.id !== 'salaire').map(c => (
+                                                <option key={c.id} value={c.id}>{c.label}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                ) : (
-                                    <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
                                 )}
                             </div>
                         </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input type="text" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />
                             <input type="text" placeholder="Montant (€)" value={amount} onChange={e => setAmount(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />
