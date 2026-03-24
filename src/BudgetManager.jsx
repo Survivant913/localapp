@@ -1046,15 +1046,12 @@ export default function BudgetManager({ data, updateData }) {
                                                     <path d={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                     <path d={futurePath} fill="none" stroke="#64748b" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
                                                     
-                                                    {/* Points supprimés, on ne garde que le point d'Aujourd'hui */}
+                                                    {/* Point central (Aujourd'hui) uniquement */}
                                                     <circle cx={getX(30)} cy={getY(evolutionChartData.points[30].balance)} r="6" fill="#3b82f6" stroke="#fff" strokeWidth="2" className="shadow-lg" />
                                                 </>
                                             );
                                         })()}
                                     </svg>
-                                    
-                                    {/* Textes -30 Jours et +30 Jours supprimés */}
-                                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-black text-blue-600 dark:text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full shadow-sm border border-blue-100 dark:border-blue-800">Aujourd'hui</div>
                                     
                                     <div className="absolute top-0 left-0 text-[10px] text-slate-500 dark:text-gray-400 -translate-y-6 flex items-center gap-2">
                                         <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
@@ -1104,7 +1101,7 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* JAUGE RUNWAY */}
+                            {/* JAUGE RUNWAY (Corrigée pour le mode clair) */}
                             <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-6 rounded-xl shadow-sm dark:shadow-lg border border-gray-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
                                 <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
                                 
