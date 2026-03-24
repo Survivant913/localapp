@@ -3,11 +3,9 @@ import {
     Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
     ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
     Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
-    // --- NOUVELLES ICÔNES POUR LES CATÉGORIES ET STATS ---
     PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle
 } from 'lucide-react';
 
-// --- NOUVEAU : LISTE DES CATÉGORIES ---
 const CATEGORIES = [
     { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30' },
     { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30' },
@@ -23,7 +21,6 @@ const CATEGORIES = [
 ];
 
 export default function BudgetManager({ data, updateData }) {
-    // --- 0. SÉCURITÉ ANTI-CRASH ---
     if (!data) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -32,7 +29,6 @@ export default function BudgetManager({ data, updateData }) {
         );
     }
 
-    // --- 1. INITIALISATION ---
     const budgetData = data?.budget || { transactions: [], recurring: [], scheduled: [], planner: { base: 0, items: [] }, accounts: [] };
     
     const transactionsList = Array.isArray(budgetData.transactions) ? budgetData.transactions : [];
@@ -44,14 +40,12 @@ export default function BudgetManager({ data, updateData }) {
     
     const planner = { items: [], safetyBases: {}, ...budgetData.planner };
 
-    // --- 2. ÉTATS LOCAUX ---
     const [activeTab, setActiveTab] = useState('dashboard');
     
-    // Formulaires
     const [amount, setAmount] = useState('');
     const [desc, setDesc] = useState('');
     const [type, setType] = useState('expense');
-    const [category, setCategory] = useState('autre'); // --- NOUVEAU : État Catégorie
+    const [category, setCategory] = useState('autre'); 
     const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
     const [targetAccountId, setTargetAccountId] = useState(accounts.length > 1 ? accounts[1].id : accounts[0]?.id);
     const [scheduleDate, setScheduleDate] = useState('');
@@ -67,12 +61,10 @@ export default function BudgetManager({ data, updateData }) {
     const [editingAccountName, setEditingAccountName] = useState('');
     const [deletingAccountId, setDeletingAccountId] = useState(null);
 
-    // Filtres
     const [showArchived, setShowArchived] = useState(false);
     const [forecastAccount, setForecastAccount] = useState('total');
     const [historyLimit, setHistoryLimit] = useState(5);
 
-    // --- NOUVEAU : ÉTATS POUR LES STATISTIQUES ---
     const [statsPeriod, setStatsPeriod] = useState(30);
     const [statsAccountId, setStatsAccountId] = useState('total');
 
@@ -86,7 +78,6 @@ export default function BudgetManager({ data, updateData }) {
         else if (type === 'expense' && category === 'salaire') setCategory('autre');
     }, [type]);
 
-    // --- HELPERS ---
     const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
 
     const parseAmount = (val) => { 
@@ -121,10 +112,8 @@ export default function BudgetManager({ data, updateData }) {
         }
     };
 
-    // --- AUTOMATISATION (Catch-up Visualisation) ---
     useEffect(() => {}, [scheduledList.length, recurringList.length]);
 
-    // --- 3. CALCULS INITIAUX ---
     const getBalanceForAccount = (accId) => {
         const bal = transactionsList
             .filter(t => String(t.accountId || (t.accountId ? t.accountId : accounts[0].id)) === String(accId))
@@ -260,7 +249,6 @@ export default function BudgetManager({ data, updateData }) {
         });
     }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, budgetData.scheduled, accounts]);
 
-    // --- LE CALCUL DE LA SECTION PRÉVISION (INTACT) ---
     const forecastData = useMemo(() => {
         const today = new Date();
         let projectedBalance = endOfMonthForecast;
@@ -311,7 +299,6 @@ export default function BudgetManager({ data, updateData }) {
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
 
-    // --- CALCULS DU GRAPHIQUE VECTORIEL (Évolution 60 Jours) ---
     const evolutionChartData = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -321,7 +308,6 @@ export default function BudgetManager({ data, updateData }) {
         let minBal = baseBalance;
         let maxBal = baseBalance;
 
-        // 1. Calculer le PASSÉ (-30 jours en marche arrière)
         const pastBalances = [];
         let tempBal = baseBalance;
         
@@ -346,7 +332,6 @@ export default function BudgetManager({ data, updateData }) {
             tempBal -= dayChange; 
         }
 
-        // 2. Calculer le FUTUR (+30 jours en marche avant)
         const futureBalances = [];
         tempBal = baseBalance; 
         
@@ -406,8 +391,29 @@ export default function BudgetManager({ data, updateData }) {
         return { points: combined, min: minBal - padding, max: maxBal + padding, todayIndex: 30 };
     }, [transactionsList, recurringList, scheduledList, statsAccountId, currentTotalBalance, accounts]);
 
+    // --- HELPER : COURBE DE BÉZIER POUR LISSER LE GRAPHIQUE SVG ---
+    const bezierCommand = (point, i, a) => {
+        const line = (pointA, pointB) => {
+            const lengthX = pointB[0] - pointA[0];
+            const lengthY = pointB[1] - pointA[1];
+            return { length: Math.sqrt(Math.pow(lengthX, 2) + Math.pow(lengthY, 2)), angle: Math.atan2(lengthY, lengthX) };
+        };
+        const controlPoint = (current, previous, next, reverse) => {
+            const p = previous || current;
+            const n = next || current;
+            const smoothing = 0.15;
+            const o = line(p, n);
+            const angle = o.angle + (reverse ? Math.PI : 0);
+            const length = o.length * smoothing;
+            return [current[0] + Math.cos(angle) * length, current[1] + Math.sin(angle) * length];
+        };
+        
+        const cps = controlPoint(a[i - 1], a[i - 2], point);
+        const cpe = controlPoint(point, a[i - 1], a[i + 1], true);
+        return `C ${cps[0]},${cps[1]} ${cpe[0]},${cpe[1]} ${point[0]},${point[1]}`;
+    };
 
-    // --- CALCULS DES STATISTIQUES (Camembert & Top 5) ---
+
     const analyticsData = useMemo(() => {
         const today = new Date();
         const pastDate = new Date();
@@ -454,9 +460,6 @@ export default function BudgetManager({ data, updateData }) {
         return { totalIn, totalOut, sortedCategories, top5, runwayMonths, currentBalance, monthlyBurnRate };
     }, [transactionsList, statsPeriod, statsAccountId, currentTotalBalance, accounts]);
 
-
-    // --- 4. ACTIONS (AVEC SAUVEGARDE IMMÉDIATE) ---
-    
     const getNoonDate = (dateObj = new Date()) => {
         const d = new Date(dateObj);
         d.setHours(12, 0, 0, 0);
@@ -707,15 +710,11 @@ export default function BudgetManager({ data, updateData }) {
                     <button onClick={() => {setActiveTab('add-recurring'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-recurring' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Récurrent</button>
                 </div>
 
-                {/* 3. CONTENU DYNAMIQUE DES ONGLETS */}
-
                 {/* --- VUE D'ENSEMBLE --- */}
                 {activeTab === 'dashboard' && (
                     <div className="p-6">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* COLONNE GAUCHE */}
                             <div className="space-y-6">
-                                {/* RÉCURRENTS */}
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                                         <Repeat size={18} className="text-orange-500"/> Récurrent (Mensuel)
@@ -752,7 +751,6 @@ export default function BudgetManager({ data, updateData }) {
                                     </ul>
                                 </div>
 
-                                {/* PLANIFIÉS */}
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                                         <CalendarClock size={18} className="text-purple-500"/> Planifié (Futur)
@@ -787,7 +785,6 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* COLONNE DROITE : Historique */}
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-fit">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -999,43 +996,81 @@ export default function BudgetManager({ data, updateData }) {
                             </h4>
                             {evolutionChartData.points.length > 0 && (
                                 <div className="w-full relative h-[240px] select-none">
+                                    {/* Grille de fond (Lignes verticales pour marquer les semaines) */}
+                                    <div className="absolute inset-0 flex justify-between pointer-events-none opacity-5 dark:opacity-10">
+                                        {[...Array(9)].map((_, i) => (
+                                            <div key={i} className="h-full border-l border-slate-500 border-dashed"></div>
+                                        ))}
+                                    </div>
+                                    
                                     <svg viewBox="0 0 800 200" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                                        {/* Ligne Zéro (si le solde est passé dans le négatif) */}
                                         {evolutionChartData.min < 0 && evolutionChartData.max > 0 && (
-                                            <line x1="0" y1={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} x2="800" y2={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" className="opacity-50"/>
+                                            <line x1="0" y1={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} x2="800" y2={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4 4" className="opacity-40"/>
                                         )}
+                                        
+                                        {/* Dégradé lissé pour le passé */}
                                         <defs>
                                             <linearGradient id="pastGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2"/>
+                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4"/>
+                                                <stop offset="70%" stopColor="#3b82f6" stopOpacity="0.05"/>
                                                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
                                             </linearGradient>
                                         </defs>
+                                        
                                         {(() => {
                                             const range = evolutionChartData.max - evolutionChartData.min;
                                             const getX = (i) => (i / 60) * 800;
                                             const getY = (val) => range === 0 ? 100 : 200 - ((val - evolutionChartData.min) / range) * 200;
                                             
-                                            const pastPoints = evolutionChartData.points.slice(0, 31);
-                                            const futurePoints = evolutionChartData.points.slice(30);
+                                            const pastPoints = evolutionChartData.points.slice(0, 31).map((p, i) => [getX(i), getY(p.balance)]);
+                                            const futurePoints = evolutionChartData.points.slice(30).map((p, i) => [getX(i + 30), getY(p.balance)]);
 
-                                            const pastPath = pastPoints.map((p, i) => `${getX(i)},${getY(p.balance)}`).join(' ');
-                                            const futurePath = futurePoints.map((p, i) => `${getX(i + 30)},${getY(p.balance)}`).join(' ');
-                                            const pastFill = `0,200 ${pastPath} ${getX(30)},200`;
+                                            // Construction des courbes de Bézier
+                                            let pastPath = `M ${pastPoints[0][0]},${pastPoints[0][1]} `;
+                                            for(let i = 1; i < pastPoints.length; i++) pastPath += bezierCommand(pastPoints[i], i, pastPoints);
+
+                                            let futurePath = `M ${futurePoints[0][0]},${futurePoints[0][1]} `;
+                                            for(let i = 1; i < futurePoints.length; i++) futurePath += bezierCommand(futurePoints[i], i, futurePoints);
+
+                                            const pastFill = `${pastPath} L ${getX(30)},200 L 0,200 Z`;
 
                                             return (
                                                 <>
-                                                    <polygon points={pastFill} fill="url(#pastGradient)" />
-                                                    <polyline points={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                                    <polyline points={futurePath} fill="none" stroke="#94a3b8" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" />
-                                                    <circle cx={getX(30)} cy={getY(pastPoints[30].balance)} r="5" fill="#3b82f6" className="animate-pulse" />
+                                                    <path d={pastFill} fill="url(#pastGradient)" />
+                                                    <path d={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <path d={futurePath} fill="none" stroke="#64748b" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
+                                                    
+                                                    {/* Nœuds (Points) pour chaque jour passé */}
+                                                    {pastPoints.map((pt, i) => (
+                                                        <circle key={i} cx={pt[0]} cy={pt[1]} r="2" fill="#fff" stroke="#3b82f6" strokeWidth="1" className="opacity-50" />
+                                                    ))}
+                                                    {/* Nœuds pour le futur */}
+                                                    {futurePoints.map((pt, i) => (
+                                                        <circle key={`f${i}`} cx={pt[0]} cy={pt[1]} r="2" fill="#fff" stroke="#64748b" strokeWidth="1" className="opacity-30" />
+                                                    ))}
+
+                                                    <circle cx={getX(30)} cy={getY(evolutionChartData.points[30].balance)} r="6" fill="#3b82f6" stroke="#fff" strokeWidth="2" className="shadow-lg" />
                                                 </>
                                             );
                                         })()}
                                     </svg>
-                                    <div className="absolute -bottom-4 left-0 text-[10px] text-gray-400 font-medium">-30 Jours</div>
-                                    <div className="absolute -bottom-4 right-0 text-[10px] text-gray-400 font-medium">+30 Jours (Prévu)</div>
-                                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-bold text-blue-500">Aujourd'hui</div>
-                                    <div className="absolute top-0 left-0 text-[10px] text-gray-400 -translate-y-4">{formatCurrency(evolutionChartData.max)}</div>
-                                    <div className="absolute bottom-0 left-0 text-[10px] text-gray-400 translate-y-2">{formatCurrency(evolutionChartData.min)}</div>
+                                    <div className="absolute -bottom-6 left-0 text-[10px] text-gray-400 font-bold uppercase tracking-wider">-30 Jours</div>
+                                    <div className="absolute -bottom-6 right-0 text-[10px] text-gray-400 font-bold uppercase tracking-wider">+30 Jours (Prévu)</div>
+                                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-black text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full shadow-sm">Aujourd'hui</div>
+                                    
+                                    <div className="absolute top-0 left-0 text-[10px] text-gray-400 -translate-y-6 flex items-center gap-2">
+                                        <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
+                                        Max: {formatCurrency(evolutionChartData.max)}
+                                    </div>
+                                    <div className="absolute top-1/2 left-0 text-[10px] text-gray-400 -translate-y-1/2 flex items-center gap-2 opacity-50">
+                                        <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
+                                        {formatCurrency((evolutionChartData.max + evolutionChartData.min) / 2)}
+                                    </div>
+                                    <div className="absolute bottom-0 left-0 text-[10px] text-gray-400 translate-y-4 flex items-center gap-2">
+                                        <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
+                                        Min: {formatCurrency(evolutionChartData.min)}
+                                    </div>
                                 </div>
                             )}
                         </div>
