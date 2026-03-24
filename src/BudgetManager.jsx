@@ -260,6 +260,7 @@ export default function BudgetManager({ data, updateData }) {
         });
     }, [planner.items, planner.safetyBases, budgetData.transactions, budgetData.recurring, budgetData.scheduled, accounts]);
 
+    // --- LE CALCUL DE LA SECTION PRÉVISION (INTACT) ---
     const forecastData = useMemo(() => {
         const today = new Date();
         let projectedBalance = endOfMonthForecast;
@@ -310,7 +311,7 @@ export default function BudgetManager({ data, updateData }) {
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
 
-    // --- NOUVEAU : CALCULS DU GRAPHIQUE VECTORIEL (Évolution 60 Jours) ---
+    // --- CALCULS DU GRAPHIQUE VECTORIEL (Évolution 60 Jours) ---
     const evolutionChartData = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -330,7 +331,6 @@ export default function BudgetManager({ data, updateData }) {
             
             pastBalances.unshift({ date: new Date(d), balance: tempBal, isFuture: false });
             
-            // On soustrait les transactions de ce jour pour trouver le solde de la veille
             const dayTx = transactionsList.filter(t => {
                 const tDate = parseLocalDate(t.date);
                 return tDate.getDate() === d.getDate() && tDate.getMonth() === d.getMonth() && tDate.getFullYear() === d.getFullYear();
@@ -670,7 +670,6 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 </div>
 
-                {/* --- MODIFICATION : CARTE PRÉVISION AVEC SÉLECTEUR INTÉGRÉ --- */}
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <div>
@@ -992,7 +991,7 @@ export default function BudgetManager({ data, updateData }) {
                             </div>
                         </div>
 
-                        {/* NOUVEAU GRAPHIQUE VECTORIEL : Évolution -30j / +30j */}
+                        {/* GRAPHIQUE VECTORIEL : Évolution -30j / +30j */}
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 mb-6">
                             <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                                 <LineChart size={16} className="text-blue-500"/>
@@ -1001,20 +1000,15 @@ export default function BudgetManager({ data, updateData }) {
                             {evolutionChartData.points.length > 0 && (
                                 <div className="w-full relative h-[240px] select-none">
                                     <svg viewBox="0 0 800 200" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                                        {/* Ligne Zéro (si le solde est passé dans le négatif) */}
                                         {evolutionChartData.min < 0 && evolutionChartData.max > 0 && (
                                             <line x1="0" y1={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} x2="800" y2={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" className="opacity-50"/>
                                         )}
-                                        
-                                        {/* Dégradé pour le passé */}
                                         <defs>
                                             <linearGradient id="pastGradient" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2"/>
                                                 <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
                                             </linearGradient>
                                         </defs>
-                                        
-                                        {/* Rendu des lignes vectorielles */}
                                         {(() => {
                                             const range = evolutionChartData.max - evolutionChartData.min;
                                             const getX = (i) => (i / 60) * 800;
@@ -1037,11 +1031,9 @@ export default function BudgetManager({ data, updateData }) {
                                             );
                                         })()}
                                     </svg>
-                                    
                                     <div className="absolute -bottom-4 left-0 text-[10px] text-gray-400 font-medium">-30 Jours</div>
                                     <div className="absolute -bottom-4 right-0 text-[10px] text-gray-400 font-medium">+30 Jours (Prévu)</div>
                                     <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-bold text-blue-500">Aujourd'hui</div>
-                                    
                                     <div className="absolute top-0 left-0 text-[10px] text-gray-400 -translate-y-4">{formatCurrency(evolutionChartData.max)}</div>
                                     <div className="absolute bottom-0 left-0 text-[10px] text-gray-400 translate-y-2">{formatCurrency(evolutionChartData.min)}</div>
                                 </div>
@@ -1160,7 +1152,35 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 )}
 
-                {/* --- FORMULAIRES DE SAISIE --- */}
+                {/* --- PRÉVISIONS (RESTAURÉ EXACTEMENT COMME L'ORIGINAL) --- */}
+                {activeTab === 'forecast' && (
+                    <div className="p-6 bg-teal-50/30 dark:bg-teal-900/10">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><LineChart size={20} className="text-teal-600"/> Projection sur 1 an</h3>
+                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1 border border-teal-200 rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:border-teal-500">
+                                <option value="total">Total (Tous les comptes)</option>
+                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {forecastData.map((data, index) => (
+                                <div key={index} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-teal-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="font-bold text-gray-700 dark:text-gray-200 capitalize">{data.label}</span>
+                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${data.change >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{data.change >= 0 ? '+' : ''}{formatCurrency(data.change)}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-xs text-gray-400 uppercase tracking-wide">Solde fin de mois</span>
+                                        <span className={`text-2xl font-bold ${data.endBalance >= 0 ? 'text-gray-800 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(data.endBalance)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center italic">* Cette projection est basée sur votre solde actuel, vos opérations récurrentes mensuelles et les opérations planifiées uniques.</p>
+                    </div>
+                )}
+
+                {/* --- FORMULAIRES DE SAISIE AVEC CATÉGORIES --- */}
                 {['add-transaction', 'add-scheduled', 'add-recurring'].includes(activeTab) && (
                     <div className="p-6 bg-gray-50 dark:bg-slate-800">
                         <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4">{activeTab === 'add-transaction' && "Transaction immédiate"}{activeTab === 'add-scheduled' && "Planifié"}{activeTab === 'add-recurring' && "Récurrent"}</h3>
