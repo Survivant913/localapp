@@ -464,7 +464,7 @@ export default function App() {
              if (!isDuplicate(s.description, s.amount, s.date)) {
                  const baseId = Date.now() + Math.floor(Math.random() * 1000000);
                  const accId = validAccounts.find(a => a.id === s.account_id) ? s.account_id : s.account_id;
-                 const common = { id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, type: s.type, description: s.description, account_id: accId };
+                 const common = { id: baseId, user_id: userId, amount: s.amount, date: s.date, archived: false, type: s.type, description: s.description, account_id: accId, category: s.category || 'autre' };
                  if (s.type === 'transfer' && s.target_account_id) {
                      const targetAccId = s.target_account_id;
                      const sourceName = validAccounts.find(a => a.id === accId)?.name || 'Source';
@@ -500,7 +500,7 @@ export default function App() {
              if (!isDuplicate(tempR.description, tempR.amount, tempR.next_due_date)) {
                  const baseId = Date.now() + Math.floor(Math.random() * 1000000) + loopSafety * 10;
                  const accId = validAccounts.find(a => a.id === tempR.account_id) ? tempR.account_id : (tempR.account_id || defaultAccountId);
-                 const common = { id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, type: tempR.type, description: tempR.description, account_id: accId };
+                 const common = { id: baseId, user_id: userId, amount: tempR.amount, date: tempR.next_due_date, archived: false, type: tempR.type, description: tempR.description, account_id: accId, category: tempR.category || 'autre' };
                  if (tempR.type === 'transfer' && tempR.target_account_id) {
                      newDBTransactions.push({ ...common, type: 'expense', description: `Virement (Rec.) : ${tempR.description}`, account_id: accId });
                      newDBTransactions.push({ ...common, id: baseId + 1, type: 'income', description: `Virement reçu (Rec.) : ${tempR.description}`, account_id: tempR.target_account_id });
@@ -633,7 +633,8 @@ export default function App() {
          bic: data.profile?.bic, tva_number: data.profile?.tva_number, logo: data.profile?.logo
      });
      await upsertInBatches('accounts', data.budget.accounts.filter(a => a && a.name && a.id).map(a => ({ id: a.id, user_id: user.id, name: a.name })), 50, a => a);
-     await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, date: t.date, account_id: t.accountId || t.account_id, archived: t.archived }));
+     // --- MODIFICATION : AJOUT DU CHAMP 'CATEGORY' LORS DE LA SAUVEGARDE ---
+     await upsertInBatches('transactions', data.budget.transactions, 50, t => ({ id: t.id, user_id: user.id, amount: t.amount, type: t.type, description: t.description, date: t.date, account_id: t.accountId || t.account_id, archived: t.archived, category: t.category || 'autre' }));
      await upsertInBatches('clients', data.clients, 50, c => ({ id: c.id, user_id: user.id, name: c.name, contact_person: c.contact_person, email: c.email, phone: c.phone, address: c.address, status: c.status }));
      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
@@ -642,8 +643,10 @@ export default function App() {
      await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: user.id, name: l.name, color: l.color })); 
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
-     await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId }));
-     await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.target_account_id }));
+     // --- MODIFICATION : AJOUT DU CHAMP 'CATEGORY' LORS DE LA SAUVEGARDE ---
+     await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId, category: r.category || 'autre' }));
+     // --- MODIFICATION : AJOUT DU CHAMP 'CATEGORY' LORS DE LA SAUVEGARDE ---
+     await upsertInBatches('scheduled', data.budget.scheduled, 50, s => ({ id: s.id, user_id: user.id, amount: s.amount, type: s.type, description: s.description, date: s.date, status: s.status, account_id: s.accountId, target_account_id: s.target_account_id, category: s.category || 'autre' }));
      await upsertInBatches('planner_items', data.budget.planner.items, 50, i => ({ id: i.id, user_id: user.id, name: i.name, cost: i.cost, target_account_id: i.targetAccountId }));
      await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite, category: g.category, priority: g.priority, motivation: g.motivation })); 
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
