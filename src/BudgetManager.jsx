@@ -715,7 +715,9 @@ export default function BudgetManager({ data, updateData }) {
                 {activeTab === 'dashboard' && (
                     <div className="p-6">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* COLONNE GAUCHE */}
                             <div className="space-y-6">
+                                {/* RÉCURRENTS */}
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                                         <Repeat size={18} className="text-orange-500"/> Récurrent (Mensuel)
@@ -752,6 +754,7 @@ export default function BudgetManager({ data, updateData }) {
                                     </ul>
                                 </div>
 
+                                {/* PLANIFIÉS */}
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                                         <CalendarClock size={18} className="text-purple-500"/> Planifié (Futur)
@@ -786,6 +789,7 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
+                            {/* COLONNE DROITE : Historique */}
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-fit">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -1042,27 +1046,16 @@ export default function BudgetManager({ data, updateData }) {
                                                     <path d={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                     <path d={futurePath} fill="none" stroke="#64748b" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
                                                     
-                                                    {/* Nœuds (Points) pour chaque jour passé */}
-                                                    {pastPoints.map((pt, i) => (
-                                                        <circle key={i} cx={pt[0]} cy={pt[1]} r="2" fill="#fff" stroke="#3b82f6" strokeWidth="1" className="opacity-50" />
-                                                    ))}
-                                                    {/* Nœuds pour le futur */}
-                                                    {futurePoints.map((pt, i) => (
-                                                        <circle key={`f${i}`} cx={pt[0]} cy={pt[1]} r="2" fill="#fff" stroke="#64748b" strokeWidth="1" className="opacity-30" />
-                                                    ))}
-
+                                                    {/* Points supprimés, on ne garde que le point d'Aujourd'hui */}
                                                     <circle cx={getX(30)} cy={getY(evolutionChartData.points[30].balance)} r="6" fill="#3b82f6" stroke="#fff" strokeWidth="2" className="shadow-lg" />
                                                 </>
                                             );
                                         })()}
                                     </svg>
                                     
-                                    {/* CORRECTION : L'espacement des libellés -30j / +30j */}
-                                    <div className="absolute -bottom-8 left-0 text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">-30 Jours</div>
-                                    <div className="absolute -bottom-8 right-0 text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">+30 Jours (Prévu)</div>
+                                    {/* Textes -30 Jours et +30 Jours supprimés */}
                                     <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs font-black text-blue-600 dark:text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full shadow-sm border border-blue-100 dark:border-blue-800">Aujourd'hui</div>
                                     
-                                    {/* CORRECTION : Le Mode Clair pour les axes */}
                                     <div className="absolute top-0 left-0 text-[10px] text-slate-500 dark:text-gray-400 -translate-y-6 flex items-center gap-2">
                                         <div className="w-4 h-px bg-gray-300 dark:bg-slate-600"></div>
                                         Max: {formatCurrency(evolutionChartData.max)}
@@ -1111,9 +1104,8 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* JAUGE RUNWAY (Corrigée pour le mode clair) */}
+                            {/* JAUGE RUNWAY */}
                             <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-6 rounded-xl shadow-sm dark:shadow-lg border border-gray-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
-                                <div className="absolute -right-6 -top-6 opacity-[0.03] dark:opacity-10 text-slate-900 dark:text-white"><Battery size={120}/></div>
                                 <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
                                 
                                 <div className="w-32 h-32 rounded-full border-8 border-slate-100 dark:border-slate-700 flex items-center justify-center mb-4 relative z-10"
