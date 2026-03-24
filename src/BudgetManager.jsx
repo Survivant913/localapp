@@ -81,7 +81,6 @@ export default function BudgetManager({ data, updateData }) {
         setPlannerBaseInput(val === 0 ? '' : val);
     }, [plannerTargetId, planner.safetyBases]);
 
-    // --- NOUVEAU : CHANGER CATÉGORIE PAR DÉFAUT SELON LE TYPE ---
     useEffect(() => {
         if (type === 'income') setCategory('salaire');
         else if (type === 'expense' && category === 'salaire') setCategory('autre');
@@ -123,10 +122,7 @@ export default function BudgetManager({ data, updateData }) {
     };
 
     // --- AUTOMATISATION (Catch-up Visualisation) ---
-    useEffect(() => {
-        // La logique lourde de rattrapage est gérée par App.jsx.
-        // Ici, on gère juste l'affichage et la synchro visuelle si besoin.
-    }, [scheduledList.length, recurringList.length]);
+    useEffect(() => {}, [scheduledList.length, recurringList.length]);
 
     // --- 3. CALCULS INITIAUX ---
     const getBalanceForAccount = (accId) => {
@@ -153,8 +149,6 @@ export default function BudgetManager({ data, updateData }) {
 
         recurringList.forEach(r => {
             if (r.endDate && parseLocalDate(r.endDate) < today) return;
-            
-            // --- FIX CORRECTION FEVRIER ---
             const effectiveDay = Math.min(r.dayOfMonth, lastDay);
 
             if (effectiveDay > currentDay) {
@@ -316,7 +310,104 @@ export default function BudgetManager({ data, updateData }) {
     }, [budgetData, forecastAccount, endOfMonthForecast]);
 
 
-    // --- NOUVEAU : CALCULS DES STATISTIQUES ---
+    // --- NOUVEAU : CALCULS DU GRAPHIQUE VECTORIEL (Évolution 60 Jours) ---
+    const evolutionChartData = useMemo(() => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        let baseBalance = statsAccountId === 'total' ? currentTotalBalance : getBalanceForAccount(statsAccountId);
+        
+        let minBal = baseBalance;
+        let maxBal = baseBalance;
+
+        // 1. Calculer le PASSÉ (-30 jours en marche arrière)
+        const pastBalances = [];
+        let tempBal = baseBalance;
+        
+        for (let i = 0; i <= 30; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i); 
+            
+            pastBalances.unshift({ date: new Date(d), balance: tempBal, isFuture: false });
+            
+            // On soustrait les transactions de ce jour pour trouver le solde de la veille
+            const dayTx = transactionsList.filter(t => {
+                const tDate = parseLocalDate(t.date);
+                return tDate.getDate() === d.getDate() && tDate.getMonth() === d.getMonth() && tDate.getFullYear() === d.getFullYear();
+            });
+            
+            let dayChange = 0;
+            dayTx.forEach(t => {
+                if (statsAccountId !== 'total' && String(t.accountId || accounts[0].id) !== String(statsAccountId)) return;
+                if (t.type === 'income') dayChange += parseFloat(t.amount || 0);
+                else dayChange -= parseFloat(t.amount || 0);
+            });
+            
+            tempBal -= dayChange; 
+        }
+
+        // 2. Calculer le FUTUR (+30 jours en marche avant)
+        const futureBalances = [];
+        tempBal = baseBalance; 
+        
+        for (let i = 1; i <= 30; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            
+            let dayChange = 0;
+            recurringList.forEach(r => {
+                if (r.endDate && parseLocalDate(r.endDate) < d) return;
+                const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                const effectiveDay = Math.min(r.dayOfMonth, daysInMonth);
+                if (effectiveDay === d.getDate()) {
+                    const amt = parseFloat(r.amount || 0);
+                    if (r.type === 'transfer') {
+                        if (statsAccountId !== 'total') {
+                            if (String(r.accountId) === String(statsAccountId)) dayChange -= amt;
+                            if (String(r.targetAccountId) === String(statsAccountId)) dayChange += amt;
+                        }
+                    } else {
+                        if (statsAccountId === 'total' || String(r.accountId) === String(statsAccountId)) {
+                            dayChange += (r.type === 'income' ? amt : -amt);
+                        }
+                    }
+                }
+            });
+
+            scheduledList.forEach(s => {
+                if (s.status !== 'pending') return;
+                const sDate = parseLocalDate(s.date);
+                if (sDate.getDate() === d.getDate() && sDate.getMonth() === d.getMonth() && sDate.getFullYear() === d.getFullYear()) {
+                    const amt = parseFloat(s.amount || 0);
+                    if (s.type === 'transfer') {
+                        if (statsAccountId !== 'total') {
+                            if (String(s.accountId) === String(statsAccountId)) dayChange -= amt;
+                            if (String(s.targetAccountId) === String(statsAccountId)) dayChange += amt;
+                        }
+                    } else {
+                        if (statsAccountId === 'total' || String(s.accountId) === String(statsAccountId)) {
+                            dayChange += (s.type === 'income' ? amt : -amt);
+                        }
+                    }
+                }
+            });
+
+            tempBal += dayChange;
+            futureBalances.push({ date: new Date(d), balance: tempBal, isFuture: true });
+        }
+
+        const combined = [...pastBalances, ...futureBalances];
+        combined.forEach(pt => {
+            if (pt.balance < minBal) minBal = pt.balance;
+            if (pt.balance > maxBal) maxBal = pt.balance;
+        });
+        
+        const padding = Math.max((maxBal - minBal) * 0.1, 100);
+        return { points: combined, min: minBal - padding, max: maxBal + padding, todayIndex: 30 };
+    }, [transactionsList, recurringList, scheduledList, statsAccountId, currentTotalBalance, accounts]);
+
+
+    // --- CALCULS DES STATISTIQUES (Camembert & Top 5) ---
     const analyticsData = useMemo(() => {
         const today = new Date();
         const pastDate = new Date();
@@ -344,7 +435,6 @@ export default function BudgetManager({ data, updateData }) {
             }
         });
 
-        // Distribution par catégories triées
         const sortedCategories = Object.keys(categoryTotals)
             .map(cat => {
                 const conf = CATEGORIES.find(c => c.id === cat) || CATEGORIES.find(c => c.id === 'autre');
@@ -352,13 +442,11 @@ export default function BudgetManager({ data, updateData }) {
             })
             .sort((a, b) => b.amount - a.amount);
 
-        // Top 5 des dépenses uniques
         const top5 = filteredTransactions
             .filter(t => t.type === 'expense')
             .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
             .slice(0, 5);
 
-        // Calcul du "Runway" (Mois de survie)
         const currentBalance = statsAccountId === 'total' ? currentTotalBalance : getBalanceForAccount(statsAccountId);
         const monthlyBurnRate = statsPeriod > 0 ? (totalOut / statsPeriod) * 30 : 0;
         const runwayMonths = monthlyBurnRate > 0 ? round2(currentBalance / monthlyBurnRate) : 999;
@@ -369,7 +457,6 @@ export default function BudgetManager({ data, updateData }) {
 
     // --- 4. ACTIONS (AVEC SAUVEGARDE IMMÉDIATE) ---
     
-    // Date Helper : Force Midi (12:00:00) pour éviter les décalages UTC
     const getNoonDate = (dateObj = new Date()) => {
         const d = new Date(dateObj);
         d.setHours(12, 0, 0, 0);
@@ -401,7 +488,6 @@ export default function BudgetManager({ data, updateData }) {
         setEditingAccountId(null); 
     };
 
-    // --- MODIFICATION : AJOUT DE LA CATÉGORIE LORS DE L'ENREGISTREMENT ---
     const addTransaction = () => {
         if(!amount || !desc) return;
         let newTransactions = [];
@@ -439,7 +525,7 @@ export default function BudgetManager({ data, updateData }) {
         }
 
         const newSch = { 
-            id: Date.now(), type, amount: parseAmount(amount), description: desc, category, // NOUVEAU
+            id: Date.now(), type, amount: parseAmount(amount), description: desc, category,
             date: scheduleDate, 
             status: 'pending', accountId: selectedAccountId, 
             targetAccountId: type === 'transfer' ? targetAccountId : null,
@@ -481,7 +567,7 @@ export default function BudgetManager({ data, updateData }) {
             id: Date.now(), 
             type, 
             amount: parseAmount(amount), 
-            description: desc, category, // NOUVEAU
+            description: desc, category, 
             dayOfMonth: targetDay, 
             endDate: recurEndDate || null, 
             accountId: selectedAccountId, 
@@ -548,7 +634,7 @@ export default function BudgetManager({ data, updateData }) {
                 type: 'expense', 
                 description: `Achat planifié : ${item.name}`, 
                 accountId: item.targetAccountId || accounts[0].id,
-                category: 'autre' // Achat planifié par défaut dans "Autre"
+                category: 'autre'
             }; 
             
             const newTransactions = [newTransaction, ...transactionsList]; 
@@ -563,7 +649,6 @@ export default function BudgetManager({ data, updateData }) {
     
     const neededToReachBase = Math.max(0, (planner.safetyBases?.[plannerTargetId] || 0) - getBalanceForAccount(plannerTargetId));
     
-    // --- TRI ET AFFICHAGE ---
     const visibleTransactions = transactionsList
         .filter(t => showArchived ? true : !t.archived)
         .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -584,22 +669,29 @@ export default function BudgetManager({ data, updateData }) {
                         {accounts.map(acc => (<div key={acc.id}><p className="text-xs text-blue-200 truncate">{acc.name}</p><p className="font-bold text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</p></div>))}
                     </div>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+
+                {/* --- MODIFICATION : CARTE PRÉVISION AVEC SÉLECTEUR INTÉGRÉ --- */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-                                Prévision (Fin de mois) 
-                                <span className="text-[10px] opacity-70 ml-1">
-                                    {forecastAccount === 'total' ? '(Global)' : accounts.find(a=>a.id === forecastAccount)?.name}
-                                </span>
-                            </p>
+                            <div className="flex items-center gap-2 mb-1">
+                                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Prévision fin de mois</p>
+                                <select 
+                                    value={forecastAccount} 
+                                    onChange={(e) => setForecastAccount(e.target.value)} 
+                                    className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded outline-none border border-transparent focus:border-blue-500 cursor-pointer shadow-sm"
+                                >
+                                    <option value="total">Global</option>
+                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                </select>
+                            </div>
                             <h3 className={`text-2xl font-bold mt-1 ${endOfMonthForecast >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                 {formatCurrency(endOfMonthForecast)}
                             </h3>
                         </div>
-                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg"><TrendingUp size={24}/></div>
+                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg shrink-0"><TrendingUp size={24}/></div>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Projection incluant les opérations à venir ce mois-ci.</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Projection incluant les opérations à venir ce mois-ci.</p>
                 </div>
             </div>
 
@@ -609,10 +701,7 @@ export default function BudgetManager({ data, updateData }) {
                     <button onClick={() => setActiveTab('dashboard')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>Vue d'ensemble</button>
                     <button onClick={() => setActiveTab('accounts')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'accounts' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-b-2 border-orange-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><CreditCard size={16} /> Comptes</button>
                     <button onClick={() => setActiveTab('planner')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'planner' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PiggyBank size={16} /> Planificateur</button>
-                    
-                    {/* --- NOUVEAU : ONGLET ANALYSES --- */}
                     <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'analytics' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-b-2 border-rose-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PieChart size={16} /> Analyses</button>
-                    
                     <button onClick={() => setActiveTab('forecast')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'forecast' ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border-b-2 border-teal-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><LineChart size={16} /> Prévisions</button>
                     <button onClick={() => {setActiveTab('add-transaction'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-transaction' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Transaction</button>
                     <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-scheduled' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Planifié</button>
@@ -637,7 +726,6 @@ export default function BudgetManager({ data, updateData }) {
                                     )}
                                     <ul className="space-y-3">
                                         {recurringList.map(r => {
-                                            // Ajout icon catégorie pour historique
                                             const catDef = CATEGORIES.find(c => c.id === r.category) || CATEGORIES.find(c => c.id === 'autre');
                                             const CatIcon = catDef.icon;
                                             return (
@@ -883,30 +971,85 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 )}
 
-                {/* --- NOUVEAU : ONGLET ANALYSES ET STATISTIQUES --- */}
+                {/* --- ONGLET ANALYSES ET STATISTIQUES --- */}
                 {activeTab === 'analytics' && (
                     <div className="p-6 bg-rose-50/30 dark:bg-rose-900/10">
-                        {/* 1. BARRE DE CONTRÔLE */}
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                             <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-xl">
                                 <PieChart size={24} className="text-rose-600"/> Statistiques Financières
                             </h3>
                             <div className="flex flex-wrap gap-3">
-                                <select value={statsPeriod} onChange={(e) => setStatsPeriod(parseInt(e.target.value))} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm">
+                                <select value={statsPeriod} onChange={(e) => setStatsPeriod(parseInt(e.target.value))} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
                                     <option value={30}>30 derniers jours</option>
                                     <option value={60}>60 derniers jours</option>
                                     <option value={90}>90 derniers jours</option>
                                     <option value={365}>Cette année</option>
                                 </select>
-                                <select value={statsAccountId} onChange={(e) => setStatsAccountId(e.target.value)} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm">
+                                <select value={statsAccountId} onChange={(e) => setStatsAccountId(e.target.value)} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
                                     <option value="total">Total (Tous les comptes)</option>
                                     {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                 </select>
                             </div>
                         </div>
 
+                        {/* NOUVEAU GRAPHIQUE VECTORIEL : Évolution -30j / +30j */}
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 mb-6">
+                            <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <LineChart size={16} className="text-blue-500"/>
+                                Évolution de la trésorerie (60 jours)
+                            </h4>
+                            {evolutionChartData.points.length > 0 && (
+                                <div className="w-full relative h-[240px] select-none">
+                                    <svg viewBox="0 0 800 200" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+                                        {/* Ligne Zéro (si le solde est passé dans le négatif) */}
+                                        {evolutionChartData.min < 0 && evolutionChartData.max > 0 && (
+                                            <line x1="0" y1={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} x2="800" y2={200 - ((0 - evolutionChartData.min) / (evolutionChartData.max - evolutionChartData.min)) * 200} stroke="#ef4444" strokeWidth="1" strokeDasharray="4 4" className="opacity-50"/>
+                                        )}
+                                        
+                                        {/* Dégradé pour le passé */}
+                                        <defs>
+                                            <linearGradient id="pastGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2"/>
+                                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
+                                            </linearGradient>
+                                        </defs>
+                                        
+                                        {/* Rendu des lignes vectorielles */}
+                                        {(() => {
+                                            const range = evolutionChartData.max - evolutionChartData.min;
+                                            const getX = (i) => (i / 60) * 800;
+                                            const getY = (val) => range === 0 ? 100 : 200 - ((val - evolutionChartData.min) / range) * 200;
+                                            
+                                            const pastPoints = evolutionChartData.points.slice(0, 31);
+                                            const futurePoints = evolutionChartData.points.slice(30);
+
+                                            const pastPath = pastPoints.map((p, i) => `${getX(i)},${getY(p.balance)}`).join(' ');
+                                            const futurePath = futurePoints.map((p, i) => `${getX(i + 30)},${getY(p.balance)}`).join(' ');
+                                            const pastFill = `0,200 ${pastPath} ${getX(30)},200`;
+
+                                            return (
+                                                <>
+                                                    <polygon points={pastFill} fill="url(#pastGradient)" />
+                                                    <polyline points={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <polyline points={futurePath} fill="none" stroke="#94a3b8" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <circle cx={getX(30)} cy={getY(pastPoints[30].balance)} r="5" fill="#3b82f6" className="animate-pulse" />
+                                                </>
+                                            );
+                                        })()}
+                                    </svg>
+                                    
+                                    <div className="absolute -bottom-4 left-0 text-[10px] text-gray-400 font-medium">-30 Jours</div>
+                                    <div className="absolute -bottom-4 right-0 text-[10px] text-gray-400 font-medium">+30 Jours (Prévu)</div>
+                                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-bold text-blue-500">Aujourd'hui</div>
+                                    
+                                    <div className="absolute top-0 left-0 text-[10px] text-gray-400 -translate-y-4">{formatCurrency(evolutionChartData.max)}</div>
+                                    <div className="absolute bottom-0 left-0 text-[10px] text-gray-400 translate-y-2">{formatCurrency(evolutionChartData.min)}</div>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* 2. CASHFLOW (ENTRÉES VS SORTIES) */}
+                            {/* CASHFLOW */}
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col justify-center">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Flux de trésorerie</h4>
                                 <div className="space-y-6">
@@ -937,7 +1080,7 @@ export default function BudgetManager({ data, updateData }) {
                                 </div>
                             </div>
 
-                            {/* 3. JAUGE RUNWAY (AUTONOMIE) */}
+                            {/* JAUGE RUNWAY */}
                             <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl shadow-lg border border-slate-700 text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
                                 <div className="absolute -right-6 -top-6 opacity-10"><Battery size={120}/></div>
                                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
@@ -955,7 +1098,7 @@ export default function BudgetManager({ data, updateData }) {
                                 <p className="text-[10px] text-slate-500 mt-4 z-10 uppercase tracking-wide">Basé sur une dépense de {formatCurrency(analyticsData.monthlyBurnRate)} / mois</p>
                             </div>
 
-                            {/* 4. TOP 5 GOUFFRES */}
+                            {/* TOP 5 GOUFFRES */}
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Top 5 Dépenses</h4>
                                 {analyticsData.top5.length === 0 ? (
@@ -982,7 +1125,7 @@ export default function BudgetManager({ data, updateData }) {
                                 )}
                             </div>
 
-                            {/* 5. RÉPARTITION PAR CATÉGORIE */}
+                            {/* RÉPARTITION PAR CATÉGORIE */}
                             <div className="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Répartition des sorties</h4>
                                 {analyticsData.totalOut === 0 ? (
@@ -1017,35 +1160,7 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 )}
 
-                {/* --- PRÉVISIONS --- */}
-                {activeTab === 'forecast' && (
-                    <div className="p-6 bg-teal-50/30 dark:bg-teal-900/10">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><LineChart size={20} className="text-teal-600"/> Projection sur 1 an</h3>
-                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1 border border-teal-200 rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:border-teal-500">
-                                <option value="total">Total (Tous les comptes)</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {forecastData.map((data, index) => (
-                                <div key={index} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-teal-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="font-bold text-gray-700 dark:text-gray-200 capitalize">{data.label}</span>
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${data.change >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{data.change >= 0 ? '+' : ''}{formatCurrency(data.change)}</span>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-xs text-gray-400 uppercase tracking-wide">Solde fin de mois</span>
-                                        <span className={`text-2xl font-bold ${data.endBalance >= 0 ? 'text-gray-800 dark:text-white' : 'text-red-600 dark:text-red-400'}`}>{formatCurrency(data.endBalance)}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center italic">* Cette projection est basée sur votre solde actuel, vos opérations récurrentes mensuelles et les opérations planifiées uniques.</p>
-                    </div>
-                )}
-
-                {/* --- MODIFICATION : FORMULAIRES AVEC CATÉGORIES --- */}
+                {/* --- FORMULAIRES DE SAISIE --- */}
                 {['add-transaction', 'add-scheduled', 'add-recurring'].includes(activeTab) && (
                     <div className="p-6 bg-gray-50 dark:bg-slate-800">
                         <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4">{activeTab === 'add-transaction' && "Transaction immédiate"}{activeTab === 'add-scheduled' && "Planifié"}{activeTab === 'add-recurring' && "Récurrent"}</h3>
@@ -1057,7 +1172,6 @@ export default function BudgetManager({ data, updateData }) {
                             </div>
                             
                             <div className="space-y-4">
-                                {/* SÉLECTEUR DE COMPTES */}
                                 <div>
                                     {type === 'transfer' ? (
                                         <div className="grid grid-cols-2 gap-2">
@@ -1078,11 +1192,10 @@ export default function BudgetManager({ data, updateData }) {
                                     )}
                                 </div>
 
-                                {/* NOUVEAU : SÉLECTEUR DE CATÉGORIE */}
                                 {type !== 'transfer' && (
                                     <div className="space-y-1">
                                         <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Catégorie</label>
-                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">
+                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm cursor-pointer">
                                             {CATEGORIES.filter(c => type === 'income' ? c.id === 'salaire' || c.id === 'autre' : c.id !== 'salaire').map(c => (
                                                 <option key={c.id} value={c.id}>{c.label}</option>
                                             ))}
