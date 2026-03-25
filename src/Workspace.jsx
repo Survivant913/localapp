@@ -7,7 +7,6 @@ import {
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
   Printer, Loader2,
-  // --- NOUVEAUX IMPORTS POUR ANALYSES ---
   PieChart, TrendingUp, TrendingDown, LayoutDashboard
 } from 'lucide-react';
 
@@ -796,54 +795,106 @@ const AnalyticsModule = ({ venture }) => {
     const renderSVG = () => {
         if (!activeChart || pts.length === 0) return <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Ajoutez des données ci-dessous pour générer le graphique.</div>;
         
+        // --- CORRECTION 2 : AGRANDISSEMENT DU GRAPHIQUE ---
         const W = 800;
-        const H = 250;
-        const P = 40;
+        const H = 350; // Plus haut pour respirer
+        const P = 50;  // Plus de marge pour les axes
         
+        // On définit la palette de couleurs ici pour qu'elle serve au Camembert ET à la légende
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
+
         if (activeChart.chart_type === 'pie') {
             if (total === 0) return null;
             let startAngle = 0;
             const cx = W / 2;
             const cy = H / 2;
             const r = Math.min(W, H) / 2 - 20;
-            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
             
             return (
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
-                    {pts.map((p, i) => {
-                        const angle = (p.value / total) * Math.PI * 2;
-                        const endAngle = startAngle + angle;
-                        
-                        const x1 = cx + r * Math.cos(startAngle - Math.PI/2);
-                        const y1 = cy + r * Math.sin(startAngle - Math.PI/2);
-                        const x2 = cx + r * Math.cos(endAngle - Math.PI/2);
-                        const y2 = cy + r * Math.sin(endAngle - Math.PI/2);
-                        
-                        const largeArc = angle > Math.PI ? 1 : 0;
-                        const d = angle >= Math.PI * 2 * 0.999 
-                            ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx} ${cy+r} A ${r} ${r} 0 1 1 ${cx} ${cy-r}`
-                            : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-                        
-                        startAngle += angle;
-                        return <path key={p.id} d={d} fill={colors[i % colors.length]} stroke="#fff" strokeWidth="2" className="dark:stroke-slate-800" />;
-                    })}
-                </svg>
+                <div className="flex items-center w-full h-full gap-8">
+                    {/* Le Camembert */}
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-2/3 h-full overflow-visible">
+                        {pts.map((p, i) => {
+                            const angle = (Math.abs(p.value) / Math.abs(total)) * Math.PI * 2; // Math.abs évite les bugs si valeur négative dans un pie
+                            const endAngle = startAngle + angle;
+                            
+                            const x1 = cx + r * Math.cos(startAngle - Math.PI/2);
+                            const y1 = cy + r * Math.sin(startAngle - Math.PI/2);
+                            const x2 = cx + r * Math.cos(endAngle - Math.PI/2);
+                            const y2 = cy + r * Math.sin(endAngle - Math.PI/2);
+                            
+                            const largeArc = angle > Math.PI ? 1 : 0;
+                            const d = angle >= Math.PI * 2 * 0.999 
+                                ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx} ${cy+r} A ${r} ${r} 0 1 1 ${cx} ${cy-r}`
+                                : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+                            
+                            startAngle += angle;
+                            return <path key={p.id} d={d} fill={colors[i % colors.length]} stroke="#fff" strokeWidth="2" className="dark:stroke-slate-800" />;
+                        })}
+                    </svg>
+
+                    {/* --- CORRECTION 3 : LÉGENDE DU CAMEMBERT --- */}
+                    <div className="w-1/3 max-h-full overflow-y-auto pr-4 custom-scrollbar flex flex-col gap-2 justify-center">
+                        {pts.map((p, i) => (
+                            <div key={p.id} className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded" style={{ backgroundColor: colors[i % colors.length] }}></div>
+                                <span className="text-sm text-slate-700 dark:text-slate-300 truncate flex-1">{p.label}</span>
+                                <span className="text-xs font-bold text-slate-500">{((Math.abs(p.value) / Math.abs(total)) * 100).toFixed(1)}%</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             );
         }
 
         const target = activeChart.target_value || 0;
-        const graphMax = Math.max(...pts.map(p => p.value), target, 1) * 1.1;
+        
+        // --- CORRECTION 1 : GESTION DES VALEURS NÉGATIVES ---
+        const dataMin = Math.min(...pts.map(p => p.value), target, 0); 
+        const dataMax = Math.max(...pts.map(p => p.value), target, 1);
+        
+        // On rajoute 10% de marge en haut et en bas
+        const graphMin = dataMin < 0 ? dataMin * 1.1 : 0;
+        const graphMax = dataMax > 0 ? dataMax * 1.1 : 0;
+        const range = graphMax - graphMin || 1;
+
         const getX = (i) => P + (i * (W - 2 * P) / Math.max(1, pts.length - 1));
         const getBarX = (i) => P + (i * (W - 2 * P) / pts.length);
-        const getY = (val) => (H - P) - (val / graphMax) * (H - 2 * P);
+        const getY = (val) => (H - P) - ((val - graphMin) / range) * (H - 2 * P);
+        
+        const yZero = getY(0);
+
+        // --- GÉNÉRATION DES LIGNES DE GRILLE (Axe Y) ---
+        const gridLines = [];
+        const step = range / 4; 
+        for (let i = 0; i <= 4; i++) {
+            const val = graphMin + (step * i);
+            gridLines.push({ val: val, y: getY(val) });
+        }
 
         return (
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
-                <line x1={P} y1={H-P} x2={W-P} y2={H-P} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
-                <line x1={P} y1={P} x2={P} y2={H-P} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
+                {/* Lignes de quadrillage horizontales */}
+                {gridLines.map((line, i) => (
+                    <g key={i}>
+                        <line x1={P} y1={line.y} x2={W-P} y2={line.y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" className="dark:stroke-slate-700 opacity-50" />
+                        <text x={P - 10} y={line.y + 4} textAnchor="end" className="text-[10px] fill-slate-400 font-medium">
+                            {line.val.toFixed(0)}
+                        </text>
+                    </g>
+                ))}
+
+                {/* Axe central (Zéro) s'il y a du négatif */}
+                {graphMin < 0 && (
+                    <line x1={P} y1={yZero} x2={W-P} y2={yZero} stroke="#94a3b8" strokeWidth="1.5" className="dark:stroke-slate-500 opacity-50" />
+                )}
                 
-                {target > 0 && (
-                    <line x1={P} y1={getY(target)} x2={W-P} y2={getY(target)} stroke="#f59e0b" strokeWidth="1" strokeDasharray="4 4" />
+                {/* Axe X et Y principaux */}
+                <line x1={P} y1={H-P} x2={W-P} y2={H-P} stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-600" />
+                <line x1={P} y1={P} x2={P} y2={H-P} stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-600" />
+                
+                {target !== 0 && (
+                    <line x1={P} y1={getY(target)} x2={W-P} y2={getY(target)} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 6" />
                 )}
 
                 {activeChart.chart_type === 'bar' ? (
@@ -851,10 +902,15 @@ const AnalyticsModule = ({ venture }) => {
                         const barW = Math.max((W - 2*P) / pts.length - 10, 10);
                         const x = getBarX(i) + ((W - 2*P) / pts.length - barW) / 2;
                         const y = getY(p.value);
+                        // Hauteur de la barre : du Y du point jusqu'à l'axe Zéro
+                        const barHeight = Math.abs(yZero - y);
+                        // Si valeur négative, la barre part de 0 et descend
+                        const startY = p.value >= 0 ? y : yZero;
+                        
                         return (
                             <g key={p.id}>
-                                <rect x={x} y={y} width={barW} height={(H-P)-y} fill="#3b82f6" rx="4" />
-                                <text x={x + barW/2} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400">{p.label}</text>
+                                <rect x={x} y={startY} width={barW} height={barHeight} fill={p.value >= 0 ? "#3b82f6" : "#ef4444"} rx="2" />
+                                <text x={x + barW/2} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400 font-bold">{p.label}</text>
                             </g>
                         );
                     })
@@ -864,7 +920,7 @@ const AnalyticsModule = ({ venture }) => {
                         {pts.map((p, i) => (
                             <g key={p.id}>
                                 <circle cx={getX(i)} cy={getY(p.value)} r="4" fill="#fff" stroke="#3b82f6" strokeWidth="2" className="dark:fill-slate-800" />
-                                <text x={getX(i)} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400">{p.label}</text>
+                                <text x={getX(i)} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400 font-bold">{p.label}</text>
                             </g>
                         ))}
                         
@@ -913,7 +969,7 @@ const AnalyticsModule = ({ venture }) => {
             {/* CONTENU PRINCIPAL */}
             <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
                 {activeChart ? (
-                    <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
+                    <div className="p-6 max-w-6xl mx-auto w-full space-y-6">
                         
                         {/* HEADER DE CONFIGURATION DU GRAPHIQUE */}
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
@@ -963,7 +1019,7 @@ const AnalyticsModule = ({ venture }) => {
 
                         {/* RENDU DU GRAPHIQUE */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="h-72 w-full flex items-center justify-center">
+                            <div className="h-96 w-full flex items-center justify-center">
                                 {renderSVG()}
                             </div>
                         </div>
