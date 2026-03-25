@@ -1045,9 +1045,6 @@ export default function BudgetManager({ data, updateData }) {
                                                     <path d={pastFill} fill="url(#pastGradient)" />
                                                     <path d={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                                                     <path d={futurePath} fill="none" stroke="#64748b" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
-                                                    
-                                                    {/* Point central (Aujourd'hui) uniquement */}
-                                                    <circle cx={getX(30)} cy={getY(evolutionChartData.points[30].balance)} r="6" fill="#3b82f6" stroke="#fff" strokeWidth="2" className="shadow-lg" />
                                                 </>
                                             );
                                         })()}
