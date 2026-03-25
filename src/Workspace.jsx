@@ -6,7 +6,9 @@ import {
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
-  Printer, Loader2
+  Printer, Loader2,
+  // --- NOUVEAUX IMPORTS POUR ANALYSES ---
+  PieChart, TrendingUp, TrendingDown, LayoutDashboard
 } from 'lucide-react';
 
 // --- MODULES ---
@@ -16,6 +18,7 @@ const MODULES = [
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
     { id: 'finance', label: 'Finance', icon: DollarSign },
     { id: 'competitors', label: 'Concurrence', icon: Swords },
+    { id: 'analytics', label: 'Analyses', icon: LayoutDashboard }, // --- NOUVEAU MODULE ---
 ];
 
 // --- COULEURS ---
@@ -712,6 +715,298 @@ const CompetitorModule = ({ venture }) => {
 };
 
 // ==========================================
+// 6. MODULE ANALYSES (NOUVEAU)
+// ==========================================
+const AnalyticsModule = ({ venture }) => {
+    const [charts, setCharts] = useState([]);
+    const [activeChartId, setActiveChartId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [saveTimer, setSaveTimer] = useState(null);
+    
+    // Champs de saisie
+    const [newLabel, setNewLabel] = useState('');
+    const [newVal, setNewVal] = useState('');
+
+    useEffect(() => {
+        if (!venture) return;
+        const fetchCharts = async () => {
+            const { data } = await supabase.from('venture_analytics').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
+            if (data) {
+                setCharts(data);
+                if (data.length > 0) setActiveChartId(data[0].id);
+            }
+            setLoading(false);
+        };
+        fetchCharts();
+    }, [venture]);
+
+    const updateChart = (id, field, value) => {
+        const updated = charts.map(c => c.id === id ? { ...c, [field]: value } : c);
+        setCharts(updated);
+        
+        if (saveTimer) clearTimeout(saveTimer);
+        setSaveTimer(setTimeout(async () => {
+            await supabase.from('venture_analytics').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
+        }, 1000));
+    };
+
+    const addChart = async () => {
+        const newChart = { venture_id: venture.id, title: 'Nouvelle Analyse', chart_type: 'line', data_points: [], show_trend: true };
+        const { data } = await supabase.from('venture_analytics').insert([newChart]).select();
+        if (data && data.length > 0) {
+            setCharts([...charts, data[0]]);
+            setActiveChartId(data[0].id);
+        }
+    };
+
+    const deleteChart = async (id, e) => {
+        e.stopPropagation();
+        if (!window.confirm("Supprimer ce graphique et toutes ses données ?")) return;
+        await supabase.from('venture_analytics').delete().eq('id', id);
+        const remaining = charts.filter(c => c.id !== id);
+        setCharts(remaining);
+        if (activeChartId === id) setActiveChartId(remaining[0]?.id || null);
+    };
+
+    const activeChart = charts.find(c => c.id === activeChartId);
+
+    const addDataPoint = () => {
+        if (!newLabel.trim() || !newVal) return;
+        const v = parseFloat(newVal);
+        if (isNaN(v)) return;
+        
+        const pts = [...(activeChart.data_points || []), { id: Date.now(), label: newLabel, value: v }];
+        updateChart(activeChart.id, 'data_points', pts);
+        setNewLabel('');
+        setNewVal('');
+    };
+
+    const removeDataPoint = (ptId) => {
+        const pts = (activeChart.data_points || []).filter(p => p.id !== ptId);
+        updateChart(activeChart.id, 'data_points', pts);
+    };
+
+    // Calculs KPI
+    const pts = activeChart?.data_points || [];
+    const total = pts.reduce((sum, p) => sum + p.value, 0);
+    const avg = pts.length > 0 ? total / pts.length : 0;
+    const max = pts.length > 0 ? Math.max(...pts.map(p => p.value)) : 0;
+    const trend = pts.length > 1 ? pts[pts.length - 1].value - pts[pts.length - 2].value : 0;
+
+    const renderSVG = () => {
+        if (!activeChart || pts.length === 0) return <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Ajoutez des données ci-dessous pour générer le graphique.</div>;
+        
+        const W = 800;
+        const H = 250;
+        const P = 40;
+        
+        if (activeChart.chart_type === 'pie') {
+            if (total === 0) return null;
+            let startAngle = 0;
+            const cx = W / 2;
+            const cy = H / 2;
+            const r = Math.min(W, H) / 2 - 20;
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
+            
+            return (
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
+                    {pts.map((p, i) => {
+                        const angle = (p.value / total) * Math.PI * 2;
+                        const endAngle = startAngle + angle;
+                        
+                        const x1 = cx + r * Math.cos(startAngle - Math.PI/2);
+                        const y1 = cy + r * Math.sin(startAngle - Math.PI/2);
+                        const x2 = cx + r * Math.cos(endAngle - Math.PI/2);
+                        const y2 = cy + r * Math.sin(endAngle - Math.PI/2);
+                        
+                        const largeArc = angle > Math.PI ? 1 : 0;
+                        const d = angle >= Math.PI * 2 * 0.999 
+                            ? `M ${cx} ${cy-r} A ${r} ${r} 0 1 1 ${cx} ${cy+r} A ${r} ${r} 0 1 1 ${cx} ${cy-r}`
+                            : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+                        
+                        startAngle += angle;
+                        return <path key={p.id} d={d} fill={colors[i % colors.length]} stroke="#fff" strokeWidth="2" className="dark:stroke-slate-800" />;
+                    })}
+                </svg>
+            );
+        }
+
+        const target = activeChart.target_value || 0;
+        const graphMax = Math.max(...pts.map(p => p.value), target, 1) * 1.1;
+        const getX = (i) => P + (i * (W - 2 * P) / Math.max(1, pts.length - 1));
+        const getBarX = (i) => P + (i * (W - 2 * P) / pts.length);
+        const getY = (val) => (H - P) - (val / graphMax) * (H - 2 * P);
+
+        return (
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
+                <line x1={P} y1={H-P} x2={W-P} y2={H-P} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
+                <line x1={P} y1={P} x2={P} y2={H-P} stroke="#e2e8f0" strokeWidth="1" className="dark:stroke-slate-700" />
+                
+                {target > 0 && (
+                    <line x1={P} y1={getY(target)} x2={W-P} y2={getY(target)} stroke="#f59e0b" strokeWidth="1" strokeDasharray="4 4" />
+                )}
+
+                {activeChart.chart_type === 'bar' ? (
+                    pts.map((p, i) => {
+                        const barW = Math.max((W - 2*P) / pts.length - 10, 10);
+                        const x = getBarX(i) + ((W - 2*P) / pts.length - barW) / 2;
+                        const y = getY(p.value);
+                        return (
+                            <g key={p.id}>
+                                <rect x={x} y={y} width={barW} height={(H-P)-y} fill="#3b82f6" rx="4" />
+                                <text x={x + barW/2} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400">{p.label}</text>
+                            </g>
+                        );
+                    })
+                ) : (
+                    <>
+                        <polyline points={pts.map((p, i) => `${getX(i)},${getY(p.value)}`).join(' ')} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        {pts.map((p, i) => (
+                            <g key={p.id}>
+                                <circle cx={getX(i)} cy={getY(p.value)} r="4" fill="#fff" stroke="#3b82f6" strokeWidth="2" className="dark:fill-slate-800" />
+                                <text x={getX(i)} y={H-P+15} textAnchor="middle" className="text-[10px] fill-slate-400">{p.label}</text>
+                            </g>
+                        ))}
+                        
+                        {activeChart.show_trend && pts.length > 1 && (() => {
+                            const n = pts.length;
+                            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+                            pts.forEach((p, i) => { sumX += i; sumY += p.value; sumXY += i * p.value; sumXX += i * i; });
+                            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+                            const intercept = (sumY - slope * sumX) / n;
+                            const y1 = intercept;
+                            const y2 = slope * (n - 1) + intercept;
+                            return (
+                                <line x1={getX(0)} y1={getY(y1)} x2={getX(n-1)} y2={getY(y2)} stroke="#ec4899" strokeWidth="2" strokeDasharray="4 4" className="opacity-50" />
+                            );
+                        })()}
+                    </>
+                )}
+            </svg>
+        );
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="flex h-full w-full bg-white dark:bg-slate-900">
+            {/* PANNEAU LATÉRAL GAUCHE : LISTE DES GRAPHIQUES */}
+            <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Graphiques</span>
+                    <button onClick={addChart} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {charts.map(c => (
+                        <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
+                            <div className="flex items-center gap-2 truncate">
+                                {c.chart_type === 'pie' ? <PieChart size={14}/> : c.chart_type === 'bar' ? <BarChart2 size={14}/> : <TrendingUp size={14}/>}
+                                <span className="truncate">{c.title}</span>
+                            </div>
+                            <button onClick={(e) => deleteChart(c.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button>
+                        </div>
+                    ))}
+                    {charts.length === 0 && <p className="text-xs text-slate-400 text-center py-4">Aucune analyse.</p>}
+                </div>
+            </div>
+
+            {/* CONTENU PRINCIPAL */}
+            <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
+                {activeChart ? (
+                    <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
+                        
+                        {/* HEADER DE CONFIGURATION DU GRAPHIQUE */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                            <input type="text" value={activeChart.title} onChange={e => updateChart(activeChart.id, 'title', e.target.value)} className="text-xl font-bold bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 min-w-[200px]"/>
+                            
+                            <div className="flex flex-wrap items-center gap-4">
+                                <select value={activeChart.chart_type} onChange={e => updateChart(activeChart.id, 'chart_type', e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 cursor-pointer">
+                                    <option value="line">Courbe (Ligne)</option>
+                                    <option value="bar">Barres (Histogramme)</option>
+                                    <option value="pie">Camembert (Circulaire)</option>
+                                </select>
+                                
+                                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                                    <Target size={14} className="text-slate-400"/>
+                                    <input type="number" placeholder="Objectif (Ligne cible)" value={activeChart.target_value || ''} onChange={e => updateChart(activeChart.id, 'target_value', parseFloat(e.target.value) || null)} className="bg-transparent w-32 text-sm font-medium outline-none text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500"/>
+                                </div>
+                                
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 cursor-pointer hover:text-indigo-600 transition-colors">
+                                    <input type="checkbox" checked={activeChart.show_trend} onChange={e => updateChart(activeChart.id, 'show_trend', e.target.checked)} className="w-4 h-4 accent-indigo-600 cursor-pointer"/>
+                                    Afficher Tendance
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* KPIS */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cumulé</span>
+                                <span className="text-2xl font-black text-slate-800 dark:text-white">{total.toLocaleString('fr-FR')}</span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Moyenne</span>
+                                <span className="text-2xl font-black text-slate-800 dark:text-white">{avg.toLocaleString('fr-FR', {maximumFractionDigits: 1})}</span>
+                            </div>
+                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pic Maximum</span>
+                                <span className="text-2xl font-black text-slate-800 dark:text-white">{max.toLocaleString('fr-FR')}</span>
+                            </div>
+                            <div className={`p-4 rounded-2xl border shadow-sm flex flex-col ${trend >= 0 ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-800' : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'}`}>
+                                <span className={`text-xs font-bold uppercase tracking-wider mb-1 ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>Dernière Tendance</span>
+                                <span className={`text-2xl font-black flex items-center gap-2 ${trend >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {trend >= 0 ? <TrendingUp size={20}/> : <TrendingDown size={20}/>}
+                                    {trend > 0 ? '+' : ''}{trend.toLocaleString('fr-FR')}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* RENDU DU GRAPHIQUE */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="h-72 w-full flex items-center justify-center">
+                                {renderSVG()}
+                            </div>
+                        </div>
+
+                        {/* LISTE DES DONNÉES / SAISIE */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="font-bold text-slate-700 dark:text-white mb-4">Valeurs du graphique</h3>
+                            
+                            <div className="flex gap-2 mb-6">
+                                <input type="text" placeholder="Libellé (ex: Janvier, Produit A...)" value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 text-slate-700 dark:text-white"/>
+                                <input type="number" placeholder="Valeur" value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="w-32 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 text-slate-700 dark:text-white"/>
+                                <button onClick={addDataPoint} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-bold flex items-center gap-2"><Plus size={18}/> Ajouter</button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                {pts.map((p, i) => (
+                                    <div key={p.id} className="flex justify-between items-center px-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-slate-400 font-black text-xs opacity-50">{i+1}</span>
+                                            <span className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate max-w-[100px]">{p.label}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-black text-indigo-600 dark:text-indigo-400">{p.value.toLocaleString('fr-FR')}</span>
+                                            <button onClick={() => removeDataPoint(p.id)} className="text-slate-400 hover:text-red-500 transition-colors bg-white dark:bg-slate-900 p-1.5 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"><Trash2 size={14}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 h-full">
+                        <LayoutDashboard size={64} className="mb-4 opacity-50"/>
+                        <p className="text-lg font-medium">Sélectionnez ou créez un graphique d'analyse</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
 // WORKSPACE MAIN
 // ==========================================
 export default function Workspace() {
@@ -1000,7 +1295,7 @@ export default function Workspace() {
                     Imprimer le Dossier
                 </button>
             </header>
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} />}</main></div>
         </div>
     );
 }
