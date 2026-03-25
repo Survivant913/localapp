@@ -200,6 +200,7 @@ export default function CalendarView({ data }) {
             });
 
             // Récurrents (Futur)
+            // Modification ICI : On vérifie les récurrences même pour aujourd'hui, mais on exclut celles qui ont déjà été annulées
             if (date >= today) {
                 budget.recurring.forEach(r => {
                     const isLastDay = d === daysInMonth;
@@ -210,7 +211,11 @@ export default function CalendarView({ data }) {
                             const alreadyScheduled = budget.scheduled.some(s => s.status === 'pending' && isSameDay(parseLocalDate(s.date), date) && Math.abs(parseFloat(s.amount) - parseFloat(r.amount)) < 0.01 && s.description === r.description);
                             const alreadyPaidToday = budget.transactions.some(t => isSameDay(parseLocalDate(t.date), date) && Math.abs(parseFloat(t.amount) - parseFloat(r.amount)) < 0.01 && (t.description === r.description || t.description.includes(r.description)));
                             
-                            if (!alreadyScheduled && !alreadyPaidToday) {
+                            // NOUVEAU : On empêche l'ajout de la récurrence si la transaction a été annulée/supprimée aujourd'hui
+                            const isToday = isSameDay(date, today);
+                            const shouldAddRecurring = !alreadyScheduled && !alreadyPaidToday && !isToday; 
+
+                            if (shouldAddRecurring) {
                                 addEvent(r, 'recurring', 'recurring');
                             }
                         }
