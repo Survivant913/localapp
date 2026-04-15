@@ -7,17 +7,17 @@ import {
 } from 'lucide-react';
 
 const CATEGORIES = [
-    { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30' },
-    { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30' },
-    { id: 'abos', label: 'Abonnements & Logiciels', icon: Repeat, color: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30' },
-    { id: 'transports', label: 'Transports & Essence', icon: Navigation, color: 'text-teal-500 bg-teal-100 dark:bg-teal-900/30' },
-    { id: 'sante', label: 'Santé & Mutuelle', icon: Heart, color: 'text-red-500 bg-red-100 dark:bg-red-900/30' },
-    { id: 'loisirs', label: 'Loisirs & Restaurants', icon: Coffee, color: 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30' },
-    { id: 'matos', label: 'Matériel Pro', icon: Laptop, color: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/30' },
-    { id: 'urssaf', label: 'URSSAF & Impôts', icon: Building, color: 'text-gray-500 bg-gray-100 dark:bg-slate-800' },
-    { id: 'frais_bancaires', label: 'Frais bancaires', icon: CreditCard, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800' },
-    { id: 'autre', label: 'Autre Dépense', icon: MoreHorizontal, color: 'text-slate-400 bg-slate-100 dark:bg-slate-800' },
-    { id: 'salaire', label: 'Revenu / Chiffre d\'Affaires', icon: Wallet, color: 'text-green-500 bg-green-100 dark:bg-green-900/30' }
+    { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30', hex: '#f97316' },
+    { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30', hex: '#3b82f6' },
+    { id: 'abos', label: 'Abonnements & Logiciels', icon: Repeat, color: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30', hex: '#a855f7' },
+    { id: 'transports', label: 'Transports & Essence', icon: Navigation, color: 'text-teal-500 bg-teal-100 dark:bg-teal-900/30', hex: '#14b8a6' },
+    { id: 'sante', label: 'Santé & Mutuelle', icon: Heart, color: 'text-red-500 bg-red-100 dark:bg-red-900/30', hex: '#ef4444' },
+    { id: 'loisirs', label: 'Loisirs & Restaurants', icon: Coffee, color: 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30', hex: '#eab308' },
+    { id: 'matos', label: 'Matériel Pro', icon: Laptop, color: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/30', hex: '#6366f1' },
+    { id: 'urssaf', label: 'URSSAF & Impôts', icon: Building, color: 'text-gray-500 bg-gray-100 dark:bg-slate-800', hex: '#6b7280' },
+    { id: 'frais_bancaires', label: 'Frais bancaires', icon: CreditCard, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800', hex: '#64748b' },
+    { id: 'autre', label: 'Autre Dépense', icon: MoreHorizontal, color: 'text-slate-400 bg-slate-100 dark:bg-slate-800', hex: '#94a3b8' },
+    { id: 'salaire', label: 'Revenu / Chiffre d\'Affaires', icon: Wallet, color: 'text-green-500 bg-green-100 dark:bg-green-900/30', hex: '#22c55e' }
 ];
 
 export default function BudgetManager({ data, updateData }) {
@@ -1165,7 +1165,7 @@ export default function BudgetManager({ data, updateData }) {
                                                         </div>
                                                     </div>
                                                     <div className="w-full h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                        <div className={`h-full rounded-full ${cat.color.split(' ')[0].replace('text-', 'bg-')}`} style={{ width: `${pct}%` }}></div>
+                                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.hex }}></div>
                                                     </div>
                                                 </div>
                                             );
