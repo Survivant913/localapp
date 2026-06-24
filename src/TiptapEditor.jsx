@@ -63,22 +63,6 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
         };
     }, [provider, initialTitle]);
 
-    useEffect(() => {
-        if (!editor || !initialContent) return;
-        
-        // Wait to see if we receive state from other users via broadcast
-        const timer = setTimeout(() => {
-            const fragment = ydoc.getXmlFragment('default');
-            // If the document is still completely empty (no nodes at all), it means
-            // we are the first user to open it, so we load the DB content.
-            if (fragment.firstChild === null) {
-                editor.commands.setContent(initialContent, false);
-            }
-        }, 600);
-        
-        return () => clearTimeout(timer);
-    }, [editor, initialContent, ydoc]);
-
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -100,6 +84,22 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
             onUpdate(titleRef.current?.value || 'Sans titre', html);
         },
     }, [pageId]);
+
+    useEffect(() => {
+        if (!editor || !initialContent) return;
+        
+        // Wait to see if we receive state from other users via broadcast
+        const timer = setTimeout(() => {
+            const fragment = ydoc.getXmlFragment('default');
+            // If the document is still completely empty (no nodes at all), it means
+            // we are the first user to open it, so we load the DB content.
+            if (fragment.firstChild === null) {
+                editor.commands.setContent(initialContent, false);
+            }
+        }, 600);
+        
+        return () => clearTimeout(timer);
+    }, [editor, initialContent, ydoc]);
 
     const ToolbarButton = ({ onClick, isActive, icon: Icon, title }) => (
         <button 
