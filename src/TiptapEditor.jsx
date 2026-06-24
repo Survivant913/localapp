@@ -31,7 +31,7 @@ export default function TiptapEditor({ pageId, initialTitle, initialContent, onU
             channel: `journal-${pageId}`,
             id: pageId,
             tableName: 'journal_pages',
-            columnName: 'content'
+            columnName: 'yjs_state'
         });
 
         provider.current.on('status', ({ status: providerStatus }) => {
