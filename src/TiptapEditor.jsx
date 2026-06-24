@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
-import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import * as Y from 'yjs';
 import { SupabaseBroadcastProvider } from './SupabaseBroadcastProvider';
 import { supabase } from './supabaseClient';
@@ -14,34 +14,31 @@ import {
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D'];
 
 export default function TiptapEditor(props) {
-    const [ydoc, setYdoc] = useState(null);
-    const [provider, setProvider] = useState(null);
+    const ydocRef = useRef(null);
+    const providerRef = useRef(null);
+
+    // Initialize synchronously to avoid null or flicker
+    if (!ydocRef.current) {
+        ydocRef.current = new Y.Doc();
+        providerRef.current = new SupabaseBroadcastProvider(ydocRef.current, supabase, `journal-${props.pageId}`);
+    }
 
     useEffect(() => {
-        if (!props.pageId) return;
-
-        const doc = new Y.Doc();
-        const prov = new SupabaseBroadcastProvider(doc, supabase, `journal-${props.pageId}`);
-        
-        setYdoc(doc);
-        setProvider(prov);
-
         return () => {
-            prov.destroy();
-            doc.destroy();
+            if (providerRef.current) providerRef.current.destroy();
+            if (ydocRef.current) ydocRef.current.destroy();
+            // CRITICAL: clear refs so they are re-created on Strict Mode remount
+            ydocRef.current = null;
+            providerRef.current = null;
         };
     }, [props.pageId]);
 
-    if (!ydoc || !provider) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
-                <p>Connexion au document...</p>
-            </div>
-        );
+    // Safety check just in case
+    if (!ydocRef.current || !providerRef.current) {
+        return null;
     }
 
-    return <TiptapEditorCore {...props} ydoc={ydoc} provider={provider} />;
+    return <TiptapEditorCore {...props} ydoc={ydocRef.current} provider={providerRef.current} />;
 }
 
 function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, currentUserEmail, isZenMode, onToggleZenMode, onPrint, header, ydoc, provider }) {
@@ -74,7 +71,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
             Collaboration.configure({
                 document: ydoc,
             }),
-            CollaborationCursor.configure({
+            CollaborationCaret.configure({
                 provider: provider,
                 user: {
                     name: currentUserEmail?.split('@')[0] || 'Anonyme',
