@@ -66,3 +66,41 @@ body {
 .collaboration-carets__caret:hover .collaboration-carets__label {
   opacity: 1;
 }
+
+/* Print Styles */
+@media print {
+  body, html {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Masquer tous les éléments d'interface inutiles à l'impression */
+  button, nav, aside, .sticky, .border-r, header {
+    display: none !important;
+  }
+  
+  /* Retirer les ombres, bordures et forcer l'expansion du conteneur principal */
+  .shadow-xl, .border, .glass-panel, .bg-slate-100, .dark\\:bg-slate-800 {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+  }
+  
+  /* L'éditeur doit prendre tout l'espace disponible */
+  .prose {
+    max-width: 100% !important;
+  }
+  
+  /* Gérer le débordement pour permettre l'impression sur plusieurs pages */
+  .flex-1, .overflow-y-auto, .h-full, .h-screen {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Cacher les curseurs collaborateurs à l'impression */
+  .collaboration-carets__caret, .collaboration-carets__label {
+    display: none !important;
+  }
+}

@@ -3,12 +3,13 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
+import Highlight from '@tiptap/extension-highlight';
 import * as Y from 'yjs';
 import { SupabaseBroadcastProvider } from './SupabaseBroadcastProvider';
 import { supabase } from './supabaseClient';
 import { 
     Bold, Italic, Strikethrough, List, CheckSquare, 
-    Heading, Pilcrow, Quote, Maximize2, Minimize2, Printer
+    Heading, Pilcrow, Quote, Maximize2, Minimize2, Printer, Highlighter
 } from 'lucide-react';
 
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D'];
@@ -68,6 +69,9 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
             StarterKit.configure({
                 history: false,
             }),
+            Highlight.configure({
+                multicolor: true,
+            }),
             Collaboration.configure({
                 document: ydoc,
             }),
@@ -124,6 +128,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
                     <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} icon={Bold} title="Gras" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} icon={Italic} title="Italique" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} icon={Strikethrough} title="Barré" />
+                    <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')} icon={Highlighter} title="Surligner" />
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')} icon={List} title="Liste à puces" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} icon={CheckSquare} title="Liste numérotée" />
