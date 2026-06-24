@@ -22,14 +22,14 @@ export class SupabaseBroadcastProvider {
     this.channel
       .on('broadcast', { event: 'update' }, ({ payload }) => {
         try {
-            Y.applyUpdate(this.doc, Uint8Array.from(payload), this);
+            Y.applyUpdate(this.doc, Uint8Array.from(payload.data), this);
         } catch(e) {
             console.error(e);
         }
       })
       .on('broadcast', { event: 'awareness' }, ({ payload }) => {
         try {
-            awarenessProtocol.applyAwarenessUpdate(this.awareness, Uint8Array.from(payload), this);
+            awarenessProtocol.applyAwarenessUpdate(this.awareness, Uint8Array.from(payload.data), this);
         } catch(e) {
             console.error(e);
         }
@@ -43,7 +43,7 @@ export class SupabaseBroadcastProvider {
           this.channel.send({
             type: 'broadcast',
             event: 'update',
-            payload: Array.from(state),
+            payload: { data: Array.from(state) },
           });
         } else {
           this.emit('status', [{ status: 'connecting' }]);
@@ -68,7 +68,7 @@ export class SupabaseBroadcastProvider {
       this.channel.send({
         type: 'broadcast',
         event: 'update',
-        payload: Array.from(update),
+        payload: { data: Array.from(update) },
       }).catch(console.error);
     }
   }
@@ -80,7 +80,7 @@ export class SupabaseBroadcastProvider {
       this.channel.send({
         type: 'broadcast',
         event: 'awareness',
-        payload: Array.from(update),
+        payload: { data: Array.from(update) },
       }).catch(console.error);
     }
   }
