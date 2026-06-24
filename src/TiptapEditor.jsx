@@ -17,30 +17,35 @@ export default function TiptapEditor({ pageId, initialTitle, initialContent, onU
     const [status, setStatus] = useState('connecting');
     const titleRef = useRef(null);
 
-    const ydoc = useRef(new Y.Doc());
+    const ydoc = useRef(null);
+    if (!ydoc.current) {
+        ydoc.current = new Y.Doc();
+    }
+
     const provider = useRef(null);
+    if (!provider.current) {
+        provider.current = new SupabaseBroadcastProvider(ydoc.current, supabase, `journal-${pageId}`);
+        provider.current.on('status', (args) => {
+            if (Array.isArray(args)) {
+                setStatus(args[0]?.status || 'connecting');
+            } else if (args && args.status) {
+                setStatus(args.status);
+            }
+        });
+    }
 
     useEffect(() => {
-        if (!pageId) return;
-
-        ydoc.current = new Y.Doc();
-
         if (titleRef.current) titleRef.current.value = initialTitle || 'Sans titre';
-
-        // Initialize the custom robust realtime provider
-        provider.current = new SupabaseBroadcastProvider(ydoc.current, supabase, `journal-${pageId}`);
-
-        provider.current.on('status', ({ status: providerStatus }) => {
-            setStatus(providerStatus);
-        });
 
         return () => {
             if (provider.current) {
                 provider.current.destroy();
             }
-            ydoc.current.destroy();
+            if (ydoc.current) {
+                ydoc.current.destroy();
+            }
         };
-    }, [pageId]);
+    }, []);
 
     const editor = useEditor({
         extensions: [
