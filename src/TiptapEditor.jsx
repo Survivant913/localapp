@@ -13,39 +13,58 @@ import {
 
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D'];
 
-export default function TiptapEditor({ pageId, initialTitle, initialContent, onUpdate, currentUserEmail, isZenMode, onToggleZenMode, onPrint, header }) {
+export default function TiptapEditor(props) {
+    const [ydoc, setYdoc] = useState(null);
+    const [provider, setProvider] = useState(null);
+
+    useEffect(() => {
+        if (!props.pageId) return;
+
+        const doc = new Y.Doc();
+        const prov = new SupabaseBroadcastProvider(doc, supabase, `journal-${props.pageId}`);
+        
+        setYdoc(doc);
+        setProvider(prov);
+
+        return () => {
+            prov.destroy();
+            doc.destroy();
+        };
+    }, [props.pageId]);
+
+    if (!ydoc || !provider) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
+                <p>Connexion au document...</p>
+            </div>
+        );
+    }
+
+    return <TiptapEditorCore {...props} ydoc={ydoc} provider={provider} />;
+}
+
+function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, currentUserEmail, isZenMode, onToggleZenMode, onPrint, header, ydoc, provider }) {
     const [status, setStatus] = useState('connecting');
     const titleRef = useRef(null);
 
-    const ydoc = useRef(null);
-    if (!ydoc.current) {
-        ydoc.current = new Y.Doc();
-    }
+    useEffect(() => {
+        if (titleRef.current) titleRef.current.value = initialTitle || 'Sans titre';
 
-    const provider = useRef(null);
-    if (!provider.current) {
-        provider.current = new SupabaseBroadcastProvider(ydoc.current, supabase, `journal-${pageId}`);
-        provider.current.on('status', (args) => {
+        const handleStatus = (args) => {
             if (Array.isArray(args)) {
                 setStatus(args[0]?.status || 'connecting');
             } else if (args && args.status) {
                 setStatus(args.status);
             }
-        });
-    }
-
-    useEffect(() => {
-        if (titleRef.current) titleRef.current.value = initialTitle || 'Sans titre';
-
-        return () => {
-            if (provider.current) {
-                provider.current.destroy();
-            }
-            if (ydoc.current) {
-                ydoc.current.destroy();
-            }
         };
-    }, []);
+
+        provider.on('status', handleStatus);
+        
+        return () => {
+            // cleanup if needed
+        };
+    }, [provider, initialTitle]);
 
     const editor = useEditor({
         extensions: [
@@ -53,10 +72,10 @@ export default function TiptapEditor({ pageId, initialTitle, initialContent, onU
                 history: false,
             }),
             Collaboration.configure({
-                document: ydoc.current,
+                document: ydoc,
             }),
             CollaborationCursor.configure({
-                provider: provider.current,
+                provider: provider,
                 user: {
                     name: currentUserEmail?.split('@')[0] || 'Anonyme',
                     color: colors[Math.floor(Math.random() * colors.length)],
