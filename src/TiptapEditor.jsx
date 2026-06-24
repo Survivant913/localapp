@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
 import * as Y from 'yjs';
-import { SupabaseProvider } from 'y-supabase';
+import { SupabaseBroadcastProvider } from './SupabaseBroadcastProvider';
 import { supabase } from './supabaseClient';
 import { 
     Bold, Italic, Strikethrough, List, CheckSquare, 
@@ -27,12 +27,8 @@ export default function TiptapEditor({ pageId, initialTitle, initialContent, onU
 
         if (titleRef.current) titleRef.current.value = initialTitle || 'Sans titre';
 
-        provider.current = new SupabaseProvider(ydoc.current, supabase, {
-            channel: `journal-${pageId}`,
-            id: pageId,
-            tableName: 'journal_pages',
-            columnName: 'yjs_state'
-        });
+        // Initialize the custom robust realtime provider
+        provider.current = new SupabaseBroadcastProvider(ydoc.current, supabase, `journal-${pageId}`);
 
         provider.current.on('status', ({ status: providerStatus }) => {
             setStatus(providerStatus);
