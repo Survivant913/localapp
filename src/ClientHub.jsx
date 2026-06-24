@@ -31,13 +31,14 @@ export default function ClientHub({ data, updateData }) {
         const prefix = type === 'quote' ? 'DEV' : 'FACT';
         const list = type === 'quote' ? quotes : invoices;
         const year = new Date().getFullYear();
+        const month = String(new Date().getMonth() + 1).padStart(2, '0');
         
         let nextNumber = 1;
         let isUnique = false;
         let finalString = "";
 
         while (!isUnique) {
-            const candidate = `${prefix}-${year}-${nextNumber.toString().padStart(3, '0')}`;
+            const candidate = `${prefix}-${year}${month}-${nextNumber.toString().padStart(3, '0')}`;
             const exists = list.some(doc => doc.number === candidate);
             
             if (!exists) {
@@ -276,7 +277,7 @@ export default function ClientHub({ data, updateData }) {
         const isInvoice = type === 'invoice';
         const [doc, setDoc] = useState(initialDoc || {
             id: Date.now(), number: generateNumber(type), date: new Date().toISOString().split('T')[0], dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-            client_id: '', client_name: '', client_address: '', items: [{ desc: 'Prestation', qty: 1, price: 0 }], status: 'Draft', target_account_id: accounts[0]?.id || '', notes: isInvoice ? 'Paiement à réception.' : 'Validité du devis : 30 jours.', taxRate: 20
+            client_id: '', client_name: '', client_address: '', items: [{ desc: 'Prestation', qty: 1, price: 0 }], status: 'Draft', target_account_id: accounts[0]?.id || '', notes: isInvoice ? 'Paiement à réception.' : 'Acompte de 30% à la signature.', taxRate: 20
         });
         const [zoom, setZoom] = useState(0.65);
 
@@ -496,6 +497,10 @@ export default function ClientHub({ data, updateData }) {
                                         <h1 className="text-4xl font-light text-slate-800 uppercase mb-2 tracking-wide">{isInvoice ? 'Facture' : 'Devis'}</h1>
                                         <p className="font-mono text-lg font-bold text-slate-600">N° {doc.number}</p>
                                         <p className="text-sm text-slate-500 mt-1">Date : {formatDate(doc.date)}</p>
+                                        <p className="text-sm font-bold text-slate-700 mt-1">
+                                            {isInvoice ? "Échéance : " : "Validité : "} 
+                                            {formatDate(doc.dueDate)}
+                                        </p>
                                     </div>
                                 </div>
                                 
@@ -586,9 +591,7 @@ export default function ClientHub({ data, updateData }) {
 
         const convertToInvoice = (quote) => {
             if(!window.confirm("Créer une facture à partir de ce devis ?")) return;
-            const year = new Date().getFullYear();
-            const count = invoices.length + 1;
-            const newInvoiceNumber = `FACT-${year}-${count.toString().padStart(3, '0')}`;
+            const newInvoiceNumber = generateNumber('invoice');
             
             // --- FIX : Réinitialisation des dates et des notes pour la facture ---
             const newInvoice = { 
@@ -604,7 +607,9 @@ export default function ClientHub({ data, updateData }) {
                 notes: 'Paiement à réception.' 
             };
 
-            updateData({ ...data, invoices: [newInvoice, ...invoices] });
+            const updatedQuotes = quotes.map(q => q.id === quote.id ? { ...q, status: 'Invoiced' } : q);
+
+            updateData({ ...data, invoices: [newInvoice, ...invoices], quotes: updatedQuotes });
             alert(`Facture brouillon ${newInvoiceNumber} créée !`);
         };
 
@@ -635,9 +640,10 @@ export default function ClientHub({ data, updateData }) {
                 Sent: 'bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-900/50',
                 Paid: 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50',
                 Accepted: 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-900/50',
+                Invoiced: 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-900/50',
                 Rejected: 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50',
             };
-            const labels = { Draft: 'Brouillon', Sent: 'Envoyé', Paid: 'Payée', Accepted: 'Accepté', Rejected: 'Refusé' };
+            const labels = { Draft: 'Brouillon', Sent: 'Envoyé', Paid: 'Payée', Accepted: 'Accepté', Invoiced: 'Facturé', Rejected: 'Refusé' };
             return (
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${styles[status] || styles.Draft}`}>
                     {labels[status] || status}
@@ -658,8 +664,8 @@ export default function ClientHub({ data, updateData }) {
                         </h3>
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
-                            {['all', 'Draft', 'Sent', type === 'invoice' ? 'Paid' : 'Accepted'].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : s}</button>
+                            {['all', 'Draft', 'Sent', ...(type === 'invoice' ? ['Paid'] : ['Accepted', 'Invoiced', 'Rejected'])].map(s => (
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : (labels[s] || s)}</button>
                             ))}
                         </div>
                     </div>
@@ -692,8 +698,15 @@ export default function ClientHub({ data, updateData }) {
                                             <select value={doc.status} onChange={(e) => handleStatusChange(doc, e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer">
                                                 <option value="Draft" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Brouillon</option>
                                                 <option value="Sent" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Envoyé</option>
-                                                {type === 'invoice' ? <option value="Paid" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Payée</option> : <option value="Accepted" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Accepté</option>}
-                                                {type === 'quote' && <option value="Rejected" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Refusé</option>}
+                                                {type === 'invoice' ? (
+                                                    <option value="Paid" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Payée</option>
+                                                ) : (
+                                                    <>
+                                                        <option value="Accepted" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Accepté</option>
+                                                        <option value="Invoiced" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Facturé</option>
+                                                        <option value="Rejected" className="text-slate-800 dark:text-slate-200 dark:bg-slate-800">Refusé</option>
+                                                    </>
+                                                )}
                                             </select>
                                         </div>
                                     </td>
