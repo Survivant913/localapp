@@ -20,6 +20,23 @@ export class SupabaseBroadcastProvider {
     this.awareness.on('update', this.onAwarenessUpdate);
 
     this.channel
+      .on('broadcast', { event: 'request_state' }, () => {
+        // Someone joined and needs the state. Send our full state.
+        const state = Y.encodeStateAsUpdate(this.doc);
+        this.channel.send({
+          type: 'broadcast',
+          event: 'update',
+          payload: { data: Array.from(state) },
+        }).catch(console.error);
+
+        // Also send awareness
+        const awarenessState = awarenessProtocol.encodeAwarenessUpdate(this.awareness, Array.from(this.awareness.getStates().keys()));
+        this.channel.send({
+          type: 'broadcast',
+          event: 'awareness',
+          payload: { data: Array.from(awarenessState) },
+        }).catch(console.error);
+      })
       .on('broadcast', { event: 'update' }, ({ payload }) => {
         try {
             Y.applyUpdate(this.doc, Uint8Array.from(payload.data), this);
@@ -38,12 +55,11 @@ export class SupabaseBroadcastProvider {
         if (status === 'SUBSCRIBED') {
           this.emit('status', [{ status: 'connected' }]);
           
-          // Send current state
-          const state = Y.encodeStateAsUpdate(this.doc);
+          // Ask others for their state
           this.channel.send({
             type: 'broadcast',
-            event: 'update',
-            payload: { data: Array.from(state) },
+            event: 'request_state',
+            payload: {},
           });
         } else {
           this.emit('status', [{ status: 'connecting' }]);
