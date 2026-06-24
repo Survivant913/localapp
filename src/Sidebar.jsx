@@ -60,8 +60,8 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'habits', label: 'Suivi Habitudes', icon: Activity },
     { id: 'budget', label: 'Budget & Finance', icon: Wallet },
     
-    // --- MASQUÉ TEMPORAIREMENT (Code préservé) ---
-    // { id: 'clients', label: 'Clients', icon: Users },
+    // --- AFFICHÉ ---
+    { id: 'clients', label: 'Gestion Client', icon: Users },
     
     { id: 'notes', label: 'Bloc-notes', icon: StickyNote },
     { id: 'journal', label: 'Carnet', icon: Book },
