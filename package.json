@@ -11,11 +11,17 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
+    "@tiptap/extension-collaboration": "^3.27.1",
+    "@tiptap/extension-collaboration-cursor": "^2.26.2",
+    "@tiptap/react": "^3.27.1",
+    "@tiptap/starter-kit": "^3.27.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.11.0"
+    "react-router-dom": "^7.11.0",
+    "y-supabase": "^0.0.4-7-alpha",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

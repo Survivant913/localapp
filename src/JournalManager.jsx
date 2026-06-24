@@ -11,6 +11,7 @@ import {
 import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import TiptapEditor from './TiptapEditor';
 
 export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- ÉTATS DONNÉES ---
@@ -29,20 +30,8 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     const [isZenMode, setIsZenMode] = useState(false); 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    
-    // Etats Menus
-    const [showColorPalette, setShowColorPalette] = useState(false);
-    const [showSizeMenu, setShowSizeMenu] = useState(false);
-    
-    // Contenu Editeur
-    const [pageContent, setPageContent] = useState('');
-    const [pageTitle, setPageTitle] = useState('');
-    
     // Refs
-    const editorRef = useRef(null);
-    const titleRef = useRef(null);
     const saveTimeoutRef = useRef(null);
-    const isDirtyRef = useRef(false);
 
     // --- ÉTATS PARTAGE ---
     const [shareModalFolder, setShareModalFolder] = useState(null);
@@ -142,25 +131,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     }, [data?.journal_folders, data?.journal_pages]); 
 
-    // --- MISE À JOUR INSTANTANÉE DU CONTENU ÉDITEUR ---
-    useEffect(() => {
-        if (!activePageId || isSaving) return;
-        
-        const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
-        if (pageFromServer && editorRef.current) {
-            if (document.activeElement !== editorRef.current) {
-                if (editorRef.current.innerHTML !== pageFromServer.content) {
-                    editorRef.current.innerHTML = pageFromServer.content || '';
-                    setPageContent(pageFromServer.content || '');
-                    isDirtyRef.current = false;
-                }
-            }
-            if (document.activeElement !== titleRef.current && pageFromServer.title !== pageTitle) {
-                setPageTitle(pageFromServer.title || '');
-                if (titleRef.current) titleRef.current.value = pageFromServer.title || '';
-            }
-        }
-    }, [allPages, activePageId, isSaving]);
+    // --- SUPPRESSION DE L'ANCIENNE MISE A JOUR INSTANTANEE ---
 
     // --- 2. NAVIGATION ---
     useEffect(() => {
@@ -198,65 +169,14 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         }
     };
 
-    // --- 3. CHARGEMENT PAGE ---
-    useEffect(() => {
-        if (!activePageId) {
-            setPageContent('');
-            setPageTitle('');
-            if (titleRef.current) titleRef.current.value = '';
-            if (editorRef.current) {
-                editorRef.current.innerHTML = '';
-                editorRef.current.removeAttribute('data-init');
-            }
-            isDirtyRef.current = false;
-            return;
-        }
-
-        const page = allPages.find(p => p.id === activePageId);
-        if (page) {
-            setPageTitle(page.title || 'Sans titre');
-            if (titleRef.current) titleRef.current.value = page.title || 'Sans titre';
-            
-            let cleanContent = page.content || '';
-            cleanContent = cleanContent.replace(/<div class="page-break"[^>]*><\/div>/g, '<br><br>');
-            
-            setPageContent(cleanContent);
-            isDirtyRef.current = false;
-            
-            if (editorRef.current) {
-                editorRef.current.innerHTML = cleanContent;
-                editorRef.current.setAttribute('data-init', activePageId);
-            }
-        }
-    }, [activePageId]);
-
-    // --- 4. SAUVEGARDE INTELLIGENTE ---
-    const saveCurrentPage = async (force = false) => {
+    // --- NOUVELLE SAUVEGARDE TIPTAP ---
+    const handleEditorUpdate = (title, content) => {
         if (!activePageId) return;
 
-        if (!isDirtyRef.current) {
-            if (force) {
-                const pageFromServer = allPages.find(p => String(p.id) === String(activePageId));
-                if (pageFromServer && editorRef.current && editorRef.current.innerHTML !== pageFromServer.content) {
-                    editorRef.current.innerHTML = pageFromServer.content || '';
-                    setPageContent(pageFromServer.content || '');
-                }
-                if (pageFromServer && titleRef.current && titleRef.current.value !== pageFromServer.title) {
-                    titleRef.current.value = pageFromServer.title || '';
-                    setPageTitle(pageFromServer.title || '');
-                }
-            }
-            return; 
-        }
-        
-        const content = editorRef.current ? editorRef.current.innerHTML : pageContent;
-        const title = titleRef.current ? titleRef.current.value : pageTitle;
-        
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-        const performSave = async () => {
+        saveTimeoutRef.current = setTimeout(async () => {
             setIsSaving(true);
-            isDirtyRef.current = false;
             try {
                 await supabase.from('journal_pages').update({
                     title: title,
@@ -267,17 +187,10 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(prev => prev.map(p => p.id === activePageId ? { ...p, title, content, updated_at: new Date().toISOString() } : p));
             } catch (err) {
                 console.error("Erreur save:", err);
-                isDirtyRef.current = true;
             } finally {
                 setIsSaving(false);
             }
-        };
-
-        if (force) await performSave();
-        else {
-            setIsSaving(true);
-            saveTimeoutRef.current = setTimeout(performSave, 1500);
-        }
+        }, 1000);
     };
 
     // --- 5. CRÉATION ---
@@ -296,7 +209,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             const NEW_ID = Date.now(); 
 
             if (type === 'page') {
-                if (activePageId) await saveCurrentPage(true);
                 const { data, error } = await supabase.from('journal_pages').insert([{ 
                     id: NEW_ID,
                     folder_id: currentFolderId, 
@@ -492,9 +404,12 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- IMPRESSION PARFAITE A4 ---
     const handlePrint = () => {
         if (!activePageId) return;
+        const page = allPages.find(p => p.id === activePageId);
+        if (!page) return;
+
         const printWindow = window.open('', '_blank');
-        const content = editorRef.current ? editorRef.current.innerHTML : pageContent;
-        const title = titleRef.current ? titleRef.current.value : pageTitle;
+        const content = page.content || '';
+        const title = page.title || 'Sans titre';
         const date = format(new Date(), 'd MMMM yyyy', { locale: fr });
 
         printWindow.document.write(`
@@ -670,7 +585,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                 <Star size={10} className="fill-amber-500"/> Favoris
                             </div>
                             {favoritePages.map(page => (
-                                <div key={`fav-${page.id}`} onClick={() => { saveCurrentPage(true); setActivePageId(page.id); }} className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all ${activePageId === page.id ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                <div key={`fav-${page.id}`} onClick={() => { setActivePageId(page.id); }} className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all ${activePageId === page.id ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                     <div className="flex items-center gap-3 overflow-hidden">
                                         <FileText size={14} className="text-amber-500 shrink-0"/>
                                         <span className={`truncate text-xs ${activePageId === page.id ? 'font-bold text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400'}`}>{page.title || 'Sans titre'}</span>
@@ -693,7 +608,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                         </div>
                     ))}
                     {displayedPages.map(page => (
-                        <div key={page.id} onClick={() => { if(activePageId !== page.id) { saveCurrentPage(true); setActivePageId(page.id); } }} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all border border-transparent ${activePageId === page.id ? 'bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-500/30 shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                        <div key={page.id} onClick={() => { if(activePageId !== page.id) { setActivePageId(page.id); } }} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all border border-transparent ${activePageId === page.id ? 'bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-500/30 shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <FileText size={16} className={`shrink-0 ${activePageId === page.id ? 'text-indigo-500' : 'text-slate-400'}`}/>
                                 <span className={`truncate text-sm ${activePageId === page.id ? 'font-bold text-indigo-900 dark:text-indigo-100' : 'text-slate-600 dark:text-slate-300'}`}>{page.title || 'Sans titre'}</span>
@@ -721,143 +636,35 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 
                 {activePageId ? (
                     <>
-                        {/* BARRE D'OUTILS */}
-                        {!isZenMode ? (
-                            <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
-                                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg md:hidden"><PanelLeft size={20}/></button>
-                                <ToolbarButton cmd="formatBlock" val="<p>" icon={Pilcrow} title="Texte Normal (Reset)" />
-                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                <ToolbarButton cmd="formatBlock" val="<h2>" icon={Heading} title="Grand Titre" />
-                                <ToolbarButton cmd="formatBlock" val="<h3>" icon={Type} title="Sous-titre" />
-                                <ToolbarButton cmd="formatBlock" val="<blockquote>" icon={Quote} title="Citation" />
-                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                <ToolbarButton cmd="bold" icon={Bold} title="Gras" />
-                                <ToolbarButton cmd="italic" icon={Italic} title="Italique" />
-                                <ToolbarButton cmd="underline" icon={Underline} title="Souligné" />
-                                <ToolbarButton cmd="strikeThrough" icon={Strikethrough} title="Barré" />
-                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                
-                                <div className="relative group">
+                        <TiptapEditor 
+                            key={activePageId}
+                            pageId={activePageId}
+                            initialTitle={allPages.find(p => p.id === activePageId)?.title}
+                            initialContent={allPages.find(p => p.id === activePageId)?.content}
+                            onUpdate={handleEditorUpdate}
+                            currentUserEmail={currentUserEmail}
+                            isZenMode={isZenMode}
+                            onToggleZenMode={() => setIsZenMode(!isZenMode)}
+                            onPrint={handlePrint}
+                            header={
+                                <div className="text-xs text-slate-400 mb-8 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 mr-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded md:hidden"><PanelLeft size={16}/></button>
+                                        <Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}
+                                    </span>
                                     <button 
-                                        onMouseDown={(e) => { e.preventDefault(); setShowSizeMenu(!showSizeMenu); setShowColorPalette(false); }}
-                                        className={`flex items-center gap-1 p-2 rounded transition-colors ${showSizeMenu ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                                        title="Taille de texte"
+                                        onClick={() => {
+                                            const page = allPages.find(p => p.id === activePageId);
+                                            if (page) toggleFavorite(page);
+                                        }}
+                                        className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${isPageFavorite(activePageId) ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
                                     >
-                                        <TypeIcon size={18}/> <ChevronDown size={12}/>
+                                        <Star size={16} className={isPageFavorite(activePageId) ? 'fill-amber-500' : ''}/>
+                                        <span className="text-[10px] font-bold uppercase">{isPageFavorite(activePageId) ? 'Favori' : 'Favoris'}</span>
                                     </button>
-                                    
-                                    {showSizeMenu && (
-                                        <div className="absolute top-full left-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-[60] min-w-[120px] overflow-hidden animate-in fade-in zoom-in-95 p-1">
-                                            {[
-                                                { label: 'Petit', val: '2' },
-                                                { label: 'Normal', val: '3' },
-                                                { label: 'Grand', val: '5' },
-                                                { label: 'Titre', val: '7' },
-                                            ].map((size) => (
-                                                <button 
-                                                    key={size.val}
-                                                    onMouseDown={(e) => { 
-                                                        e.preventDefault(); 
-                                                        changeFontSizeSelection(size.val);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm text-slate-700 dark:text-slate-200 rounded-lg"
-                                                >
-                                                    {size.label}
-                                                </button>
-                                            ))}
-                                            <div className="h-px bg-slate-100 dark:bg-slate-700 my-1"></div>
-                                            <button 
-                                                onMouseDown={(e) => { 
-                                                    e.preventDefault(); 
-                                                    document.execCommand('removeFormat', false, null); 
-                                                    setShowSizeMenu(false);
-                                                    isDirtyRef.current = true;
-                                                    saveCurrentPage(false);
-                                                }}
-                                                className="w-full text-left px-3 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 text-xs font-bold rounded-lg flex items-center gap-2"
-                                            >
-                                                <RotateCcw size={12}/> Reset
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
-
-                                <div className="relative">
-                                    <button onMouseDown={(e)=>{e.preventDefault(); setShowColorPalette(!showColorPalette)}} className={`p-2 rounded transition-colors ${showColorPalette ? 'bg-indigo-100 text-indigo-600' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`} title="Surligneur"><Highlighter size={18}/></button>
-                                    {showColorPalette && (
-                                        <div className="absolute top-full left-0 mt-2 flex gap-1 bg-white dark:bg-slate-800 border dark:border-slate-700 p-2 rounded-lg shadow-xl z-[60] min-w-max animate-in fade-in zoom-in-95">
-                                            {[
-                                                { val: '#fef08a', darkVal: '#ffff00' },
-                                                { val: '#bbf7d0', darkVal: '#00ff00' },
-                                                { val: '#bfdbfe', darkVal: '#00ffff' },
-                                                { val: '#fecaca', darkVal: '#ff00ff' },
-                                                { val: 'transparent', darkVal: 'transparent', icon: X }
-                                            ].map((color, i) => (
-                                                <button key={i} onMouseDown={(e)=>{ e.preventDefault(); const isDark = document.documentElement.classList.contains('dark'); execCmd('hiliteColor', isDark ? color.darkVal : color.val); }} className="w-6 h-6 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:scale-110 transition-transform" style={{backgroundColor: color.val === 'transparent' ? 'white' : color.val}}>
-                                                    {color.val === 'transparent' && <X size={12} className="text-red-500"/>}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                <ToolbarButton cmd="insertUnorderedList" icon={List} title="Liste à puces" />
-                                <ToolbarButton cmd="insertOrderedList" icon={CheckSquare} title="Liste numérotée" />
-                                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                                <ToolbarButton cmd="justifyLeft" icon={AlignLeft} title="Gauche" />
-                                <ToolbarButton cmd="justifyCenter" icon={AlignCenter} title="Centrer" />
-                                <ToolbarButton cmd="justifyRight" icon={AlignRight} title="Droite" />
-                                <div className="flex-1"></div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => setIsZenMode(true)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
-                                    <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Imprimer"><Printer size={18}/></button>
-                                    <div className="text-xs text-slate-400 font-mono w-16 text-right">{isSaving ? <Loader2 size={12} className="animate-spin inline"/> : 'Prêt'}</div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="absolute top-6 right-10 z-50 animate-in fade-in slide-in-from-top-4 duration-500">
-                                <button 
-                                    onClick={() => setIsZenMode(false)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 rounded-full text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all shadow-lg border border-slate-200 dark:border-slate-700"
-                                >
-                                    <Minimize2 size={14}/> Quitter le mode Focus
-                                </button>
-                            </div>
-                        )}
-
-                        <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
-                            <div className={`mx-auto transition-all duration-700 py-12 ${isZenMode ? 'w-full max-w-7xl px-8' : 'w-full px-4 md:px-12 max-w-4xl'}`}>
-                                
-                                <div className="bg-white dark:bg-black shadow-2xl border border-slate-200 dark:border-slate-800 rounded-lg min-h-[1122px] px-12 md:px-20 py-16 relative flex flex-col transition-all">
-                                    <div className="text-xs text-slate-400 mb-8 font-mono flex items-center gap-2 uppercase tracking-widest flex justify-between">
-                                        <span className="flex items-center gap-2"><Calendar size={12}/> {format(new Date(), 'd MMMM yyyy', {locale: fr})}</span>
-                                        <button 
-                                            onClick={() => toggleFavorite(allPages.find(p => p.id === activePageId))}
-                                            className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${isPageFavorite(activePageId) ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'text-slate-300 hover:text-slate-500'}`}
-                                        >
-                                            <Star size={16} className={isPageFavorite(activePageId) ? 'fill-amber-500' : ''}/>
-                                            <span className="text-[10px] font-bold uppercase">{isPageFavorite(activePageId) ? 'Favori' : 'Favoris'}</span>
-                                        </button>
-                                    </div>
-                                    
-                                    <input ref={titleRef} type="text" defaultValue={pageTitle} 
-                                        onChange={() => { isDirtyRef.current = true; saveCurrentPage(false); }} 
-                                        onBlur={() => saveCurrentPage(true)} 
-                                        className={`w-full ${isZenMode ? 'text-5xl' : 'text-4xl'} font-black bg-transparent outline-none mb-10 text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800 leading-tight transition-all`} placeholder="Titre du document..."/>
-                                    
-                                    <div 
-                                        ref={editorRef} 
-                                        contentEditable 
-                                        suppressContentEditableWarning={true}
-                                        onInput={() => { isDirtyRef.current = true; saveCurrentPage(false); }} 
-                                        onBlur={() => saveCurrentPage(true)} 
-                                        className={`prose dark:prose-invert max-w-none outline-none ${isZenMode ? 'text-xl' : 'text-lg'} leading-loose text-slate-700 dark:text-slate-300 empty:before:content-[attr(placeholder)] empty:before:text-slate-300 transition-all flex-1`}
-                                        placeholder="Commencez à écrire ici..."
-                                    ></div>
-                                </div>
-                                
-                            </div>
-                        </div>
+                            }
+                        />
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 bg-white dark:bg-slate-950">
