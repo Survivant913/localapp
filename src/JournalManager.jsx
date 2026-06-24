@@ -12,6 +12,7 @@ import { supabase } from './supabaseClient';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import TiptapEditor from './TiptapEditor';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- ÉTATS DONNÉES ---
@@ -635,7 +636,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-slate-100 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-900'} relative min-w-0 transition-colors duration-500`}>
                 
                 {activePageId ? (
-                    <>
+                    <ErrorBoundary>
                         <TiptapEditor 
                             key={activePageId}
                             pageId={activePageId}
@@ -665,7 +666,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                 </div>
                             }
                         />
-                    </>
+                    </ErrorBoundary>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 bg-white dark:bg-slate-950">
                         <div className="w-24 h-24 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mb-6"><Book size={48} className="opacity-20"/></div>
