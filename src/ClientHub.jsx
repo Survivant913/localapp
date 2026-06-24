@@ -634,6 +634,8 @@ export default function ClientHub({ data, updateData }) {
             }
         };
 
+        const statusLabels = { Draft: 'Brouillon', Sent: 'Envoyé', Paid: 'Payée', Accepted: 'Accepté', Invoiced: 'Facturé', Rejected: 'Refusé' };
+
         const getStatusBadge = (status) => {
             const styles = {
                 Draft: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
@@ -643,10 +645,9 @@ export default function ClientHub({ data, updateData }) {
                 Invoiced: 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-900/50',
                 Rejected: 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50',
             };
-            const labels = { Draft: 'Brouillon', Sent: 'Envoyé', Paid: 'Payée', Accepted: 'Accepté', Invoiced: 'Facturé', Rejected: 'Refusé' };
             return (
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${styles[status] || styles.Draft}`}>
-                    {labels[status] || status}
+                    {statusLabels[status] || status}
                 </span>
             );
         };
@@ -665,7 +666,7 @@ export default function ClientHub({ data, updateData }) {
                         <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
                         <div className="flex gap-2">
                             {['all', 'Draft', 'Sent', ...(type === 'invoice' ? ['Paid'] : ['Accepted', 'Invoiced', 'Rejected'])].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : (labels[s] || s)}</button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : (statusLabels[s] || s)}</button>
                             ))}
                         </div>
                     </div>
