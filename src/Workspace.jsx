@@ -1280,8 +1280,8 @@ const KanbanModule = ({ venture, currentUserEmail }) => {
                             {tasks.filter(t => t.status === col.id).map(task => (
                                 <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing group">
                                     <div className="flex justify-between items-start gap-2">
-                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{task.title}</p>
-                                        <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap flex-1">{task.title}</p>
+                                        <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><Trash2 size={14}/></button>
                                     </div>
                                 </div>
                             ))}
@@ -1339,7 +1339,7 @@ const ChatModule = ({ venture, currentUserEmail }) => {
                     return (
                         <div key={msg.id} className={`flex flex-col max-w-[75%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
                             <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">{isMe ? 'Vous' : msg.user_email}</span>
-                            <div className={`p-3 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
+                            <div className={`p-3 rounded-2xl text-sm break-words whitespace-pre-wrap ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
                                 {msg.message}
                             </div>
                         </div>
