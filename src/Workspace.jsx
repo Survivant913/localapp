@@ -128,6 +128,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!venture) return;
@@ -1595,3 +1596,4 @@ export default function Workspace() {
         </div>
     );
 }
+// Trigger Vite HMR
