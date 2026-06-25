@@ -1207,7 +1207,7 @@ export default function Workspace() {
             let allVentures = [];
             
             // Projets possédés
-            const { data: ownedData, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false }); 
+            const { data: ownedData, error } = await supabase.from('ventures').select('*').eq('user_id', userData.user.id).order('last_modified', { ascending: false }); 
             if (!error && ownedData) {
                 allVentures = [...ownedData];
             }
