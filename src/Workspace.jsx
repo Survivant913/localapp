@@ -6,7 +6,7 @@ import {
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
-  Printer, Loader2, LogOut,
+  Printer, Loader2, LogOut, LayoutList, MessageSquare, Send,
   PieChart, TrendingUp, TrendingDown, LayoutDashboard
 } from 'lucide-react';
 import TiptapEditor from './TiptapEditor';
@@ -18,7 +18,9 @@ const MODULES = [
     { id: 'mindmap', label: 'Mindmap', icon: Activity },
     { id: 'finance', label: 'Finance', icon: DollarSign },
     { id: 'competitors', label: 'Concurrence', icon: Swords },
-    { id: 'analytics', label: 'Analyses', icon: LayoutDashboard }, // --- NOUVEAU MODULE ---
+    { id: 'kanban', label: 'Tâches', icon: LayoutList },
+    { id: 'analytics', label: 'Analyses', icon: LayoutDashboard },
+    { id: 'chat', label: 'Discussion', icon: MessageSquare },
 ];
 
 // --- COULEURS ---
@@ -1200,6 +1202,161 @@ const ShareModal = ({ venture, onClose }) => {
     );
 };
 
+// ==========================================
+// MODULE KANBAN
+// ==========================================
+const KanbanModule = ({ venture, currentUserEmail }) => {
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [newTaskTitle, setNewTaskTitle] = useState("");
+    const saveTimeoutRef = useRef(null);
+    const channelRef = useRef(null);
+    const [draggingTaskId, setDraggingTaskId] = useState(null);
+
+    useEffect(() => {
+        const load = async () => {
+            const { data } = await supabase.from('venture_kanban').select('content').eq('venture_id', venture.id).single();
+            if (data && data.content) { setTasks(data.content); }
+            else { setTasks([]); }
+            setLoading(false);
+        };
+        load();
+        const channel = supabase.channel(`venture_kanban_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => { setTasks(payload.tasks); })
+            .subscribe();
+        channelRef.current = channel;
+        return () => supabase.removeChannel(channel);
+    }, [venture]);
+
+    const broadcastAndSave = (newTasks) => {
+        setTasks(newTasks);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { tasks: newTasks } });
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(async () => {
+            await supabase.from('venture_kanban').upsert({ venture_id: venture.id, content: newTasks }, { onConflict: 'venture_id' });
+        }, 1000);
+    };
+
+    const addTask = () => {
+        if (!newTaskTitle.trim()) return;
+        const newTask = { id: Date.now().toString(), title: newTaskTitle, status: 'todo', created_by: currentUserEmail };
+        broadcastAndSave([...tasks, newTask]);
+        setNewTaskTitle("");
+    };
+
+    const deleteTask = (id) => {
+        broadcastAndSave(tasks.filter(t => t.id !== id));
+    };
+
+    const handleDragStart = (e, id) => { setDraggingTaskId(id); e.dataTransfer.setData('text/plain', id); };
+    const handleDragOver = (e) => { e.preventDefault(); };
+    const handleDrop = (e, status) => {
+        e.preventDefault();
+        if (!draggingTaskId) return;
+        const newTasks = tasks.map(t => t.id === draggingTaskId ? { ...t, status } : t);
+        broadcastAndSave(newTasks);
+        setDraggingTaskId(null);
+    };
+
+    const cols = [
+        { id: 'todo', label: 'À faire', color: 'bg-slate-100 dark:bg-slate-800' },
+        { id: 'in_progress', label: 'En cours', color: 'bg-blue-50 dark:bg-blue-900/20' },
+        { id: 'done', label: 'Terminé', color: 'bg-emerald-50 dark:bg-emerald-900/20' }
+    ];
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="h-full flex flex-col bg-white dark:bg-slate-950 p-6 overflow-hidden">
+            <div className="flex gap-2 mb-6 shrink-0 max-w-sm">
+                <input type="text" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Nouvelle tâche..." className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-indigo-500" />
+                <button onClick={addTask} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Plus size={16}/></button>
+            </div>
+            <div className="flex-1 flex gap-6 overflow-x-auto overflow-y-hidden pb-4">
+                {cols.map(col => (
+                    <div key={col.id} className={`flex-1 min-w-[280px] rounded-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 ${col.color}`} onDragOver={handleDragOver} onDrop={e => handleDrop(e, col.id)}>
+                        <div className="p-4 border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between shrink-0"><h3 className="font-bold text-slate-700 dark:text-slate-300">{col.label}</h3><span className="text-xs font-bold bg-white dark:bg-slate-800 px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">{tasks.filter(t => t.status === col.id).length}</span></div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {tasks.filter(t => t.status === col.id).map(task => (
+                                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing group">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{task.title}</p>
+                                        <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// MODULE CHAT
+// ==========================================
+const ChatModule = ({ venture, currentUserEmail }) => {
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState("");
+    const [loading, setLoading] = useState(true);
+    const messagesEndRef = useRef(null);
+
+    useEffect(() => {
+        const fetchMessages = async () => {
+            const { data } = await supabase.from('venture_chats').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
+            if (data) setMessages(data);
+            setLoading(false);
+        };
+        fetchMessages();
+
+        const channel = supabase.channel(`venture_chats_${venture.id}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'venture_chats', filter: `venture_id=eq.${venture.id}` }, (payload) => {
+                setMessages(prev => [...prev, payload.new]);
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [venture]);
+
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+    const sendMessage = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim()) return;
+        const msg = newMessage.trim();
+        setNewMessage("");
+        await supabase.from('venture_chats').insert([{ venture_id: venture.id, user_email: currentUserEmail, message: msg }]);
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                {messages.length === 0 ? <div className="text-center text-slate-400 mt-10">Aucun message. Commencez la discussion !</div> : messages.map(msg => {
+                    const isMe = msg.user_email === currentUserEmail;
+                    return (
+                        <div key={msg.id} className={`flex flex-col max-w-[75%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                            <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">{isMe ? 'Vous' : msg.user_email}</span>
+                            <div className={`p-3 rounded-2xl text-sm ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
+                                {msg.message}
+                            </div>
+                        </div>
+                    );
+                })}
+                <div ref={messagesEndRef} />
+            </div>
+            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+                <form onSubmit={sendMessage} className="flex gap-2">
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Écrire un message..." className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-indigo-500" />
+                    <button type="submit" disabled={!newMessage.trim()} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white p-2 px-4 rounded-xl transition-colors"><Send size={18}/></button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 export default function Workspace() {
     const [ventures, setVentures] = useState([]);
     const [activeVenture, setActiveVenture] = useState(null);
@@ -1596,7 +1753,7 @@ export default function Workspace() {
                 </div>
             </header>
             {showShareModal && <ShareModal venture={activeVenture} onClose={() => setShowShareModal(false)} />}
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} currentUserEmail={currentUserEmail} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'kanban' && <KanbanModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'chat' && <ChatModule venture={activeVenture} currentUserEmail={currentUserEmail} />}</main></div>
         </div>
     );
 }
