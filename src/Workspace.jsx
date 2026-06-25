@@ -1091,19 +1091,20 @@ export default function Workspace() {
         await supabase.from('ventures').delete().eq('id', id); setVentures(ventures.filter(v => v.id !== id));
     };
 
-    // --- EXPORT PDF V3 : ULTIMATE EDITION (AVEC SWOT MATRICE) ---
+    // --- EXPORT PDF V4 : PREMIUM EDITION ---
     const generateBusinessPlan = async () => {
         if (!activeVenture) return;
         setIsExporting(true);
         
         try {
             // 1. Récupérer TOUTES les données
-            const [pages, strat, fin, comps, mind] = await Promise.all([
+            const [pages, strat, fin, comps, mind, analytics] = await Promise.all([
                 supabase.from('venture_pages').select('*').eq('venture_id', activeVenture.id),
                 supabase.from('venture_strategies').select('*').eq('venture_id', activeVenture.id),
                 supabase.from('venture_financials').select('scenarios').eq('venture_id', activeVenture.id).single(),
                 supabase.from('venture_competitors').select('*').eq('venture_id', activeVenture.id),
-                supabase.from('venture_mindmaps').select('content').eq('venture_id', activeVenture.id).single()
+                supabase.from('venture_mindmaps').select('content').eq('venture_id', activeVenture.id).single(),
+                supabase.from('venture_analytics').select('*').eq('venture_id', activeVenture.id)
             ]);
 
             const pagesData = pages.data || [];
@@ -1111,203 +1112,255 @@ export default function Workspace() {
             const f = fin.data?.scenarios || { realistic: {}, optimistic: {}, pessimistic: {} };
             const compData = comps.data || [];
             const mindData = mind.data?.content || [];
+            const analyticsData = analytics.data || [];
 
-            const calcProfit = (s) => (s.target * s.price) - (s.fixed + (s.target * s.var));
+            const calcProfit = (s) => (s?.target * s?.price) - (s?.fixed + (s?.target * s?.var));
+            
+            const getList = (sectionId) => {
+                const items = stratData.find(s => s.section_id === sectionId)?.content || [];
+                if (items.length === 0) return '<li>-</li>';
+                return items.map(i => `<li>${i.text}</li>`).join('');
+            };
 
             // --- HTML TEMPLATE ---
             const htmlContent = `
+                <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Business Plan - ${activeVenture.title}</title>
+                    <title>Dossier - ${activeVenture.title}</title>
                     <style>
-                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
-                        @page { margin: 0; }
-                        
+                        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&display=swap');
+                        @page { margin: 15mm; size: A4 portrait; }
                         body { 
-                            font-family: 'Inter', sans-serif; 
-                            color: #1e293b; 
+                            font-family: 'Outfit', sans-serif; 
+                            color: #0f172a; 
                             line-height: 1.6; 
-                            margin: 0; 
                             background: #fff; 
+                            font-size: 10pt;
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                            margin: 0;
+                            padding: 0;
                         }
                         
-                        .sheet { padding: 40px; max-width: 210mm; margin: 0 auto; min-height: 297mm; }
-                        .page-break { page-break-before: always; }
-                        .no-break { page-break-inside: avoid; }
-
-                        /* HEADER/FOOTER */
-                        .page-number { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 10px; }
-
-                        /* TYPOGRAPHY */
-                        h2 { font-size: 24px; color: #0f172a; border-left: 6px solid #2563eb; padding-left: 15px; margin-top: 40px; margin-bottom: 25px; letter-spacing: -0.5px; }
-                        h3 { font-size: 14px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; }
+                        .section { page-break-after: always; padding: 5mm 0; }
+                        .section:last-child { page-break-after: auto; }
+                        
+                        h1, h2, h3 { color: #0f172a; margin-top: 0; }
+                        h2 { font-size: 18pt; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px; font-weight: 800; color: #1e293b; }
+                        h3 { font-size: 14pt; font-weight: 700; color: #334155; margin-bottom: 15px; margin-top: 25px; }
 
                         /* COVER */
-                        .cover { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #f8fafc; border-bottom: 20px solid #2563eb; }
-                        .cover h1 { font-size: 48px; margin: 0; font-weight: 800; color: #0f172a; line-height: 1.2; }
-                        .cover .subtitle { font-size: 20px; color: #64748b; margin-top: 15px; font-weight: 400; }
-                        .cover .meta { margin-top: 60px; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
+                        .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; border: 4px solid #3b82f6; padding: 20mm; border-radius: 20px; box-sizing: border-box; }
+                        .cover h1 { font-size: 42pt; font-weight: 800; color: #2563eb; margin: 0; line-height: 1.1; }
+                        .cover .subtitle { font-size: 16pt; color: #475569; margin-top: 20px; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; }
+                        .cover .meta { margin-top: auto; font-size: 10pt; color: #64748b; font-weight: 500; }
+
+                        /* NOTES */
+                        .note-item { margin-bottom: 20px; page-break-inside: avoid; background: #f8fafc; padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+                        .note-title { font-weight: 800; font-size: 14pt; color: #1e293b; margin-bottom: 8px; }
+                        .note-content { white-space: pre-wrap; color: #334155; font-size: 11pt; line-height: 1.7; }
 
                         /* CANVAS */
-                        .canvas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-                        .card { border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; background: #fff; font-size: 11px; min-height: 100px; }
-                        .card strong { display: block; margin-bottom: 5px; color: #475569; font-size: 10px; text-transform: uppercase; }
-                        .card ul { padding-left: 15px; margin: 0; }
-                        .card li { margin-bottom: 2px; }
+                        .canvas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+                        .canvas-box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; font-size: 9pt; background: #fff; page-break-inside: avoid; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+                        .canvas-box.highlight { background: #f0fdf4; border-color: #bbf7d0; }
+                        .canvas-header { font-weight: 800; font-size: 9pt; text-transform: uppercase; margin-bottom: 10px; color: #2563eb; }
+                        .canvas-list { padding-left: 15px; margin: 0; color: #475569; }
+                        .canvas-list li { margin-bottom: 5px; }
 
-                        /* SWOT MATRIX (NEW) */
-                        .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-                        .swot-box { padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; }
-                        .swot-box.positive { background-color: #f0fdf4; border-color: #bbf7d0; }
-                        .swot-box.negative { background-color: #fef2f2; border-color: #fecaca; }
-                        .swot-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-weight: 800; font-size: 14px; text-transform: uppercase; }
-                        .positive .swot-header { color: #166534; }
-                        .negative .swot-header { color: #991b1b; }
-                        .swot-list { list-style: none; padding: 0; margin: 0; }
-                        .swot-list li { margin-bottom: 6px; padding-left: 15px; position: relative; font-size: 12px; }
-                        .swot-list li::before { content: "•"; position: absolute; left: 0; color: inherit; font-weight: bold; }
+                        /* SWOT */
+                        .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                        .swot-box { padding: 20px; border-radius: 12px; page-break-inside: avoid; }
+                        .swot-box.s { background: #f0fdf4; border: 1px solid #bbf7d0; }
+                        .swot-box.w { background: #fef2f2; border: 1px solid #fecaca; }
+                        .swot-box.o { background: #eff6ff; border: 1px solid #bfdbfe; }
+                        .swot-box.t { background: #fffbeb; border: 1px solid #fde68a; }
+                        .swot-title { font-weight: 800; font-size: 12pt; margin-bottom: 12px; text-transform: uppercase; }
+                        .swot-box.s .swot-title { color: #166534; }
+                        .swot-box.w .swot-title { color: #991b1b; }
+                        .swot-box.o .swot-title { color: #1e40af; }
+                        .swot-box.t .swot-title { color: #b45309; }
 
-                        /* FINANCE TABLE */
-                        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
-                        th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; }
-                        th { text-align: left; background: #f1f5f9; color: #334155; font-weight: 600; }
-                        td:first-child { text-align: left; font-weight: 500; color: #334155; }
-                        .highlight-row { background: #f8fafc; font-weight: 700; }
-                        .positive { color: #059669; }
-                        .negative { color: #dc2626; }
+                        /* TABLES */
+                        table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 25px; page-break-inside: avoid; }
+                        th, td { padding: 12px 15px; text-align: right; border-bottom: 1px solid #e2e8f0; }
+                        th { background: #f8fafc; color: #475569; font-weight: 700; font-size: 10pt; text-align: left; }
+                        th:not(:first-child) { text-align: right; }
+                        td:first-child { text-align: left; font-weight: 600; color: #1e293b; }
+                        tr:last-child td { border-bottom: none; }
+                        .highlight-row { background: #eff6ff; }
+                        .highlight-row td { font-weight: 800; font-size: 11pt; }
+                        .positive { color: #059669; font-weight: 800; }
+                        .negative { color: #dc2626; font-weight: 800; }
 
-                        @media print { body { -webkit-print-color-adjust: exact; } }
+                        /* MINDMAP */
+                        .mindmap-box { padding: 15px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; page-break-inside: avoid; }
+                        .mindmap-list { list-style: none; padding: 0; margin: 0; }
+                        .mindmap-list li { position: relative; padding-left: 20px; margin-bottom: 8px; color: #334155; font-weight: 500; }
+                        .mindmap-list li::before { content: "→"; position: absolute; left: 0; color: #3b82f6; font-weight: bold; }
                     </style>
                 </head>
                 <body>
                     
-                    <div class="cover">
+                    <div class="cover section">
                         <h1>${activeVenture.title}</h1>
-                        <div class="subtitle">Document de Synthèse Stratégique</div>
-                        <div class="meta">Généré le ${new Date().toLocaleDateString('fr-FR')} | Confidentiel</div>
+                        <div class="subtitle">Dossier Stratégique & Prévisionnel</div>
+                        <div class="meta">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
                     </div>
 
-                    <div class="sheet">
-                        <h2>1. Résumé Exécutif</h2>
-                        <div style="column-count: 2; column-gap: 40px; font-size: 12px; text-align: justify;">
-                            ${pagesData.length === 0 ? '<p>Aucune note enregistrée.</p>' : pagesData.map(p => `
-                                <div style="margin-bottom: 20px; break-inside: avoid;">
-                                    <div style="font-weight: 700; font-size: 14px; color: #2563eb; margin-bottom: 5px;">${p.title}</div>
-                                    <div style="white-space: pre-wrap;">${p.content || ''}</div>
+                    <div class="section">
+                        <h2>1. Résumé Exécutif & Notes</h2>
+                        ${pagesData.length === 0 ? '<p style="color:#64748b;">Aucune note enregistrée.</p>' : pagesData.map(p => `
+                            <div class="note-item">
+                                <div class="note-title">${p.title}</div>
+                                <div class="note-content">${p.content || ''}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="section">
+                        <h2>2. Business Model Canvas</h2>
+                        <div class="canvas-grid">
+                            <div class="canvas-box highlight">
+                                <div class="canvas-header">PROPOSITIONS DE VALEUR</div>
+                                <ul class="canvas-list">${getList('valueProps')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">SEGMENTS CLIENTS</div>
+                                <ul class="canvas-list">${getList('segments')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">CANAUX</div>
+                                <ul class="canvas-list">${getList('channels')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">RELATIONS CLIENT</div>
+                                <ul class="canvas-list">${getList('relationships')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">REVENUS</div>
+                                <ul class="canvas-list">${getList('revenue')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">RESSOURCES CLÉS</div>
+                                <ul class="canvas-list">${getList('resources')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">ACTIVITÉS CLÉS</div>
+                                <ul class="canvas-list">${getList('activities')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">PARTENAIRES CLÉS</div>
+                                <ul class="canvas-list">${getList('partners')}</ul>
+                            </div>
+                            <div class="canvas-box">
+                                <div class="canvas-header">COÛTS</div>
+                                <ul class="canvas-list">${getList('cost')}</ul>
+                            </div>
+                        </div>
+                        
+                        ${mindData.length > 0 ? `
+                        <h3>Structure des Idées (Mindmap)</h3>
+                        <div class="mindmap-box">
+                            <ul class="mindmap-list">
+                                ${mindData.map(n => `<li>${n.label}</li>`).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="section">
+                        <h2>3. Analyse SWOT</h2>
+                        <div class="swot-grid">
+                            <div class="swot-box s">
+                                <div class="swot-title">Forces (Interne)</div>
+                                <ul class="canvas-list">${getList('strengths')}</ul>
+                            </div>
+                            <div class="swot-box w">
+                                <div class="swot-title">Faiblesses (Interne)</div>
+                                <ul class="canvas-list">${getList('weaknesses')}</ul>
+                            </div>
+                            <div class="swot-box o">
+                                <div class="swot-title">Opportunités (Externe)</div>
+                                <ul class="canvas-list">${getList('opportunities')}</ul>
+                            </div>
+                            <div class="swot-box t">
+                                <div class="swot-title">Menaces (Externe)</div>
+                                <ul class="canvas-list">${getList('threats')}</ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2>4. Marché & Concurrence</h2>
+                        ${compData.length > 0 ? `
+                        <table>
+                            <thead><tr><th>Concurrent</th><th>Forces / Faiblesses</th><th>Note Moyenne</th></tr></thead>
+                            <tbody>
+                                ${compData.filter(c => c.is_visible).map(c => {
+                                    const vals = Object.values(c.scores || {});
+                                    const score = vals.length > 0 ? (vals.reduce((a,b)=>a+b,0) / vals.length) : 0;
+                                    return `<tr>
+                                        <td>${c.name} ${c.is_primary ? '<strong style="color:#2563eb;">(Vous)</strong>' : ''}</td>
+                                        <td style="font-size: 9pt; text-align: right; color: #64748b;">
+                                            ${c.strengths ? `<span style="color:#166534;">+ ${c.strengths}</span>` : ''} 
+                                            ${c.strengths && c.weaknesses ? '<br>' : ''}
+                                            ${c.weaknesses ? `<span style="color:#991b1b;">- ${c.weaknesses}</span>` : ''}
+                                        </td>
+                                        <td><strong>${score.toFixed(1)} / 5</strong></td>
+                                    </tr>`
+                                }).join('')}
+                            </tbody>
+                        </table>
+                        ` : '<p style="color:#64748b;">Aucune donnée de concurrence.</p>'}
+                        
+                        ${analyticsData.length > 0 ? `
+                        <h3>Métriques & Analyses</h3>
+                        <div class="canvas-grid" style="grid-template-columns: repeat(2, 1fr);">
+                            ${analyticsData.map(c => `
+                                <div class="canvas-box">
+                                    <div class="canvas-header" style="color:#0f172a;">${c.title}</div>
+                                    <table style="margin-bottom:0; box-shadow:none; border:none;">
+                                        <tbody>
+                                            ${(c.data_points || []).map(p => `<tr><td style="padding:4px 0; border:none; text-align:left;">${p.label}</td><td style="padding:4px 0; border:none;"><strong>${p.value}</strong></td></tr>`).join('')}
+                                        </tbody>
+                                    </table>
                                 </div>
                             `).join('')}
                         </div>
-                        <div class="page-number">Page 2</div>
+                        ` : ''}
                     </div>
 
-                    <div class="page-break"></div>
-                    <div class="sheet">
-                        <h2>2. Business Model Canvas</h2>
-                        <div class="canvas-grid">
-                            <div class="card" style="background:#eff6ff; border-color:#bfdbfe;"><strong>PARTENAIRES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='partners')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#fefce8; border-color:#fde047;"><strong>ACTIVITÉS CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='activities')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#fef2f2; border-color:#fecaca;"><strong>PROPOSITIONS DE VALEUR</strong><ul>${(stratData.find(s=>s.section_id==='valueProps')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>RELATIONS CLIENT</strong><ul>${(stratData.find(s=>s.section_id==='relationships')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>SEGMENTS CLIENTS</strong><ul>${(stratData.find(s=>s.section_id==='segments')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#fefce8; border-color:#fde047;"><strong>RESSOURCES CLÉS</strong><ul>${(stratData.find(s=>s.section_id==='resources')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>CANAUX</strong><ul>${(stratData.find(s=>s.section_id==='channels')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#fef2f2; border-color:#fecaca;"><strong>COÛTS</strong><ul>${(stratData.find(s=>s.section_id==='cost')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                            <div class="card" style="background:#ecfdf5; border-color:#a7f3d0;"><strong>REVENUS</strong><ul>${(stratData.find(s=>s.section_id==='revenue')?.content||[]).map(i=>`<li>${i.text}</li>`).join('')}</ul></div>
-                        </div>
-                        <div class="page-number">Page 3</div>
-                    </div>
-
-                    <div class="page-break"></div>
-                    <div class="sheet">
-                        <h2>3. Analyse Stratégique (SWOT)</h2>
-                        <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Analyse des facteurs internes et externes influençant le projet.</p>
-                        
-                        <div class="swot-grid">
-                            <div class="swot-box positive">
-                                <div class="swot-header">Forces (Interne)</div>
-                                <ul class="swot-list">
-                                    ${(stratData.find(s=>s.section_id==='strengths')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune force listée</li>'}
-                                </ul>
-                            </div>
-                            
-                            <div class="swot-box negative">
-                                <div class="swot-header">Faiblesses (Interne)</div>
-                                <ul class="swot-list">
-                                    ${(stratData.find(s=>s.section_id==='weaknesses')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune faiblesse listée</li>'}
-                                </ul>
-                            </div>
-
-                            <div class="swot-box positive">
-                                <div class="swot-header">Opportunités (Externe)</div>
-                                <ul class="swot-list">
-                                    ${(stratData.find(s=>s.section_id==='opportunities')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune opportunité listée</li>'}
-                                </ul>
-                            </div>
-
-                            <div class="swot-box negative">
-                                <div class="swot-header">Menaces (Externe)</div>
-                                <ul class="swot-list">
-                                    ${(stratData.find(s=>s.section_id==='threats')?.content||[]).map(i=>`<li>${i.text}</li>`).join('') || '<li>Aucune menace listée</li>'}
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="no-break" style="margin-top: 40px;">
-                            <h3>Structure des Idées (Mindmap)</h3>
-                            <div style="font-size: 11px; padding: 15px; border: 1px dashed #cbd5e1; border-radius: 6px; background: #f8fafc;">
-                                <ul style="list-style-type: circle; padding-left: 20px;">
-                                    ${mindData.map(n => `<li>${n.label}</li>`).join('')}
-                                </ul>
-                            </div>
-                        </div>
-                        <div class="page-number">Page 4</div>
-                    </div>
-
-                    <div class="page-break"></div>
-                    <div class="sheet">
-                        <h2>4. Prévisions Financières & Marché</h2>
-                        
+                    <div class="section">
+                        <h2>5. Prévisions Financières</h2>
                         <table>
                             <thead>
                                 <tr>
                                     <th style="width: 40%">Indicateur</th>
-                                    <th style="background: #fef2f2; color: #dc2626;">Pessimiste</th>
-                                    <th style="background: #f1f5f9; color: #0f172a;">Réaliste</th>
-                                    <th style="background: #ecfdf5; color: #059669;">Optimiste</th>
+                                    <th>Pessimiste</th>
+                                    <th>Réaliste</th>
+                                    <th>Optimiste</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td>Prix de Vente</td><td>${f.pessimistic?.price || 0} €</td><td><strong>${f.realistic?.price || 0} €</strong></td><td>${f.optimistic?.price || 0} €</td></tr>
-                                <tr><td>Coût Variable</td><td>${f.pessimistic?.var || 0} €</td><td>${f.realistic?.var || 0} €</td><td>${f.optimistic?.var || 0} €</td></tr>
-                                <tr><td>Coûts Fixes (Mois)</td><td>${f.pessimistic?.fixed || 0} €</td><td>${f.realistic?.fixed || 0} €</td><td>${f.optimistic?.fixed || 0} €</td></tr>
-                                <tr><td>Volume Ventes</td><td>${f.pessimistic?.target || 0}</td><td><strong>${f.realistic?.target || 0}</strong></td><td>${f.optimistic?.target || 0}</td></tr>
+                                <tr><td>Prix de Vente Unitaire</td><td>${f.pessimistic?.price || 0} €</td><td><strong>${f.realistic?.price || 0} €</strong></td><td>${f.optimistic?.price || 0} €</td></tr>
+                                <tr><td>Coût Variable Unitaire</td><td>${f.pessimistic?.var || 0} €</td><td>${f.realistic?.var || 0} €</td><td>${f.optimistic?.var || 0} €</td></tr>
+                                <tr><td>Coûts Fixes (Mensuels)</td><td>${f.pessimistic?.fixed || 0} €</td><td>${f.realistic?.fixed || 0} €</td><td>${f.optimistic?.fixed || 0} €</td></tr>
+                                <tr><td>Volume de Ventes Objectif</td><td>${f.pessimistic?.target || 0}</td><td><strong>${f.realistic?.target || 0}</strong></td><td>${f.optimistic?.target || 0}</td></tr>
                                 <tr class="highlight-row">
-                                    <td>RÉSULTAT NET</td>
-                                    <td class="${calcProfit(f.pessimistic || {}) >= 0 ? 'positive' : 'negative'}">${calcProfit(f.pessimistic || {}).toFixed(2)} €</td>
-                                    <td class="${calcProfit(f.realistic || {}) >= 0 ? 'positive' : 'negative'}"><strong>${calcProfit(f.realistic || {}).toFixed(2)} €</strong></td>
-                                    <td class="${calcProfit(f.optimistic || {}) >= 0 ? 'positive' : 'negative'}">${calcProfit(f.optimistic || {}).toFixed(2)} €</td>
+                                    <td>RÉSULTAT NET PROJETÉ</td>
+                                    <td class="${calcProfit(f.pessimistic) >= 0 ? 'positive' : 'negative'}">${(calcProfit(f.pessimistic) || 0).toFixed(2)} €</td>
+                                    <td class="${calcProfit(f.realistic) >= 0 ? 'positive' : 'negative'}">${(calcProfit(f.realistic) || 0).toFixed(2)} €</td>
+                                    <td class="${calcProfit(f.optimistic) >= 0 ? 'positive' : 'negative'}">${(calcProfit(f.optimistic) || 0).toFixed(2)} €</td>
                                 </tr>
                             </tbody>
                         </table>
-
-                        <div style="margin-top: 40px;">
-                            <h3>Positionnement Concurrentiel</h3>
-                            <table>
-                                <thead><tr><th>Concurrent</th><th>Forces / Faiblesses</th><th>Note</th></tr></thead>
-                                <tbody>
-                                    ${compData.map(c => {
-                                        const score = (Object.values(c.scores || {}).reduce((a,b)=>a+b,0) / (Object.values(c.scores || {}).length || 1));
-                                        return `<tr>
-                                            <td><strong>${c.name}</strong> ${c.is_primary ? '(Vous)' : ''}</td>
-                                            <td style="font-size: 10px;">${c.strengths ? `+ ${c.strengths}` : ''} <br> ${c.weaknesses ? `- ${c.weaknesses}` : ''}</td>
-                                            <td><strong>${score.toFixed(1)}/5</strong></td>
-                                        </tr>`
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="page-number">Page 5</div>
+                        <p style="text-align: center; color: #64748b; font-size: 9pt; margin-top: 20px;">
+                            Fin du document.
+                        </p>
                     </div>
+
                 </body>
                 </html>
             `;
