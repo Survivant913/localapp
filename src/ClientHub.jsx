@@ -24,7 +24,14 @@ export default function ClientHub({ data, updateData }) {
 
     // --- UTILS ---
     const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val || 0);
-    const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
+    const formatDate = (d) => {
+        if (!d) return '---';
+        try {
+            return new Date(d).toLocaleDateString('fr-FR');
+        } catch(e) {
+            return '---';
+        }
+    };
     
     // --- NUMÉROTATION SÉCURISÉE (ANTIDOUBLON) ---
     const generateNumber = (type) => {
