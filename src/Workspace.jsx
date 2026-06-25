@@ -128,7 +128,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [, setSaving] = useState(false);
 
     useEffect(() => {
         if (!venture) return;
@@ -335,9 +335,6 @@ const MindmapModule = ({ venture }) => {
             await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: newNodes }, { onConflict: 'venture_id' }); 
         }, 1000);
     };
-
-    // Remove the old useEffect that watched [nodes] and saved on every change
-
 
     const getDescendants = (nodeId, allNodes) => { let descendants = []; allNodes.filter(n => n.parentId === nodeId).forEach(child => { descendants.push(child.id); descendants = [...descendants, ...getDescendants(child.id, allNodes)]; }); return descendants; };
     const isVisible = (nodeId) => { const node = nodes.find(n => n.id === nodeId); if (!node) return false; if (!node.parentId) return true; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return false; if (parent.collapsed) return false; return isVisible(parent.id); };
@@ -848,7 +845,7 @@ const AnalyticsModule = ({ venture }) => {
         const v = parseFloat(newVal);
         if (isNaN(v)) return;
         
-        const pts = [...(activeChart.data_points || []), { id: Date.now(), label: newLabel, value: v }];
+        const pts = [...(activeChart.data_points || []), { id: crypto.randomUUID(), label: newLabel, value: v }];
         updateChart(activeChart.id, 'data_points', pts);
         setNewLabel('');
         setNewVal('');
@@ -869,12 +866,10 @@ const AnalyticsModule = ({ venture }) => {
     const renderSVG = () => {
         if (!activeChart || pts.length === 0) return <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Ajoutez des données ci-dessous pour générer le graphique.</div>;
         
-        // --- CORRECTION 2 : AGRANDISSEMENT DU GRAPHIQUE ---
         const W = 800;
-        const H = 350; // Plus haut pour respirer
-        const P = 50;  // Plus de marge pour les axes
+        const H = 350;
+        const P = 50;
         
-        // On définit la palette de couleurs ici pour qu'elle serve au Camembert ET à la légende
         const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
 
         if (activeChart.chart_type === 'pie') {
@@ -886,10 +881,9 @@ const AnalyticsModule = ({ venture }) => {
             
             return (
                 <div className="flex items-center w-full h-full gap-8">
-                    {/* Le Camembert */}
                     <svg viewBox={`0 0 ${W} ${H}`} className="w-2/3 h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
                         {pts.map((p, i) => {
-                            const angle = (Math.abs(p.value) / Math.abs(total)) * Math.PI * 2; // Math.abs évite les bugs si valeur négative dans un pie
+                            const angle = (Math.abs(p.value) / Math.abs(total)) * Math.PI * 2;
                             const endAngle = startAngle + angle;
                             
                             const x1 = cx + r * Math.cos(startAngle - Math.PI/2);
@@ -907,7 +901,6 @@ const AnalyticsModule = ({ venture }) => {
                         })}
                     </svg>
 
-                    {/* --- CORRECTION 3 : LÉGENDE DU CAMEMBERT --- */}
                     <div className="w-1/3 max-h-full overflow-y-auto pr-4 custom-scrollbar flex flex-col gap-2 justify-center">
                         {pts.map((p, i) => (
                             <div key={p.id} className="flex items-center gap-3">
@@ -922,12 +915,8 @@ const AnalyticsModule = ({ venture }) => {
         }
 
         const target = activeChart.target_value || 0;
-        
-        // --- CORRECTION 1 : GESTION DES VALEURS NÉGATIVES ---
         const dataMin = Math.min(...pts.map(p => p.value), target, 0); 
         const dataMax = Math.max(...pts.map(p => p.value), target, 1);
-        
-        // On rajoute 10% de marge en haut et en bas
         const graphMin = dataMin < 0 ? dataMin * 1.1 : 0;
         const graphMax = dataMax > 0 ? dataMax * 1.1 : 0;
         const range = graphMax - graphMin || 1;
@@ -938,7 +927,6 @@ const AnalyticsModule = ({ venture }) => {
         
         const yZero = getY(0);
 
-        // --- GÉNÉRATION DES LIGNES DE GRILLE (Axe Y) ---
         const gridLines = [];
         const step = range / 4; 
         for (let i = 0; i <= 4; i++) {
@@ -948,7 +936,6 @@ const AnalyticsModule = ({ venture }) => {
 
         return (
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
-                {/* Lignes de quadrillage horizontales */}
                 {gridLines.map((line, i) => (
                     <g key={i}>
                         <line x1={P} y1={line.y} x2={W-P} y2={line.y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" className="dark:stroke-slate-700 opacity-50" />
@@ -958,12 +945,10 @@ const AnalyticsModule = ({ venture }) => {
                     </g>
                 ))}
 
-                {/* Axe central (Zéro) s'il y a du négatif */}
                 {graphMin < 0 && (
                     <line x1={P} y1={yZero} x2={W-P} y2={yZero} stroke="#94a3b8" strokeWidth="1.5" className="dark:stroke-slate-500 opacity-50" />
                 )}
                 
-                {/* Axe X et Y principaux */}
                 <line x1={P} y1={H-P} x2={W-P} y2={H-P} stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-600" />
                 <line x1={P} y1={P} x2={P} y2={H-P} stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-600" />
                 
@@ -976,9 +961,7 @@ const AnalyticsModule = ({ venture }) => {
                         const barW = Math.max((W - 2*P) / pts.length - 10, 10);
                         const x = getBarX(i) + ((W - 2*P) / pts.length - barW) / 2;
                         const y = getY(p.value);
-                        // Hauteur de la barre : du Y du point jusqu'à l'axe Zéro
                         const barHeight = Math.abs(yZero - y);
-                        // Si valeur négative, la barre part de 0 et descend
                         const startY = p.value >= 0 ? y : yZero;
                         
                         return (
@@ -1020,7 +1003,6 @@ const AnalyticsModule = ({ venture }) => {
 
     return (
         <div className="flex h-full w-full bg-white dark:bg-slate-900">
-            {/* PANNEAU LATÉRAL GAUCHE : LISTE DES GRAPHIQUES */}
             <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Graphiques</span>
@@ -1040,12 +1022,10 @@ const AnalyticsModule = ({ venture }) => {
                 </div>
             </div>
 
-            {/* CONTENU PRINCIPAL */}
             <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
                 {activeChart ? (
                     <div className="p-6 max-w-6xl mx-auto w-full flex flex-col gap-6 min-h-full">
                         
-                        {/* HEADER DE CONFIGURATION DU GRAPHIQUE */}
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
                             <input type="text" value={activeChart.title} onChange={e => updateChart(activeChart.id, 'title', e.target.value)} className="text-xl font-bold bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 min-w-[200px]"/>
                             
@@ -1068,7 +1048,6 @@ const AnalyticsModule = ({ venture }) => {
                             </div>
                         </div>
 
-                        {/* KPIS */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cumulé</span>
@@ -1091,14 +1070,12 @@ const AnalyticsModule = ({ venture }) => {
                             </div>
                         </div>
 
-                        {/* RENDU DU GRAPHIQUE */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-h-[400px] flex flex-col">
                             <div className="flex-1 w-full flex items-center justify-center">
                                 {renderSVG()}
                             </div>
                         </div>
 
-                        {/* LISTE DES DONNÉES / SAISIE */}
                         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                             <h3 className="font-bold text-slate-700 dark:text-white mb-4">Valeurs du graphique</h3>
                             
