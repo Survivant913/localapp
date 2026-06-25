@@ -697,10 +697,10 @@ export default function ClientHub({ data, updateData }) {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                             {filteredList.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-slate-400 italic">Aucun document trouvé.</td></tr>}
                             {filteredList.map(doc => (
-                                <tr key={doc.id} onClick={() => openEditor(doc)} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                                    <td className="p-4 font-mono font-bold text-slate-700 dark:text-slate-200">{doc.number}</td>
-                                    <td className="p-4 font-medium text-slate-900 dark:text-white">{doc.client_name}</td>
-                                    <td className="p-4 text-slate-500">{formatDate(doc.date)}</td>
+                                <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                    <td onClick={() => openEditor(doc)} className="p-4 font-mono font-bold text-slate-700 dark:text-slate-200 cursor-pointer">{doc.number}</td>
+                                    <td onClick={() => openEditor(doc)} className="p-4 font-medium text-slate-900 dark:text-white cursor-pointer">{doc.client_name}</td>
+                                    <td onClick={() => openEditor(doc)} className="p-4 text-slate-500 cursor-pointer">{formatDate(doc.date)}</td>
                                     <td className="p-4 text-right font-bold text-slate-900 dark:text-white">{formatCurrency(doc.total)}</td>
                                     <td className="p-4 text-center">
                                         <div className="relative group/status inline-block">
@@ -721,7 +721,6 @@ export default function ClientHub({ data, updateData }) {
                                         </div>
                                     </td>
                                     <td className="p-4 text-right flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); openEditor(doc); }} title="Modifier / Imprimer" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition-colors"><Pencil size={16}/></button>
                                         {type === 'quote' && <button onClick={(e) => { e.stopPropagation(); convertToInvoice(doc); }} title="Convertir en Facture" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><ArrowRightLeft size={16}/></button>}
                                         <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc.id); }} className="text-slate-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={16}/></button>
                                     </td>
