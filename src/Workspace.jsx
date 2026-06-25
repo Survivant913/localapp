@@ -141,6 +141,24 @@ const EditorModule = ({ venture, currentUserEmail }) => {
             }
         };
         fetchPages();
+
+        const channel = supabase.channel(`venture_pages_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_pages', filter: `venture_id=eq.${venture.id}` }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setPages(prev => {
+                        if (prev.find(p => p.id === payload.new.id)) return prev;
+                        return [...prev, payload.new];
+                    });
+                } else if (payload.eventType === 'UPDATE') {
+                    setPages(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+                } else if (payload.eventType === 'DELETE') {
+                    setPages(prev => prev.filter(p => p.id !== payload.old.id));
+                    setActivePageId(current => current === payload.old.id ? null : current);
+                }
+            })
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const createPage = async () => {
