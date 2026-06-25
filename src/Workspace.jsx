@@ -9,6 +9,7 @@ import {
   Printer, Loader2,
   PieChart, TrendingUp, TrendingDown, LayoutDashboard
 } from 'lucide-react';
+import TiptapEditor from './TiptapEditor';
 
 // --- MODULES ---
 const MODULES = [
@@ -123,33 +124,22 @@ const MindmapNode = ({ node, selectedId, setSelectedId, updateLabel, handleMouse
 // ==========================================
 // 1. MODULE CARNET
 // ==========================================
-const EditorModule = ({ venture }) => {
+const EditorModule = ({ venture, currentUserEmail }) => {
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (!venture) return;
         const fetchPages = async () => {
             const { data } = await supabase.from('venture_pages').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
-            if (data) { 
-                setPages(prev => {
-                    if (prev.length === 0 && data.length > 0) setActivePageId(data[0].id);
-                    return data;
-                });
+            if (data) {
+                setPages(data);
+                if (data.length > 0 && !activePageId) setActivePageId(data[0].id);
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchPages();
-        
-        const channel = supabase.channel(`venture_pages_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_pages', filter: `venture_id=eq.${venture.id}` }, () => {
-                fetchPages();
-            })
-            .subscribe();
-            
-        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const createPage = async () => {
@@ -167,14 +157,15 @@ const EditorModule = ({ venture }) => {
 
     const savePageTimeoutRef = useRef(null);
 
-    const updateLocalPage = (id, field, value) => { 
-        setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p)); 
+    const handleEditorUpdate = (title, content) => {
+        const id = activePageId;
+        setPages(prev => prev.map(p => p.id === id ? { ...p, title, content } : p)); 
         
         if (savePageTimeoutRef.current) clearTimeout(savePageTimeoutRef.current);
         savePageTimeoutRef.current = setTimeout(async () => {
             setSaving(true);
             try {
-                await supabase.from('venture_pages').update({ [field]: value }).eq('id', id);
+                await supabase.from('venture_pages').update({ title, content }).eq('id', id);
             } finally {
                 setSaving(false);
             }
@@ -183,15 +174,7 @@ const EditorModule = ({ venture }) => {
     
     const activePage = pages.find(p => p.id === activePageId);
 
-    const savePageToDb = async (pageToSave) => {
-        if (!pageToSave) return;
-        setSaving(true);
-        try { 
-            await supabase.from('venture_pages').update({ title: pageToSave.title, content: pageToSave.content }).eq('id', pageToSave.id); 
-        } finally { 
-            setSaving(false); 
-        }
-    };
+
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
@@ -203,26 +186,14 @@ const EditorModule = ({ venture }) => {
             </div>
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black">
                 {activePage ? (
-                    <>
-                        <div className="px-8 pt-8 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <input 
-                                type="text" 
-                                value={activePage.title} 
-                                onChange={(e) => updateLocalPage(activePage.id, 'title', e.target.value)} 
-                                onBlur={() => savePageToDb(activePage)}
-                                placeholder="Titre de la page" 
-                                className="w-full text-3xl font-bold text-slate-800 dark:text-white bg-transparent outline-none placeholder-slate-300 dark:placeholder-slate-700" 
-                            />
-                            {saving && <span className="text-xs text-slate-400 animate-pulse absolute top-4 right-8">Sauvegarde...</span>}
-                        </div>
-                        <textarea 
-                            className="flex-1 w-full p-8 resize-none outline-none bg-transparent text-slate-700 dark:text-slate-200 leading-relaxed font-mono text-base custom-scrollbar" 
-                            placeholder="Écrivez ici..." 
-                            value={activePage.content || ''} 
-                            onChange={(e) => updateLocalPage(activePage.id, 'content', e.target.value)}
-                            onBlur={() => savePageToDb(activePage)}
-                        ></textarea>
-                    </>
+                    <TiptapEditor 
+                        key={activePage.id}
+                        pageId={activePage.id} 
+                        initialTitle={activePage.title} 
+                        initialContent={activePage.content} 
+                        onUpdate={handleEditorUpdate} 
+                        currentUserEmail={currentUserEmail} 
+                    />
                 ) : (<div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><FileText size={48} className="mb-4 opacity-50"/><p>Sélectionnez une page</p></div>)}
             </div>
         </div>
@@ -256,6 +227,8 @@ const StrategyModule = ({ venture }) => {
         { id: 'threats', label: 'Menaces', icon: AlertTriangle, color: 'yellow' },
     ];
 
+    const channelRef = useRef(null);
+
     useEffect(() => {
         if (!venture) return;
         const loadStrategy = async () => {
@@ -266,16 +239,20 @@ const StrategyModule = ({ venture }) => {
             setLoading(false);
         };
         loadStrategy();
-        const channel = supabase.channel(`venture_strategies_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_strategies', filter: `venture_id=eq.${venture.id}` }, () => {
-                loadStrategy();
+        const channel = supabase.channel(`venture_strategies_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setData(prev => ({ ...prev, [payload.sectionId]: payload.newItems }));
             })
             .subscribe();
+            
+        channelRef.current = channel;
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const handleUpdate = (sectionId, newItems) => {
         setData(prev => ({ ...prev, [sectionId]: newItems }));
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { sectionId, newItems } });
+        
         if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
         saveTimeoutRef.current[sectionId] = setTimeout(async () => {
             const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
@@ -328,6 +305,8 @@ const MindmapModule = ({ venture }) => {
     const containerRef = useRef(null);
     const saveTimeoutRef = useRef(null);
 
+    const channelRef = useRef(null);
+
     useEffect(() => {
         const load = async () => {
             const { data } = await supabase.from('venture_mindmaps').select('content').eq('venture_id', venture.id).single();
@@ -335,28 +314,38 @@ const MindmapModule = ({ venture }) => {
             else { const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue', collapsed: false }]; setNodes(root); await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' }); }
         };
         load();
-        const channel = supabase.channel(`venture_mindmaps_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_mindmaps', filter: `venture_id=eq.${venture.id}` }, () => {
-                load();
+        
+        const channel = supabase.channel(`venture_mindmaps_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setNodes(payload.nodes);
             })
             .subscribe();
+            
+        channelRef.current = channel;
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
-    useEffect(() => {
-        if (nodes.length === 0) return;
+    const broadcastAndSave = (newNodes) => {
+        setNodes(newNodes);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { nodes: newNodes } });
+        
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = setTimeout(async () => { await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: nodes }, { onConflict: 'venture_id' }); }, 1000);
-    }, [nodes, venture.id]);
+        saveTimeoutRef.current = setTimeout(async () => { 
+            await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: newNodes }, { onConflict: 'venture_id' }); 
+        }, 1000);
+    };
+
+    // Remove the old useEffect that watched [nodes] and saved on every change
+
 
     const getDescendants = (nodeId, allNodes) => { let descendants = []; allNodes.filter(n => n.parentId === nodeId).forEach(child => { descendants.push(child.id); descendants = [...descendants, ...getDescendants(child.id, allNodes)]; }); return descendants; };
     const isVisible = (nodeId) => { const node = nodes.find(n => n.id === nodeId); if (!node) return false; if (!node.parentId) return true; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return false; if (parent.collapsed) return false; return isVisible(parent.id); };
 
-    const addNode = () => { if (!selectedId) { alert("Sélectionnez une carte !"); return; } const parent = nodes.find(n => n.id === selectedId); if (!parent) return; if (parent.collapsed) { setNodes(prev => prev.map(n => n.id === parent.id ? { ...n, collapsed: false } : n)); } const newNode = { id: Date.now().toString(), x: parent.x + 240, y: parent.y, label: 'Nouvelle idée', parentId: selectedId, type: 'child', color: parent.color || 'white', collapsed: false }; setNodes(prev => [...prev, newNode]); setSelectedId(newNode.id); };
-    const addRoot = () => { const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale; const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale; const newRoot = { id: Date.now().toString(), x: viewportCenterX - 90, y: viewportCenterY - 40, label: 'Nouvelle Source', type: 'root', color: 'blue', collapsed: false }; setNodes([...nodes, newRoot]); setSelectedId(newRoot.id); };
-    const deleteNode = () => { if (!selectedId) return; const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]); setNodes(nodes.filter(n => !toDelete.has(n.id))); setSelectedId(null); };
-    const toggleCollapse = (e, nodeId) => { e.stopPropagation(); setNodes(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n)); };
-    const updateColor = (colorId) => { if(!selectedId) return; setNodes(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n)); };
+    const addNode = () => { if (!selectedId) { alert("Sélectionnez une carte !"); return; } const parent = nodes.find(n => n.id === selectedId); if (!parent) return; let currentNodes = [...nodes]; if (parent.collapsed) { currentNodes = currentNodes.map(n => n.id === parent.id ? { ...n, collapsed: false } : n); } const newNode = { id: Date.now().toString(), x: parent.x + 240, y: parent.y, label: 'Nouvelle idée', parentId: selectedId, type: 'child', color: parent.color || 'white', collapsed: false }; broadcastAndSave([...currentNodes, newNode]); setSelectedId(newNode.id); };
+    const addRoot = () => { const viewportCenterX = (-pan.x + (containerRef.current?.clientWidth || 800) / 2) / scale; const viewportCenterY = (-pan.y + (containerRef.current?.clientHeight || 600) / 2) / scale; const newRoot = { id: Date.now().toString(), x: viewportCenterX - 90, y: viewportCenterY - 40, label: 'Nouvelle Source', type: 'root', color: 'blue', collapsed: false }; broadcastAndSave([...nodes, newRoot]); setSelectedId(newRoot.id); };
+    const deleteNode = () => { if (!selectedId) return; const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]); broadcastAndSave(nodes.filter(n => !toDelete.has(n.id))); setSelectedId(null); };
+    const toggleCollapse = (e, nodeId) => { e.stopPropagation(); broadcastAndSave(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n)); };
+    const updateColor = (colorId) => { if(!selectedId) return; broadcastAndSave(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n)); };
 
     const handleMouseDown = (e, nodeId = null) => { if (nodeId) { e.stopPropagation(); setSelectedId(nodeId); setDraggingNode({ id: nodeId, lastX: e.clientX, lastY: e.clientY }); } else { setIsPanning(true); setLastMousePos({ x: e.clientX, y: e.clientY }); setSelectedId(null); } };
     
@@ -367,7 +356,8 @@ const MindmapModule = ({ venture }) => {
                 const deltaX = (e.clientX - draggingNode.lastX) / scale; 
                 const deltaY = (e.clientY - draggingNode.lastY) / scale; 
                 const nodesToMove = new Set([draggingNode.id, ...getDescendants(draggingNode.id, currentNodes)]); 
-                setNodes(prev => prev.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n)); 
+                const newNodes = currentNodes.map(n => nodesToMove.has(n.id) ? { ...n, x: n.x + deltaX, y: n.y + deltaY } : n);
+                broadcastAndSave(newNodes);
                 setDraggingNode(prev => ({ ...prev, lastX: e.clientX, lastY: e.clientY })); 
             } else if (isPanning) { 
                 const dx = e.clientX - lastMousePos.x; 
@@ -382,7 +372,7 @@ const MindmapModule = ({ venture }) => {
         return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); }; 
     }, [draggingNode, isPanning, lastMousePos, scale]);
 
-    const updateLabel = (id, newLabel) => { setNodes(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n)); };
+    const updateLabel = (id, newLabel) => { broadcastAndSave(nodes.map(n => n.id === id ? { ...n, label: newLabel } : n)); };
 
     const renderLines = () => nodes.map(node => { if (!isVisible(node.id)) return null; if (!node.parentId) return null; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return null; const w = 180; const startX = parent.x + w; const startY = parent.y + 40; const endX = node.x; const endY = node.y + 40; const dist = Math.abs(endX - startX) / 2; const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`; return (<path key={`link-${node.id}`} d={pathData} fill="none" stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-700" />); });
 
@@ -390,7 +380,7 @@ const MindmapModule = ({ venture }) => {
         <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-2"><div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors"><GitCommit size={20}/></button><button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors"><Plus size={20}/></button><div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div><button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`}><Trash2 size={20}/></button></div>{selectedId && (<div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">{NODE_COLORS.map(c => (<button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>))}</div>)}</div>
             <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button><button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button><button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button></div>
-            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning ? 'cursor-grabbing' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
+            <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning || draggingNode ? 'cursor-grabbing select-none' : ''}`} onMouseDown={(e) => handleMouseDown(e)}>
                 <div style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, transformOrigin: '0 0', width: '100%', height: '100%', position: 'absolute' }}>
                     <svg className="absolute top-0 left-0 overflow-visible pointer-events-none z-0" width="100%" height="100%">{renderLines()}</svg>
                     {nodes.map(node => (
@@ -428,6 +418,8 @@ const FinanceModule = ({ venture }) => {
         pessimistic: { fixed: 1800, var: 12, price: 40, target: 50 }
     };
 
+    const channelRef = useRef(null);
+
     useEffect(() => {
         const load = async () => {
             const { data: dbData } = await supabase.from('venture_financials').select('scenarios').eq('venture_id', venture.id).single();
@@ -439,11 +431,13 @@ const FinanceModule = ({ venture }) => {
             setLoading(false);
         };
         load();
-        const channel = supabase.channel(`venture_financials_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_financials', filter: `venture_id=eq.${venture.id}` }, () => {
-                load();
+        const channel = supabase.channel(`venture_financials_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setData(payload.newData);
             })
             .subscribe();
+            
+        channelRef.current = channel;
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
@@ -453,6 +447,8 @@ const FinanceModule = ({ venture }) => {
         else newData[activeScenario][field] = parseFloat(value) || 0;
         
         setData(newData);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { newData } });
+        
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = setTimeout(async () => {
             await supabase.from('venture_financials').upsert({ venture_id: venture.id, scenarios: newData }, { onConflict: 'venture_id' });
@@ -570,6 +566,8 @@ const CompetitorModule = ({ venture }) => {
 
     const COMP_COLORS = ['red', 'green', 'orange', 'purple', 'pink', 'cyan', 'yellow'];
 
+    const channelRef = useRef(null);
+
     useEffect(() => {
         const load = async () => {
             const { data } = await supabase.from('venture_competitors').select('*').eq('venture_id', venture.id).order('is_primary', { ascending: false });
@@ -583,17 +581,21 @@ const CompetitorModule = ({ venture }) => {
             setLoading(false);
         };
         load();
-        const channel = supabase.channel(`venture_competitors_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_competitors', filter: `venture_id=eq.${venture.id}` }, () => {
-                load();
+        const channel = supabase.channel(`venture_competitors_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setCompetitors(payload.competitors);
             })
             .subscribe();
+            
+        channelRef.current = channel;
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const handleUpdate = (id, field, value) => {
         const newComps = competitors.map(c => c.id === id ? { ...c, [field]: value } : c);
         setCompetitors(newComps);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { competitors: newComps } });
+        
         if (saveTimeoutRef.current[id]) clearTimeout(saveTimeoutRef.current[id]);
         saveTimeoutRef.current[id] = setTimeout(async () => {
             await supabase.from('venture_competitors').update({ [field]: value }).eq('id', id);
@@ -615,17 +617,24 @@ const CompetitorModule = ({ venture }) => {
         const base = competitors[0] || { scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
         const nextColor = COMP_COLORS[(competitors.length - 1) % COMP_COLORS.length];
         const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: nextColor, is_visible: true, scores: base.scores }]).select();
-        if (data) setCompetitors([...competitors, data[0]]);
+        if (data) {
+            const newComps = [...competitors, data[0]];
+            setCompetitors(newComps);
+            channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { competitors: newComps } });
+        }
     };
 
     const deleteCompetitor = async (id) => {
         if (!window.confirm("Supprimer ?")) return;
         await supabase.from('venture_competitors').delete().eq('id', id);
-        setCompetitors(competitors.filter(c => c.id !== id));
+        const newComps = competitors.filter(c => c.id !== id);
+        setCompetitors(newComps);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { competitors: newComps } });
     };
 
     const updateAllScores = async (updatedCompetitors) => {
         setCompetitors(updatedCompetitors);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { competitors: updatedCompetitors } });
         for (const comp of updatedCompetitors) {
             await supabase.from('venture_competitors').update({ scores: comp.scores }).eq('id', comp.id);
         }
@@ -776,6 +785,8 @@ const AnalyticsModule = ({ venture }) => {
     const [newLabel, setNewLabel] = useState('');
     const [newVal, setNewVal] = useState('');
 
+    const channelRef = useRef(null);
+
     useEffect(() => {
         if (!venture) return;
         const fetchCharts = async () => {
@@ -787,17 +798,20 @@ const AnalyticsModule = ({ venture }) => {
             setLoading(false);
         };
         fetchCharts();
-        const channel = supabase.channel(`venture_analytics_${venture.id}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_analytics', filter: `venture_id=eq.${venture.id}` }, () => {
-                fetchCharts();
+        const channel = supabase.channel(`venture_analytics_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setCharts(payload.charts);
             })
             .subscribe();
+            
+        channelRef.current = channel;
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const updateChart = (id, field, value) => {
         const updated = charts.map(c => c.id === id ? { ...c, [field]: value } : c);
         setCharts(updated);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: updated } });
         
         if (saveTimer) clearTimeout(saveTimer);
         setSaveTimer(setTimeout(async () => {
@@ -809,8 +823,10 @@ const AnalyticsModule = ({ venture }) => {
         const newChart = { venture_id: venture.id, title: 'Nouvelle Analyse', chart_type: 'line', data_points: [], show_trend: true };
         const { data } = await supabase.from('venture_analytics').insert([newChart]).select();
         if (data && data.length > 0) {
-            setCharts([...charts, data[0]]);
+            const newCharts = [...charts, data[0]];
+            setCharts(newCharts);
             setActiveChartId(data[0].id);
+            channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: newCharts } });
         }
     };
 
@@ -821,6 +837,7 @@ const AnalyticsModule = ({ venture }) => {
         const remaining = charts.filter(c => c.id !== id);
         setCharts(remaining);
         if (activeChartId === id) setActiveChartId(remaining[0]?.id || null);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: remaining } });
     };
 
     const activeChart = charts.find(c => c.id === activeChartId);
@@ -1195,6 +1212,7 @@ export default function Workspace() {
     const [activeModuleId, setActiveModuleId] = useState('editor');
     const [isExporting, setIsExporting] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
 
     useEffect(() => { fetchVentures(); }, []);
 
@@ -1203,6 +1221,7 @@ export default function Workspace() {
             setLoading(true);
             const { data: userData } = await supabase.auth.getUser();
             const userEmail = userData?.user?.email;
+            if (userEmail) setCurrentUserEmail(userEmail);
 
             let allVentures = [];
             
@@ -1572,7 +1591,7 @@ export default function Workspace() {
                 </div>
             </header>
             {showShareModal && <ShareModal venture={activeVenture} onClose={() => setShowShareModal(false)} />}
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} currentUserEmail={currentUserEmail} />}</main></div>
         </div>
     );
 }
