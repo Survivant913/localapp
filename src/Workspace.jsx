@@ -1278,9 +1278,9 @@ const KanbanModule = ({ venture, currentUserEmail }) => {
                         <div className="p-4 border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between shrink-0"><h3 className="font-bold text-slate-700 dark:text-slate-300">{col.label}</h3><span className="text-xs font-bold bg-white dark:bg-slate-800 px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">{tasks.filter(t => t.status === col.id).length}</span></div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {tasks.filter(t => t.status === col.id).map(task => (
-                                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing group">
-                                    <div className="flex justify-between items-start gap-2">
-                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap flex-1">{task.title}</p>
+                                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing group overflow-hidden">
+                                    <div className="flex justify-between items-start gap-2 min-w-0">
+                                        <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-words break-all whitespace-pre-wrap flex-1 min-w-0 overflow-hidden">{task.title}</p>
                                         <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><Trash2 size={14}/></button>
                                     </div>
                                 </div>
@@ -1337,9 +1337,9 @@ const ChatModule = ({ venture, currentUserEmail }) => {
                 {messages.length === 0 ? <div className="text-center text-slate-400 mt-10">Aucun message. Commencez la discussion !</div> : messages.map(msg => {
                     const isMe = msg.user_email === currentUserEmail;
                     return (
-                        <div key={msg.id} className={`flex flex-col max-w-[75%] ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                        <div key={msg.id} className={`flex flex-col max-w-[75%] min-w-0 ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
                             <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">{isMe ? 'Vous' : msg.user_email}</span>
-                            <div className={`p-3 rounded-2xl text-sm break-words whitespace-pre-wrap ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
+                            <div className={`p-3 rounded-2xl text-sm break-words break-all whitespace-pre-wrap min-w-0 ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
                                 {msg.message}
                             </div>
                         </div>
