@@ -133,10 +133,23 @@ const EditorModule = ({ venture }) => {
         if (!venture) return;
         const fetchPages = async () => {
             const { data } = await supabase.from('venture_pages').select('*').eq('venture_id', venture.id).order('created_at', { ascending: true });
-            if (data) { setPages(data); if (data.length > 0) setActivePageId(data[0].id); }
+            if (data) { 
+                setPages(prev => {
+                    if (prev.length === 0 && data.length > 0) setActivePageId(data[0].id);
+                    return data;
+                });
+            }
             setLoading(false);
         };
         fetchPages();
+        
+        const channel = supabase.channel(`venture_pages_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_pages', filter: `venture_id=eq.${venture.id}` }, () => {
+                fetchPages();
+            })
+            .subscribe();
+            
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const createPage = async () => {
@@ -240,6 +253,12 @@ const StrategyModule = ({ venture }) => {
             setLoading(false);
         };
         loadStrategy();
+        const channel = supabase.channel(`venture_strategies_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_strategies', filter: `venture_id=eq.${venture.id}` }, () => {
+                loadStrategy();
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const handleUpdate = (sectionId, newItems) => {
@@ -303,6 +322,12 @@ const MindmapModule = ({ venture }) => {
             else { const root = [{ id: 'root', x: 400, y: 300, label: venture.title || 'Idée Centrale', type: 'root', color: 'blue', collapsed: false }]; setNodes(root); await supabase.from('venture_mindmaps').upsert({ venture_id: venture.id, content: root }, { onConflict: 'venture_id' }); }
         };
         load();
+        const channel = supabase.channel(`venture_mindmaps_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_mindmaps', filter: `venture_id=eq.${venture.id}` }, () => {
+                load();
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     useEffect(() => {
@@ -401,6 +426,12 @@ const FinanceModule = ({ venture }) => {
             setLoading(false);
         };
         load();
+        const channel = supabase.channel(`venture_financials_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_financials', filter: `venture_id=eq.${venture.id}` }, () => {
+                load();
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const updateData = (field, value, isGlobal = false) => {
@@ -539,6 +570,12 @@ const CompetitorModule = ({ venture }) => {
             setLoading(false);
         };
         load();
+        const channel = supabase.channel(`venture_competitors_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_competitors', filter: `venture_id=eq.${venture.id}` }, () => {
+                load();
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const handleUpdate = (id, field, value) => {
@@ -737,6 +774,12 @@ const AnalyticsModule = ({ venture }) => {
             setLoading(false);
         };
         fetchCharts();
+        const channel = supabase.channel(`venture_analytics_${venture.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_analytics', filter: `venture_id=eq.${venture.id}` }, () => {
+                fetchCharts();
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
     }, [venture]);
 
     const updateChart = (id, field, value) => {
@@ -1065,6 +1108,72 @@ const AnalyticsModule = ({ venture }) => {
 // ==========================================
 // WORKSPACE MAIN
 // ==========================================
+
+const ShareModal = ({ venture, onClose }) => {
+    const [email, setEmail] = useState('');
+    const [shares, setShares] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!venture) return;
+        const fetchShares = async () => {
+            const { data } = await supabase.from('venture_shares').select('*').eq('venture_id', venture.id);
+            setShares(data || []);
+            setLoading(false);
+        };
+        fetchShares();
+    }, [venture]);
+
+    const addShare = async (e) => {
+        e.preventDefault();
+        if (!email) return;
+        try {
+            const { data, error } = await supabase.from('venture_shares').insert([{ venture_id: venture.id, user_email: email, role: 'editor' }]).select();
+            if (error) throw error;
+            if (data) setShares([...shares, data[0]]);
+            setEmail('');
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors du partage");
+        }
+    };
+
+    const removeShare = async (id) => {
+        try {
+            await supabase.from('venture_shares').delete().eq('id', id);
+            setShares(shares.filter(s => s.id !== id));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh]">
+                <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><Share2 size={18}/> Partager "{venture?.title}"</h3>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg"><X size={20}/></button>
+                </div>
+                <div className="p-4 flex-1 overflow-y-auto">
+                    <form onSubmit={addShare} className="flex gap-2 mb-6">
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email du collaborateur" className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-indigo-500" />
+                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Inviter</button>
+                    </form>
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Collaborateurs ({shares.length})</h4>
+                        {loading ? <p className="text-sm text-slate-500">Chargement...</p> : shares.length === 0 ? <p className="text-sm text-slate-500">Aucun collaborateur.</p> : shares.map(s => (
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{s.user_email}</span>
+                                <button onClick={() => removeShare(s.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function Workspace() {
     const [ventures, setVentures] = useState([]);
     const [activeVenture, setActiveVenture] = useState(null);
@@ -1072,11 +1181,45 @@ export default function Workspace() {
     const [newVentureTitle, setNewVentureTitle] = useState("");
     const [activeModuleId, setActiveModuleId] = useState('editor');
     const [isExporting, setIsExporting] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
     useEffect(() => { fetchVentures(); }, []);
 
     const fetchVentures = async () => {
-        try { const { data, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false }); if (error) throw error; setVentures(data || []); } 
+        try { 
+            setLoading(true);
+            const { data: userData } = await supabase.auth.getUser();
+            const userEmail = userData?.user?.email;
+
+            let allVentures = [];
+            
+            // Projets possédés
+            const { data: ownedData, error } = await supabase.from('ventures').select('*').order('last_modified', { ascending: false }); 
+            if (!error && ownedData) {
+                allVentures = [...ownedData];
+            }
+
+            // Projets partagés
+            if (userEmail) {
+                const { data: sharedIds } = await supabase.from('venture_shares').select('venture_id').eq('user_email', userEmail);
+                if (sharedIds && sharedIds.length > 0) {
+                    const ids = sharedIds.map(s => s.venture_id);
+                    const { data: sharedData } = await supabase.from('ventures').select('*').in('id', ids);
+                    if (sharedData) {
+                        const ownedIds = new Set(allVentures.map(v => v.id));
+                        sharedData.forEach(v => {
+                            if (!ownedIds.has(v.id)) {
+                                v.isShared = true;
+                                allVentures.push(v);
+                            }
+                        });
+                    }
+                }
+            }
+
+            allVentures.sort((a, b) => new Date(b.last_modified) - new Date(a.last_modified));
+            setVentures(allVentures);
+        } 
         catch (error) { console.error(error); } finally { setLoading(false); }
     };
 
@@ -1393,17 +1536,29 @@ export default function Workspace() {
             <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
                 <div className="flex items-center gap-4">
                     <button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button>
-                    <h2 className="text-sm font-bold text-slate-800 dark:text-white">{activeVenture.title}</h2>
+                    <h2 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        {activeVenture.title}
+                        {activeVenture.isShared && <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Partagé</span>}
+                    </h2>
                 </div>
-                <button 
-                    onClick={generateBusinessPlan} 
-                    disabled={isExporting}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                >
-                    {isExporting ? <Loader2 size={14} className="animate-spin"/> : <Printer size={14}/>}
-                    Imprimer le Dossier
-                </button>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowShareModal(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                        <Share2 size={14}/> Partager
+                    </button>
+                    <button 
+                        onClick={generateBusinessPlan} 
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                    >
+                        {isExporting ? <Loader2 size={14} className="animate-spin"/> : <Printer size={14}/>}
+                        Imprimer le Dossier
+                    </button>
+                </div>
             </header>
+            {showShareModal && <ShareModal venture={activeVenture} onClose={() => setShowShareModal(false)} />}
             <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} />}</main></div>
         </div>
     );
