@@ -165,7 +165,22 @@ const EditorModule = ({ venture }) => {
         if (activePageId === id) setActivePageId(newPages[0]?.id || null);
     };
 
-    const updateLocalPage = (id, field, value) => { setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p)); };
+    const savePageTimeoutRef = useRef(null);
+
+    const updateLocalPage = (id, field, value) => { 
+        setPages(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p)); 
+        
+        if (savePageTimeoutRef.current) clearTimeout(savePageTimeoutRef.current);
+        savePageTimeoutRef.current = setTimeout(async () => {
+            setSaving(true);
+            try {
+                await supabase.from('venture_pages').update({ [field]: value }).eq('id', id);
+            } finally {
+                setSaving(false);
+            }
+        }, 1500);
+    };
+    
     const activePage = pages.find(p => p.id === activePageId);
 
     const savePageToDb = async (pageToSave) => {
@@ -177,8 +192,6 @@ const EditorModule = ({ venture }) => {
             setSaving(false); 
         }
     };
-
-    useAutoSave(activePage, 1500, savePageToDb);
 
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
@@ -1133,8 +1146,8 @@ const ShareModal = ({ venture, onClose }) => {
             if (data) setShares([...shares, data[0]]);
             setEmail('');
         } catch (error) {
-            console.error(error);
-            alert("Erreur lors du partage");
+            console.error("Share error details:", error);
+            alert("Erreur lors du partage : " + (error.message || "Vérifiez vos permissions (RLS) sur la table venture_shares."));
         }
     };
 
