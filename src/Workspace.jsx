@@ -6,7 +6,7 @@ import {
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
-  Printer, Loader2,
+  Printer, Loader2, LogOut,
   PieChart, TrendingUp, TrendingDown, LayoutDashboard
 } from 'lucide-react';
 import TiptapEditor from './TiptapEditor';
@@ -1257,9 +1257,16 @@ export default function Workspace() {
         catch (error) { alert("Erreur"); }
     };
 
-    const deleteVenture = async (id, e) => {
-        e.stopPropagation(); if (!window.confirm("Supprimer ?")) return;
-        await supabase.from('ventures').delete().eq('id', id); setVentures(ventures.filter(v => v.id !== id));
+    const deleteVenture = async (v, e) => {
+        e.stopPropagation(); 
+        if (v.isShared) {
+            if (!window.confirm("Quitter ce projet partagé ?")) return;
+            await supabase.from('venture_shares').delete().match({ venture_id: v.id, user_email: currentUserEmail });
+        } else {
+            if (!window.confirm("Supprimer définitivement ce projet pour tout le monde ?")) return;
+            await supabase.from('ventures').delete().eq('id', v.id); 
+        }
+        setVentures(ventures.filter(ven => ven.id !== v.id));
     };
 
     // --- EXPORT PDF V4 : PREMIUM EDITION ---
@@ -1555,7 +1562,7 @@ export default function Workspace() {
 
     if (!activeVenture) {
         return (
-            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2></div><div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v.id, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowLeft size={16} className="rotate-180"/></div></div>))}</div>)}</div>
+            <div className="fade-in p-6 max-w-6xl mx-auto space-y-8"><div className="flex justify-between items-center"><h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2></div><div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100" title={v.isShared ? "Quitter le projet" : "Supprimer le projet"}>{v.isShared ? <LogOut size={16}/> : <Trash2 size={16}/>}</button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowLeft size={16} className="rotate-180"/></div></div>))}</div>)}</div>
         );
     }
 
@@ -1570,12 +1577,14 @@ export default function Workspace() {
                     </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button 
-                        onClick={() => setShowShareModal(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                    >
-                        <Share2 size={14}/> Partager
-                    </button>
+                    {!activeVenture.isShared && (
+                        <button 
+                            onClick={() => setShowShareModal(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        >
+                            <Share2 size={14}/> Partager
+                        </button>
+                    )}
                     <button 
                         onClick={generateBusinessPlan} 
                         disabled={isExporting}
