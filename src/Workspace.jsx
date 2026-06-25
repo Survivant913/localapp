@@ -464,8 +464,8 @@ const FinanceModule = ({ venture }) => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 shrink-0">
                     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><Menu size={16}/> Paramètres ({activeScenario})</h3>
                         <div className="space-y-4">
@@ -490,8 +490,8 @@ const FinanceModule = ({ venture }) => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-96 relative flex flex-col">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4">Analyse du Point Mort</h3>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-h-[400px] relative flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 shrink-0">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
                         <svg className="w-full h-full overflow-hidden rounded-lg" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
                             <polygon points={`${ptBreakeven.x},${ptBreakeven.y} ${WIDTH-PADDING},${ptEndRev.y} ${WIDTH-PADDING},${ptEndCost.y}`} fill="rgba(16, 185, 129, 0.1)" />
@@ -656,7 +656,7 @@ const CompetitorModule = ({ venture }) => {
 
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center min-h-[400px]">
-                    <svg width="350" height="350" viewBox="0 0 300 300" className="overflow-visible">
+                    <svg viewBox="0 0 300 300" className="w-full h-full max-h-[600px] overflow-visible" preserveAspectRatio="xMidYMid meet">
                         {[1, 2, 3, 4, 5].map(level => (
                             <polygon key={level} points={criteria.map((_, i) => `${getCoords(level, i).x},${getCoords(level, i).y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1" className="text-slate-200 dark:text-slate-700" />
                         ))}
@@ -813,7 +813,7 @@ const AnalyticsModule = ({ venture }) => {
             return (
                 <div className="flex items-center w-full h-full gap-8">
                     {/* Le Camembert */}
-                    <svg viewBox={`0 0 ${W} ${H}`} className="w-2/3 h-full overflow-visible">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-2/3 h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
                         {pts.map((p, i) => {
                             const angle = (Math.abs(p.value) / Math.abs(total)) * Math.PI * 2; // Math.abs évite les bugs si valeur négative dans un pie
                             const endAngle = startAngle + angle;
@@ -873,7 +873,7 @@ const AnalyticsModule = ({ venture }) => {
         }
 
         return (
-            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
                 {/* Lignes de quadrillage horizontales */}
                 {gridLines.map((line, i) => (
                     <g key={i}>
@@ -969,7 +969,7 @@ const AnalyticsModule = ({ venture }) => {
             {/* CONTENU PRINCIPAL */}
             <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
                 {activeChart ? (
-                    <div className="p-6 max-w-6xl mx-auto w-full space-y-6">
+                    <div className="p-6 max-w-6xl mx-auto w-full flex flex-col gap-6 min-h-full">
                         
                         {/* HEADER DE CONFIGURATION DU GRAPHIQUE */}
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
@@ -1018,8 +1018,8 @@ const AnalyticsModule = ({ venture }) => {
                         </div>
 
                         {/* RENDU DU GRAPHIQUE */}
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <div className="h-96 w-full flex items-center justify-center">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-h-[400px] flex flex-col">
+                            <div className="flex-1 w-full flex items-center justify-center">
                                 {renderSVG()}
                             </div>
                         </div>
