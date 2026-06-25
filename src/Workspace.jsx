@@ -131,6 +131,8 @@ const EditorModule = ({ venture, currentUserEmail }) => {
     const [activePageId, setActivePageId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [, setSaving] = useState(false);
+    const [isZenMode, setIsZenMode] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     useEffect(() => {
         if (!venture) return;
@@ -200,12 +202,25 @@ const EditorModule = ({ venture, currentUserEmail }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-slate-900">
-            <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center"><span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pages</span><button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button></div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map(page => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
-            </div>
-            <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black">
+        <div className={`flex h-full w-full bg-white dark:bg-slate-900 ${isZenMode ? 'fixed inset-0 z-[100]' : ''}`}>
+            {!isZenMode && !isSidebarCollapsed && (
+                <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 animate-in slide-in-from-left-4 duration-300">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pages</span>
+                        <div className="flex items-center gap-1">
+                            <button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Nouvelle page"><Plus size={16}/></button>
+                            <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
+                        </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map(page => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
+                </div>
+            )}
+            <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
+                {!isZenMode && isSidebarCollapsed && (
+                    <button onClick={() => setIsSidebarCollapsed(false)} className="absolute top-4 left-4 z-50 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors" title="Afficher les pages">
+                        <Menu size={18}/>
+                    </button>
+                )}
                 {activePage ? (
                     <TiptapEditor 
                         key={activePage.id}
@@ -214,6 +229,8 @@ const EditorModule = ({ venture, currentUserEmail }) => {
                         initialContent={activePage.content} 
                         onUpdate={handleEditorUpdate} 
                         currentUserEmail={currentUserEmail} 
+                        isZenMode={isZenMode}
+                        onToggleZenMode={() => setIsZenMode(!isZenMode)}
                     />
                 ) : (<div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700"><FileText size={48} className="mb-4 opacity-50"/><p>Sélectionnez une page</p></div>)}
             </div>
