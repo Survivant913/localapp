@@ -260,10 +260,10 @@ export default function ProjectsManager({ data, updateData }) {
                 </div>
             )}
 
-            {/* LISTE DES PROJETS - GRILLE RESPONSIVE */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+            {/* LISTE DES PROJETS - GRILLE RESPONSIVE EN COLONNES (MASONRY) */}
+            <div className="columns-1 xl:columns-2 gap-8">
                 {sortedProjects.length === 0 && !showForm && ( 
-                    <div className="xl:col-span-2 text-center py-24"> 
+                    <div className="text-center py-24 break-inside-avoid"> 
                         <FolderKanban className="mx-auto h-20 w-20 text-gray-200 dark:text-slate-700 mb-6" /> 
                         <h3 className="text-2xl font-bold text-gray-400 dark:text-slate-600">Aucun projet actif</h3> 
                     </div> 
@@ -278,7 +278,7 @@ export default function ProjectsManager({ data, updateData }) {
                     const linkedNotes = (data.notes || []).filter(n => String(n.linkedProjectId) === String(project.id));
 
                     return (
-                        <div key={project.id} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-lg border border-white dark:border-slate-800 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-900 group relative flex flex-col">
+                        <div key={project.id} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-lg border border-white dark:border-slate-800 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-900 group relative flex flex-col break-inside-avoid mb-8 w-full inline-block">
                             
                             {/* EN-TÊTE DE LA CARTE */}
                             <div className="p-8 cursor-pointer bg-gradient-to-br from-gray-50/50 to-white dark:from-slate-800/50 dark:to-slate-900 transition-colors" onClick={() => toggleExpand(project.id)}>
@@ -380,19 +380,21 @@ export default function ProjectsManager({ data, updateData }) {
                                                     const objProgress = obj.subObjectives && obj.subObjectives.length > 0 ? (obj.subObjectives.filter(s => s.completed).length / obj.subObjectives.length) * 100 : (obj.completed ? 100 : 0); 
                                                     return ( 
                                                         <div key={obj.id} className="group/obj animate-in fade-in slide-in-from-left-2"> 
-                                                            <div className="flex items-center justify-between mb-3 bg-gray-50/80 dark:bg-slate-700/30 p-2 pr-4 rounded-xl border border-gray-100/50 dark:border-slate-600/30 shadow-sm"> 
-                                                                <div className="flex items-center gap-3 font-bold text-gray-800 dark:text-gray-200"> 
-                                                                    <div className={`w-1.5 h-6 rounded-full shadow-sm ${objProgress === 100 ? 'bg-green-500 shadow-green-500/50' : 'bg-blue-500 shadow-blue-500/50'}`}></div>
-                                                                    <span className="text-sm">{obj.title}</span> 
+                                                            <div className="flex items-start justify-between mb-3 bg-gray-50/80 dark:bg-slate-700/30 p-2 pr-4 rounded-xl border border-gray-100/50 dark:border-slate-600/30 shadow-sm"> 
+                                                                <div className="flex items-start gap-3 font-bold text-gray-800 dark:text-gray-200 w-full"> 
+                                                                    <div className={`w-1.5 h-6 rounded-full shadow-sm shrink-0 mt-0.5 ${objProgress === 100 ? 'bg-green-500 shadow-green-500/50' : 'bg-blue-500 shadow-blue-500/50'}`}></div>
+                                                                    <span className="text-sm break-words flex-1 whitespace-pre-wrap">{obj.title}</span> 
                                                                 </div> 
-                                                                <button onClick={() => deleteObjective(project.id, obj.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover/obj:opacity-100 transition-opacity bg-white dark:bg-slate-800 p-1.5 rounded-md shadow-sm"><X size={14} /></button> 
+                                                                <button onClick={() => deleteObjective(project.id, obj.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover/obj:opacity-100 transition-opacity bg-white dark:bg-slate-800 p-1.5 rounded-md shadow-sm shrink-0 ml-2"><X size={14} /></button> 
                                                             </div> 
                                                             
                                                             <div className="pl-4 ml-1.5 border-l-2 border-gray-100 dark:border-slate-700/50 space-y-2 mb-6"> 
                                                                 {obj.subObjectives && obj.subObjectives.map(sub => ( 
-                                                                    <div key={sub.id} className="flex items-center gap-3 cursor-pointer group/sub hover:bg-white dark:hover:bg-slate-700/50 p-2.5 rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-slate-600 animate-in fade-in" onClick={() => toggleSubObjective(project.id, obj.id, sub.id)}> 
-                                                                        {sub.completed ? <CheckSquare size={18} className="text-green-500 drop-shadow-sm" /> : <Square size={18} className="text-gray-300 group-hover/sub:text-blue-500 transition-colors" />} 
-                                                                        <span className={`text-sm font-medium transition-all ${sub.completed ? 'text-gray-400 line-through opacity-70' : 'text-gray-700 dark:text-gray-200'}`}>{sub.title}</span> 
+                                                                    <div key={sub.id} className="flex items-start gap-3 cursor-pointer group/sub hover:bg-white dark:hover:bg-slate-700/50 p-2.5 rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-slate-600 animate-in fade-in" onClick={() => toggleSubObjective(project.id, obj.id, sub.id)}> 
+                                                                        <div className="mt-0.5 shrink-0">
+                                                                            {sub.completed ? <CheckSquare size={18} className="text-green-500 drop-shadow-sm" /> : <Square size={18} className="text-gray-300 group-hover/sub:text-blue-500 transition-colors" />} 
+                                                                        </div>
+                                                                        <span className={`text-sm font-medium transition-all break-words flex-1 whitespace-pre-wrap ${sub.completed ? 'text-gray-400 line-through opacity-70' : 'text-gray-700 dark:text-gray-200'}`}>{sub.title}</span> 
                                                                     </div> 
                                                                 ))} 
                                                                 <div className="flex gap-2 pl-2 mt-2 group/input"> 
