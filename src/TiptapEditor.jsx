@@ -7,9 +7,11 @@ import Highlight from '@tiptap/extension-highlight';
 import * as Y from 'yjs';
 import { SupabaseBroadcastProvider } from './SupabaseBroadcastProvider';
 import { supabase } from './supabaseClient';
+import TextAlign from '@tiptap/extension-text-align';
 import { 
     Bold, Italic, Strikethrough, List, CheckSquare, 
-    Heading, Pilcrow, Quote, Maximize2, Minimize2, Printer, Highlighter
+    Heading, Pilcrow, Quote, Maximize2, Minimize2, Printer, Highlighter,
+    AlignLeft, AlignCenter, AlignRight, AlignJustify
 } from 'lucide-react';
 
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D'];
@@ -72,6 +74,9 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
             Highlight.configure({
                 multicolor: true,
             }),
+            TextAlign.configure({
+                types: ['heading', 'paragraph'],
+            }),
             Collaboration.configure({
                 document: ydoc,
             }),
@@ -128,7 +133,21 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
                     <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} icon={Bold} title="Gras" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} icon={Italic} title="Italique" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} icon={Strikethrough} title="Barré" />
-                    <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')} icon={Highlighter} title="Surligner" />
+                    <div className="flex items-center">
+                        <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight().run()} isActive={editor.isActive('highlight')} icon={Highlighter} title="Surligner" />
+                        <input 
+                            type="color" 
+                            onInput={(e) => editor.chain().focus().setHighlight({ color: e.target.value }).run()}
+                            value={editor.getAttributes('highlight').color || '#ffff00'}
+                            className="w-6 h-6 ml-1 p-0 border-0 cursor-pointer rounded bg-transparent [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded"
+                            title="Changer la couleur"
+                        />
+                    </div>
+                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                    <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('left').run()} isActive={editor.isActive({ textAlign: 'left' })} icon={AlignLeft} title="Aligner à gauche" />
+                    <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('center').run()} isActive={editor.isActive({ textAlign: 'center' })} icon={AlignCenter} title="Centrer" />
+                    <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('right').run()} isActive={editor.isActive({ textAlign: 'right' })} icon={AlignRight} title="Aligner à droite" />
+                    <ToolbarButton onClick={() => editor.chain().focus().setTextAlign('justify').run()} isActive={editor.isActive({ textAlign: 'justify' })} icon={AlignJustify} title="Justifier" />
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')} icon={List} title="Liste à puces" />
                     <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} icon={CheckSquare} title="Liste numérotée" />

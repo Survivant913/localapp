@@ -438,7 +438,12 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 <div class="meta">${date}</div>
                 <h1>${title}</h1>
                 <div class="content">${content}</div>
-                <script>window.onload = () => { window.print(); window.close(); }</script>
+                <script>
+                    setTimeout(() => {
+                        window.print();
+                        window.close();
+                    }, 500);
+                </script>
             </body>
             </html>
         `);
