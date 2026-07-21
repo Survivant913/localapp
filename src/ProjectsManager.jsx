@@ -153,6 +153,7 @@ export default function ProjectsManager({ data, updateData }) {
     const deleteObjective = (projectId, objId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.filter(o => o.id !== objId); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
     const addSubObjective = (projectId, objId) => { const key = `${projectId}-${objId}`; const text = newSubObjectiveText[key]; if (!text || !text.trim()) return; const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: [...(o.subObjectives || []), { id: Date.now(), title: text, completed: false }] }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); setNewSubObjectiveText({ ...newSubObjectiveText, [key]: '' }); };
     const toggleSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { const newSubs = o.subObjectives.map(s => s.id === subId ? { ...s, completed: !s.completed } : s); return { ...o, subObjectives: newSubs }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
+    const deleteSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: o.subObjectives.filter(s => s.id !== subId) }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
     const updateProjectStatus = (projectId, newStatus) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, status: newStatus } : p) }); };
     const updateProjectNotes = (projectId, newNotes) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, notes: newNotes } : p) }); };
 
@@ -261,7 +262,7 @@ export default function ProjectsManager({ data, updateData }) {
             )}
 
             {/* LISTE DES PROJETS - GRILLE RESPONSIVE EN COLONNES (MASONRY) */}
-            <div className="columns-1 xl:columns-2 gap-8">
+            <div className="flex flex-col gap-8">
                 {sortedProjects.length === 0 && !showForm && ( 
                     <div className="text-center py-24 break-inside-avoid"> 
                         <FolderKanban className="mx-auto h-20 w-20 text-gray-200 dark:text-slate-700 mb-6" /> 
@@ -348,10 +349,16 @@ export default function ProjectsManager({ data, updateData }) {
                                     
                                     {project.cost > 0 && financialStatus && ( 
                                         <div className="space-y-2"> 
-                                            <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400"> 
+                                            <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1"> 
                                                 <span className="flex items-center gap-2"><Euro size={14}/> {financialStatus.isLinked ? "Budget (Compte dédié)" : "Budget (Global)"}</span> 
-                                                <span className={financialStatus.fundingPercentage >= 100 ? "text-green-500" : "text-orange-500"}>{Math.round(financialStatus.fundingPercentage)}%</span> 
-                                            </div> 
+                                                <div className="text-right">
+                                                    <span className={financialStatus.fundingPercentage >= 100 ? "text-green-500" : "text-orange-500"}>{Math.round(financialStatus.fundingPercentage)}%</span>
+                                                    <div className="text-[10px] normal-case text-gray-400 font-normal mt-0.5">
+                                                        {financialStatus.available.toLocaleString('fr-FR')}€ / {Number(project.cost).toLocaleString('fr-FR')}€
+                                                        {financialStatus.missing > 0 ? ` (Manque ${financialStatus.missing.toLocaleString('fr-FR')}€)` : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div className="h-2 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden"> 
                                                 <div className={`h-full transition-all duration-1000 rounded-full ${financialStatus.fundingPercentage >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-orange-400 to-yellow-400'}`} style={{ width: `${financialStatus.fundingPercentage}%` }}></div> 
                                             </div> 
@@ -380,21 +387,22 @@ export default function ProjectsManager({ data, updateData }) {
                                                     const objProgress = obj.subObjectives && obj.subObjectives.length > 0 ? (obj.subObjectives.filter(s => s.completed).length / obj.subObjectives.length) * 100 : (obj.completed ? 100 : 0); 
                                                     return ( 
                                                         <div key={obj.id} className="group/obj animate-in fade-in slide-in-from-left-2"> 
-                                                            <div className="flex items-start justify-between mb-3 bg-gray-50/80 dark:bg-slate-700/30 p-2 pr-4 rounded-xl border border-gray-100/50 dark:border-slate-600/30 shadow-sm"> 
-                                                                <div className="flex items-start gap-3 font-bold text-gray-800 dark:text-gray-200 w-full"> 
+                                                            <div className="flex items-start justify-between mb-3 bg-gray-50/80 dark:bg-slate-700/30 p-2 pr-4 rounded-xl border border-gray-100/50 dark:border-slate-600/30 shadow-sm min-w-0"> 
+                                                                <div className="flex items-start gap-3 font-bold text-gray-800 dark:text-gray-200 flex-1 min-w-0"> 
                                                                     <div className={`w-1.5 h-6 rounded-full shadow-sm shrink-0 mt-0.5 ${objProgress === 100 ? 'bg-green-500 shadow-green-500/50' : 'bg-blue-500 shadow-blue-500/50'}`}></div>
-                                                                    <span className="text-sm break-words flex-1 whitespace-pre-wrap">{obj.title}</span> 
+                                                                    <span className="text-sm break-words flex-1 whitespace-pre-wrap min-w-0">{obj.title}</span> 
                                                                 </div> 
                                                                 <button onClick={() => deleteObjective(project.id, obj.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover/obj:opacity-100 transition-opacity bg-white dark:bg-slate-800 p-1.5 rounded-md shadow-sm shrink-0 ml-2"><X size={14} /></button> 
                                                             </div> 
                                                             
                                                             <div className="pl-4 ml-1.5 border-l-2 border-gray-100 dark:border-slate-700/50 space-y-2 mb-6"> 
                                                                 {obj.subObjectives && obj.subObjectives.map(sub => ( 
-                                                                    <div key={sub.id} className="flex items-start gap-3 cursor-pointer group/sub hover:bg-white dark:hover:bg-slate-700/50 p-2.5 rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-slate-600 animate-in fade-in" onClick={() => toggleSubObjective(project.id, obj.id, sub.id)}> 
+                                                                    <div key={sub.id} className="flex items-start gap-3 cursor-pointer group/sub hover:bg-white dark:hover:bg-slate-700/50 p-2.5 rounded-xl transition-all shadow-sm border border-transparent hover:border-gray-100 dark:hover:border-slate-600 animate-in fade-in min-w-0" onClick={() => toggleSubObjective(project.id, obj.id, sub.id)}> 
                                                                         <div className="mt-0.5 shrink-0">
                                                                             {sub.completed ? <CheckSquare size={18} className="text-green-500 drop-shadow-sm" /> : <Square size={18} className="text-gray-300 group-hover/sub:text-blue-500 transition-colors" />} 
                                                                         </div>
-                                                                        <span className={`text-sm font-medium transition-all break-words flex-1 whitespace-pre-wrap ${sub.completed ? 'text-gray-400 line-through opacity-70' : 'text-gray-700 dark:text-gray-200'}`}>{sub.title}</span> 
+                                                                        <span className={`text-sm font-medium transition-all break-words flex-1 whitespace-pre-wrap min-w-0 ${sub.completed ? 'text-gray-400 line-through opacity-70' : 'text-gray-700 dark:text-gray-200'}`}>{sub.title}</span> 
+                                                                        <button onClick={(e) => { e.stopPropagation(); deleteSubObjective(project.id, obj.id, sub.id); }} className="text-gray-400 hover:text-red-500 opacity-0 group-hover/sub:opacity-100 transition-opacity p-1 rounded-md shrink-0"><X size={14} /></button>
                                                                     </div> 
                                                                 ))} 
                                                                 <div className="flex gap-2 pl-2 mt-2 group/input"> 
