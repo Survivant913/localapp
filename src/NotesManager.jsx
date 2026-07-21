@@ -25,7 +25,7 @@ export default function NotesManager({ data, updateData }) {
         const timer = setTimeout(() => {
             if (mainNote !== data.mainNote) {
                 setIsSavingMain(true);
-                updateData({ ...data, mainNote });
+                updateData({ ...data, mainNote, settings: { ...data.settings, mainNote } });
                 setTimeout(() => setIsSavingMain(false), 1000);
             }
         }, 1000);

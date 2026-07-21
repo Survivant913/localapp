@@ -539,7 +539,7 @@ export default function App() {
      const mappedScheduled = (scheduled || []).map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
      const mappedPlannerItems = (plannerItems || []).map(i => ({ ...i, targetAccountId: i.target_account_id }));
      const plannerBases = {}; (safetyBases || []).forEach(b => plannerBases[b.account_id] = b.amount);
-     const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id }));
+     const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id, notes: p.internal_notes || '' }));
      const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
      
      const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'light';
@@ -582,7 +582,7 @@ export default function App() {
        venture_analytics: venture_analytics || [], // --- NOUVEAU
        profile: { ...(profile || {}), email: userEmail }, 
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
-       customLabels: profile?.custom_labels || {}, mainNote: ""
+       customLabels: profile?.custom_labels || {}, mainNote: profile?.settings?.mainNote || ""
      };
 
      setData(newData);
