@@ -105,7 +105,7 @@ export default function ProjectsManager({ data, updateData }) {
     // --- 3. ACTIONS (INTACTES) ---
     const updateProjectFromFocus = (updatedProject) => {
         const updatedProjects = data.projects.map(p => p.id === updatedProject.id ? updatedProject : p);
-        updateData({ ...data, projects: updatedProjects });
+        updateData({ ...data, projects: updatedProjects }, { table: 'projects' });
         setFocusedProject(updatedProject);
     };
 
@@ -131,11 +131,11 @@ export default function ProjectsManager({ data, updateData }) {
         const projectData = { title: newProjectTitle, description: newProjectDesc, deadline: newProjectDeadline, priority: newProjectPriority, cost: parseAmount(newProjectCost) || 0, linkedAccountId: linkedAccountId || null };
         if (editingProject) {
             const updatedProjects = data.projects.map(p => p.id === editingProject.id ? { ...p, ...projectData } : p);
-            updateData({ ...data, projects: updatedProjects });
+            updateData({ ...data, projects: updatedProjects }, { table: 'projects' });
             setEditingProject(null);
         } else {
             const newProject = { id: Date.now(), ...projectData, progress: 0, objectives: [], status: 'todo', notes: '' };
-            updateData({ ...data, projects: [...(data.projects || []), newProject] });
+            updateData({ ...data, projects: [...(data.projects || []), newProject] }, { table: 'projects' });
         }
         setNewProjectTitle(''); setNewProjectDesc(''); setNewProjectDeadline(''); setNewProjectPriority('none'); setNewProjectCost(''); setLinkedAccountId('');
         setShowForm(false);
@@ -165,15 +165,15 @@ export default function ProjectsManager({ data, updateData }) {
         const text = newObjectiveText[projectId];
         if (!text || !text.trim()) return;
         const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = [...(p.objectives || []), { id: Date.now(), title: text, completed: false, subObjectives: [] }]; return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; });
-        updateData({ ...data, projects: updatedProjects });
+        updateData({ ...data, projects: updatedProjects }, { table: 'projects' });
         setNewObjectiveText({ ...newObjectiveText, [projectId]: '' });
     };
-    const deleteObjective = (projectId, objId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.filter(o => o.id !== objId); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
-    const addSubObjective = (projectId, objId) => { const key = `${projectId}-${objId}`; const text = newSubObjectiveText[key]; if (!text || !text.trim()) return; const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: [...(o.subObjectives || []), { id: Date.now(), title: text, completed: false }] }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); setNewSubObjectiveText({ ...newSubObjectiveText, [key]: '' }); };
-    const toggleSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { const newSubs = o.subObjectives.map(s => s.id === subId ? { ...s, completed: !s.completed } : s); return { ...o, subObjectives: newSubs }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
-    const deleteSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: o.subObjectives.filter(s => s.id !== subId) }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }); };
-    const updateProjectStatus = (projectId, newStatus) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, status: newStatus } : p) }); };
-    const updateProjectNotes = (projectId, newNotes) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, notes: newNotes } : p) }); };
+    const deleteObjective = (projectId, objId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.filter(o => o.id !== objId); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }, { table: 'projects' }); };
+    const addSubObjective = (projectId, objId) => { const key = `${projectId}-${objId}`; const text = newSubObjectiveText[key]; if (!text || !text.trim()) return; const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: [...(o.subObjectives || []), { id: Date.now(), title: text, completed: false }] }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }, { table: 'projects' }); setNewSubObjectiveText({ ...newSubObjectiveText, [key]: '' }); };
+    const toggleSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { const newSubs = o.subObjectives.map(s => s.id === subId ? { ...s, completed: !s.completed } : s); return { ...o, subObjectives: newSubs }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }, { table: 'projects' }); };
+    const deleteSubObjective = (projectId, objId, subId) => { const updatedProjects = data.projects.map(p => { if (p.id === projectId) { const newObjectives = p.objectives.map(o => { if (o.id === objId) { return { ...o, subObjectives: o.subObjectives.filter(s => s.id !== subId) }; } return o; }); return { ...p, objectives: newObjectives, progress: calculateProgress(newObjectives) }; } return p; }); updateData({ ...data, projects: updatedProjects }, { table: 'projects' }); };
+    const updateProjectStatus = (projectId, newStatus) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, status: newStatus } : p) }, { table: 'projects' }); };
+    const updateProjectNotes = (projectId, newNotes) => { updateData({ ...data, projects: data.projects.map(p => p.id === projectId ? { ...p, notes: newNotes } : p) }, { table: 'projects' }); };
 
     const sortedProjects = (data.projects || []).sort((a, b) => { const pScore = { high: 3, medium: 2, low: 1, none: 0 }; const diffP = (pScore[b.priority || 'none'] || 0) - (pScore[a.priority || 'none'] || 0); if (diffP !== 0) return diffP; if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline); if (a.deadline) return -1; if (b.deadline) return 1; return 0; });
     const statusColors = { todo: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700 shadow-sm', in_progress: 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50 shadow-sm shadow-blue-500/10', on_hold: 'bg-orange-50 text-orange-600 border border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800/50 shadow-sm shadow-orange-500/10', done: 'bg-green-50 text-green-600 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800/50 shadow-sm shadow-green-500/10' };
@@ -188,8 +188,10 @@ export default function ProjectsManager({ data, updateData }) {
             {sharingProject && (
                 <ShareProjectModal 
                     project={sharingProject} 
-                    shares={data.project_shares?.filter(s => s.project_id === sharingProject.id) || []}
-                    onClose={() => setSharingProject(null)} 
+                    shares={data.project_shares?.filter(s => String(s.project_id) === String(sharingProject.id)) || []}
+                    onClose={() => setSharingProject(null)}
+                    updateData={updateData}
+                    data={data} 
                 />
             )}
             
@@ -356,7 +358,7 @@ export default function ProjectsManager({ data, updateData }) {
                                                 title="Partager"
                                             >
                                                 <Share2 size={18} />
-                                                {(data.project_shares?.filter(s => s.project_id === project.id).length > 0) && (
+                                                {(data.project_shares?.filter(s => String(s.project_id) === String(project.id)).length > 0) && (
                                                     <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
                                                 )}
                                             </button>

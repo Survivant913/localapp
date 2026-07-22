@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Users, Mail, Trash2, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function ShareProjectModal({ project, shares, onClose }) {
+export default function ShareProjectModal({ project, shares, onClose, updateData, data }) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -57,6 +57,10 @@ export default function ShareProjectModal({ project, shares, onClose }) {
     const handleRemoveShare = async (shareId) => {
         try {
             await supabase.from('project_shares').delete().eq('id', shareId);
+            if (updateData && data) {
+                const newShares = (data.project_shares || []).filter(s => s.id !== shareId);
+                updateData({ ...data, project_shares: newShares }, { table: 'project_shares', id: shareId, action: 'delete' });
+            }
         } catch (err) {
             console.error('Erreur lors de la suppression du partage:', err);
         }
