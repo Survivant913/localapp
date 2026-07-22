@@ -14,6 +14,11 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'blue');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
 
+    // VISIBILITÉ SIDEBAR
+    const [showClients, setShowClients] = useState(data.settings?.showClients ?? false);
+    const [showGoals, setShowGoals] = useState(data.settings?.showGoals ?? false);
+    const [showProjects, setShowProjects] = useState(data.settings?.showProjects ?? false);
+
     // On utilise des noms de variables génériques pour le formulaire
     const [companyData, setCompanyData] = useState({
         user_name: '', 
@@ -37,6 +42,9 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         if (data.settings) {
             setAccentColor(data.settings.accentColor || 'blue');
             setGrayShade(data.settings.grayShade || 'slate');
+            setShowClients(data.settings.showClients ?? false);
+            setShowGoals(data.settings.showGoals ?? false);
+            setShowProjects(data.settings.showProjects ?? false);
         }
         
         if (data.profile) {
@@ -79,8 +87,11 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             customLabels: { ...(data.customLabels || {}), appName, userName: companyData.user_name },
             settings: { 
                 ...(data.settings || {}), 
-                accentColor: accentColor || 'blue', // Force une couleur par défaut si vide
-                grayShade: grayShade || 'slate'
+                accentColor,
+                grayShade,
+                showClients,
+                showGoals,
+                showProjects
             },
             profile: { 
                 ...(data.profile || {}), 
@@ -206,6 +217,53 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                     <div className="pt-4">
                         <label className="text-xs font-bold text-slate-500 block mb-2">Nom de l'application (Barre latérale)</label>
                         <input type="text" value={appName} onChange={(e) => setAppName(e.target.value)} className="w-full max-w-md px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white text-sm" />
+                    </div>
+
+                    <hr className="border-slate-100 dark:border-slate-700 my-6"/>
+
+                    {/* Visibilité Barre Latérale */}
+                    <div>
+                        <div className="mb-4">
+                            <h4 className="font-bold text-slate-700 dark:text-slate-200">Modules de la Barre Latérale</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Personnalisez votre espace en affichant ou masquant certains modules (masqués par défaut).</p>
+                        </div>
+                        <div className="space-y-3 max-w-md">
+                            {/* Toggle Gestion Client */}
+                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Gestion Client</p>
+                                    <p className="text-xs text-slate-500">Factures, devis, catalogue</p>
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                    <input type="checkbox" checked={showClients} onChange={(e) => setShowClients(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </div>
+                            </label>
+
+                            {/* Toggle Objectifs */}
+                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Objectifs</p>
+                                    <p className="text-xs text-slate-500">Suivi de vos objectifs à long terme</p>
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                    <input type="checkbox" checked={showGoals} onChange={(e) => setShowGoals(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </div>
+                            </label>
+
+                            {/* Toggle Projets */}
+                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Mes Projets</p>
+                                    <p className="text-xs text-slate-500">Gestion de projets</p>
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                    <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </div>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
