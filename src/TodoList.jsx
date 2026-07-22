@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
     CheckCircle2, Circle, Plus, Trash2, Calendar, Flag, 
     Filter, CheckSquare, AlertCircle, X, ListTodo,
@@ -30,6 +30,39 @@ export default function TodoList({ data, updateData }) {
     // --- PARTAGE ---
     const [showShareModal, setShowShareModal] = useState(false);
     const [shareEmail, setShareEmail] = useState('');
+
+    // Auto-réparation des permissions (Self-Share)
+    useEffect(() => {
+        if (!data.profile?.email || !data.profile?.id) return;
+        const myEmail = data.profile.email.toLowerCase();
+        const myId = data.profile.id;
+        
+        let needsUpdate = false;
+        const newShares = [...(data.todo_list_shares || [])];
+        
+        // Assurer l'accès à la liste 'default'
+        if (!newShares.some(s => s.list_id === 'default' && s.user_email?.toLowerCase() === myEmail)) {
+            newShares.push({ id: crypto.randomUUID(), list_id: 'default', user_email: myEmail, owner_id: myId });
+            needsUpdate = true;
+        }
+        
+        // Assurer l'accès à toutes ses listes créées
+        (data.todoLists || []).filter(l => l.user_id === myId).forEach(l => {
+            if (!newShares.some(s => String(s.list_id) === String(l.id) && s.user_email?.toLowerCase() === myEmail)) {
+                newShares.push({ id: crypto.randomUUID(), list_id: l.id, user_email: myEmail, owner_id: myId });
+                needsUpdate = true;
+            }
+        });
+
+        if (needsUpdate) {
+            const missingShares = newShares.filter(ns => !(data.todo_list_shares || []).some(os => os.id === ns.id));
+            if(missingShares.length > 0) {
+                missingShares.forEach(share => {
+                    updateData({ ...data, todo_list_shares: newShares }, { table: 'todo_list_shares', data: share, action: 'insert' });
+                });
+            }
+        }
+    }, [data.todoLists, data.profile]);
 
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
@@ -491,3 +524,4 @@ export default function TodoList({ data, updateData }) {
         </div>
     );
 }
+
