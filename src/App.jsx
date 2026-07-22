@@ -262,10 +262,21 @@ export default function App() {
         .subscribe();
 
     // --- NOUVEAU: ÉCOUTEUR GLOBAL BUDGET AVEC BROADCAST ---
-    const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { self: false } } })
+    const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { ack: true, self: false } } })
         .on('broadcast', { event: 'custom_sync' }, async (payload) => {
+            console.log("Broadcast reçu:", payload);
             const { table, accountId } = payload.payload;
-            if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
+            
+            if (table === 'account_shares') {
+                 const [accRes, shareRes] = await Promise.all([
+                     supabase.from('accounts').select('*'),
+                     supabase.from('account_shares').select('*')
+                 ]);
+                 if (accRes.data && shareRes.data) {
+                     setData(prev => ({ ...prev, budget: { ...prev.budget, accounts: accRes.data }, account_shares: shareRes.data }));
+                 }
+            }
+            else if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
                 const { data: newData } = await supabase.from(table).select('*').eq('account_id', accountId);
                 if (newData) {
                     setData(prev => {
@@ -677,14 +688,14 @@ export default function App() {
        }
        
        // CUSTOM SYNC BROADCAST
-       if (budgetChannelRef.current && ['transactions', 'recurring', 'scheduled'].includes(table)) {
-           const accId = payload?.account_id || payload?.accountId;
-           if (accId) {
+       if (budgetChannelRef.current && ['transactions', 'recurring', 'scheduled', 'account_shares'].includes(table)) {
+           const accId = payload?.account_id || payload?.accountId || (table === 'account_shares' ? payload?.account_id : null);
+           if (accId || table === 'account_shares') {
                budgetChannelRef.current.send({
                    type: 'broadcast',
                    event: 'custom_sync',
                    payload: { table, accountId: accId }
-               });
+               }).then(res => console.log("Broadcast envoyé:", res)).catch(err => console.error("Erreur broadcast:", err));
            }
        }
      } catch (e) { console.error("Erreur action DB immédiate", e); }
