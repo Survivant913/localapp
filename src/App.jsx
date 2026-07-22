@@ -261,52 +261,52 @@ export default function App() {
         })
         .subscribe();
 
-    // --- NOUVEAU: Ã‰COUTEUR GLOBAL BUDGET AVEC BROADCAST ---
+    // --- NOUVEAU: ÉCOUTEUR GLOBAL BUDGET AVEC BROADCAST ---
     const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { ack: true, self: false } } })
-        .on('broadcast', { event: 'custom_sync' }, async (payload) => {
-            console.log("Broadcast reÃ§u:", payload);
+        .on('broadcast', { event: 'custom_sync' }, (payload) => {
+            console.log("Broadcast reçu:", payload);
             const { table, accountId } = payload.payload;
             
-                          if (table === 'account_shares') {
-                   const [accRes, shareRes, txRes, recRes, schedRes] = await Promise.all([
-                       supabase.from('accounts').select('*'),
-                       supabase.from('account_shares').select('*'),
-                       supabase.from('transactions').select('*').limit(10000),
-                       supabase.from('recurring').select('*'),
-                       supabase.from('scheduled').select('*')
-                   ]);
-                   if (accRes.data && shareRes.data) {
-                       setData(prev => {
-                           const mappedTx = (txRes.data || []).map(t => ({ ...t, accountId: t.account_id }));
-                           const mappedRec = (recRes.data || []).map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
-                           const mappedSched = (schedRes.data || []).map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
-                           return { 
-                               ...prev, 
-                               account_shares: shareRes.data,
-                               budget: { 
-                                   ...prev.budget, 
-                                   accounts: accRes.data,
-                                   transactions: mappedTx.sort((a,b) => new Date(b.date) - new Date(a.date)),
-                                   recurring: mappedRec,
-                                   scheduled: mappedSched
-                               } 
-                           };
-                       });
-                   }
-              }));
-                 }
-            }
-            else if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
-                const { data: newData } = await supabase.from(table).select('*').eq('account_id', accountId);
-                if (newData) {
-                    setData(prev => {
-                        const other = (prev.budget[table] || []).filter(item => String(item.account_id) !== String(accountId) && String(item.accountId) !== String(accountId));
-                        const mapped = newData.map(i => ({ ...i, accountId: i.account_id }));
-                        if (table === 'transactions') return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped].sort((a,b) => new Date(b.date) - new Date(a.date)) } };
-                        return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped] } };
-                    });
+            setTimeout(async () => {
+                if (table === 'account_shares') {
+                     const [accRes, shareRes, txRes, recRes, schedRes] = await Promise.all([
+                         supabase.from('accounts').select('*'),
+                         supabase.from('account_shares').select('*'),
+                         supabase.from('transactions').select('*').limit(10000),
+                         supabase.from('recurring').select('*'),
+                         supabase.from('scheduled').select('*')
+                     ]);
+                     if (accRes.data && shareRes.data) {
+                         setData(prev => {
+                             const mappedTx = (txRes.data || []).map(t => ({ ...t, accountId: t.account_id }));
+                             const mappedRec = (recRes.data || []).map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
+                             const mappedSched = (schedRes.data || []).map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
+                             return { 
+                                 ...prev, 
+                                 account_shares: shareRes.data,
+                                 budget: { 
+                                     ...prev.budget, 
+                                     accounts: accRes.data,
+                                     transactions: mappedTx.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                                     recurring: mappedRec,
+                                     scheduled: mappedSched
+                                 } 
+                             };
+                         });
+                     }
                 }
-            }
+                else if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
+                    const { data: newData } = await supabase.from(table).select('*').eq('account_id', accountId);
+                    if (newData) {
+                        setData(prev => {
+                            const other = (prev.budget[table] || []).filter(item => String(item.account_id) !== String(accountId) && String(item.accountId) !== String(accountId));
+                            const mapped = newData.map(i => ({ ...i, accountId: i.account_id }));
+                            if (table === 'transactions') return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped].sort((a,b) => new Date(b.date) - new Date(a.date)) } };
+                            return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped] } };
+                        });
+                    }
+                }
+            }, 1000);
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
             setData(prev => {
@@ -866,4 +866,7 @@ export default function App() {
    </div>
  );
 }
+
+
+
 
