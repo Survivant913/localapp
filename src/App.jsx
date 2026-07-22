@@ -636,10 +636,15 @@ export default function App() {
      try {
        if (action === 'insert' && table && payload) {
            const { data: { session } } = await supabase.auth.getSession();
-           await supabase.from(table).insert({ ...payload, user_id: session?.user?.id });
+           const insertPayload = { ...payload };
+           if (table === 'account_shares') insertPayload.owner_id = session?.user?.id;
+           else if (table !== 'journal_shares') insertPayload.user_id = session?.user?.id;
+           const { error } = await supabase.from(table).insert(insertPayload);
+           if (error) throw error;
        } 
        else if (action === 'update' && table && id && payload) {
-           await supabase.from(table).update(payload).eq('id', id);
+           const { error } = await supabase.from(table).update(payload).eq('id', id);
+           if (error) throw error;
        }
        else if ((action === 'delete' || (!action && table && id)) || (filter)) {
            if (filter && filter.column && filter.value) {
