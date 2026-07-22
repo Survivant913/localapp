@@ -321,6 +321,75 @@ export default function ChatManager({ user }) {
 
     // --- RENDER ---
     const pinnedMessages = messages.filter(m => m.is_pinned);
+    
+    const renderedMessages = useMemo(() => {
+        const participantDict = {};
+        participants.forEach(p => participantDict[p.user_id] = p);
+        
+        const messageDict = {};
+        messages.forEach(m => messageDict[m.id] = m);
+
+        
+        try {
+            return messages.map(msg => {
+
+            const isMe = msg.sender_id === user.id;
+            const sender = participantDict[msg.sender_id];
+            const senderName = (sender && sender.user_email) ? sender.user_email.split('@')[0] : 'Inconnu';
+            const avatarColor = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500'][senderName.length % 5];
+            const replyOrigin = msg.reply_to_id ? messageDict[msg.reply_to_id] : null;
+            const replySender = replyOrigin ? (participantDict[replyOrigin.sender_id]?.user_email?.split('@')[0] || 'Inconnu') : 'Message supprim�';
+
+            return (
+                <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group ${msg.is_pinned ? 'bg-amber-50/50 dark:bg-amber-900/10 -mx-4 px-4 py-2 rounded-lg' : ''}`}>
+                    {!isMe && (
+                        <div className="flex items-center gap-2 ml-1 mb-1">
+                            <div className={`w-4 h-4 rounded-full ${avatarColor} flex items-center justify-center text-[8px] text-white font-bold uppercase`}>{senderName[0]}</div>
+                            <span className="text-[10px] text-slate-400 font-medium">{senderName}</span>
+                            {msg.is_pinned && <Pin size={10} className="text-amber-500 fill-amber-500"/>}
+                        </div>
+                    )}
+                    
+                    <div className="relative max-w-[75%] md:max-w-[60%]">
+                        {msg.reply_to_id && (
+                            <div className={`mb-1 px-3 py-2 text-xs rounded-lg opacity-80 ${isMe ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-800 dark:text-indigo-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} border-l-2 border-indigo-400 flex flex-col`}>
+                                <span className="font-bold flex items-center gap-1"><CornerDownRight size={10}/> R�ponse � {replySender}</span>
+                                <span className="truncate italic">{replyOrigin ? replyOrigin.content : 'Message introuvable'}</span>
+                            </div>
+                        )}
+
+                        <div className={`p-3 rounded-2xl shadow-sm text-sm break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-100 dark:border-slate-700'} ${msg.is_pinned ? 'ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900' : ''}`}>
+                            <p>{msg.content}</p>
+                            <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-slate-400'} flex justify-end gap-1 items-center`}>
+                                {isMe && msg.is_pinned && <Pin size={8} className="text-indigo-200 fill-indigo-200"/>}
+                                {format(new Date(msg.created_at), 'HH:mm')}
+                            </div>
+                        </div>
+
+                        <div className={`absolute ${isMe ? '-left-28' : '-right-28'} top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                            <button onClick={() => startReplying(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="R�pondre"><Reply size={12}/></button>
+                            {(isMe || activeRoom?.isOwner) && (
+                                <button onClick={() => handleTogglePin(msg)} className={`p-1.5 bg-white dark:bg-slate-800 rounded-full shadow border border-slate-200 dark:border-slate-700 ${msg.is_pinned ? 'text-amber-500 hover:text-slate-500' : 'text-slate-500 hover:text-amber-500'}`} title={msg.is_pinned ? "D�s�pingler" : "�pingler"}>
+                                    {msg.is_pinned ? <PinOff size={12}/> : <Pin size={12}/>}
+                                </button>
+                            )}
+                            {isMe && (
+                                <>
+                                    <button onClick={() => startEditing(msg)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-indigo-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Modifier"><Pencil size={12}/></button>
+                                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-1.5 bg-white dark:bg-slate-800 text-slate-500 hover:text-red-600 rounded-full shadow border border-slate-200 dark:border-slate-700" title="Supprimer"><Trash2 size={12}/></button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        });
+        } catch (error) {
+            console.error("CHAT RENDER ERROR:", error);
+            return [<div key="error" className="p-4 bg-red-100 text-red-600 rounded">Erreur d'affichage : {error.message}</div>];
+        }
+    }, [messages, participants, user.id, activeRoom?.isOwner]);
+
     const displayedPin = pinnedMessages.length > 0 ? pinnedMessages[currentPinIndex >= pinnedMessages.length ? 0 : currentPinIndex] : null;
 
     const nextPin = () => setCurrentPinIndex((prev) => (prev + 1) % pinnedMessages.length);

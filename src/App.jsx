@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
@@ -31,6 +31,29 @@ const THEME_COLORS = {
  rose:    { primary: '#e11d48', hover: '#be123c', light: '#fff1f2', text: '#e11d48', textLight: '#f43f5e', border: '#fecdd3', badge: '#ffe4e6' },
  indigo:  { primary: '#4f46e5', hover: '#4338ca', light: '#eef2ff', text: '#4f46e5', textLight: '#6366f1', border: '#c7d2fe', badge: '#e0e7ff' },
 };
+
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="p-8 text-red-500 bg-red-50 font-bold">Erreur Critique: {this.state.error?.message}</div>;
+    }
+    return this.props.children; 
+  }
+}
 
 export default function App() {
  const [session, setSession] = useState(null);
