@@ -53,7 +53,7 @@ export default function TodoList({ data, updateData }) {
         { id: 'default', name: 'To-Do', color: 'indigo' }, 
         ...todoListsFromData.filter(l => 
             !l.user_id || l.user_id === data.profile?.id || 
-            myShares.some(s => String(s.list_id) === String(l.id))
+            sharedListIds.includes(String(l.id))
         )
     ];
 
