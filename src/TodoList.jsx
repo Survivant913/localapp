@@ -8,6 +8,17 @@ import {
 } from 'lucide-react';
 
 export default function TodoList({ data, updateData }) {
+    const generateUUID = () => {
+        try {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                return crypto.randomUUID();
+            }
+        } catch (e) {}
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    };
     // --- ÉTATS ORIGINAUX (CONSERVÉS À 100%) ---
     const [newTaskText, setNewTaskText] = useState('');
     const [newTaskPriority, setNewTaskPriority] = useState('medium'); 
@@ -42,14 +53,14 @@ export default function TodoList({ data, updateData }) {
         
         // Assurer l'accès à la liste 'default'
         if (!newShares.some(s => s.list_id === 'default' && s.user_email?.toLowerCase() === myEmail)) {
-            newShares.push({ id: crypto.randomUUID(), list_id: 'default', user_email: myEmail, owner_id: myId });
+            newShares.push({ id: generateUUID(), list_id: 'default', user_email: myEmail, owner_id: myId });
             needsUpdate = true;
         }
         
         // Assurer l'accès à toutes ses listes créées
         (data.todoLists || []).filter(l => l.user_id === myId).forEach(l => {
             if (!newShares.some(s => String(s.list_id) === String(l.id) && s.user_email?.toLowerCase() === myEmail)) {
-                newShares.push({ id: crypto.randomUUID(), list_id: l.id, user_email: myEmail, owner_id: myId });
+                newShares.push({ id: generateUUID(), list_id: l.id, user_email: myEmail, owner_id: myId });
                 needsUpdate = true;
             }
         });
@@ -149,7 +160,8 @@ export default function TodoList({ data, updateData }) {
             priority: newTaskPriority,
             deadline: newTaskDeadline || null,
             list_id: activeListId,
-            status: 'todo'
+            status: 'todo',
+            user_id: data.profile?.id
         };
 
         const newTodos = [...todos, newTodo];
@@ -199,7 +211,7 @@ export default function TodoList({ data, updateData }) {
         if (!newListTitle.trim()) return;
         const listId = Date.now().toString();
         const newList = { id: listId, name: newListTitle, color: 'purple', user_id: data.profile?.id };
-        const newShare = { id: crypto.randomUUID(), list_id: listId, user_email: data.profile?.email, owner_id: data.profile?.id };
+        const newShare = { id: generateUUID(), list_id: listId, user_email: data.profile?.email, owner_id: data.profile?.id };
         
         const newLists = [...todoListsFromData, newList];
         const newShares = [...(data.todo_list_shares || []), newShare];
@@ -239,8 +251,13 @@ export default function TodoList({ data, updateData }) {
 
     const addShare = () => {
         if (!shareEmail.trim()) return;
-        const newShare = { id: Date.now().toString(), list_id: activeListId, user_email: shareEmail };
-        updateData({ ...data, todo_list_shares: [...(data.todo_list_shares || []), newShare] }, { table: 'todo_list_shares', data: newShare, action: 'insert' });
+        const cleanEmail = shareEmail.trim().toLowerCase();
+        if (cleanEmail === data.profile?.email?.toLowerCase()) return;
+        const newShare = { id: generateUUID(), list_id: activeListId, user_email: cleanEmail, owner_id: data.profile?.id };
+        updateData(
+            { ...data, todo_list_shares: [...(data.todo_list_shares || []), newShare] },
+            { table: 'todo_list_shares', data: newShare, action: 'insert' }
+        );
         setShareEmail('');
     };
 
