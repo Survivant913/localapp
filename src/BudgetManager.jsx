@@ -675,7 +675,7 @@ export default function BudgetManager({ data, updateData }) {
     };
 
     const leaveAccount = (accId) => {
-        const share = data.account_shares?.find(s => String(s.account_id) === String(accId) && s.user_email === data.profile?.email);
+        const share = data.account_shares?.find(s => String(s.account_id) === String(accId) && s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase());
         if (share) {
             updateData(
                 { ...data, budget: { ...data.budget, accounts: data.budget.accounts.filter(a => String(a.id) !== String(accId)) } },
