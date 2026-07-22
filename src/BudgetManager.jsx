@@ -660,6 +660,19 @@ export default function BudgetManager({ data, updateData }) {
     const displayedTransactions = visibleTransactions.slice(0, historyLimit);
     const visibleScheduled = scheduledList.filter(s => s.status === 'pending');
 
+    const addShare = () => {
+        if (!shareEmail.trim() || !sharingAccountId) return;
+        const newShare = { id: crypto.randomUUID(), account_id: sharingAccountId, user_email: shareEmail };
+        const updatedShares = [...(data.account_shares || []), newShare];
+        updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', data: newShare, action: 'insert' });
+        setShareEmail('');
+    };
+
+    const removeShare = (shareId) => {
+        const updatedShares = (data.account_shares || []).filter(s => s.id !== shareId);
+        updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', id: shareId, action: 'delete' });
+    };
+
     return (
         <div className="space-y-6 fade-in w-full pb-20">
             {/* 1. CARTES DU HAUT */}
