@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
@@ -753,9 +753,9 @@ export default function App() {
      try {
        if (action === 'insert' && table && payload) {
            const { data: { session } } = await supabase.auth.getSession();
-           const insertPayload = { ...payload }; delete insertPayload.accountId; delete insertPayload.targetAccountId; delete insertPayload.listId; delete insertPayload.linkedProjectId;
-           if (table === 'account_shares') insertPayload.owner_id = session?.user?.id;
-           else if (table !== 'journal_shares') insertPayload.user_id = session?.user?.id;
+             const insertPayload = { ...payload }; delete insertPayload.accountId; delete insertPayload.targetAccountId; delete insertPayload.listId; delete insertPayload.linkedProjectId;
+             if (table === 'account_shares') insertPayload.owner_id = session?.user?.id;
+             else if (table !== 'journal_shares' && table !== 'todo_list_shares') insertPayload.user_id = session?.user?.id;
            const { error } = await supabase.from(table).insert(insertPayload);
            if (error) throw error;
        } 
