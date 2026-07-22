@@ -580,7 +580,8 @@ export default function App() {
         supabase.from('journal_shares').select('*'),
         supabase.from('journal_favorites').select('*'), // MODIFICATION ICI : On charge les favoris
         supabase.from('venture_analytics').select('*'), // --- NOUVEAU : Chargement des graphiques Workspace
-        supabase.from('account_shares').select('*') // CHARGEMENT DES PARTAGES DE COMPTES
+        supabase.from('account_shares').select('*'),
+        supabase.from('todo_list_shares').select('*')
       ]);
 
      const [
@@ -599,7 +600,8 @@ export default function App() {
         { data: journal_shares },
         { data: journal_favorites }, // MODIFICATION ICI
         { data: venture_analytics }, // --- NOUVEAU
-        { data: account_shares } // PARTAGES COMPTES
+        { data: account_shares },
+        { data: todo_list_shares }
       ] = results;
 
      let newDBTransactions = [];
