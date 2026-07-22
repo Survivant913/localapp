@@ -338,6 +338,10 @@ export default function App() {
                     if (!currentTransactions.some(t => String(t.id) === String(payload.new.id))) currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
                 } else if (payload.eventType === 'UPDATE') {
                     const idx = currentTransactions.findIndex(t => String(t.id) === String(payload.new.id));
+                if (payload.eventType === 'INSERT') {
+                    if (!currentTransactions.some(t => String(t.id) === String(payload.new.id))) currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
+                } else if (payload.eventType === 'UPDATE') {
+                    const idx = currentTransactions.findIndex(t => String(t.id) === String(payload.new.id));
                     if (idx !== -1) currentTransactions[idx] = { ...payload.new, accountId: payload.new.account_id };
                     else currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
                 } else if (payload.eventType === 'DELETE') {
@@ -346,16 +350,35 @@ export default function App() {
                 return { ...prev, budget: { ...prev.budget, transactions: currentTransactions } };
             });
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_list_shares' }, (payload) => {
-            setData(prev => {
-                let currentShares = [...(prev.todo_list_shares || [])];
-                if (payload.eventType === 'INSERT') {
-                    if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
-                } else if (payload.eventType === 'DELETE') {
-                    currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
-                }
-                return { ...prev, todo_list_shares: currentShares };
-            })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_list_shares' }, async (payload) => {
+              if (payload.eventType === 'INSERT') {
+                  // Fetch the missing list and its tasks
+                  const { data: listData } = await supabase.from('todo_lists').select('*').eq('id', payload.new.list_id).single();
+                  const { data: todosData } = await supabase.from('todos').select('*').eq('list_id', payload.new.list_id);
+                  
+                  setData(prev => {
+                      let currentShares = [...(prev.todo_list_shares || [])];
+                      if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
+                      
+                      let currentLists = [...(prev.todoLists || [])];
+                      if (listData && !currentLists.some(l => String(l.id) === String(listData.id))) currentLists.push(listData);
+                      
+                      let currentTodos = [...(prev.todos || [])];
+                      if (todosData) {
+                          todosData.forEach(td => {
+                              if (!currentTodos.some(t => String(t.id) === String(td.id))) currentTodos.push(td);
+                          });
+                      }
+                      
+                      return { ...prev, todo_list_shares: currentShares, todoLists: currentLists, todos: currentTodos };
+                  });
+              } else if (payload.eventType === 'DELETE') {
+                  setData(prev => ({
+                      ...prev,
+                      todo_list_shares: (prev.todo_list_shares || []).filter(s => String(s.id) !== String(payload.old.id))
+                  }));
+              }
+          })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_lists' }, (payload) => {
               setData(prev => {
                   let currentLists = [...(prev.todoLists || [])];
