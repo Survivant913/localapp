@@ -2,14 +2,32 @@ import { useState } from 'react';
 import { 
   FolderKanban, Target, Calendar, List, Euro, Briefcase, Plus, X, 
   ChevronDown, ChevronRight, CheckSquare, Square, Link as LinkIcon, 
-  StickyNote, Trash2, Edit, Maximize2, CheckCircle2 
+  StickyNote, Trash2, Edit, Maximize2, CheckCircle2, Share2, LogOut 
 } from 'lucide-react';
 import FocusProjectModal from './FocusProjectModal';
+import ShareProjectModal from './ShareProjectModal';
+import { supabase } from './supabaseClient';
 
 export default function ProjectsManager({ data, updateData }) {
     // --- 1. ÉTATS LOCAUX (INTACTS) ---
     const [newProjectTitle, setNewProjectTitle] = useState('');
     const [newProjectDesc, setNewProjectDesc] = useState('');
+    const [sharingProject, setSharingProject] = useState(null);
+
+    const handleLeaveProject = async (projectId) => {
+        if (!window.confirm("�tes-vous s�r de vouloir quitter ce projet partag� ?")) return;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const myShare = data.project_shares?.find(s => s.project_id === projectId && s.user_email.toLowerCase() === user.email.toLowerCase());
+            if (myShare) {
+                await supabase.from('project_shares').delete().eq('id', myShare.id);
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    };
+
     const [newProjectDeadline, setNewProjectDeadline] = useState('');
     const [newProjectPriority, setNewProjectPriority] = useState('none');
     const [newProjectCost, setNewProjectCost] = useState('');
@@ -166,6 +184,14 @@ export default function ProjectsManager({ data, updateData }) {
 
     return (
         <div className="space-y-10 fade-in w-full max-w-[1920px] mx-auto p-6 md:p-10 pb-24">
+            
+            {sharingProject && (
+                <ShareProjectModal 
+                    project={sharingProject} 
+                    shares={data.project_shares?.filter(s => s.project_id === sharingProject.id) || []}
+                    onClose={() => setSharingProject(null)} 
+                />
+            )}
             
             {focusedProject && (
                 <FocusProjectModal 

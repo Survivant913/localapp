@@ -53,7 +53,7 @@ export default function App() {
  };
 
  const [data, setData] = useState({
-   todos: [], todoLists: [], projects: [], todo_list_shares: [], 
+   todos: [], todoLists: [], projects: [], todo_list_shares: [], project_shares: [], 
    goals: [], goal_milestones: [], 
    journal_folders: [], journal_pages: [], journal_shares: [], journal_favorites: [], // MODIFICATION ICI
    calendar_events: [], 
@@ -268,7 +268,16 @@ export default function App() {
             const { table, accountId } = payload.payload;
             
             setTimeout(async () => {
-                if (['todo_list_shares', 'todo_lists', 'todos'].includes(table)) {
+                if (['project_shares', 'projects'].includes(table)) {
+                  const [projRes, projSharesRes] = await Promise.all([
+                      supabase.from('projects').select('*'),
+                      supabase.from('project_shares').select('*')
+                  ]);
+                  if (projRes.data && projSharesRes.data) {
+                      setData(prev => ({ ...prev, projects: projRes.data, project_shares: projSharesRes.data }));
+                  }
+              }
+              if (['todo_list_shares', 'todo_lists', 'todos'].includes(table)) {
                      const [listsRes, sharesRes, todosRes] = await Promise.all([
                          supabase.from('todo_lists').select('*'),
                          supabase.from('todo_list_shares').select('*'),
@@ -808,9 +817,9 @@ export default function App() {
        }
        
        // CUSTOM SYNC BROADCAST
-       if (budgetChannelRef.current && ['transactions', 'recurring', 'scheduled', 'account_shares', 'todos', 'todo_lists', 'todo_list_shares'].includes(table)) {
+       if (budgetChannelRef.current && ['transactions', 'recurring', 'scheduled', 'account_shares', 'todos', 'todo_lists', 'todo_list_shares', 'projects', 'project_shares'].includes(table)) {
            const accId = payload?.account_id || payload?.accountId || (table === 'account_shares' ? payload?.account_id : null);
-           if (accId || ['account_shares', 'todos', 'todo_lists', 'todo_list_shares'].includes(table)) {
+           if (accId || ['account_shares', 'todos', 'todo_lists', 'todo_list_shares', 'projects', 'project_shares'].includes(table)) {
                budgetChannelRef.current.send({
                    type: 'broadcast',
                    event: 'custom_sync',
