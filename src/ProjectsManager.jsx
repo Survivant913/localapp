@@ -339,6 +339,30 @@ export default function ProjectsManager({ data, updateData }) {
                                     
                                     {/* Actions Intégrées (Capsule) */}
                                     <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-800 p-1.5 rounded-xl shadow-md border border-gray-100 dark:border-slate-700 ml-auto sm:ml-0 shrink-0"> 
+                                        
+                                        {/* SHARE OR LEAVE BUTTON */}
+                                        {project.user_id && project.user_id !== data.profile?.id ? (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleLeaveProject(project.id); }} 
+                                                className="text-gray-400 dark:text-gray-500 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                title="Quitter le projet partagé"
+                                            >
+                                                <LogOut size={18} />
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setSharingProject(project); }} 
+                                                className="text-gray-400 dark:text-gray-500 hover:text-blue-500 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors relative"
+                                                title="Partager"
+                                            >
+                                                <Share2 size={18} />
+                                                {(data.project_shares?.filter(s => s.project_id === project.id).length > 0) && (
+                                                    <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
+                                                )}
+                                            </button>
+                                        )}
+                                        <div className="w-px h-6 bg-gray-200 dark:bg-slate-700 mx-1"></div>
+
                                         {/* MODIF: Bouton Focus intégré ici */}
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); setFocusedProject(project); }} 
@@ -348,11 +372,15 @@ export default function ProjectsManager({ data, updateData }) {
                                             <Maximize2 size={18} />
                                         </button>
 
-                                        <button onClick={(e) => { e.stopPropagation(); startEditProject(project); }} className="text-gray-400 dark:text-gray-500 hover:text-blue-500 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit size={18} /></button> 
-                                        {deletingProjectId === project.id ? ( 
-                                            <button onClick={(e) => { e.stopPropagation(); confirmDeleteProject(project.id); }} className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 animate-in fade-in shadow-lg">Confirmer</button> 
-                                        ) : ( 
-                                            <button onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }} className="text-gray-400 dark:text-gray-500 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={18} /></button> 
+                                        {(!project.user_id || project.user_id === data.profile?.id) && (
+                                            <>
+                                                <button onClick={(e) => { e.stopPropagation(); startEditProject(project); }} className="text-gray-400 dark:text-gray-500 hover:text-blue-500 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"><Edit size={18} /></button> 
+                                                {deletingProjectId === project.id ? ( 
+                                                    <button onClick={(e) => { e.stopPropagation(); confirmDeleteProject(project.id); }} className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 animate-in fade-in shadow-lg">Confirmer</button> 
+                                                ) : ( 
+                                                    <button onClick={(e) => { e.stopPropagation(); setDeletingProjectId(project.id); }} className="text-gray-400 dark:text-gray-500 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 size={18} /></button> 
+                                                )} 
+                                            </>
                                         )} 
                                         <div className="w-px h-6 bg-gray-200 dark:bg-slate-700 mx-1"></div>
                                         <div className={`p-2 text-gray-300 dark:text-slate-500 transition-transform duration-300 ${expandedProjects[project.id] ? 'rotate-90 text-blue-500' : 'rotate-0'}`}>
