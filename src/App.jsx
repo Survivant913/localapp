@@ -40,6 +40,7 @@ export default function App() {
  const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
+ const budgetChannelRef = useRef(null);
  const loadSuccess = useRef(false); // --- SÉCURITÉ ANTI-EFFACEMENT ---
  
  // --- AJOUT 2 : ÉTATS POUR SON ET COMPTEUR ---
@@ -256,7 +257,22 @@ export default function App() {
         })
         .subscribe();
 
-    const budgetChannel = supabase.channel('budget-sync-master')
+    // --- NOUVEAU: ÉCOUTEUR GLOBAL BUDGET AVEC BROADCAST ---
+    const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { self: false } } })
+        .on('broadcast', { event: 'custom_sync' }, async (payload) => {
+            const { table, accountId } = payload.payload;
+            if (accountId && data.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
+                const { data: newData } = await supabase.from(table).select('*').eq('account_id', accountId);
+                if (newData) {
+                    setData(prev => {
+                        const other = (prev.budget[table] || []).filter(item => String(item.account_id) !== String(accountId) && String(item.accountId) !== String(accountId));
+                        const mapped = newData.map(i => ({ ...i, accountId: i.account_id }));
+                        if (table === 'transactions') return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped].sort((a,b) => new Date(b.date) - new Date(a.date)) } };
+                        return { ...prev, budget: { ...prev.budget, [table]: [...other, ...mapped] } };
+                    });
+                }
+            }
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
             setData(prev => {
                 let currentTransactions = [...(prev.budget?.transactions || [])];
@@ -284,6 +300,8 @@ export default function App() {
             });
         })
         .subscribe();
+    
+    budgetChannelRef.current = budgetChannel;
 
     return () => { 
         supabase.removeChannel(journalChannel); 
@@ -651,6 +669,18 @@ export default function App() {
                await supabase.from(table).delete().eq(filter.column, filter.value);
            } else if (table && id) {
                await supabase.from(table).delete().eq('id', id);
+           }
+       }
+       
+       // CUSTOM SYNC BROADCAST
+       if (budgetChannelRef.current && ['transactions', 'recurring', 'scheduled'].includes(table)) {
+           const accId = payload?.account_id || payload?.accountId;
+           if (accId) {
+               budgetChannelRef.current.send({
+                   type: 'broadcast',
+                   event: 'custom_sync',
+                   payload: { table, accountId: accId }
+               });
            }
        }
      } catch (e) { console.error("Erreur action DB immédiate", e); }

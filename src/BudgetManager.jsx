@@ -674,6 +674,19 @@ export default function BudgetManager({ data, updateData }) {
         updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', id: shareId, action: 'delete' });
     };
 
+    const leaveAccount = (accId) => {
+        const share = data.account_shares?.find(s => String(s.account_id) === String(accId) && s.user_email === data.profile?.email);
+        if (share) {
+            updateData(
+                { ...data, budget: { ...data.budget, accounts: data.budget.accounts.filter(a => String(a.id) !== String(accId)) } },
+                { table: 'account_shares', id: share.id, action: 'delete' }
+            );
+            if (String(activeAccount) === String(accId)) {
+                setActiveAccount(data.budget.accounts.find(a => String(a.id) !== String(accId))?.id);
+            }
+        }
+    };
+
     return (
         <div className="space-y-6 fade-in w-full pb-20">
             {/* 1. CARTES DU HAUT */}
@@ -883,12 +896,18 @@ export default function BudgetManager({ data, updateData }) {
                                             <div className="flex items-center gap-3">
                                                 <span className="font-bold text-gray-500 dark:text-gray-400 text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</span>
                                                 <div className="flex gap-1">
-                                                    <button onClick={() => setSharingAccountId(acc.id)} className="text-gray-400 hover:text-purple-600 p-1" title="Partager"><Users size={14}/></button>
-                                                    <button onClick={() => startEditAccount(acc)} className="text-gray-400 hover:text-blue-600 p-1"><Edit size={14}/></button>
-                                                    {deletingAccountId === acc.id ? (
-                                                        <button onClick={() => deleteAccount(acc.id)} className="text-white bg-red-600 px-2 rounded text-xs hover:bg-red-700 transition-colors">Confirmer ?</button>
+                                                    {(acc.user_id && data.profile?.id && acc.user_id !== data.profile.id) ? (
+                                                        <button onClick={() => leaveAccount(acc.id)} className="text-gray-400 hover:text-red-600 p-1 text-xs font-bold bg-gray-100 dark:bg-slate-700 rounded transition-colors" title="Quitter le compte partagé">Quitter</button>
                                                     ) : (
-                                                        <button onClick={() => setDeletingAccountId(acc.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={14}/></button>
+                                                        <>
+                                                            <button onClick={() => setSharingAccountId(acc.id)} className="text-gray-400 hover:text-purple-600 p-1" title="Partager"><Users size={14}/></button>
+                                                            <button onClick={() => startEditAccount(acc)} className="text-gray-400 hover:text-blue-600 p-1"><Edit size={14}/></button>
+                                                            {deletingAccountId === acc.id ? (
+                                                                <button onClick={() => deleteAccount(acc.id)} className="text-white bg-red-600 px-2 rounded text-xs hover:bg-red-700 transition-colors">Confirmer ?</button>
+                                                            ) : (
+                                                                <button onClick={() => setDeletingAccountId(acc.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={14}/></button>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
