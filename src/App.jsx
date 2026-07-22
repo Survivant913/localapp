@@ -53,7 +53,7 @@ export default function App() {
  };
 
  const [data, setData] = useState({
-   todos: [], todoLists: [], projects: [], 
+   todos: [], todoLists: [], projects: [], todo_list_shares: [], 
    goals: [], goal_milestones: [], 
    journal_folders: [], journal_pages: [], journal_shares: [], journal_favorites: [], // MODIFICATION ICI
    calendar_events: [], 
@@ -716,6 +716,7 @@ export default function App() {
      const newData = {
        todos: todos || [], 
        todoLists: todo_lists || [], 
+       todo_list_shares: todo_list_shares || [],
        notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
