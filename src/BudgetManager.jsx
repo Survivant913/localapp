@@ -393,25 +393,8 @@ export default function BudgetManager({ data, updateData }) {
         return { points: combined, min: minBal - padding, max: maxBal + padding, todayIndex: 30 };
     }, [transactionsList, recurringList, scheduledList, statsAccountId, currentTotalBalance, accounts]);
 
-    const bezierCommand = (point, i, a) => {
-        const line = (pointA, pointB) => {
-            const lengthX = pointB[0] - pointA[0];
-            const lengthY = pointB[1] - pointA[1];
-            return { length: Math.sqrt(Math.pow(lengthX, 2) + Math.pow(lengthY, 2)), angle: Math.atan2(lengthY, lengthX) };
-        };
-        const controlPoint = (current, previous, next, reverse) => {
-            const p = previous || current;
-            const n = next || current;
-            const smoothing = 0.15;
-            const o = line(p, n);
-            const angle = o.angle + (reverse ? Math.PI : 0);
-            const length = o.length * smoothing;
-            return [current[0] + Math.cos(angle) * length, current[1] + Math.sin(angle) * length];
-        };
-        
-        const cps = controlPoint(a[i - 1], a[i - 2], point);
-        const cpe = controlPoint(point, a[i - 1], a[i + 1], true);
-        return `C ${cps[0]},${cps[1]} ${cpe[0]},${cpe[1]} ${point[0]},${point[1]}`;
+    const bezierCommand = (point) => {
+        return `L ${point[0]},${point[1]}`;
     };
 
 
