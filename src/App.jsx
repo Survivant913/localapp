@@ -605,8 +605,9 @@ export default function App() {
         supabase.from('journal_favorites').select('*'), // MODIFICATION ICI : On charge les favoris
         supabase.from('venture_analytics').select('*'), // --- NOUVEAU : Chargement des graphiques Workspace
         supabase.from('account_shares').select('*'),
-        supabase.from('todo_list_shares').select('*')
-      ]);
+        supabase.from('todo_list_shares').select('*'),
+          supabase.from('project_shares').select('*')
+        ]);
 
      const [
        { data: profile }, { data: todos }, { data: notes }, { data: projects },
@@ -625,8 +626,9 @@ export default function App() {
         { data: journal_favorites }, // MODIFICATION ICI
         { data: venture_analytics }, // --- NOUVEAU
         { data: account_shares },
-        { data: todo_list_shares }
-      ] = results;
+        { data: todo_list_shares },
+          { data: project_shares }
+        ] = results;
 
      let newDBTransactions = [];
      let updatedDBScheduled = [];
@@ -743,7 +745,8 @@ export default function App() {
        todos: todos || [], 
        todoLists: todo_lists || [], 
        todo_list_shares: todo_list_shares || [],
-       notes: mappedNotes, projects: mappedProjects, events: events || [],
+         project_shares: project_shares || [],
+         notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],
        journal_shares: journal_shares || [], 
