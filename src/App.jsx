@@ -41,10 +41,7 @@ export default function App() {
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
  const budgetChannelRef = useRef(null);
- const dataRef = useRef(data);
  const loadSuccess = useRef(false); // --- SÉCURITÉ ANTI-EFFACEMENT ---
- 
- useEffect(() => { dataRef.current = data; }, [data]);
  
  // --- AJOUT 2 : ÉTATS POUR SON ET COMPTEUR ---
  const [unreadCount, setUnreadCount] = useState(0);
@@ -65,8 +62,12 @@ export default function App() {
    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'blue' }, customLabels: {},
    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
    ventures: [],
-   venture_analytics: [] // --- NOUVEAU : Ajout de la table d'analyse
+   venture_analytics: [], // --- NOUVEAU : Ajout de la table d'analyse
+   account_shares: [] // --- INITIALISATION POUR ÉVITER LES BUGS ---
  });
+
+ const dataRef = useRef(data);
+ useEffect(() => { dataRef.current = data; }, [data]);
 
  const [unsavedChanges, setUnsavedChanges] = useState(false);
  const [isSaving, setIsSaving] = useState(false);
