@@ -338,10 +338,6 @@ export default function App() {
                     if (!currentTransactions.some(t => String(t.id) === String(payload.new.id))) currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
                 } else if (payload.eventType === 'UPDATE') {
                     const idx = currentTransactions.findIndex(t => String(t.id) === String(payload.new.id));
-                if (payload.eventType === 'INSERT') {
-                    if (!currentTransactions.some(t => String(t.id) === String(payload.new.id))) currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
-                } else if (payload.eventType === 'UPDATE') {
-                    const idx = currentTransactions.findIndex(t => String(t.id) === String(payload.new.id));
                     if (idx !== -1) currentTransactions[idx] = { ...payload.new, accountId: payload.new.account_id };
                     else currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
                 } else if (payload.eventType === 'DELETE') {
@@ -408,8 +404,7 @@ export default function App() {
                   }
                   return { ...prev, todos: currentTodos };
               });
-          });
-        })
+          })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'account_shares' }, (payload) => {
             setData(prev => {
                 let currentShares = [...(prev.account_shares || [])];
