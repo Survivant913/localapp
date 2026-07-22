@@ -590,7 +590,8 @@ export default function BudgetManager({ data, updateData }) {
     const deleteItem = (collection, id) => { 
         const map = { 'transactions': 'transactions', 'recurring': 'recurring', 'scheduled': 'scheduled' };
         const targetList = Array.isArray(budgetData[collection]) ? budgetData[collection] : [];
-        updateData({ ...data, budget: { ...budgetData, [collection]: targetList.filter(i => i.id !== id) } }, { table: map[collection], id: id, action: 'delete' }); 
+        const itemToDel = targetList.find(i => i.id === id);
+        updateData({ ...data, budget: { ...budgetData, [collection]: targetList.filter(i => i.id !== id) } }, { table: map[collection], id: id, data: { accountId: itemToDel?.accountId }, action: 'delete' }); 
     };
     
     const archiveTransaction = (id) => { 
@@ -598,7 +599,7 @@ export default function BudgetManager({ data, updateData }) {
         const target = newTransactions.find(t => t.id === id);
         updateData(
             { ...data, budget: { ...budgetData, transactions: newTransactions } },
-            { table: 'transactions', id: id, data: { archived: target.archived }, action: 'update' }
+            { table: 'transactions', id: id, data: { archived: target.archived, accountId: target.accountId }, action: 'update' }
         ); 
     };
     
@@ -671,7 +672,7 @@ export default function BudgetManager({ data, updateData }) {
 
     const removeShare = (shareId) => {
         const updatedShares = (data.account_shares || []).filter(s => s.id !== shareId);
-        updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', id: shareId, action: 'delete' });
+        updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', id: shareId, data: { account_id: data.account_shares?.find(s => s.id === shareId)?.account_id }, action: 'delete' });
     };
 
     const leaveAccount = (accId) => {
@@ -1354,3 +1355,6 @@ export default function BudgetManager({ data, updateData }) {
         </div>
     );
 }
+
+
+
