@@ -18,6 +18,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showClients, setShowClients] = useState(data.settings?.showClients ?? false);
     const [showGoals, setShowGoals] = useState(data.settings?.showGoals ?? false);
     const [showProjects, setShowProjects] = useState(data.settings?.showProjects ?? false);
+    const [showHabits, setShowHabits] = useState(data.settings?.showHabits ?? false);
 
     // On utilise des noms de variables génériques pour le formulaire
     const [companyData, setCompanyData] = useState({
@@ -45,6 +46,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowClients(data.settings.showClients ?? false);
             setShowGoals(data.settings.showGoals ?? false);
             setShowProjects(data.settings.showProjects ?? false);
+            setShowHabits(data.settings.showHabits ?? false);
         }
         
         if (data.profile) {
@@ -91,7 +93,8 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 grayShade,
                 showClients,
                 showGoals,
-                showProjects
+                showProjects,
+                showHabits
             },
             profile: { 
                 ...(data.profile || {}), 
@@ -260,6 +263,18 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 </div>
                                 <div className="relative inline-flex items-center">
                                     <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </div>
+                            </label>
+
+                            {/* Toggle Habitudes */}
+                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Suivi Habitudes</p>
+                                    <p className="text-xs text-slate-500">Créer et suivre vos habitudes au quotidien</p>
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                    <input type="checkbox" checked={showHabits} onChange={(e) => setShowHabits(e.target.checked)} className="sr-only peer" />
                                     <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                                 </div>
                             </label>

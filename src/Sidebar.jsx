@@ -71,6 +71,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     if (item.id === 'clients') return settings?.showClients === true;
     if (item.id === 'goals') return settings?.showGoals === true;
     if (item.id === 'projects') return settings?.showProjects === true;
+    if (item.id === 'habits') return settings?.showHabits === true;
     return true;
   });
 
