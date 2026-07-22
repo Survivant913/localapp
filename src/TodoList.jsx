@@ -4,7 +4,7 @@ import {
     Filter, CheckSquare, AlertCircle, X, ListTodo,
     LayoutDashboard, List, ChevronRight, Clock, Hash, ArrowRight,
     GripVertical, ChevronLeft, PanelLeftClose, PanelLeftOpen,
-    Edit2
+    Edit2, Users
 } from 'lucide-react';
 
 export default function TodoList({ data, updateData }) {
@@ -27,10 +27,28 @@ export default function TodoList({ data, updateData }) {
 
     const isDark = data.settings?.theme === 'dark';
 
+    // --- PARTAGE ---
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareEmail, setShareEmail] = useState('');
+
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
     const todoListsFromData = data.todoLists || [];
-    const allLists = [{ id: 'default', name: 'To-Do', color: 'indigo' }, ...todoListsFromData];
+    const myShares = (data.todo_list_shares || []).filter(s => s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase());
+    
+    const allLists = [
+        { id: 'default', name: 'To-Do', color: 'indigo' }, 
+        ...todoListsFromData.filter(l => 
+            l.user_id === data.profile?.id || 
+            myShares.some(s => String(s.list_id) === String(l.id))
+        )
+    ];
+
+    const isSharedWithMe = (listId) => {
+        if (listId === 'default') return false;
+        const list = todoListsFromData.find(l => String(l.id) === String(listId));
+        return list && list.user_id && data.profile?.id && list.user_id !== data.profile.id;
+    };
 
     // --- STATISTIQUES (TON CODE ORIGINAL) ---
     const stats = useMemo(() => {
@@ -132,13 +150,14 @@ export default function TodoList({ data, updateData }) {
 
     const deleteTodo = (id) => {
         if(window.confirm("Supprimer cette tâche ?")) {
-            updateData({ ...data, todos: todos.filter(t => t.id !== id) }, { table: 'todos', id, action: 'delete' });
+            const target = todos.find(t => t.id === id);
+            updateData({ ...data, todos: todos.filter(t => t.id !== id) }, { table: 'todos', id, action: 'delete', data: { list_id: target?.listId || target?.list_id } });
         }
     };
 
     const addList = () => {
         if (!newListTitle.trim()) return;
-        const newList = { id: Date.now().toString(), name: newListTitle, color: 'purple' };
+        const newList = { id: Date.now().toString(), name: newListTitle, color: 'purple', user_id: data.profile?.id };
         updateData({ ...data, todoLists: [...todoListsFromData, newList] }, { table: 'todo_lists', data: newList, action: 'insert' });
         setNewListTitle('');
         setIsAddingList(false);
@@ -165,6 +184,17 @@ export default function TodoList({ data, updateData }) {
                 updateData({ ...data, todos: activeTodos }, { table: 'todos', id: todo.id, action: 'delete' });
             });
         }
+    };
+
+    const addShare = () => {
+        if (!shareEmail.trim()) return;
+        const newShare = { id: Date.now().toString(), list_id: activeListId, user_email: shareEmail };
+        updateData({ ...data, todo_list_shares: [...(data.todo_list_shares || []), newShare] }, { table: 'todo_list_shares', data: newShare, action: 'insert' });
+        setShareEmail('');
+    };
+
+    const removeShare = (id) => {
+        updateData({ ...data, todo_list_shares: (data.todo_list_shares || []).filter(s => s.id !== id) }, { table: 'todo_list_shares', id, action: 'delete' });
     };
 
     const filteredTodos = useMemo(() => {
@@ -252,14 +282,24 @@ export default function TodoList({ data, updateData }) {
                             <span className="absolute text-sm font-bold">{stats.percentage}%</span>
                         </div>
                         <div>
-                            <h2 className="text-xl md:text-3xl font-black">{allLists.find(l => l.id === activeListId)?.name}</h2>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-xl md:text-3xl font-black">{allLists.find(l => l.id === activeListId)?.name}</h2>
+                                {isSharedWithMe(activeListId) && <div className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">Partagée</div>}
+                            </div>
                             <p className="text-xs md:text-sm text-slate-500">{stats.completed} terminées sur {stats.total}</p>
                         </div>
                     </div>
 
-                    <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
-                        <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><List size={16} /> Liste</button>
-                        <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'kanban' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><LayoutDashboard size={16} /> Kanban</button>
+                    <div className="flex items-center gap-3">
+                        {activeListId !== 'default' && (
+                            <button onClick={() => setShowShareModal(true)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all border shadow-sm ${isDark ? 'bg-slate-800 border-white/5 hover:bg-slate-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                <Users size={16}/> Partage
+                            </button>
+                        )}
+                        <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
+                            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><List size={16} /> Liste</button>
+                            <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'kanban' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><LayoutDashboard size={16} /> Kanban</button>
+                        </div>
                     </div>
                 </header>
 
@@ -412,6 +452,42 @@ export default function TodoList({ data, updateData }) {
                     )}
                 </div>
             </main>
+
+            {/* MODAL DE PARTAGE */}
+            {showShareModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
+                    <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+                        <div className={`px-6 py-4 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                            <h3 className="font-black flex items-center gap-2"><Users size={18}/> Partager la liste</h3>
+                            <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                        </div>
+                        <div className="p-6">
+                            {!isSharedWithMe(activeListId) ? (
+                                <>
+                                    <div className="flex gap-2 mb-6">
+                                        <input type="email" placeholder="Email de l'invité..." value={shareEmail} onChange={e => setShareEmail(e.target.value)} className={`flex-1 px-4 py-2 rounded-xl outline-none border ${isDark ? 'bg-slate-900 border-white/10' : 'bg-slate-50 border-slate-200'}`} />
+                                        <button onClick={addShare} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold">Inviter</button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Membres invités</h4>
+                                        {(data.todo_list_shares || []).filter(s => String(s.list_id) === String(activeListId)).map(share => (
+                                            <div key={share.id} className={`flex items-center justify-between p-3 rounded-xl border ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                                                <span className="text-sm font-medium">{share.user_email}</span>
+                                                <button onClick={() => removeShare(share.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md" title="Expulser"><Trash2 size={14}/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center">
+                                    <p className="text-sm text-slate-500 mb-6">Vous êtes invité sur cette liste. Vous pouvez la quitter à tout moment.</p>
+                                    <button onClick={() => deleteList(activeListId)} className="w-full px-4 py-3 bg-red-100 text-red-600 font-bold rounded-xl">Quitter la liste</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

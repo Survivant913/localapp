@@ -268,7 +268,30 @@ export default function App() {
             const { table, accountId } = payload.payload;
             
             setTimeout(async () => {
-                if (table === 'account_shares') {
+                if (table === 'todo_list_shares') {
+                     const [listsRes, sharesRes, todosRes] = await Promise.all([
+                         supabase.from('todo_lists').select('*'),
+                         supabase.from('todo_list_shares').select('*'),
+                         supabase.from('todos').select('*')
+                     ]);
+                     if (listsRes.data && sharesRes.data && todosRes.data) {
+                         setData(prev => ({
+                             ...prev,
+                             todoLists: listsRes.data,
+                             todo_list_shares: sharesRes.data,
+                             todos: todosRes.data
+                         }));
+                     }
+                }
+                else if (table === 'todo_lists') {
+                    const { data: newData } = await supabase.from('todo_lists').select('*');
+                    if (newData) setData(prev => ({ ...prev, todoLists: newData }));
+                }
+                else if (table === 'todos') {
+                    const { data: newData } = await supabase.from('todos').select('*');
+                    if (newData) setData(prev => ({ ...prev, todos: newData }));
+                }
+                else if (table === 'account_shares') {
                      const [accRes, shareRes, txRes, recRes, schedRes] = await Promise.all([
                          supabase.from('accounts').select('*'),
                          supabase.from('account_shares').select('*'),
@@ -321,6 +344,17 @@ export default function App() {
                     currentTransactions = currentTransactions.filter(t => String(t.id) !== String(payload.old.id));
                 }
                 return { ...prev, budget: { ...prev.budget, transactions: currentTransactions } };
+            });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_list_shares' }, (payload) => {
+            setData(prev => {
+                let currentShares = [...(prev.todo_list_shares || [])];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
+                }
+                return { ...prev, todo_list_shares: currentShares };
             });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'account_shares' }, (payload) => {
@@ -866,6 +900,11 @@ export default function App() {
    </div>
  );
 }
+
+
+
+
+
 
 
 

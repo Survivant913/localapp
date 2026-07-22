@@ -437,8 +437,13 @@ export default function Dashboard({ data, updateData, setView }) {
     };
 
     const toggleTodo = (id) => {
-        const newTodos = todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
-        updateData({ ...data, todos: newTodos });
+        const target = todos.find(t => t.id === id);
+        if (!target) return;
+        const newTodos = todos.map(t => t.id === id ? { ...t, completed: !t.completed, status: !t.completed ? 'done' : 'todo' } : t);
+        updateData(
+            { ...data, todos: newTodos },
+            { table: 'todos', id, data: { completed: !target.completed, status: !target.completed ? 'done' : 'todo', list_id: target.listId || target.list_id }, action: 'update' }
+        );
     };
 
     const updateHabit = (updatedHabit) => {
@@ -771,3 +776,4 @@ export default function Dashboard({ data, updateData, setView }) {
         </div>
     );
 }
+
