@@ -41,7 +41,10 @@ export default function App() {
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
  const budgetChannelRef = useRef(null);
+ const dataRef = useRef(data);
  const loadSuccess = useRef(false); // --- SÉCURITÉ ANTI-EFFACEMENT ---
+ 
+ useEffect(() => { dataRef.current = data; }, [data]);
  
  // --- AJOUT 2 : ÉTATS POUR SON ET COMPTEUR ---
  const [unreadCount, setUnreadCount] = useState(0);
@@ -261,7 +264,7 @@ export default function App() {
     const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { self: false } } })
         .on('broadcast', { event: 'custom_sync' }, async (payload) => {
             const { table, accountId } = payload.payload;
-            if (accountId && data.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
+            if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
                 const { data: newData } = await supabase.from(table).select('*').eq('account_id', accountId);
                 if (newData) {
                     setData(prev => {
