@@ -662,7 +662,8 @@ export default function BudgetManager({ data, updateData }) {
 
     const addShare = () => {
         if (!shareEmail.trim() || !sharingAccountId) return;
-        const newShare = { id: crypto.randomUUID(), account_id: sharingAccountId, user_email: shareEmail };
+        const cleanEmail = shareEmail.trim().toLowerCase();
+        const newShare = { id: crypto.randomUUID(), account_id: sharingAccountId, user_email: cleanEmail };
         const updatedShares = [...(data.account_shares || []), newShare];
         updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', data: newShare, action: 'insert' });
         setShareEmail('');
