@@ -192,13 +192,19 @@ export default function ChatManager({ user }) {
         return () => { channel.unsubscribe(); };
     }, [activeRoom]);
 
-    const handleInputChange = async (e) => {
+    const handleInputChange = (e) => {
         setNewMessage(e.target.value);
         if (!activeRoom || activeRoom.status !== 'accepted') return;
-        if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: true });
+        
+        if (!isTypingRef.current) {
+            isTypingRef.current = true;
+            if (channelRef.current) channelRef.current.track({ online_at: new Date().toISOString(), isTyping: true });
+        }
+        
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = setTimeout(async () => {
-            if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
+        typingTimeoutRef.current = setTimeout(() => {
+            isTypingRef.current = false;
+            if (channelRef.current) channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
         }, 2000);
     };
 
@@ -229,7 +235,8 @@ export default function ChatManager({ user }) {
         if (!newMessage.trim() || !activeRoom) return;
 
         const text = newMessage;
-        if (channelRef.current) await channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
+        isTypingRef.current = false;
+        if (channelRef.current) channelRef.current.track({ online_at: new Date().toISOString(), isTyping: false });
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
         if (editingMessageId) {
@@ -240,10 +247,27 @@ export default function ChatManager({ user }) {
             if (error) { alert("Erreur modification"); setMessages(oldMessages); }
         } else {
             setNewMessage(''); setReplyingTo(null);
+            
+            // Generate a temporary ID for immediate display (Optimistic UI)
+            const tempId = 'temp-' + Date.now();
+            const tempMessage = {
+                id: tempId,
+                room_id: activeRoom.id,
+                sender_id: user.id,
+                content: text,
+                reply_to_id: replyingTo ? replyingTo.id : null,
+                created_at: new Date().toISOString(),
+                is_pinned: false
+            };
+            setMessages(current => [...current, tempMessage]);
+            
             const payload = { room_id: activeRoom.id, sender_id: user.id, content: text, reply_to_id: replyingTo ? replyingTo.id : null };
             const { error } = await supabase.from('chat_messages').insert([payload]);
-            if (error) { alert("Erreur envoi"); setNewMessage(text); } else { 
-                fetchMessages(activeRoom.id);
+            if (error) { 
+                alert("Erreur envoi"); 
+                setNewMessage(text); 
+                setMessages(current => current.filter(m => m.id !== tempId));
+            } else { 
                 markRoomAsRead(activeRoom.id);
             }
         }
