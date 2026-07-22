@@ -274,7 +274,8 @@ export default function App() {
                       supabase.from('project_shares').select('*')
                   ]);
                   if (projRes.data && projSharesRes.data) {
-                      setData(prev => ({ ...prev, projects: projRes.data, project_shares: projSharesRes.data }));
+                      const mappedProjectsSync = projRes.data.map(p => ({ id: p.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linkedAccountId: p.linked_account_id, objectives: p.objectives, notes: p.internal_notes, user_id: p.user_id }));
+                        setData(prev => ({ ...prev, projects: mappedProjectsSync, project_shares: projSharesRes.data }));
                   }
               }
               if (['todo_list_shares', 'todo_lists', 'todos'].includes(table)) {
