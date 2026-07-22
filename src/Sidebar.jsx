@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount }) {
+export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings }) {
   // MODIFICATION ICI : useState(true) pour que la sidebar soit fermée au démarrage
   const [isCollapsed, setIsCollapsed] = useState(true);
   
@@ -67,7 +67,12 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'journal', label: 'Carnet', icon: Book },
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
-  ];
+  ].filter(item => {
+    if (item.id === 'clients') return settings?.showClients === true;
+    if (item.id === 'goals') return settings?.showGoals === true;
+    if (item.id === 'projects') return settings?.showProjects === true;
+    return true;
+  });
 
   return (
     <>
