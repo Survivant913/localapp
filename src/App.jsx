@@ -949,6 +949,7 @@ export default function App() {
        darkMode={data.settings?.theme === 'dark'} 
        toggleTheme={toggleTheme} 
        unreadCount={unreadCount} 
+       settings={data.settings}
      />
      
      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
