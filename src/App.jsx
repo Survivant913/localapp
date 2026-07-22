@@ -391,20 +391,35 @@ export default function App() {
               });
           })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'todos' }, (payload) => {
-              setData(prev => {
-                  let currentTodos = [...(prev.todos || [])];
-                  if (payload.eventType === 'INSERT') {
-                      if (!currentTodos.some(t => String(t.id) === String(payload.new.id))) currentTodos.push(payload.new);
-                  } else if (payload.eventType === 'UPDATE') {
-                      const idx = currentTodos.findIndex(t => String(t.id) === String(payload.new.id));
-                      if (idx !== -1) currentTodos[idx] = payload.new;
-                      else currentTodos.push(payload.new);
-                  } else if (payload.eventType === 'DELETE') {
-                      currentTodos = currentTodos.filter(t => String(t.id) !== String(payload.old.id));
-                  }
-                  return { ...prev, todos: currentTodos };
-              });
-          })
+            if (payload.eventType === 'DELETE') {
+                // BUG SUPABASE FIX: Les UPDATE peuvent envoyer un faux DELETE � cause du EXISTS dans RLS
+                supabase.from('todos').select('*').eq('id', payload.old.id).single().then(({ data: existingTodo }) => {
+                    if (existingTodo) {
+                        setData(prev => {
+                            let currentTodos = [...(prev.todos || [])];
+                            const idx = currentTodos.findIndex(t => String(t.id) === String(existingTodo.id));
+                            if (idx !== -1) currentTodos[idx] = existingTodo;
+                            else currentTodos.push(existingTodo);
+                            return { ...prev, todos: currentTodos };
+                        });
+                    } else {
+                        setData(prev => ({ ...prev, todos: (prev.todos || []).filter(t => String(t.id) !== String(payload.old.id)) }));
+                    }
+                });
+            } else {
+                setData(prev => {
+                    let currentTodos = [...(prev.todos || [])];
+                    if (payload.eventType === 'INSERT') {
+                        if (!currentTodos.some(t => String(t.id) === String(payload.new.id))) currentTodos.push(payload.new);
+                    } else if (payload.eventType === 'UPDATE') {
+                        const idx = currentTodos.findIndex(t => String(t.id) === String(payload.new.id));
+                        if (idx !== -1) currentTodos[idx] = payload.new;
+                        else currentTodos.push(payload.new);
+                    }
+                    return { ...prev, todos: currentTodos };
+                });
+            }
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'account_shares' }, (payload) => {
             setData(prev => {
                 let currentShares = [...(prev.account_shares || [])];
