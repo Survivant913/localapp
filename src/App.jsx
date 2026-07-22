@@ -267,13 +267,33 @@ export default function App() {
             console.log("Broadcast reçu:", payload);
             const { table, accountId } = payload.payload;
             
-            if (table === 'account_shares') {
-                 const [accRes, shareRes] = await Promise.all([
-                     supabase.from('accounts').select('*'),
-                     supabase.from('account_shares').select('*')
-                 ]);
-                 if (accRes.data && shareRes.data) {
-                     setData(prev => ({ ...prev, budget: { ...prev.budget, accounts: accRes.data }, account_shares: shareRes.data }));
+                          if (table === 'account_shares') {
+                   const [accRes, shareRes, txRes, recRes, schedRes] = await Promise.all([
+                       supabase.from('accounts').select('*'),
+                       supabase.from('account_shares').select('*'),
+                       supabase.from('transactions').select('*').limit(10000),
+                       supabase.from('recurring').select('*'),
+                       supabase.from('scheduled').select('*')
+                   ]);
+                   if (accRes.data && shareRes.data) {
+                       setData(prev => {
+                           const mappedTx = (txRes.data || []).map(t => ({ ...t, accountId: t.account_id }));
+                           const mappedRec = (recRes.data || []).map(r => ({ ...r, accountId: r.account_id, targetAccountId: r.target_account_id, nextDueDate: r.next_due_date, dayOfMonth: r.day_of_month, endDate: r.end_date }));
+                           const mappedSched = (schedRes.data || []).map(s => ({ ...s, accountId: s.account_id, targetAccountId: s.target_account_id }));
+                           return { 
+                               ...prev, 
+                               account_shares: shareRes.data,
+                               budget: { 
+                                   ...prev.budget, 
+                                   accounts: accRes.data,
+                                   transactions: mappedTx.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                                   recurring: mappedRec,
+                                   scheduled: mappedSched
+                               } 
+                           };
+                       });
+                   }
+              }));
                  }
             }
             else if (accountId && dataRef.current?.budget?.accounts?.some(a => String(a.id) === String(accountId))) {
@@ -846,3 +866,4 @@ export default function App() {
    </div>
  );
 }
+
