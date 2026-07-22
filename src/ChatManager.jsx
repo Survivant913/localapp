@@ -32,6 +32,7 @@ export default function ChatManager({ user }) {
     const [onlineUsers, setOnlineUsers] = useState(new Set());
     const [typingUsers, setTypingUsers] = useState(new Set());
     const typingTimeoutRef = useRef(null);
+    const isTypingRef = useRef(false);
     
     // UI States
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
