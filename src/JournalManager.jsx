@@ -261,17 +261,21 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
         const itemToDelete = type === 'page' ? allPages.find(p => p.id === id) : allFolders.find(f => f.id === id);
         if (!itemToDelete) return;
 
-        const isOwner = itemToDelete.user_id === data?.profile?.id;
+        // Check if this is a root folder shared WITH me
+        const shareToRemove = type === 'folder' ? (data?.journal_shares || []).find(s => 
+            String(s.folder_id) === String(id) && 
+            s.user_email?.toLowerCase() === currentUserEmail?.toLowerCase()
+        ) : null;
+        
+        const isLeavingShare = !!shareToRemove;
 
         let confirmMsg = "";
         if (type === 'page') {
             confirmMsg = "Supprimer ce document ?";
         } else {
-            confirmMsg = isOwner 
-                ? "Supprimer ce dossier et TOUT son contenu (sous-dossiers et pages) ? Cette action est irréversible."
-                : "Quitter ce carnet ? Il disparaîtra de votre liste, mais restera intact chez le propriétaire.";
+            confirmMsg = isLeavingShare ? "Quitter ce carnet partag� ?" : "Supprimer d�finitivement ce dossier et tout son contenu ?";
         }
-            
+        
         if (!window.confirm(confirmMsg)) return;
 
         try {
@@ -280,7 +284,11 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                 setAllPages(allPages.filter(p => p.id !== id));
                 if (activePageId === id) setActivePageId(null);
             } else {
-                if (isOwner) {
+                if (isLeavingShare) {
+                    await supabase.from('journal_shares').delete().eq('id', shareToRemove.id);
+                    setAllFolders(prev => prev.filter(f => f.id !== id));
+                    setAllPages(prev => prev.filter(p => p.folder_id !== id));
+                } else {
                     const getAllDescendantIds = (parentId) => {
                         let ids = [parentId];
                         const children = allFolders.filter(f => f.parent_id === parentId);
@@ -294,23 +302,6 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     await supabase.from('journal_folders').delete().in('id', idsToDelete);
                     setAllFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
                     setAllPages(prev => prev.filter(p => !idsToDelete.includes(p.folder_id)));
-                } else {
-                    const shareToRemove = (data?.journal_shares || []).find(s => 
-                        String(s.folder_id) === String(id) && 
-                        s.user_email?.toLowerCase() === currentUserEmail?.toLowerCase()
-                    );
-                    
-                    if (shareToRemove) {
-                        await supabase.from('journal_shares').delete().eq('id', shareToRemove.id);
-                        setAllFolders(prev => prev.filter(f => f.id !== id));
-                        setAllPages(prev => prev.filter(p => p.folder_id !== id));
-                    }
-                }
-
-                if (activeNotebookId === id || currentFolderId === id) {
-                    setActiveNotebookId(null);
-                    setCurrentFolderId(null);
-                    setActivePageId(null);
                 }
             }
         } catch (err) {
@@ -504,7 +495,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                                                 {isOwner && (
                                                     <button onClick={(e) => openShareModal(nb, e)} className="p-1.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Partager ce carnet"><Users size={16}/></button>
                                                 )}
-                                                <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={isOwner ? "Supprimer définitivement" : "Quitter ce carnet"}><Trash2 size={16}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); deleteItem(nb.id, 'folder'); }} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title={nb.user_id === data?.profile?.id ? "Supprimer d�finitivement" : "Quitter ce carnet"}><Trash2 size={16}/></button>
                                             </div>
                                         </div>
                                         <h3 className="font-bold text-xl text-slate-800 dark:text-white line-clamp-2">{nb.name}</h3>
