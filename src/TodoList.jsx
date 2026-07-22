@@ -42,39 +42,6 @@ export default function TodoList({ data, updateData }) {
     const [showShareModal, setShowShareModal] = useState(false);
     const [shareEmail, setShareEmail] = useState('');
 
-    // Auto-réparation des permissions (Self-Share)
-    useEffect(() => {
-        if (!data.profile?.email || !data.profile?.id) return;
-        const myEmail = data.profile.email.toLowerCase();
-        const myId = data.profile.id;
-        
-        let needsUpdate = false;
-        const newShares = [...(data.todo_list_shares || [])];
-        
-        // Assurer l'accès à la liste 'default'
-        if (!newShares.some(s => s.list_id === 'default' && s.user_email?.toLowerCase() === myEmail)) {
-            newShares.push({ id: generateUUID(), list_id: 'default', user_email: myEmail, owner_id: myId });
-            needsUpdate = true;
-        }
-        
-        // Assurer l'accès à toutes ses listes créées
-        (data.todoLists || []).filter(l => l.user_id === myId).forEach(l => {
-            if (!newShares.some(s => String(s.list_id) === String(l.id) && s.user_email?.toLowerCase() === myEmail)) {
-                newShares.push({ id: generateUUID(), list_id: l.id, user_email: myEmail, owner_id: myId });
-                needsUpdate = true;
-            }
-        });
-
-        if (needsUpdate) {
-            const missingShares = newShares.filter(ns => !(data.todo_list_shares || []).some(os => os.id === ns.id));
-            if(missingShares.length > 0) {
-                missingShares.forEach(share => {
-                    updateData({ ...data, todo_list_shares: newShares }, { table: 'todo_list_shares', data: share, action: 'insert' });
-                });
-            }
-        }
-    }, [data.todoLists, data.profile]);
-
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
     const todoListsFromData = data.todoLists || [];
@@ -211,16 +178,10 @@ export default function TodoList({ data, updateData }) {
         if (!newListTitle.trim()) return;
         const listId = Date.now().toString();
         const newList = { id: listId, name: newListTitle, color: 'purple', user_id: data.profile?.id };
-        const newShare = { id: generateUUID(), list_id: listId, user_email: data.profile?.email, owner_id: data.profile?.id };
         
         const newLists = [...todoListsFromData, newList];
-        const newShares = [...(data.todo_list_shares || []), newShare];
         
-        // Push both list and share immediately via setTimeout to avoid state batching collision
-        updateData({ ...data, todoLists: newLists, todo_list_shares: newShares }, { table: 'todo_lists', data: newList, action: 'insert' });
-        setTimeout(() => {
-            updateData({ ...data, todoLists: newLists, todo_list_shares: newShares }, { table: 'todo_list_shares', data: newShare, action: 'insert' });
-        }, 100);
+        updateData({ ...data, todoLists: newLists }, { table: 'todo_lists', data: newList, action: 'insert' });
 
         setNewListTitle('');
         setIsAddingList(false);
@@ -536,9 +497,11 @@ export default function TodoList({ data, updateData }) {
                                         <input type="email" placeholder="Email de l'invité..." value={shareEmail} onChange={e => setShareEmail(e.target.value)} className={`flex-1 px-4 py-2 rounded-xl outline-none border ${isDark ? 'bg-slate-900 border-white/10' : 'bg-slate-50 border-slate-200'}`} />
                                         <button onClick={addShare} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold">Inviter</button>
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 mt-4">
                                         <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Membres invités</h4>
-                                        {(data.todo_list_shares || []).filter(s => String(s.list_id) === String(activeListId)).map(share => (
+                                        {(data.todo_list_shares || [])
+                                            .filter(s => String(s.list_id) === String(activeListId) && s.user_email !== data.profile?.email)
+                                            .map(share => (
                                             <div key={share.id} className={`flex items-center justify-between p-3 rounded-xl border ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                                                 <span className="text-sm font-medium">{share.user_email}</span>
                                                 <button onClick={() => removeShare(share.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md" title="Expulser"><Trash2 size={14}/></button>

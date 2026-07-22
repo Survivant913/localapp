@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+ï»¿import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
@@ -261,10 +261,10 @@ export default function App() {
         })
         .subscribe();
 
-    // --- NOUVEAU: ÉCOUTEUR GLOBAL BUDGET AVEC BROADCAST ---
+    // --- NOUVEAU: ï¿½COUTEUR GLOBAL BUDGET AVEC BROADCAST ---
     const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { ack: true, self: false } } })
         .on('broadcast', { event: 'custom_sync' }, (payload) => {
-            console.log("Broadcast reçu:", payload);
+            console.log("Broadcast reï¿½u:", payload);
             const { table, accountId } = payload.payload;
             
             setTimeout(async () => {
@@ -355,7 +355,37 @@ export default function App() {
                     currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
                 }
                 return { ...prev, todo_list_shares: currentShares };
-            });
+            })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_lists' }, (payload) => {
+              setData(prev => {
+                  let currentLists = [...(prev.todoLists || [])];
+                  if (payload.eventType === 'INSERT') {
+                      if (!currentLists.some(l => String(l.id) === String(payload.new.id))) currentLists.push(payload.new);
+                  } else if (payload.eventType === 'UPDATE') {
+                      const idx = currentLists.findIndex(l => String(l.id) === String(payload.new.id));
+                      if (idx !== -1) currentLists[idx] = payload.new;
+                      else currentLists.push(payload.new);
+                  } else if (payload.eventType === 'DELETE') {
+                      currentLists = currentLists.filter(l => String(l.id) !== String(payload.old.id));
+                  }
+                  return { ...prev, todoLists: currentLists };
+              });
+          })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'todos' }, (payload) => {
+              setData(prev => {
+                  let currentTodos = [...(prev.todos || [])];
+                  if (payload.eventType === 'INSERT') {
+                      if (!currentTodos.some(t => String(t.id) === String(payload.new.id))) currentTodos.push(payload.new);
+                  } else if (payload.eventType === 'UPDATE') {
+                      const idx = currentTodos.findIndex(t => String(t.id) === String(payload.new.id));
+                      if (idx !== -1) currentTodos[idx] = payload.new;
+                      else currentTodos.push(payload.new);
+                  } else if (payload.eventType === 'DELETE') {
+                      currentTodos = currentTodos.filter(t => String(t.id) !== String(payload.old.id));
+                  }
+                  return { ...prev, todos: currentTodos };
+              });
+          });
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'account_shares' }, (payload) => {
             setData(prev => {
