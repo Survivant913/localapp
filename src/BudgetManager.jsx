@@ -3,7 +3,7 @@ import {
     Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
     ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
     Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
-    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle
+    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -60,6 +60,8 @@ export default function BudgetManager({ data, updateData }) {
     const [editingAccountId, setEditingAccountId] = useState(null);
     const [editingAccountName, setEditingAccountName] = useState('');
     const [deletingAccountId, setDeletingAccountId] = useState(null);
+    const [sharingAccountId, setSharingAccountId] = useState(null);
+    const [shareEmail, setShareEmail] = useState('');
 
     const [showArchived, setShowArchived] = useState(false);
     const [forecastAccount, setForecastAccount] = useState('total');
@@ -867,6 +869,7 @@ export default function BudgetManager({ data, updateData }) {
                                             <div className="flex items-center gap-3">
                                                 <span className="font-bold text-gray-500 dark:text-gray-400 text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</span>
                                                 <div className="flex gap-1">
+                                                    <button onClick={() => setSharingAccountId(acc.id)} className="text-gray-400 hover:text-purple-600 p-1" title="Partager"><Users size={14}/></button>
                                                     <button onClick={() => startEditAccount(acc)} className="text-gray-400 hover:text-blue-600 p-1"><Edit size={14}/></button>
                                                     {deletingAccountId === acc.id ? (
                                                         <button onClick={() => deleteAccount(acc.id)} className="text-white bg-red-600 px-2 rounded text-xs hover:bg-red-700 transition-colors">Confirmer ?</button>
@@ -1274,6 +1277,47 @@ export default function BudgetManager({ data, updateData }) {
                     </div>
                 )}
             </div>
+            {/* MODAL DE PARTAGE */}
+            {sharingAccountId && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
+                                    <Users className="text-purple-500" /> Partager ce compte
+                                </h2>
+                                <button onClick={() => setSharingAccountId(null)} className="p-2 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white rounded-xl transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1">Inviter quelqu'un</label>
+                                    <div className="flex gap-2">
+                                        <input type="email" value={shareEmail} onChange={e => setShareEmail(e.target.value)} placeholder="Email de la personne..." className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 rounded-xl outline-none focus:border-purple-500 dark:text-white" />
+                                        <button onClick={addShare} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors">Inviter</button>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 mt-6">Accès partagés</h4>
+                                    <ul className="space-y-2">
+                                        {(data.account_shares || []).filter(s => s.account_id === sharingAccountId).length === 0 && (
+                                            <p className="text-sm text-gray-400 italic">Ce compte est privé. Personne d'autre n'y a accès.</p>
+                                        )}
+                                        {(data.account_shares || []).filter(s => s.account_id === sharingAccountId).map(share => (
+                                            <li key={share.id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-100 dark:border-slate-600">
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{share.user_email}</span>
+                                                <button onClick={() => removeShare(share.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

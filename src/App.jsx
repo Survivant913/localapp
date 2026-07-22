@@ -256,7 +256,39 @@ export default function App() {
         })
         .subscribe();
 
-    return () => { supabase.removeChannel(journalChannel); };
+    const budgetChannel = supabase.channel('budget-sync-master')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+            setData(prev => {
+                let currentTransactions = [...(prev.budget?.transactions || [])];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentTransactions.some(t => String(t.id) === String(payload.new.id))) currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
+                } else if (payload.eventType === 'UPDATE') {
+                    const idx = currentTransactions.findIndex(t => String(t.id) === String(payload.new.id));
+                    if (idx !== -1) currentTransactions[idx] = { ...payload.new, accountId: payload.new.account_id };
+                    else currentTransactions.push({ ...payload.new, accountId: payload.new.account_id });
+                } else if (payload.eventType === 'DELETE') {
+                    currentTransactions = currentTransactions.filter(t => String(t.id) !== String(payload.old.id));
+                }
+                return { ...prev, budget: { ...prev.budget, transactions: currentTransactions } };
+            });
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'account_shares' }, (payload) => {
+            setData(prev => {
+                let currentShares = [...(prev.account_shares || [])];
+                if (payload.eventType === 'INSERT') {
+                    if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
+                } else if (payload.eventType === 'DELETE') {
+                    currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
+                }
+                return { ...prev, account_shares: currentShares };
+            });
+        })
+        .subscribe();
+
+    return () => { 
+        supabase.removeChannel(journalChannel); 
+        supabase.removeChannel(budgetChannel);
+    };
  }, [session]);
 
  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE (CORRIGÉ POUR ÉVITER LES CONFLITS) ---
@@ -409,11 +441,12 @@ export default function App() {
        supabase.from('event_participants').select('*'),
        // AJOUT : CHARGEMENT DES HABITUDES ET DES LOGS DU JOUR
        supabase.from('habits').select('*'),
-       supabase.from('habit_logs').select('*').eq('date', todayIsoDate),
-       supabase.from('journal_shares').select('*'),
-       supabase.from('journal_favorites').select('*'), // MODIFICATION ICI : On charge les favoris
-       supabase.from('venture_analytics').select('*') // --- NOUVEAU : Chargement des graphiques Workspace
-     ]);
+        supabase.from('habit_logs').select('*').eq('date', todayIsoDate),
+        supabase.from('journal_shares').select('*'),
+        supabase.from('journal_favorites').select('*'), // MODIFICATION ICI : On charge les favoris
+        supabase.from('venture_analytics').select('*'), // --- NOUVEAU : Chargement des graphiques Workspace
+        supabase.from('account_shares').select('*') // CHARGEMENT DES PARTAGES DE COMPTES
+      ]);
 
      const [
        { data: profile }, { data: todos }, { data: notes }, { data: projects },
@@ -425,13 +458,14 @@ export default function App() {
        { data: calendar_events },
        { data: todo_lists },
        { data: all_participants },
-       // AJOUT : RÉCUPÉRATION HABITUDES & LOGS
-       { data: habits },
-       { data: daily_logs },
-       { data: journal_shares },
-       { data: journal_favorites }, // MODIFICATION ICI
-       { data: venture_analytics } // --- NOUVEAU
-     ] = results;
+        // AJOUT : RÉCUPÉRATION HABITUDES & LOGS
+        { data: habits },
+        { data: daily_logs },
+        { data: journal_shares },
+        { data: journal_favorites }, // MODIFICATION ICI
+        { data: venture_analytics }, // --- NOUVEAU
+        { data: account_shares } // PARTAGES COMPTES
+      ] = results;
 
      let newDBTransactions = [];
      let updatedDBScheduled = [];
@@ -580,6 +614,7 @@ export default function App() {
        clients: clients || [], quotes: quotes || [], invoices: invoices || [], catalog: catalog || [],
        ventures: ventures || [], 
        venture_analytics: venture_analytics || [], // --- NOUVEAU
+       account_shares: account_shares || [], // PARTAGES DE COMPTES
        profile: { ...(profile || {}), email: userEmail }, 
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
        customLabels: profile?.custom_labels || {}, mainNote: profile?.settings?.mainNote || ""
