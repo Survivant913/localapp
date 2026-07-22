@@ -152,6 +152,20 @@ export default function ChatManager({ user }) {
                 if (payload.eventType === 'INSERT') {
                     setMessages(current => {
                         if (current.some(m => m.id === payload.new.id)) return current;
+                        
+                        // Remplacer le message temporaire s'il existe (Optimistic UI)
+                        const tempIndex = current.findIndex(m => 
+                            String(m.id).startsWith('temp-') && 
+                            m.sender_id === payload.new.sender_id && 
+                            m.content === payload.new.content
+                        );
+                        
+                        if (tempIndex !== -1) {
+                            const newArr = [...current];
+                            newArr[tempIndex] = payload.new;
+                            return newArr;
+                        }
+                        
                         return [...current, payload.new];
                     });
                     scrollToBottom();
