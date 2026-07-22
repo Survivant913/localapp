@@ -104,6 +104,21 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     };
 
     // --- SYNCHRONISATION TEMPS RÉEL ---
+    
+    useEffect(() => {
+        const channel = new BroadcastChannel('app-sync');
+        channel.onmessage = (e) => {
+            if (e.data.type === 'journal_page_deleted') {
+                setAllPages(prev => prev.filter(p => String(p.id) !== String(e.data.id)));
+                setActivePageId(prev => String(prev) === String(e.data.id) ? null : prev);
+            } else if (e.data.type === 'journal_folder_deleted') {
+                setAllFolders(prev => prev.filter(f => String(f.id) !== String(e.data.id)));
+                setCurrentFolderId(prev => String(prev) === String(e.data.id) ? null : prev);
+            }
+        };
+        return () => channel.close();
+    }, []);
+
     useEffect(() => {
         if (data?.journal_folders) {
             setAllFolders(prev => {
