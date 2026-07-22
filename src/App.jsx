@@ -669,7 +669,7 @@ export default function App() {
      try {
        if (action === 'insert' && table && payload) {
            const { data: { session } } = await supabase.auth.getSession();
-           const insertPayload = { ...payload };
+           const insertPayload = { ...payload }; delete insertPayload.accountId; delete insertPayload.targetAccountId; delete insertPayload.listId; delete insertPayload.linkedProjectId;
            if (table === 'account_shares') insertPayload.owner_id = session?.user?.id;
            else if (table !== 'journal_shares') insertPayload.user_id = session?.user?.id;
            const { error } = await supabase.from(table).insert(insertPayload);
