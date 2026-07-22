@@ -513,8 +513,18 @@ export default function TodoList({ data, updateData }) {
                                 </>
                             ) : (
                                 <div className="text-center">
-                                    <p className="text-sm text-slate-500 mb-6">Vous êtes invité sur cette liste. Vous pouvez la quitter à tout moment.</p>
-                                    <button onClick={() => deleteList(activeListId)} className="w-full px-4 py-3 bg-red-100 text-red-600 font-bold rounded-xl">Quitter la liste</button>
+                                    <p className="text-sm text-slate-500 mb-6">Vous �tes invit� sur cette liste. Vous pouvez la quitter � tout moment.</p>
+                                    <button onClick={() => {
+                                        const myShare = data.todo_list_shares?.find(s => s.list_id === activeListId);
+                                        if (myShare) {
+                                            if (window.confirm("Voulez-vous vraiment quitter cette liste ?")) {
+                                                const newShares = (data.todo_list_shares || []).filter(s => s.id !== myShare.id);
+                                                updateData({ ...data, todo_list_shares: newShares }, { table: 'todo_list_shares', id: myShare.id, action: 'delete' });
+                                                setShowShares(false);
+                                                setActiveListId('default');
+                                            }
+                                        }
+                                    }} className="w-full px-4 py-3 bg-red-100 text-red-600 font-bold rounded-xl">Quitter la liste</button>
                                 </div>
                             )}
                         </div>
