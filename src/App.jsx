@@ -240,6 +240,7 @@ export default function App() {
                     else currentPages.push(payload.new);
                 } else if (payload.eventType === 'DELETE') {
                     currentPages = currentPages.filter(p => String(p.id) !== String(payload.old.id));
+                    new BroadcastChannel('app-sync').postMessage({ type: 'journal_page_deleted', id: payload.old.id });
                 }
                 return { ...prev, journal_pages: currentPages };
             });
@@ -255,6 +256,7 @@ export default function App() {
                     else currentFolders.push(payload.new);
                 } else if (payload.eventType === 'DELETE') {
                     currentFolders = currentFolders.filter(f => String(f.id) !== String(payload.old.id));
+                    new BroadcastChannel('app-sync').postMessage({ type: 'journal_folder_deleted', id: payload.old.id });
                 }
                 return { ...prev, journal_folders: currentFolders };
             });
