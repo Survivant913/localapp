@@ -1302,10 +1302,10 @@ export default function BudgetManager({ data, updateData }) {
                                 <div>
                                     <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 mt-6">Accès partagés</h4>
                                     <ul className="space-y-2">
-                                        {(data?.account_shares || []).filter(s => s?.account_id === sharingAccountId).length === 0 && (
+                                        {(data?.account_shares || []).filter(s => String(s?.account_id) === String(sharingAccountId)).length === 0 && (
                                             <p className="text-sm text-gray-400 italic">Ce compte est privé. Personne d'autre n'y a accès.</p>
                                         )}
-                                        {(data?.account_shares || []).filter(s => s?.account_id === sharingAccountId).map(share => (
+                                        {(data?.account_shares || []).filter(s => String(s?.account_id) === String(sharingAccountId)).map(share => (
                                             <li key={share?.id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-100 dark:border-slate-600">
                                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{share?.user_email}</span>
                                                 <button onClick={() => removeShare(share?.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={14}/></button>
