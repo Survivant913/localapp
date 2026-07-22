@@ -120,37 +120,44 @@ export default function TodoList({ data, updateData }) {
 
     // --- LOGIQUE AJOUT ET MODIFICATION ---
     const handleSaveTask = (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         if (!newTaskText.trim()) return;
 
         if (editingTaskId) {
-            // Mode Édition
-            const updatedTodos = todos.map(t =>
-                t.id === editingTaskId ? { ...t, text: newTaskText, priority: newTaskPriority, deadline: newTaskDeadline || null } : t
-            );
-            const target = updatedTodos.find(t => t.id === editingTaskId);
-            updateData({ ...data, todos: updatedTodos }, { table: 'todos', id: editingTaskId, data: { text: target.text, priority: target.priority, deadline: target.deadline }, action: 'update' });
+            const updatedTodos = todos.map(t => {
+                if (t.id === editingTaskId) {
+                    const updated = { 
+                        ...t, 
+                        text: newTaskText, 
+                        priority: newTaskPriority, 
+                        deadline: newTaskDeadline || null 
+                    };
+                    updateData({ ...data, todos: todos.map(tod => tod.id === editingTaskId ? updated : tod) }, { table: 'todos', id: editingTaskId, data: { text: updated.text, priority: updated.priority, deadline: updated.deadline }, action: 'update' });
+                    return updated;
+                }
+                return t;
+            });
             setEditingTaskId(null);
-        } else {
-            // Mode Ajout (Original)
-            const newTodo = {
-                id: Date.now(),
-                text: newTaskText,
-                completed: false,
-                priority: newTaskPriority,
-                deadline: newTaskDeadline || null,
-                createdAt: new Date().toISOString(),
-                listId: activeListId,
-                list_id: activeListId,
-                status: 'todo'
-            };
-            updateData({ ...data, todos: [newTodo, ...todos] }, { table: 'todos', data: newTodo, action: 'insert' }); 
+            setNewTaskText('');
+            return;
         }
 
-        // Reset du formulaire
+        const newTodo = {
+            id: Date.now(),
+            text: newTaskText,
+            completed: false,
+            priority: newTaskPriority,
+            deadline: newTaskDeadline || null,
+            list_id: activeListId,
+            status: 'todo'
+        };
+
+        const newTodos = [...todos, newTodo];
+        updateData({ ...data, todos: newTodos }, { table: 'todos', data: newTodo, action: 'insert' });
+
         setNewTaskText('');
-        setNewTaskPriority('medium');
         setNewTaskDeadline('');
+        setNewTaskPriority('medium');
     };
 
     // Lancer la modification
@@ -190,8 +197,19 @@ export default function TodoList({ data, updateData }) {
 
     const addList = () => {
         if (!newListTitle.trim()) return;
-        const newList = { id: Date.now().toString(), name: newListTitle, color: 'purple', user_id: data.profile?.id };
-        updateData({ ...data, todoLists: [...todoListsFromData, newList] }, { table: 'todo_lists', data: newList, action: 'insert' });
+        const listId = Date.now().toString();
+        const newList = { id: listId, name: newListTitle, color: 'purple', user_id: data.profile?.id };
+        const newShare = { id: crypto.randomUUID(), list_id: listId, user_email: data.profile?.email, owner_id: data.profile?.id };
+        
+        const newLists = [...todoListsFromData, newList];
+        const newShares = [...(data.todo_list_shares || []), newShare];
+        
+        // Push both list and share immediately via setTimeout to avoid state batching collision
+        updateData({ ...data, todoLists: newLists, todo_list_shares: newShares }, { table: 'todo_lists', data: newList, action: 'insert' });
+        setTimeout(() => {
+            updateData({ ...data, todoLists: newLists, todo_list_shares: newShares }, { table: 'todo_list_shares', data: newShare, action: 'insert' });
+        }, 100);
+
         setNewListTitle('');
         setIsAddingList(false);
         setActiveListId(newList.id);
