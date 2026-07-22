@@ -45,7 +45,9 @@ export default function TodoList({ data, updateData }) {
     // Sécurisation données (Structure préservée)
     const todos = data.todos || [];
     const todoListsFromData = data.todoLists || [];
-    const myShares = (data.todo_list_shares || []).filter(s => s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase());
+    const sharedListIds = (data.todo_list_shares || [])
+        .filter(s => s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase())
+        .map(s => String(s.list_id));
     
     const allLists = [
         { id: 'default', name: 'To-Do', color: 'indigo' }, 
