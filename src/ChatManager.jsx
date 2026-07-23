@@ -480,7 +480,7 @@ export default function ChatManager({ user }) {
                                     </h3>
                                     {activeRoom.status === 'accepted' && (
                                         <span className="text-xs text-slate-400 flex items-center gap-1">
-                                            <div className={`w-2 h-2 rounded-full ${onlineUsers.size > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div> {onlineUsers.size} en ligne
+                                            <div className={`w-2 h-2 rounded-full ${(onlineUsers.has(user.id) ? onlineUsers.size - 1 : onlineUsers.size) > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div> {onlineUsers.has(user.id) ? onlineUsers.size - 1 : onlineUsers.size} en ligne
                                         </span>
                                     )}
                                 </div>
