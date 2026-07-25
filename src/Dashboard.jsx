@@ -251,9 +251,13 @@ export default function Dashboard({ data, updateData, setView }) {
 
     // --- FILTRES ---
     const isRelevantItem = (item) => {
-        if (dashboardFilter === 'total') return true;
+        const hiddenAccounts = data.profile?.settings?.hidden_accounts || [];
         const accId = String(item.accountId || item.account_id);
         const targetId = String(item.targetAccountId || item.target_account_id);
+        
+        if (dashboardFilter === 'total') {
+            return !hiddenAccounts.includes(accId) && !hiddenAccounts.includes(targetId);
+        }
         return accId === String(dashboardFilter) || targetId === String(dashboardFilter);
     };
 
@@ -500,7 +504,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         <div className="flex justify-start">
                             <select value={dashboardFilter} onChange={(e) => setDashboardFilter(e.target.value)} className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm">
                                 <option value="total">GLOBAL</option>
-                                {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+                                {accounts.filter(acc => !(data.profile?.settings?.hidden_accounts || []).includes(String(acc.id))).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                             </select>
                         </div>
                         <div className="text-center">

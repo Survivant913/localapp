@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Eye, EyeOff, useState, useEffect, useMemo } from 'react';
 import { 
     Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
     ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
     Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
-    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users
-} from 'lucide-react';
+    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users } from 'lucide-react';
 
 const CATEGORIES = [
     { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30', hex: '#f97316' },
@@ -123,7 +122,7 @@ export default function BudgetManager({ data, updateData }) {
         return round2(bal);
     };
 
-    const currentTotalBalance = round2(transactionsList.reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0));
+    const currentTotalBalance = round2(transactionsList.filter(t => !(data.profile?.settings?.hidden_accounts || []).includes(String(t.accountId || t.account_id))).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0));
 
     const endOfMonthForecast = useMemo(() => {
         const today = new Date();
@@ -880,7 +879,10 @@ export default function BudgetManager({ data, updateData }) {
                                             <div className="flex items-center gap-3">
                                                 <span className="font-bold text-gray-500 dark:text-gray-400 text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</span>
                                                 <div className="flex gap-1">
-                                                    {(acc.user_id && data.profile?.id && acc.user_id !== data.profile.id) ? (
+                                                      <button onClick={() => toggleHiddenAccount(acc.id)} className="text-gray-400 hover:text-slate-600 p-1" title={(data.profile?.settings?.hidden_accounts || []).includes(String(acc.id)) ? "Afficher dans les totaux globaux" : "Masquer des totaux globaux"}>
+                                                          {(data.profile?.settings?.hidden_accounts || []).includes(String(acc.id)) ? <EyeOff size={14}/> : <Eye size={14}/>}
+                                                      </button>
+                                                      {(acc.user_id && data.profile?.id && acc.user_id !== data.profile.id) ? (
                                                         <button onClick={() => leaveAccount(acc.id)} className="text-gray-400 hover:text-red-600 p-1 text-xs font-bold bg-gray-100 dark:bg-slate-700 rounded transition-colors" title="Quitter le compte partagé">Quitter</button>
                                                     ) : (
                                                         <>
