@@ -97,21 +97,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <div className={`h-20 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-slate-800/60 relative z-10`}>
           {!isCollapsed && (
             <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden flex items-center gap-3">
-              {/* --- LE LOGO DRAGON (Rendu ultra-discret) --- */}
-              <div 
-                className="w-10 h-10 bg-white opacity-20 shrink-0 transition-colors duration-300"
-                style={{
-                    maskImage: 'url(/dragon.png)',
-                    WebkitMaskImage: 'url(/dragon.png)',
-                    maskSize: 'contain',
-                    WebkitMaskSize: 'contain',
-                    maskPosition: 'center',
-                    WebkitMaskPosition: 'center',
-                    maskRepeat: 'no-repeat',
-                    WebkitMaskRepeat: 'no-repeat'
-                }}
-              ></div>
-              
+
               {labels?.appName || 'Mon Espace'}
             </h1>
           )}
