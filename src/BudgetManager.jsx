@@ -592,20 +592,22 @@ export default function BudgetManager({ data, updateData }) {
 
     const addPlannerItem = () => { 
         if (!plannerItemName || !plannerItemCost) return; 
-        const newItem = { id: Date.now(), name: plannerItemName, cost: parseAmount(plannerItemCost), targetAccountId: plannerItemAccount };
+        const targetAcc = plannerItemAccount || accounts[0]?.id;
+        if (!targetAcc) return;
+        const newItem = { id: Date.now(), name: plannerItemName, cost: parseAmount(plannerItemCost), targetAccountId: targetAcc };
         updateData(
-            { ...data, budget: { ...budgetData, planner: { ...planner, items: [...planner.items, newItem] } } },
+            { ...data, budget: { ...budgetData, planner: { ...planner, items: [...(planner.items || []), newItem] } } },
             { table: 'planner_items', data: { ...newItem, target_account_id: newItem.targetAccountId }, action: 'insert' }
         ); 
         setPlannerItemName(''); setPlannerItemCost(''); 
     };
 
     const deletePlannerItem = (id) => { 
-        updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items: planner.items.filter(i => i.id !== id) } } }, { table: 'planner_items', id: id, action: 'delete' }); 
+        updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items: (planner.items || []).filter(i => i.id !== id) } } }, { table: 'planner_items', id: id, action: 'delete' }); 
     };
 
     const movePlannerItem = (index, direction) => { 
-        const items = [...planner.items]; 
+        const items = [...(planner.items || [])]; 
         if (direction === 'up' && index > 0) { [items[index], items[index - 1]] = [items[index - 1], items[index]]; } 
         else if (direction === 'down' && index < items.length - 1) { [items[index], items[index + 1]] = [items[index + 1], items[index]]; } 
         updateData({ ...data, budget: { ...budgetData, planner: { ...planner, items } } }); 
@@ -625,7 +627,7 @@ export default function BudgetManager({ data, updateData }) {
             }; 
             
             const newTransactions = [newTransaction, ...transactionsList]; 
-            const newItems = planner.items.filter(i => i.id !== item.id); 
+            const newItems = (planner.items || []).filter(i => i.id !== item.id); 
             
             updateData(
                 { ...data, budget: { ...budgetData, transactions: newTransactions, planner: { ...planner, items: newItems } } }, 
