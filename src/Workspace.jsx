@@ -217,7 +217,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
             )}
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
                 {!isZenMode && isSidebarCollapsed && (
-                    <button onClick={() => setIsSidebarCollapsed(false)} className="absolute top-4 left-4 z-50 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors" title="Afficher les pages">
+                    <button onClick={() => setIsSidebarCollapsed(false)} className="absolute top-16 left-4 z-50 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors" title="Afficher les pages">
                         <Menu size={18}/>
                     </button>
                 )}
