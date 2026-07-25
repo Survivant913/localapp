@@ -9,7 +9,8 @@ import { supabase } from './supabaseClient';
 
 export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings }) {
   // MODIFICATION ICI : useState(true) pour que la sidebar soit fermée au démarrage
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [_isCollapsed, setIsCollapsed] = useState(true);
+  const isCollapsed = _isCollapsed && !isMobileOpen;
   
   // --- CHRONO SECONDES ---
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -103,7 +104,7 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
           )}
 
           <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => setIsCollapsed(!_isCollapsed)}
             className="hidden md:flex text-slate-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-slate-800/50"
             title={isCollapsed ? "Agrandir le menu" : "Réduire le menu"}
           >
