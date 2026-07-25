@@ -949,7 +949,7 @@ export default function App() {
      case 'habits': return <HabitTracker data={data} updateData={updateData} />;
      case 'chat': return <ChatManager user={session.user} />; 
      case 'clients': return <ClientHub data={data} updateData={updateData} />;
-     case 'workspace': return <Workspace data={data} updateData={updateData} />;
+     case 'workspace': return <Workspace data={data} updateData={updateData} workspaceFocus={isWorkspaceFocus} setWorkspaceFocus={setIsWorkspaceFocus} />;
      case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
      case 'planning': return <PlanningManager data={data} updateData={updateData} />;
      default: return <Dashboard data={data} updateData={updateData} setView={setView} />;

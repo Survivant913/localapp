@@ -304,7 +304,7 @@ const StrategyModule = ({ venture }) => {
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
             <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0">
                 <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                    <button onClick={() => setView('canvas')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'canvas' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>Canvas</button>
+                    <button onClick={() => setView('canvas')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'canvas' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>Business Model</button>
                     <button onClick={() => setView('swot')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'swot' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>SWOT</button>
                 </div>
             </div>
@@ -1374,7 +1374,7 @@ const ChatModule = ({ venture, currentUserEmail }) => {
     );
 };
 
-export default function Workspace() {
+export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
     const [ventures, setVentures] = useState([]);
     const [activeVenture, setActiveVenture] = useState(null);
     const [loading, setLoading] = useState(true);

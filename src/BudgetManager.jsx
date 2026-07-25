@@ -949,7 +949,7 @@ export default function BudgetManager({ data, updateData }) {
                                 <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-purple-100 dark:border-slate-700 shadow-sm">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2"><Plus size={18} className="text-purple-600"/> Ajouter une envie</h3>
                                     <div className="space-y-3">
-                                        <input type="text" value={plannerItemName} onChange={e => setPlannerItemName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white text-sm" placeholder="Nom (ex: PS5, Voyage...)" />
+                                        <input type="text" value={plannerItemName} onChange={e => setPlannerItemName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white text-sm" placeholder="Nom du projet ou de l'objectif" />
                                         <input type="text" value={plannerItemCost} onChange={e => setPlannerItemCost(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white text-sm" placeholder="Coût (€)" />
                                         <div>
                                             <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block uppercase">Compte à débiter</label>
@@ -965,7 +965,7 @@ export default function BudgetManager({ data, updateData }) {
                                 <h3 className="font-bold text-gray-800 dark:text-white text-lg">Liste de souhaits (Par priorité)</h3>
                                 {processedPlannerItems.length === 0 ? (
                                     <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-700">
-                                        <PiggyBank size={48} className="mx-auto text-purple-200 mb-2"/>
+
                                         <p className="text-gray-400">Aucune envie pour le moment.</p>
                                     </div>
                                 ) : (
