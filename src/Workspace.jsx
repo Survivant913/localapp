@@ -1760,6 +1760,14 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
                         </button>
                     )}
                     <button 
+                        onClick={() => setWorkspaceFocus(!workspaceFocus)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        title={workspaceFocus ? "Quitter le mode focus" : "Mode focus"}
+                    >
+                        <Maximize size={14}/>
+                        {workspaceFocus ? "Quitter Focus" : "Focus"}
+                    </button>
+                    <button 
                         onClick={generateBusinessPlan} 
                         disabled={isExporting}
                         className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
