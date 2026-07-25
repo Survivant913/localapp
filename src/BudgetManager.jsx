@@ -1,9 +1,9 @@
-import { Eye, EyeOff, useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
     Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
     ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
     Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
-    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users } from 'lucide-react';
+    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users, Eye, EyeOff } from 'lucide-react';
 
 const CATEGORIES = [
     { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30', hex: '#f97316' },
