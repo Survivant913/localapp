@@ -60,6 +60,7 @@ export default function App() {
  const [loading, setLoading] = useState(true);
  const [currentView, setView] = useState('dashboard');
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+   const [isWorkspaceFocus, setIsWorkspaceFocus] = useState(false);
  const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
@@ -978,7 +979,7 @@ export default function App() {
 
      {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
      
-     <Sidebar 
+     {!isWorkspaceFocus && <Sidebar 
        currentView={currentView} 
        setView={setView} 
        isMobileOpen={isMobileMenuOpen} 
@@ -988,13 +989,13 @@ export default function App() {
        toggleTheme={toggleTheme} 
        unreadCount={unreadCount} 
        settings={data.settings}
-     />
+       />}
      
      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
-       <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
+       {!isWorkspaceFocus && <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
          <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'Freelance Cockpit'}</h1>
          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
-       </header>
+       </header>}
        
        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>
          <div className={`w-full ${isWorkspace ? 'h-full' : 'px-6'}`}> 
