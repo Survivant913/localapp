@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { ChevronUp, ChevronDown, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Users, ArrowLeft, Trash2, 
@@ -165,6 +165,29 @@ const EditorModule = ({ venture, currentUserEmail }) => {
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
+
+    const movePage = async (index, direction, e) => {
+        e.stopPropagation();
+        const newPages = [...pages];
+        let current, swap;
+        if (direction === 'up' && index > 0) {
+            current = newPages[index]; swap = newPages[index - 1];
+        } else if (direction === 'down' && index < newPages.length - 1) {
+            current = newPages[index]; swap = newPages[index + 1];
+        } else return;
+        
+        const temp = current.created_at;
+        current.created_at = swap.created_at;
+        swap.created_at = temp;
+        
+        newPages.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+        setPages(newPages);
+        await Promise.all([
+            supabase.from('venture_pages').update({ created_at: current.created_at }).eq('id', current.id),
+            supabase.from('venture_pages').update({ created_at: swap.created_at }).eq('id', swap.id)
+        ]);
+    };
+
     const createPage = async () => {
         const { data } = await supabase.from('venture_pages').insert([{ venture_id: venture.id, title: 'Nouvelle Page', content: '' }]).select();
         if (data) { setPages([...pages, data[0]]); setActivePageId(data[0].id); }
@@ -212,7 +235,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
                             <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map(page => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
                 </div>
             )}
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
@@ -854,6 +877,30 @@ const AnalyticsModule = ({ venture }) => {
         }, 1000));
     };
 
+
+    const moveChart = async (index, direction, e) => {
+        e.stopPropagation();
+        const newCharts = [...charts];
+        let current, swap;
+        if (direction === 'up' && index > 0) {
+            current = newCharts[index]; swap = newCharts[index - 1];
+        } else if (direction === 'down' && index < newCharts.length - 1) {
+            current = newCharts[index]; swap = newCharts[index + 1];
+        } else return;
+        
+        const temp = current.created_at;
+        current.created_at = swap.created_at;
+        swap.created_at = temp;
+        
+        newCharts.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+        setCharts(newCharts);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: newCharts } });
+        await Promise.all([
+            supabase.from('venture_analytics').update({ created_at: current.created_at }).eq('id', current.id),
+            supabase.from('venture_analytics').update({ created_at: swap.created_at }).eq('id', swap.id)
+        ]);
+    };
+
     const addChart = async () => {
         const newChart = { venture_id: venture.id, title: 'Nouvelle Analyse', chart_type: 'line', data_points: [], show_trend: true };
         const { data } = await supabase.from('venture_analytics').insert([newChart]).select();
@@ -1046,7 +1093,7 @@ const AnalyticsModule = ({ venture }) => {
                     <button onClick={addChart} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {charts.map(c => (
+                    {charts.map((c, index) => (
                         <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
                             <div className="flex items-center gap-2 truncate">
                                 {c.chart_type === 'pie' ? <PieChart size={14}/> : c.chart_type === 'bar' ? <BarChart2 size={14}/> : <TrendingUp size={14}/>}
@@ -1061,7 +1108,7 @@ const AnalyticsModule = ({ venture }) => {
 
             <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
                 {activeChart ? (
-                    <div className="p-6 max-w-6xl mx-auto w-full flex flex-col gap-6 min-h-full">
+                    <div className="p-6 max-w-full w-full flex flex-col gap-6 min-h-full">
                         
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
                             <input type="text" value={activeChart.title} onChange={e => updateChart(activeChart.id, 'title', e.target.value)} className="text-xl font-bold bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 min-w-[200px]"/>
