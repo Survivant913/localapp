@@ -657,6 +657,20 @@ export default function BudgetManager({ data, updateData }) {
         updateData({ ...data, account_shares: updatedShares }, { table: 'account_shares', id: shareId, data: { account_id: data.account_shares?.find(s => s.id === shareId)?.account_id }, action: 'delete' });
     };
 
+    const toggleHiddenAccount = (accountId) => {
+        const currentHidden = data.profile?.settings?.hidden_accounts || [];
+        let newHidden = [];
+        if (currentHidden.includes(String(accountId))) {
+            newHidden = currentHidden.filter(id => id !== String(accountId));
+        } else {
+            newHidden = [...currentHidden, String(accountId)];
+        }
+        updateData({
+            profile: { ...data.profile, settings: { ...(data.profile?.settings || {}), hidden_accounts: newHidden } },
+            settings: { ...(data.settings || {}), hidden_accounts: newHidden }
+        });
+    };
+
     const leaveAccount = (accId) => {
         const share = data.account_shares?.find(s => String(s.account_id) === String(accId) && s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase());
         if (share) {
