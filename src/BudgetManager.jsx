@@ -666,6 +666,7 @@ export default function BudgetManager({ data, updateData }) {
             newHidden = [...currentHidden, String(accountId)];
         }
         updateData({
+            ...data,
             profile: { ...data.profile, settings: { ...(data.profile?.settings || {}), hidden_accounts: newHidden } },
             settings: { ...(data.settings || {}), hidden_accounts: newHidden }
         });
