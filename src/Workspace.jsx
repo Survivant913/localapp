@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown, useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
   Plus, FileText, Users, ArrowLeft, Trash2, 
@@ -7,7 +7,8 @@ import {
   ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
   Printer, Loader2, LogOut, LayoutList, MessageSquare, Send,
-  PieChart, TrendingUp, TrendingDown, LayoutDashboard
+  PieChart, TrendingUp, TrendingDown, LayoutDashboard,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import TiptapEditor from './TiptapEditor';
 
@@ -1487,7 +1488,7 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
             }
             setNewVentureTitle(""); 
         } 
-        catch (error) { alert("Erreur"); }
+        catch (err) { alert("Erreur: " + err.message); }
     };
 
     const deleteVenture = async (v, e) => {
