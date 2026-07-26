@@ -237,7 +237,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
                             <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
                 </div>
             )}
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
@@ -1097,8 +1097,8 @@ const AnalyticsModule = ({ venture }) => {
                     {charts.map((c, index) => (
                         <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
                             <div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1">
-                                <button onClick={(e) => moveChart(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button>
-                                <button onClick={(e) => moveChart(index, 'down', e)} disabled={index === charts.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button>
+                                <button onClick={(e) => moveChart(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button>
+                                <button onClick={(e) => moveChart(index, 'down', e)} disabled={index === charts.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button>
                             </div>
                             <div className="flex items-center gap-2 truncate flex-1">
                                 {c.chart_type === 'pie' ? <PieChart size={14}/> : c.chart_type === 'bar' ? <BarChart2 size={14}/> : <TrendingUp size={14}/>}
@@ -1226,12 +1226,12 @@ const ShareModal = ({ venture, onClose }) => {
         if (!email) return;
         try {
             const { data, error } = await supabase.from('venture_shares').insert([{ venture_id: venture.id, user_email: email, role: 'editor' }]).select();
-            if (error) throw error;
+            if (error) console.error(error);
             if (data && data.length > 0) setShares([...shares, data[0]]);
             setEmail('');
-        } catch (error) {
-            console.error("Share error details:", error);
-            alert("Erreur lors du partage : " + (error.message || "Vérifiez vos permissions (RLS) sur la table venture_shares."));
+        } catch (err) {
+            console.error("Share error details:", err);
+            alert("Erreur lors du partage : " + (err.message || "Vérifiez vos permissions (RLS) sur la table venture_shares."));
         }
     };
 
@@ -1308,6 +1308,7 @@ const KanbanModule = ({ venture, currentUserEmail }) => {
 
     const addTask = () => {
         if (!newTaskTitle.trim()) return;
+        // eslint-disable-next-line react-hooks/purity
         const newTask = { id: Date.now().toString(), title: newTaskTitle, status: 'todo', created_by: currentUserEmail };
         broadcastAndSave([...tasks, newTask]);
         setNewTaskTitle("");

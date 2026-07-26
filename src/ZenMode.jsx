@@ -64,6 +64,7 @@ export default function ZenMode({ data, updateData, close }) {
         if (isTimerActive && timeLeft > 0) {
             interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
         } else if (timeLeft === 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsTimerActive(false);
         }
         return () => clearInterval(interval);
@@ -88,7 +89,7 @@ export default function ZenMode({ data, updateData, close }) {
             }
         }, 1500);
         return () => clearTimeout(timer);
-    }, [text]);
+    }, [text, data, updateData]);
 
     // --- ACTIONS ---
     const cycleTheme = () => { 
