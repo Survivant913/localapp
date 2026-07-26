@@ -967,7 +967,6 @@ export default function BudgetManager({ data, updateData }) {
                                 <h3 className="font-bold text-gray-800 dark:text-white text-lg">Liste de souhaits (Par priorité)</h3>
                                 {processedPlannerItems.length === 0 ? (
                                     <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-700">
-
                                         <p className="text-gray-400">Aucune envie pour le moment.</p>
                                     </div>
                                 ) : (

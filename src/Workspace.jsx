@@ -165,6 +165,13 @@ const EditorModule = ({ venture, currentUserEmail }) => {
         return () => supabase.removeChannel(channel);
     }, [venture]);
 
+    const createPage = async () => {
+        const { data } = await supabase.from('venture_pages').insert([{ venture_id: venture.id, title: 'Nouvelle Page', content: '' }]).select();
+        if (data && data.length > 0) { 
+            setPages(prev => prev.find(p => p.id === data[0].id) ? prev : [...prev, data[0]]);
+            setActivePageId(data[0].id); 
+        }
+    };
 
     const movePage = async (index, direction, e) => {
         e.stopPropagation();
@@ -186,11 +193,6 @@ const EditorModule = ({ venture, currentUserEmail }) => {
             supabase.from('venture_pages').update({ created_at: current.created_at }).eq('id', current.id),
             supabase.from('venture_pages').update({ created_at: swap.created_at }).eq('id', swap.id)
         ]);
-    };
-
-    const createPage = async () => {
-        const { data } = await supabase.from('venture_pages').insert([{ venture_id: venture.id, title: 'Nouvelle Page', content: '' }]).select();
-        if (data) { setPages([...pages, data[0]]); setActivePageId(data[0].id); }
     };
 
     const deletePage = async (id, e) => {
@@ -235,7 +237,7 @@ const EditorModule = ({ venture, currentUserEmail }) => {
                             <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
                 </div>
             )}
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
@@ -675,7 +677,7 @@ const CompetitorModule = ({ venture }) => {
         const base = competitors[0] || { scores: { "Prix": 3, "Qualité": 3, "Innovation": 3, "Service": 3, "Design": 3 } };
         const nextColor = COMP_COLORS[(competitors.length - 1) % COMP_COLORS.length];
         const { data } = await supabase.from('venture_competitors').insert([{ venture_id: venture.id, name: 'Nouveau', is_primary: false, color: nextColor, is_visible: true, scores: base.scores }]).select();
-        if (data) {
+        if (data && data.length > 0) {
             const newComps = [...competitors, data[0]];
             setCompetitors(newComps);
             channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { competitors: newComps } });
@@ -831,7 +833,7 @@ const CompetitorModule = ({ venture }) => {
 };
 
 // ==========================================
-// 6. MODULE ANALYSES (NOUVEAU)
+// 6. MODULE ANALYSES
 // ==========================================
 const AnalyticsModule = ({ venture }) => {
     const [charts, setCharts] = useState([]);
@@ -877,6 +879,26 @@ const AnalyticsModule = ({ venture }) => {
         }, 1000));
     };
 
+    const addChart = async () => {
+        const newChart = { venture_id: venture.id, title: 'Nouvelle Analyse', chart_type: 'line', data_points: [], show_trend: true };
+        const { data } = await supabase.from('venture_analytics').insert([newChart]).select();
+        if (data && data.length > 0) {
+            const newCharts = [...charts, data[0]];
+            setCharts(newCharts);
+            setActiveChartId(data[0].id);
+            channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: newCharts } });
+        }
+    };
+
+    const deleteChart = async (id, e) => {
+        e.stopPropagation();
+        if (!window.confirm("Supprimer ce graphique et toutes ses données ?")) return;
+        await supabase.from('venture_analytics').delete().eq('id', id);
+        const remaining = charts.filter(c => c.id !== id);
+        setCharts(remaining);
+        if (activeChartId === id) setActiveChartId(remaining[0]?.id || null);
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: remaining } });
+    };
 
     const moveChart = async (index, direction, e) => {
         e.stopPropagation();
@@ -899,27 +921,6 @@ const AnalyticsModule = ({ venture }) => {
             supabase.from('venture_analytics').update({ created_at: current.created_at }).eq('id', current.id),
             supabase.from('venture_analytics').update({ created_at: swap.created_at }).eq('id', swap.id)
         ]);
-    };
-
-    const addChart = async () => {
-        const newChart = { venture_id: venture.id, title: 'Nouvelle Analyse', chart_type: 'line', data_points: [], show_trend: true };
-        const { data } = await supabase.from('venture_analytics').insert([newChart]).select();
-        if (data && data.length > 0) {
-            const newCharts = [...charts, data[0]];
-            setCharts(newCharts);
-            setActiveChartId(data[0].id);
-            channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: newCharts } });
-        }
-    };
-
-    const deleteChart = async (id, e) => {
-        e.stopPropagation();
-        if (!window.confirm("Supprimer ce graphique et toutes ses données ?")) return;
-        await supabase.from('venture_analytics').delete().eq('id', id);
-        const remaining = charts.filter(c => c.id !== id);
-        setCharts(remaining);
-        if (activeChartId === id) setActiveChartId(remaining[0]?.id || null);
-        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { charts: remaining } });
     };
 
     const activeChart = charts.find(c => c.id === activeChartId);
@@ -1095,7 +1096,11 @@ const AnalyticsModule = ({ venture }) => {
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {charts.map((c, index) => (
                         <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
-                            <div className="flex items-center gap-2 truncate">
+                            <div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1">
+                                <button onClick={(e) => moveChart(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronUp size={12}/></button>
+                                <button onClick={(e) => moveChart(index, 'down', e)} disabled={index === charts.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:opacity-0 p-0.5"><ChevronDown size={12}/></button>
+                            </div>
+                            <div className="flex items-center gap-2 truncate flex-1">
                                 {c.chart_type === 'pie' ? <PieChart size={14}/> : c.chart_type === 'bar' ? <BarChart2 size={14}/> : <TrendingUp size={14}/>}
                                 <span className="truncate">{c.title}</span>
                             </div>
@@ -1108,7 +1113,7 @@ const AnalyticsModule = ({ venture }) => {
 
             <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
                 {activeChart ? (
-                    <div className="p-6 max-w-full w-full flex flex-col gap-6 min-h-full">
+                    <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6 min-h-full">
                         
                         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
                             <input type="text" value={activeChart.title} onChange={e => updateChart(activeChart.id, 'title', e.target.value)} className="text-xl font-bold bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 min-w-[200px]"/>
@@ -1222,7 +1227,7 @@ const ShareModal = ({ venture, onClose }) => {
         try {
             const { data, error } = await supabase.from('venture_shares').insert([{ venture_id: venture.id, user_email: email, role: 'editor' }]).select();
             if (error) throw error;
-            if (data) setShares([...shares, data[0]]);
+            if (data && data.length > 0) setShares([...shares, data[0]]);
             setEmail('');
         } catch (error) {
             console.error("Share error details:", error);
@@ -1243,7 +1248,7 @@ const ShareModal = ({ venture, onClose }) => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh]">
                 <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
-                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><Share2 size={18}/> Partager "{venture?.title}"</h3>
+                    <h3 className="font-bold text-slate-800 dark:white flex items-center gap-2"><Share2 size={18}/> Partager "{venture?.title}"</h3>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg"><X size={20}/></button>
                 </div>
                 <div className="p-4 flex-1 overflow-y-auto">
@@ -1474,7 +1479,13 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
 
     const createVenture = async () => {
         if (!newVentureTitle.trim()) return;
-        try { const { data } = await supabase.from('ventures').insert([{ title: newVentureTitle, status: 'Idea' }]).select(); setVentures([data[0], ...ventures]); setNewVentureTitle(""); } 
+        try { 
+            const { data } = await supabase.from('ventures').insert([{ title: newVentureTitle, status: 'Idea' }]).select(); 
+            if (data && data.length > 0) {
+                setVentures(prev => prev.find(v => v.id === data[0].id) ? prev : [data[0], ...prev]);
+            }
+            setNewVentureTitle(""); 
+        } 
         catch (error) { alert("Erreur"); }
     };
 
@@ -1820,7 +1831,7 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
                         className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                     >
                         {isExporting ? <Loader2 size={14} className="animate-spin"/> : <Printer size={14}/>}
-                        Imprimer le Dossier
+                        Imprimer
                     </button>
                 </div>
             </header>
