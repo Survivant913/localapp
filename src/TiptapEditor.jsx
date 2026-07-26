@@ -17,31 +17,20 @@ import {
 const colors = ['#958DF1', '#F98181', '#FBBC88', '#FAF594', '#70CFF8', '#94FADB', '#B9F18D'];
 
 export default function TiptapEditor(props) {
-    const ydocRef = useRef(null);
-    const providerRef = useRef(null);
-
-    // Initialize synchronously to avoid null or flicker
-    if (!ydocRef.current) {
-        ydocRef.current = new Y.Doc();
-        providerRef.current = new SupabaseBroadcastProvider(ydocRef.current, supabase, `journal-${props.pageId}`);
-    }
+    const [state] = useState(() => {
+        const ydoc = new Y.Doc();
+        const provider = new SupabaseBroadcastProvider(ydoc, supabase, `journal-${props.pageId}`);
+        return { ydoc, provider };
+    });
 
     useEffect(() => {
         return () => {
-            if (providerRef.current) providerRef.current.destroy();
-            if (ydocRef.current) ydocRef.current.destroy();
-            // CRITICAL: clear refs so they are re-created on Strict Mode remount
-            ydocRef.current = null;
-            providerRef.current = null;
+            state.provider.destroy();
+            state.ydoc.destroy();
         };
-    }, [props.pageId]);
+    }, [state]);
 
-    // Safety check just in case
-    if (!ydocRef.current || !providerRef.current) {
-        return null;
-    }
-
-    return <TiptapEditorCore {...props} ydoc={ydocRef.current} provider={providerRef.current} />;
+    return <TiptapEditorCore {...props} ydoc={state.ydoc} provider={state.provider} />;
 }
 
 function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, currentUserEmail, isZenMode, onToggleZenMode, onPrint, header, ydoc, provider }) {
@@ -228,3 +217,4 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
         </div>
     );
 }
+
