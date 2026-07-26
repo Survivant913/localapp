@@ -144,10 +144,6 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
                     <div className="flex items-center gap-2">
                         <button onClick={onToggleZenMode} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
                         <button onClick={onPrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Imprimer"><Printer size={18}/></button>
-                        <div className="flex items-center gap-2 text-xs font-mono ml-2">
-                            <span className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-green-500' : 'bg-amber-500'}`}></span>
-                            <span className="text-slate-400">{status === 'connected' ? 'Connecté' : 'Connexion...'}</span>
-                        </div>
                     </div>
                 </div>
             )}
