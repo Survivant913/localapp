@@ -4,7 +4,7 @@ import {
   Plus, FileText, Users, ArrowLeft, Trash2, 
   Activity, Target, DollarSign, BarChart2, Share2, Menu, 
   Sun, Zap, AlertTriangle, Check, X, Box, Move, 
-  ZoomIn, ZoomOut, Maximize, GitCommit, GripHorizontal, Minus,
+  ZoomIn, ZoomOut, Maximize, Minimize, GitCommit, GripHorizontal, Minus,
   Wallet, Clock, Trophy, Swords, Settings, Eye, EyeOff,
   Printer, Loader2, LogOut, LayoutList, MessageSquare, Send,
   PieChart, TrendingUp, TrendingDown, LayoutDashboard,
@@ -1856,3 +1856,4 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
     );
 }
 // Trigger Vite HMR
+
