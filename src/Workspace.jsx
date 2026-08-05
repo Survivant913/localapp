@@ -82,7 +82,7 @@ const MindmapNode = ({ node, selectedId, setSelectedId, updateLabel, handleMouse
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
-    }, [node.label]);
+    }, [node.label, isVisible]);
 
     if (!isVisible) return null;
 
@@ -408,6 +408,33 @@ const MindmapModule = ({ venture }) => {
     const deleteNode = () => { if (!selectedId) return; const toDelete = new Set([selectedId, ...getDescendants(selectedId, nodes)]); broadcastAndSave(nodes.filter(n => !toDelete.has(n.id))); setSelectedId(null); };
     const toggleCollapse = (e, nodeId) => { e.stopPropagation(); broadcastAndSave(nodes.map(n => n.id === nodeId ? { ...n, collapsed: !n.collapsed } : n)); };
     const updateColor = (colorId) => { if(!selectedId) return; broadcastAndSave(nodes.map(n => n.id === selectedId ? { ...n, color: colorId } : n)); };
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.key === 'Tab') { e.preventDefault(); addNode(); }
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedId) {
+                    const currentNodes = nodesRef.current;
+                    const selectedNode = currentNodes.find(n => n.id === selectedId);
+                    if (selectedNode && selectedNode.parentId) {
+                        const siblings = currentNodes.filter(n => n.parentId === selectedNode.parentId);
+                        const maxY = siblings.reduce((max, n) => Math.max(max, n.y), selectedNode.y);
+                        const newNode = { id: Date.now().toString(), x: selectedNode.x, y: maxY + 80, label: 'Nouvelle idée', parentId: selectedNode.parentId, type: 'child', color: selectedNode.color || 'white', collapsed: false };
+                        broadcastAndSave([...currentNodes, newNode]);
+                        setSelectedId(newNode.id);
+                    } else if (selectedNode && !selectedNode.parentId) {
+                        addNode();
+                    }
+                }
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                deleteNode();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedId, nodes]);
 
     const handleMouseDown = (e, nodeId = null) => { if (nodeId) { e.stopPropagation(); setSelectedId(nodeId); setDraggingNode({ id: nodeId, lastX: e.clientX, lastY: e.clientY }); } else { setIsPanning(true); setLastMousePos({ x: e.clientX, y: e.clientY }); setSelectedId(null); } };
     
