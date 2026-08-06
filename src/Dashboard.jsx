@@ -624,6 +624,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
 
                     {/* --- ZONE PROJETS ACTIFS --- */}
+                    {activeProjects.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
@@ -691,6 +692,7 @@ export default function Dashboard({ data, updateData, setView }) {
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
 
                 {/* COLONNE DROITE */}
@@ -745,6 +747,7 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                     </div>
 
+                    {urgentTodos.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
                         <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500"><Flag size={80} className="-rotate-12"/></div>
                         <div className="flex justify-between items-center mb-8 relative z-10">
@@ -775,9 +778,9 @@ export default function Dashboard({ data, updateData, setView }) {
                         </div>
                         <button onClick={() => setView('todo')} className="w-full mt-10 py-5 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-3xl hover:bg-black transition-all shadow-xl active:scale-95 shadow-sm shadow-indigo-500/10">Explorer les tâches</button>
                     </div>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
-
