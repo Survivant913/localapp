@@ -7,7 +7,7 @@ import {
 import { 
     format, addDays, startOfWeek, addWeeks, subWeeks, 
     isSameDay, parseISO, getHours, getMinutes, 
-    setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay
+    setHours, setMinutes, addMinutes, differenceInMinutes, parse, isValid, startOfDay, addMonths
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from './supabaseClient';
@@ -33,7 +33,7 @@ export default function PlanningManager({ data, updateData }) {
     const [eventForm, setEventForm] = useState({ 
         id: null, title: '', date: format(new Date(), 'yyyy-MM-dd'),
         startHour: 9, startMin: 0, duration: 60, 
-        type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
+        type: 'event', recurrence: false, recurrenceType: 'weekly', recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue',
         isAllDay: false, invitedEmail: '' 
     });
 
@@ -53,11 +53,12 @@ export default function PlanningManager({ data, updateData }) {
                 .map(ev => ev.id);
         }
 
-        const updatedEvents = events.map(ev => 
-            idsToUpdate.includes(ev.id) ? { ...ev, my_status: newStatus, status: newStatus } : ev
-        );
-        
-        updateData({ ...data, calendar_events: updatedEvents });
+        updateData(prev => ({ 
+            ...prev, 
+            calendar_events: (prev.calendar_events || []).map(ev => 
+                idsToUpdate.includes(ev.id) ? { ...ev, my_status: newStatus, status: newStatus } : ev
+            ) 
+        }));
         
         await supabase.from('event_participants')
             .upsert(
@@ -80,11 +81,12 @@ export default function PlanningManager({ data, updateData }) {
         const newEmails = currentEmails.filter(e => e !== emailToRemove.toLowerCase());
         const newEmailString = newEmails.join(', ');
 
-        const updatedEvents = events.map(ev => 
-            String(ev.id) === String(evt.id) ? { ...ev, invited_email: newEmailString } : ev
-        );
-        
-        updateData({ ...data, calendar_events: updatedEvents }, { 
+        updateData(prev => ({ 
+            ...prev, 
+            calendar_events: (prev.calendar_events || []).map(ev => 
+                String(ev.id) === String(evt.id) ? { ...ev, invited_email: newEmailString } : ev
+            ) 
+        }), { 
             table: 'calendar_events', 
             id: evt.id, 
             action: 'update', 
@@ -105,8 +107,10 @@ export default function PlanningManager({ data, updateData }) {
 
     const handleUninvite = async (evt) => {
         if (!window.confirm("Annuler TOUTES les invitations ? L'événement redeviendra privé.")) return;
-        const updatedEvents = events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, invited_email: '', status: 'accepted' } : ev);
-        updateData({ ...data, calendar_events: updatedEvents }, { table: 'calendar_events', id: evt.id, action: 'update', data: { invited_email: '', status: 'accepted' } });
+        updateData(prev => ({ 
+            ...prev, 
+            calendar_events: (prev.calendar_events || []).map(ev => String(ev.id) === String(evt.id) ? { ...ev, invited_email: '', status: 'accepted' } : ev) 
+        }), { table: 'calendar_events', id: evt.id, action: 'update', data: { invited_email: '', status: 'accepted' } });
         await supabase.from('event_participants').delete().eq('event_id', evt.id);
         setSelectedEvent(null);
     };
@@ -121,7 +125,7 @@ export default function PlanningManager({ data, updateData }) {
         const deletedCount = events.length - activeEvents.length;
         if (deletedCount === 0) return alert("Agenda déjà propre !");
         if (window.confirm(`⚠️ SUPPRIMER ${deletedCount} ÉVÉNEMENTS PASSÉS ?`)) {
-            updateData({ ...data, calendar_events: activeEvents });
+            updateData(prev => ({ ...prev, calendar_events: activeEvents }));
             const pastEventsIds = events.filter(ev => !ev.end_time || parseISO(ev.end_time) <= now).map(ev => ev.id);
             if (pastEventsIds.length > 0) {
                 try { await supabase.from('calendar_events').delete().in('id', pastEventsIds); } catch (err) { console.error(err); }
@@ -172,8 +176,10 @@ export default function PlanningManager({ data, updateData }) {
             setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: newDuration, isAllDay: false });
             setConfirmMode('ask_update'); setIsCreating(true);
         } else {
-            const updated = events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, end_time: newEnd.toISOString() } : ev);
-            updateData({ ...data, calendar_events: updated }, { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
+            updateData(prev => ({ 
+                ...prev, 
+                calendar_events: (prev.calendar_events || []).map(ev => String(ev.id) === String(evt.id) ? { ...ev, end_time: newEnd.toISOString() } : ev) 
+            }), { table: 'calendar_events', id: evt.id, action: 'update', data: { end_time: newEnd.toISOString() } });
         }
     };
 
@@ -215,14 +221,14 @@ export default function PlanningManager({ data, updateData }) {
 
     const openCreateModal = (dayOffset = 0, hour = 9, isAllDay = false, title = '') => {
         const targetDate = addDays(currentWeekStart, dayOffset);
-        setEventForm({ id: null, title, date: format(targetDate, 'yyyy-MM-dd'), startHour: hour, startMin: 0, duration: 60, type: 'event', recurrence: false, recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue', isAllDay, invitedEmail: '' });
+        setEventForm({ id: null, title, date: format(targetDate, 'yyyy-MM-dd'), startHour: hour, startMin: 0, duration: 60, type: 'event', recurrence: false, recurrenceType: 'weekly', recurrenceWeeks: 12, recurrenceGroupId: null, color: 'blue', isAllDay, invitedEmail: '' });
         setIsCreating(true); setSelectedEvent(null);
     };
 
     const openEditModal = (evt) => {
         const start = parseISO(evt.start_time); const end = parseISO(evt.end_time);
         const duration = evt.is_all_day ? 60 : differenceInMinutes(end, start);
-        setEventForm({ id: evt.id, title: evt.title, date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), duration, type: 'event', recurrence: !!evt.recurrence_group_id, recurrenceWeeks: 12, recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue', isAllDay: evt.is_all_day || false, invitedEmail: evt.invited_email || '' });
+        setEventForm({ id: evt.id, title: evt.title, date: format(start, 'yyyy-MM-dd'), startHour: getHours(start), startMin: getMinutes(start), duration, type: 'event', recurrence: !!evt.recurrence_group_id, recurrenceType: evt.recurrence_type || 'weekly', recurrenceWeeks: 12, recurrenceGroupId: evt.recurrence_group_id, color: evt.color || 'blue', isAllDay: evt.is_all_day || false, invitedEmail: evt.invited_email || '' });
         setIsCreating(true); setSelectedEvent(null);
     };
 
@@ -238,10 +244,25 @@ export default function PlanningManager({ data, updateData }) {
 
         if (!eventForm.id) {
             const groupId = eventForm.recurrence ? Date.now().toString() : null;
-            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? 'weekly' : null, is_all_day: eventForm.isAllDay, invited_email: finalEmail, status: 'accepted', organizer_email: data.profile?.email };
+            const eventBase = { user_id: data.profile?.id, title: eventForm.title, color: eventForm.color, recurrence_group_id: groupId, recurrence_type: eventForm.recurrence ? eventForm.recurrenceType : null, is_all_day: eventForm.isAllDay, invited_email: finalEmail, status: 'accepted', organizer_email: data.profile?.email };
             let newEvts = [];
-            for (let i = 0; i < (eventForm.recurrence ? (parseInt(eventForm.recurrenceWeeks) || 1) : 1); i++) {
-                newEvts.push({ ...eventBase, id: Date.now() + i, start_time: addWeeks(newStart, i).toISOString(), end_time: addWeeks(newEnd, i).toISOString() });
+            const count = eventForm.recurrence ? (parseInt(eventForm.recurrenceWeeks) || 1) : 1;
+            for (let i = 0; i < count; i++) {
+                let iterStart = newStart;
+                let iterEnd = newEnd;
+                if (eventForm.recurrence) {
+                    if (eventForm.recurrenceType === 'daily') {
+                        iterStart = addDays(newStart, i);
+                        iterEnd = addDays(newEnd, i);
+                    } else if (eventForm.recurrenceType === 'monthly') {
+                        iterStart = addMonths(newStart, i);
+                        iterEnd = addMonths(newEnd, i);
+                    } else { // weekly
+                        iterStart = addWeeks(newStart, i);
+                        iterEnd = addWeeks(newEnd, i);
+                    }
+                }
+                newEvts.push({ ...eventBase, id: Date.now() + i, start_time: iterStart.toISOString(), end_time: iterEnd.toISOString() });
             }
             const { data: createdEvts } = await supabase.from('calendar_events').insert(newEvts).select();
             if (createdEvts && invitedEmails.length > 0) {
@@ -251,7 +272,7 @@ export default function PlanningManager({ data, updateData }) {
                 });
                 await supabase.from('event_participants').insert(participants);
             }
-            updateData({ ...data, calendar_events: [...events, ...(createdEvts || newEvts)] });
+            updateData(prev => ({ ...prev, calendar_events: [...(prev.calendar_events || []), ...(createdEvts || newEvts)] }));
             setIsCreating(false); return;
         }
 
@@ -263,25 +284,31 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const applyUpdate = (targetId, startObj, endObj, formData, mode) => {
-        let updated = [...events];
         const resetStat = formData.invitedEmail && (formData.invitedEmail !== events.find(e => String(e.id) === String(targetId))?.invited_email);
-        if (mode === 'series' && formData.recurrenceGroupId) {
-            updated = updated.map(ev => {
-                if (ev.recurrence_group_id === formData.recurrenceGroupId) {
-                    let s = parseISO(ev.start_time);
-                    if (s.getDay() !== startObj.getDay()) { s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => String(e.id) === String(targetId)).start_time))) / 86400000)); }
-                    let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
-                    // CORRECTION ICI : Ne pas écraser invited_email ni status
-                    return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay };
-                }
-                return ev;
-            });
-        } else {
-            updated = updated.map(ev => String(ev.id) === String(targetId) ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
-        }
-        updateData({ ...data, calendar_events: updated });
-        const toSave = updated.filter(ev => String(ev.id) === String(targetId) || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
-        toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
+        
+        updateData(prev => {
+            let updated = [...(prev.calendar_events || [])];
+            if (mode === 'series' && formData.recurrenceGroupId) {
+                updated = updated.map(ev => {
+                    if (ev.recurrence_group_id === formData.recurrenceGroupId) {
+                        let s = parseISO(ev.start_time);
+                        if (s.getDay() !== startObj.getDay()) { s = addDays(s, Math.round((startOfDay(startObj) - startOfDay(parseISO(events.find(e => String(e.id) === String(targetId)).start_time))) / 86400000)); }
+                        let ns = formData.isAllDay ? setMinutes(setHours(s, 0), 0) : setMinutes(setHours(s, getHours(startObj)), getMinutes(startObj));
+                        return { ...ev, title: formData.title, color: formData.color, start_time: ns.toISOString(), end_time: addMinutes(ns, formData.duration).toISOString(), is_all_day: formData.isAllDay };
+                    }
+                    return ev;
+                });
+            } else {
+                updated = updated.map(ev => String(ev.id) === String(targetId) ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
+            }
+            
+            // Effectuer la sauvegarde en arrière-plan avec les données fraîchement calculées
+            const toSave = updated.filter(ev => String(ev.id) === String(targetId) || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
+            toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
+            
+            return { ...prev, calendar_events: updated };
+        });
+        
         setConfirmMode(null); setIsCreating(false);
     };
 
@@ -292,8 +319,10 @@ export default function PlanningManager({ data, updateData }) {
     };
 
     const performDelete = (evt, series) => {
-        const updated = events.filter(e => series ? e.recurrence_group_id !== evt.recurrence_group_id : String(e.id) !== String(evt.id));
-        updateData({ ...data, calendar_events: updated }, series ? { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } } : { table: 'calendar_events', id: evt.id });
+        updateData(prev => ({
+            ...prev,
+            calendar_events: (prev.calendar_events || []).filter(e => series ? e.recurrence_group_id !== evt.recurrence_group_id : String(e.id) !== String(evt.id))
+        }), series ? { table: 'calendar_events', filter: { column: 'recurrence_group_id', value: evt.recurrence_group_id } } : { table: 'calendar_events', id: evt.id });
         setSelectedEvent(null); setConfirmMode(null);
     };
 
@@ -305,10 +334,23 @@ export default function PlanningManager({ data, updateData }) {
         img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; 
         e.dataTransfer.setDragImage(img, 0, 0); 
     };
-    const onDragOverGrid = (e, dayIdx) => { if (draggedItem?.data.is_all_day) return; e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let snap = Math.round((y % 60) / 15) * 15; if (snap === 60) { snap = 0; h++; } let dur = differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time)); setPreviewSlot({ dayIndex: dayIdx, top: h * 60 + snap, height: Math.max(30, dur), timeLabel: `${h}:${snap.toString().padStart(2, '0')}` }); };
-    const onDropGrid = (e, day) => { e.preventDefault(); setPreviewSlot(null); if (!draggedItem || draggedItem.data.is_all_day) return; const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let m = Math.round((y % 60) / 15) * 15; if (m === 60) { m = 0; h++; } const start = setMinutes(setHours(day, h), m); const evt = draggedItem.data; const dur = differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time)); const newEnd = addMinutes(start, dur);
-        if (evt.recurrence_group_id) { setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, date: format(start, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true }); setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); setConfirmMode('ask_update'); setIsCreating(true); } 
-        else { updateData({ ...data, calendar_events: events.map(ev => String(ev.id) === String(evt.id) ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString() } : ev) }, { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); } setDraggedItem(null); 
+    const onDragOverGrid = (e, dayIdx) => { e.preventDefault(); const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; let h = Math.floor(y / 60); let snap = Math.round((y % 60) / 15) * 15; if (snap === 60) { snap = 0; h++; } let dur = draggedItem?.data.is_all_day ? 60 : differenceInMinutes(parseISO(draggedItem.data.end_time), parseISO(draggedItem.data.start_time)); setPreviewSlot({ dayIndex: dayIdx, top: h * 60 + snap, height: Math.max(30, dur), timeLabel: `${h}:${snap.toString().padStart(2, '0')}` }); };
+    const onDropGrid = (e, day) => { 
+        e.preventDefault(); setPreviewSlot(null); if (!draggedItem) return; 
+        const rect = e.currentTarget.getBoundingClientRect(); const y = e.clientY - rect.top; 
+        let h = Math.floor(y / 60); let m = Math.round((y % 60) / 15) * 15; if (m === 60) { m = 0; h++; } 
+        const start = setMinutes(setHours(day, h), m); const evt = draggedItem.data; 
+        const dur = evt.is_all_day ? 60 : differenceInMinutes(parseISO(evt.end_time), parseISO(evt.start_time)); 
+        const newEnd = addMinutes(start, dur);
+        if (evt.recurrence_group_id) { 
+            setEventForm({ ...eventForm, id: evt.id, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, date: format(start, 'yyyy-MM-dd'), startHour: h, startMin: m, recurrence: true }); 
+            setPendingUpdate({ newStart: start, newEnd, title: evt.title, color: evt.color, recurrenceGroupId: evt.recurrence_group_id, duration: dur, isAllDay: false }); 
+            setConfirmMode('ask_update'); setIsCreating(true); 
+        } 
+        else { 
+            updateData(prev => ({ ...prev, calendar_events: (prev.calendar_events || []).map(ev => String(ev.id) === String(evt.id) ? { ...ev, start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } : ev) }), { table: 'calendar_events', id: evt.id, action: 'update', data: { start_time: start.toISOString(), end_time: newEnd.toISOString(), is_all_day: false } }); 
+        } 
+        setDraggedItem(null); 
     };
 
     const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(currentWeekStart, i));
@@ -359,18 +401,18 @@ export default function PlanningManager({ data, updateData }) {
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
                                                 <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
                                             </div>
-                                            <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20' : ''}`} onDragOver={e => { if (draggedItem && !draggedItem.data.is_all_day) return; e.preventDefault(); }} 
-                                              onDrop={e => { e.preventDefault(); if (draggedItem?.data.is_all_day) { const st = setMinutes(setHours(day, 0), 0); const et = setMinutes(setHours(day, 23), 59); updateData({ ...data, calendar_events: events.map(ev => String(ev.id) === String(draggedItem.data.id) ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString() } : ev) }, { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); } setDraggedItem(null); }}>
+                                            <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20 ring-inset ring-2 ring-transparent hover:ring-blue-500/30' : ''}`} onDragOver={e => { e.preventDefault(); }} 
+                                              onDrop={e => { e.preventDefault(); if (draggedItem) { const st = setMinutes(setHours(day, 0), 0); const et = setMinutes(setHours(day, 23), 59); updateData(prev => ({ ...prev, calendar_events: (prev.calendar_events || []).map(ev => String(ev.id) === String(draggedItem.data.id) ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } : ev) }), { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); } setDraggedItem(null); }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const isOwner = item.data.user_id === data.profile?.id;
-                                                    const colorClass = (item.data.color || 'blue') === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : (item.data.color || 'blue') === 'gray' ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 border-l-slate-500' : 'bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 border-l-blue-500';
+                                                    const colorClass = (item.data.color || 'blue') === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : (item.data.color || 'blue') === 'gray' ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 border-l-slate-500' : (item.data.color || 'blue') === 'red' ? 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 border-l-red-500' : (item.data.color || 'blue') === 'purple' ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 border-l-purple-500' : (item.data.color || 'blue') === 'orange' ? 'bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 border-l-orange-500' : 'bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 border-l-blue-500';
                                                     const isPending = (item.data.my_status || item.data.status) === 'pending' && !isOwner;
-                                                    return (<div key={item.data.id} draggable={isOwner} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded border border-l-4 truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
+                                                    return (<div key={item.data.id} draggable={isOwner} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-l-[3px] truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
                                             </div>
                                             <div className={`relative h-[1440px] transition-colors bg-white dark:bg-slate-900 ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOverGrid(e, dayIndex)} onDrop={(e) => onDropGrid(e, day)}>
                                                 {Array.from({length: 24}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
-                                                {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-1"></div></div>)}
+                                                {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center shadow-[0_0_10px_rgba(239,68,68,0.5)]" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2.5 h-2.5 bg-red-500 rounded-full -ml-[5px] shadow-[0_0_5px_rgba(239,68,68,0.8)]"></div></div>)}
                                                 {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center text-xs font-bold text-blue-600" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
                                                 {layoutItems.map((item) => {
                                                     const dataItem = item.data; 
@@ -379,13 +421,19 @@ export default function PlanningManager({ data, updateData }) {
                                                     const isDeclined = (dataItem.my_status || dataItem.status) === 'declined';
                                                     
                                                     const colorClass = (dataItem.color || 'blue') === 'green' 
-                                                        ? 'bg-emerald-100 dark:bg-emerald-900/50 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' 
+                                                        ? 'bg-emerald-100 dark:bg-emerald-900/60 border-l-emerald-500 text-emerald-900 dark:text-emerald-100 shadow-emerald-500/20' 
                                                         : (dataItem.color || 'blue') === 'gray' 
-                                                            ? 'bg-slate-100 dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300' 
-                                                            : 'bg-blue-100 dark:bg-blue-900/50 border-l-blue-600 text-blue-900 dark:text-blue-100';
+                                                            ? 'bg-slate-100 dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300 shadow-slate-500/20' 
+                                                            : (dataItem.color || 'blue') === 'red' 
+                                                                ? 'bg-red-100 dark:bg-red-900/60 border-l-red-500 text-red-900 dark:text-red-100 shadow-red-500/20' 
+                                                                : (dataItem.color || 'blue') === 'purple' 
+                                                                    ? 'bg-purple-100 dark:bg-purple-900/60 border-l-purple-500 text-purple-900 dark:text-purple-100 shadow-purple-500/20' 
+                                                                    : (dataItem.color || 'blue') === 'orange' 
+                                                                        ? 'bg-orange-100 dark:bg-orange-900/60 border-l-orange-500 text-orange-900 dark:text-orange-100 shadow-orange-500/20' 
+                                                                        : 'bg-blue-100 dark:bg-blue-900/60 border-l-blue-500 text-blue-900 dark:text-blue-100 shadow-blue-500/20';
                                                     
                                                     return (
-                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded-r-lg rounded-l-sm p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm border border-gray-200 dark:border-slate-700 border-l-4 ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
+                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm hover:shadow-md border border-gray-200/50 dark:border-slate-700/50 border-l-[3px] ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
                                                             <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-blue-500"/>}{dataItem.title}</span>
                                                             <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')}</span>{!!dataItem.recurrence_group_id && <Repeat size={10} />}</div>
                                                             {isOwner && !isPending && !isDeclined && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
@@ -433,9 +481,30 @@ export default function PlanningManager({ data, updateData }) {
                                         </div>
                                     )}
                                     {!eventForm.id && (
-                                        <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 rounded text-blue-600"/><span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter (Hebdo)</span></label>{eventForm.recurrence && (<div className="flex items-center gap-2 mt-2"><span className="text-xs text-slate-500">Pendant</span><input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm dark:text-white"/><span className="text-xs text-slate-500">semaines</span></div>)}</div>
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                            <label className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 rounded text-blue-600"/>
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter l'événement</span>
+                                            </label>
+                                            {eventForm.recurrence && (
+                                                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                                                    <select value={eventForm.recurrenceType} onChange={e => setEventForm({...eventForm, recurrenceType: e.target.value})} className="p-1.5 bg-white dark:bg-slate-800 border rounded text-sm dark:text-white outline-none">
+                                                        <option value="daily">Quotidien</option>
+                                                        <option value="weekly">Hebdomadaire</option>
+                                                        <option value="monthly">Mensuel</option>
+                                                    </select>
+                                                    <span className="text-xs text-slate-500 ml-2">Pendant</span>
+                                                    <input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm dark:text-white outline-none"/>
+                                                    <span className="text-xs text-slate-500">fois</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
-                                    <div className="flex gap-3 pt-2">{['blue', 'green', 'gray'].map(c => (<button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`flex-1 h-8 rounded-lg border-2 transition-all ${eventForm.color === c ? 'border-slate-800 dark:border-white' : 'border-transparent opacity-40'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : 'bg-slate-500'}`}></button>))}</div>
+                                    <div className="flex gap-2 flex-wrap pt-2">
+                                        {['blue', 'green', 'gray', 'red', 'purple', 'orange'].map(c => (
+                                            <button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`w-8 h-8 rounded-full transition-transform ${eventForm.color === c ? 'scale-110 ring-2 ring-offset-2 ring-slate-800 dark:ring-white dark:ring-offset-slate-800' : 'opacity-60 hover:opacity-100'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : c === 'red' ? 'bg-red-500' : c === 'purple' ? 'bg-purple-500' : c === 'orange' ? 'bg-orange-500' : 'bg-slate-500'}`}></button>
+                                        ))}
+                                    </div>
                                     <div className="flex gap-3 pt-4"><button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-bold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm">{eventForm.id ? 'Sauver' : 'Créer'}</button></div>
                                 </div>
                             </>
