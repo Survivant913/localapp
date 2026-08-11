@@ -276,16 +276,20 @@ export default function App() {
                 return { ...prev, journal_folders: currentFolders };
             });
         })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_shares' }, (payload) => {
-            setData(prev => {
-                let currentShares = [...(prev.journal_shares || [])];
-                if (payload.eventType === 'INSERT') {
-                    if (!currentShares.some(s => String(s.id) === String(payload.new.id))) currentShares.push(payload.new);
-                } else if (payload.eventType === 'DELETE') {
-                    currentShares = currentShares.filter(s => String(s.id) !== String(payload.old.id));
-                }
-                return { ...prev, journal_shares: currentShares };
-            });
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_shares' }, async (payload) => {
+            const [foldersRes, pagesRes, sharesRes] = await Promise.all([
+                supabase.from('journal_folders').select('*'),
+                supabase.from('journal_pages').select('*'),
+                supabase.from('journal_shares').select('*')
+            ]);
+            if (foldersRes.data && pagesRes.data && sharesRes.data) {
+                setData(prev => ({ 
+                    ...prev, 
+                    journal_folders: foldersRes.data,
+                    journal_pages: pagesRes.data,
+                    journal_shares: sharesRes.data 
+                }));
+            }
         })
         // --- NOUVEAU : TEMPS RÉEL FAVORIS PERSONNELS ---
         .on('postgres_changes', { event: '*', schema: 'public', table: 'journal_favorites' }, (payload) => {
@@ -496,6 +500,33 @@ export default function App() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'ventures' }, async (payload) => {
             const { data: venData } = await supabase.from('ventures').select('*');
             if (venData) setData(prev => ({ ...prev, ventures: venData }));
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_shares' }, async (payload) => {
+            const [projRes, projSharesRes] = await Promise.all([
+                supabase.from('projects').select('*'),
+                supabase.from('project_shares').select('*')
+            ]);
+            if (projRes.data && projSharesRes.data) {
+                const mappedProjectsSync = projRes.data.map(p => ({ id: p.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linkedAccountId: p.linked_account_id, objectives: p.objectives, notes: p.internal_notes, user_id: p.user_id }));
+                setData(prev => ({ ...prev, projects: mappedProjectsSync, project_shares: projSharesRes.data }));
+            }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'event_participants' }, async (payload) => {
+            const [eventsRes, partsRes] = await Promise.all([
+                supabase.from('calendar_events').select('*'),
+                supabase.from('event_participants').select('*')
+            ]);
+            if (eventsRes.data && partsRes.data) {
+                setData(prev => ({ 
+                    ...prev, 
+                    all_participants: partsRes.data,
+                    calendar_events: eventsRes.data.map(ev => {
+                        const parts = partsRes.data.filter(p => String(p.event_id) === String(ev.id));
+                        const myPart = parts.find(p => p.user_email?.toLowerCase() === session?.user?.email?.toLowerCase());
+                        return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === session?.user?.id ? 'accepted' : 'pending') };
+                    })
+                }));
+            }
         })
         .subscribe();
 
