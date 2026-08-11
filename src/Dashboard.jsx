@@ -484,6 +484,47 @@ export default function Dashboard({ data, updateData, setView }) {
         return accId === String(dashboardFilter) || targetId === String(dashboardFilter);
     };
 
+    // --- AUTO-REPAIR HABITS HISTORY IN DASHBOARD ---
+    useEffect(() => {
+        const repairHabits = async () => {
+            if (!habits || habits.length === 0) return;
+            try {
+                // Fetch recent logs
+                const d = new Date(); d.setDate(d.getDate() - 365);
+                const year = d.getFullYear(); const month = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0');
+                const dStr = `${year}-${month}-${day}`;
+                
+                const { data: logs } = await supabase.from('habit_logs').select('habit_id, date').gte('date', dStr);
+                if (!logs) return;
+
+                const logsByHabit = {};
+                for (const lg of logs) {
+                    if (!logsByHabit[lg.habit_id]) logsByHabit[lg.habit_id] = [];
+                    logsByHabit[lg.habit_id].push(lg.date);
+                }
+                
+                let repaired = false;
+                const syncedHabs = habits.map(h => {
+                    const existing = h.history || [];
+                    const logged = logsByHabit[h.id] || [];
+                    const merged = [...new Set([...existing, ...logged])];
+                    if (merged.length !== existing.length) {
+                        repaired = true;
+                        // Background update in DB
+                        supabase.from('habits').update({ history: merged }).eq('id', h.id).then();
+                        return { ...h, history: merged };
+                    }
+                    return h;
+                });
+
+                if (repaired && updateData) {
+                    updateData({ ...data, habits: syncedHabs }); 
+                }
+            } catch (e) { console.error("Dashboard habit repair error:", e); }
+        };
+        repairHabits();
+    }, [habits.length]); // Only run when habits count changes to avoid infinite loops if data changes
+
     const getFinancialImpact = (item) => {
         const amount = parseFloat(item.amount || 0);
         const type = item.type;
