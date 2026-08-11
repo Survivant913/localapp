@@ -180,7 +180,9 @@ export default function DashboardCalendar({ data, filter }) {
         }
     };
 
-    const selectedDayData = timeline.find(d => d.dateStr === selectedDateStr) || { dateStr: selectedDateStr, dayName: '', dayNum: '', events: [] }    return (
+    const selectedDayData = timeline.find(d => d.dateStr === selectedDateStr) || { dateStr: selectedDateStr, dayName: '', dayNum: '', events: [] };
+    
+    return (
         <>
             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-100/50 dark:border-slate-800/50 shadow-2xl mb-8 group transition-all relative overflow-hidden flex flex-col">
                 {/* Decorative background elements */}
