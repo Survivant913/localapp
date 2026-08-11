@@ -133,24 +133,26 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
         <nav className={`flex-1 py-6 space-y-1 custom-scrollbar ${isCollapsed ? 'px-2' : 'px-4'} overflow-y-auto overflow-x-hidden relative z-10`}>
             
             {/* BOUTON RECHERCHE GLOBALE */}
-            <button
-                onClick={onSearchClick}
-                className={`
-                w-full flex items-center gap-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group relative mb-4
-                ${isCollapsed ? 'justify-center px-0' : 'px-3'}
-                text-slate-400 hover:bg-indigo-900/40 hover:text-indigo-400 border border-transparent hover:border-indigo-800/50
-                `}
-            >
-                <div className="relative">
-                    <Search size={20} className="shrink-0 transition-colors text-slate-500 group-hover:text-indigo-400" />
-                </div>
-                {!isCollapsed && (
-                    <span className="whitespace-nowrap overflow-hidden transition-all duration-300 flex-1 text-left flex justify-between items-center">
-                        Recherche Globale
-                        <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[9px] font-bold bg-slate-800 text-slate-500 rounded font-sans uppercase tracking-widest border border-slate-700 shadow-sm">CTRL+K</kbd>
-                    </span>
-                )}
-            </button>
+            {settings?.showGlobalSearch !== false && (
+                <button
+                    onClick={onSearchClick}
+                    className={`
+                    w-full flex items-center gap-3 py-3 rounded-lg text-sm font-medium transition-all duration-200 group relative mb-4
+                    ${isCollapsed ? 'justify-center px-0' : 'px-3'}
+                    text-slate-400 hover:bg-indigo-900/40 hover:text-indigo-400 border border-transparent hover:border-indigo-800/50
+                    `}
+                >
+                    <div className="relative">
+                        <Search size={20} className="shrink-0 transition-colors text-slate-500 group-hover:text-indigo-400" />
+                    </div>
+                    {!isCollapsed && (
+                        <span className="whitespace-nowrap overflow-hidden transition-all duration-300 flex-1 text-left flex justify-between items-center">
+                            Recherche Globale
+                            <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[9px] font-bold bg-slate-800 text-slate-500 rounded font-sans uppercase tracking-widest border border-slate-700 shadow-sm">CTRL+K</kbd>
+                        </span>
+                    )}
+                </button>
+            )}
 
           {menuItems.map(item => {
             const Icon = item.icon;

@@ -29,6 +29,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showNotesSide, setShowNotesSide] = useState(data.settings?.showNotesSide ?? true);
     const [showJournal, setShowJournal] = useState(data.settings?.showJournal ?? true);
     const [showTodo, setShowTodo] = useState(data.settings?.showTodo ?? true);
+    const [showGlobalSearch, setShowGlobalSearch] = useState(data.settings?.showGlobalSearch ?? true);
 
     // VISIBILITÉ DASHBOARD
     const [dcSolde, setDcSolde] = useState(data.settings?.dcSolde ?? true);
@@ -77,6 +78,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowNotesSide(data.settings.showNotesSide ?? true);
             setShowJournal(data.settings.showJournal ?? true);
             setShowTodo(data.settings.showTodo ?? true);
+            setShowGlobalSearch(data.settings.showGlobalSearch ?? true);
             
             setDcSolde(data.settings.dcSolde ?? true);
             setDcOperations(data.settings.dcOperations ?? true);
@@ -143,6 +145,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 showNotesSide,
                 showJournal,
                 showTodo,
+                showGlobalSearch,
                 dcSolde,
                 dcOperations,
                 dcTimeline,
@@ -300,7 +303,8 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 { label: 'Gestion Client', desc: 'Factures, devis, catalogue', state: showClients, setter: setShowClients },
                                 { label: 'Bloc-notes', desc: 'Prise de notes', state: showNotesSide, setter: setShowNotesSide },
                                 { label: 'Carnet', desc: 'Journal', state: showJournal, setter: setShowJournal },
-                                { label: 'Tâches Rapides', desc: 'To-Do list', state: showTodo, setter: setShowTodo }
+                                { label: 'Tâches Rapides', desc: 'To-Do list', state: showTodo, setter: setShowTodo },
+                                { label: 'Recherche Globale', desc: 'Omnibar', state: showGlobalSearch, setter: setShowGlobalSearch }
                             ].map((mod, i) => (
                                 <label key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
                                     <div>
