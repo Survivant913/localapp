@@ -133,6 +133,28 @@ export default function DashboardCalendar({ data, filter }) {
             });
         }
 
+        // 6. Budget (Transactions)
+        if (data.budget && data.budget.transactions) {
+            data.budget.transactions.forEach(t => {
+                if (t.date && isRelevant(t)) {
+                    let dStr;
+                    try {
+                        const d = new Date(t.date);
+                        if (!isNaN(d.getTime())) dStr = d.toLocaleDateString('fr-CA');
+                    } catch(e){}
+                    if (dStr) {
+                        events.push({
+                            type: 'transaction',
+                            title: t.description || 'Opération',
+                            date: dStr,
+                            color: t.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+                            icon: <Wallet size={12} />
+                        });
+                    }
+                }
+            });
+        }
+
         // Map events to days
         days.forEach(day => {
             day.events = events.filter(e => e.date === day.dateStr);
