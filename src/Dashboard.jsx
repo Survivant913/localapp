@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 // AJOUT : Import de supabase pour la synchronisation parfaite avec le Tracker
 import { supabase } from './supabaseClient';
 import * as AllIcons from 'lucide-react';
@@ -6,10 +6,159 @@ import {
     LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
     CheckSquare, StickyNote, Plus, FolderKanban, 
     Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft, ArrowRight,
-    Repeat, RotateCcw, Check, Coffee, Activity
+    Repeat, RotateCcw, Check, Coffee, Activity, ChevronLeft, ChevronRight, Flame, Trophy, X
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 import DashboardCalendar from './DashboardCalendar';
+
+// --- UTILITAIRE : CALCUL DE LA SÉRIE (STREAK) EN TEMPS RÉEL ---
+const calculateStreak = (habit) => {
+    if (!habit.history || habit.history.length === 0) return 0;
+    
+    const historyDates = habit.history.map(dStr => new Date(dStr).toDateString());
+    const uniqueHistory = [...new Set(historyDates)].map(dStr => new Date(dStr));
+    uniqueHistory.sort((a, b) => b.getTime() - a.getTime()); // Décroissant
+    
+    let streak = 0;
+    let currentDate = new Date();
+    
+    const isScheduled = (dateObj) => {
+        const dayIdx = dateObj.getDay();
+        if (habit.days_of_week && Array.isArray(habit.days_of_week)) {
+            return habit.days_of_week.includes(dayIdx);
+        }
+        if (habit.frequency && Array.isArray(habit.frequency)) {
+            return habit.frequency.some(d => {
+                if (!d) return false;
+                const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
+                const map = { 'dim': 0, 'sun': 0, 'lun': 1, 'mon': 1, 'mar': 2, 'tue': 2, 'mer': 3, 'wed': 3, 'jeu': 4, 'thu': 4, 'ven': 5, 'fri': 5, 'sam': 6, 'sat': 6 };
+                return map[norm] === dayIdx;
+            });
+        }
+        return true; // Par défaut tous les jours
+    };
+
+    let historyIdx = 0;
+    let daysChecked = 0;
+    
+    while (daysChecked < 365) { // On remonte max 1 an
+        const currentStr = currentDate.toDateString();
+        const doneToday = historyIdx < uniqueHistory.length && uniqueHistory[historyIdx].toDateString() === currentStr;
+
+        if (isScheduled(currentDate)) {
+            if (doneToday) {
+                streak++;
+                historyIdx++;
+            } else {
+                // Si c'est aujourd'hui et non fait, on ne casse pas la série car le jour n'est pas fini
+                if (daysChecked > 0) break; 
+            }
+        } else {
+            // Pas prévu aujourd'hui. Mais si fait quand même, bonus !
+            if (doneToday) {
+                streak++;
+                historyIdx++;
+            }
+        }
+        
+        currentDate.setDate(currentDate.getDate() - 1);
+        daysChecked++;
+        if (historyIdx >= uniqueHistory.length) break;
+    }
+    
+    return streak;
+};
+
+// --- COMPOSANT FOCUS HABIT MODAL ---
+const FocusHabitModal = ({ habit, onClose }) => {
+    // Calcul complet des stats
+    const historyDates = (habit.history || []).map(dStr => new Date(dStr).toDateString());
+    const uniqueHistory = [...new Set(historyDates)];
+    const currentStreak = calculateStreak(habit);
+    
+    // Calcul meilleure série
+    let maxStreak = 0;
+    let currentTempStreak = 0;
+    let tempDate = new Date();
+    tempDate.setFullYear(tempDate.getFullYear() - 1); // remonte 1 an
+    let tempHistory = [...uniqueHistory].map(d => new Date(d));
+    tempHistory.sort((a,b) => a.getTime() - b.getTime());
+    
+    // Simplification : on regarde juste les séquences consécutives dans l'historique
+    if (tempHistory.length > 0) {
+        let currentS = 1;
+        let maxS = 1;
+        for (let i = 1; i < tempHistory.length; i++) {
+            const diff = (tempHistory[i].getTime() - tempHistory[i-1].getTime()) / (1000 * 3600 * 24);
+            if (diff <= 1.5) { // Consécutif (ou même jour)
+                currentS++;
+            } else {
+                if (currentS > maxS) maxS = currentS;
+                currentS = 1;
+            }
+        }
+        if (currentS > maxS) maxS = currentS;
+        maxStreak = Math.max(maxS, currentStreak);
+    }
+
+    // Heatmap 30 jours
+    const last30Days = [];
+    for(let i=29; i>=0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        last30Days.push({
+            date: d,
+            done: uniqueHistory.includes(d.toDateString())
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-lg relative z-10 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
+                <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+                    <X size={20} />
+                </button>
+                
+                <div className="flex flex-col items-center mb-8">
+                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[2rem] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4 transform -rotate-6">
+                        <DynamicIcon name={habit.icon} size={48} />
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-800 dark:text-white text-center tracking-tighter">{habit.name}</h2>
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-2">{habit.category || 'Routine'}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center">
+                        <Flame size={24} className="text-orange-500 mb-2"/>
+                        <span className="text-3xl font-black text-slate-800 dark:text-white">{currentStreak}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Série actuelle</span>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center">
+                        <Trophy size={24} className="text-yellow-500 mb-2"/>
+                        <span className="text-3xl font-black text-slate-800 dark:text-white">{maxStreak}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Record absolu</span>
+                    </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+                    <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Calendar size={14}/> Les 30 derniers jours
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5 justify-center">
+                        {last30Days.map((d, i) => (
+                            <div 
+                                key={i} 
+                                className={`w-6 h-6 rounded-md ${d.done ? 'bg-blue-500 shadow-sm shadow-blue-500/20' : 'bg-slate-200 dark:bg-slate-700'} transition-all`}
+                                title={d.date.toLocaleDateString()}
+                            ></div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- COMPOSANT DYNAMIC ICON ---
 const DynamicIcon = ({ name, size = 18, className = "" }) => {
@@ -67,18 +216,23 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         });
     }, [habits, todayIndex]);
 
-    // ÉTATS POUR L'ANIMATION DE MASQUAGE
+    // ÉTATS
     const [hidingIds, setHidingIds] = useState([]);
     const [hiddenIds, setHiddenIds] = useState([]); 
+    const [focusHabit, setFocusHabit] = useState(null);
+    const scrollContainerRef = useRef(null);
+
+    const scroll = (direction) => {
+        if (scrollContainerRef.current) {
+            const amount = direction === 'left' ? -300 : 300;
+            scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+        }
+    };
 
     const handlePass = (id, e) => {
         e.stopPropagation();
         if (e.currentTarget) e.currentTarget.blur();
-        
-        // Déclenche l'animation
         setHidingIds(prev => [...prev, id]);
-        
-        // Supprime le composant après l'animation (300ms)
         setTimeout(() => {
             setHiddenIds(prev => [...prev, id]);
         }, 300);
@@ -93,7 +247,7 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         const todayStr = `${year}-${month}-${day}`; 
 
         const newHistory = [...(habit.history || []), new Date().toISOString()];
-        updateHabit({ ...habit, history: newHistory, streak: (habit.streak || 0) + 1 });
+        updateHabit({ ...habit, history: newHistory }); 
 
         try {
             await supabase.from('habit_logs').insert({
@@ -120,51 +274,68 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     }
 
     return (
-        <div className="flex overflow-x-auto pb-6 pt-2 snap-x scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {activeHabits.map(h => {
-                const isHiding = hidingIds.includes(h.id);
-                const streak = h.streak || 0;
-                return (
-                    <div 
-                        key={h.id} 
-                        className={`snap-center shrink-0 flex items-center group relative overflow-hidden transition-all duration-500 ease-out
-                        ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-72 mr-5 opacity-100 scale-100 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-[1.5rem] border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 p-3 gap-4'}`}
-                    >
-                        {/* Barre lumineuse au hover */}
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        
-                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-blue-500 shadow-inner shrink-0 relative">
-                            <DynamicIcon name={h.icon} size={24} strokeWidth={2.5} />
-                            {streak > 2 && (
-                                <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm animate-pulse border border-white dark:border-slate-900">
-                                    🔥{streak}
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                            <p className="font-black text-sm text-slate-800 dark:text-slate-200 truncate pr-2 tracking-tight">{h.name}</p>
-                            {streak > 0 && (
-                                <div className="flex items-center justify-between mt-1">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{streak} jour{streak > 1 ? 's' : ''} de suite</span>
-                                </div>
-                            )}
-                        </div>
-                        
-                        {/* Bouton d'action "Check" */}
-                        <button 
-                            onClick={(e) => handleCheck(h, e)} 
-                            className="w-12 h-12 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 rounded-xl hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm border border-slate-100 dark:border-slate-800 hover:border-transparent hover:shadow-blue-500/30 group/btn"
+        <div className="relative group/strip">
+            {activeHabits.length > 2 && (
+                <>
+                    <button onClick={() => scroll('left')} className="absolute -left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 opacity-0 group-hover/strip:opacity-100 transition-opacity hover:scale-110">
+                        <ChevronLeft size={20} />
+                    </button>
+                    <button onClick={() => scroll('right')} className="absolute -right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 opacity-0 group-hover/strip:opacity-100 transition-opacity hover:scale-110">
+                        <ChevronRight size={20} />
+                    </button>
+                </>
+            )}
+            
+            <div ref={scrollContainerRef} className="flex overflow-x-auto pb-6 pt-2 snap-x scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {activeHabits.map(h => {
+                    const isHiding = hidingIds.includes(h.id);
+                    const streak = calculateStreak(h);
+                    return (
+                        <div 
+                            key={h.id} 
+                            onClick={() => setFocusHabit(h)}
+                            className={`cursor-pointer snap-center shrink-0 flex items-center group relative overflow-hidden transition-all duration-500 ease-out
+                            ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-72 mr-5 opacity-100 scale-100 bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 dark:border-slate-800 hover:border-blue-500/30 dark:hover:border-blue-500/30 hover:shadow-blue-500/10 hover:-translate-y-1 p-3 gap-4'}`}
                         >
-                            <Check size={24} strokeWidth={3} className="transition-transform group-hover/btn:scale-110"/>
-                        </button>
-                    </div>
-                );
-            })}
-            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-24 h-[84px] flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors gap-2">
-                <Plus size={20} className="text-slate-400"/>
-                <span className="text-slate-400 font-black text-[10px] tracking-widest uppercase">Gérer</span>
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-[1rem] text-slate-600 dark:text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 dark:group-hover:bg-blue-500/10 dark:group-hover:text-blue-400 transition-colors shrink-0 relative">
+                                <DynamicIcon name={h.icon} size={24} strokeWidth={2.5} />
+                                {streak > 2 && (
+                                    <div className="absolute -top-2 -right-2 bg-gradient-to-br from-orange-400 to-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-md shadow-orange-500/20 border border-white dark:border-slate-900">
+                                        🔥{streak}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <p className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate pr-2 tracking-tight">{h.name}</p>
+                                {streak > 0 && (
+                                    <div className="flex items-center justify-between mt-1">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                            <Flame size={10} className="text-orange-500"/>
+                                            {streak} jour{streak > 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <button 
+                                onClick={(e) => handleCheck(h, e)} 
+                                className="w-10 h-10 bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 rounded-full hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm border-2 border-slate-100 dark:border-slate-700 hover:border-transparent hover:shadow-lg hover:shadow-blue-500/30 group/btn"
+                            >
+                                <Check size={20} strokeWidth={3} className="transition-transform group-hover/btn:scale-110"/>
+                            </button>
+                        </div>
+                    );
+                })}
+                <div onClick={() => setView('habits')} className="snap-center shrink-0 w-24 h-[76px] flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors gap-2">
+                    <Plus size={20} className="text-slate-400"/>
+                    <span className="text-slate-400 font-black text-[10px] tracking-widest uppercase">Gérer</span>
+                </div>
             </div>
+
+            {focusHabit && <FocusHabitModal habit={focusHabit} onClose={() => setFocusHabit(null)} />}
         </div>
     );
 };
