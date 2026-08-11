@@ -166,6 +166,7 @@ export default function DashboardCalendar({ data, filter }) {
     }, [data, offsetDays, filter]);
 
     const [selectedDateStr, setSelectedDateStr] = useState(new Date().toLocaleDateString('fr-CA'));
+    const [showGlobalDetail, setShowGlobalDetail] = useState(false);
     const dateStripRef = React.useRef(null);
 
     const handlePrev = () => setOffsetDays(prev => prev - 7);
@@ -195,6 +196,8 @@ export default function DashboardCalendar({ data, filter }) {
                     Focus Agenda
                 </h3>
                 <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-md">
+                    <button onClick={() => setShowGlobalDetail(true)} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600" title="Vue détaillée globale"><List size={18}/></button>
+                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <button onClick={handleToday} className="px-4 py-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600">Aujourd'hui</button>
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <button onClick={handlePrev} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600"><ChevronLeft size={18}/></button>
@@ -289,6 +292,58 @@ export default function DashboardCalendar({ data, filter }) {
                     )}
                 </div>
             </div>
+
+            {/* Modal Focus Global (Agenda) */}
+            {showGlobalDetail && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowGlobalDetail(false)}></div>
+                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-3xl shadow-2xl relative z-10 border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-8 duration-300">
+                        <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3">
+                                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white shadow-lg"><List size={24}/></div>
+                                    Vue Détaillée
+                                </h3>
+                                <p className="text-slate-500 mt-2 font-medium">Vos prochains jours chargés</p>
+                            </div>
+                            <button onClick={() => setShowGlobalDetail(false)} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all"><X size={24}/></button>
+                        </div>
+                        <div className="p-6 md:p-8 overflow-y-auto flex-1 space-y-8 bg-slate-50/30 dark:bg-slate-900/30 custom-scrollbar">
+                            {timeline.filter(day => day.events.length > 0).length === 0 ? (
+                                <div className="text-center py-12 opacity-50">
+                                    <CalendarIcon size={48} className="mx-auto mb-4 opacity-50" />
+                                    <p className="font-bold">Aucun événement prévu.</p>
+                                </div>
+                            ) : (
+                                timeline.filter(day => day.events.length > 0).map((day, idx) => (
+                                    <div key={idx} className="flex gap-6">
+                                        <div className="w-16 shrink-0 text-right pt-2">
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.dayName}</p>
+                                            <p className={`text-2xl font-black ${day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>{day.dayNum}</p>
+                                        </div>
+                                        <div className="flex-1 space-y-3 relative">
+                                            {/* Ligne verticale de connexion */}
+                                            <div className="absolute -left-3 top-2 bottom-0 w-px bg-slate-200 dark:bg-slate-800"></div>
+                                            
+                                            {day.events.map((evt, i) => (
+                                                <div key={i} className={`p-4 rounded-2xl flex items-center gap-4 ${evt.color} border border-white/40 dark:border-white/5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}>
+                                                    <div className="p-3 bg-white/50 dark:bg-black/20 rounded-xl shrink-0 shadow-inner">
+                                                        {evt.icon}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-sm truncate">{evt.title}</p>
+                                                        <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold mt-1">{evt.type}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style jsx>{`
                 .scrollbar-hide::-webkit-scrollbar {
