@@ -157,6 +157,15 @@ export default function App() {
                }
            }
        })
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, async (payload) => {
+            const { data: notifData } = await supabase.from('notifications').select('*').eq('user_email', session.user.email).order('created_at', { ascending: false });
+            if (notifData) {
+                setData(prev => ({ ...prev, notifications: notifData }));
+                if (payload.eventType === 'INSERT') {
+                    try { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch(e) {}
+                }
+            }
+        })
        .subscribe();
    return () => { supabase.removeChannel(channel); };
  }, [session, currentView]);

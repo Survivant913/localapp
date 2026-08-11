@@ -1744,8 +1744,6 @@ export default function Workspace({ data, updateData, workspaceFocus, setWorkspa
                 if (error) {
                     alert("Erreur de suppression : " + error.message);
                     console.error("Delete share error:", error);
-                } else {
-                    alert("Projet quitté avec succès ! (Attendez le rafraîchissement)");
                 }
             } catch (err) {
                 alert("Erreur réseau : " + err.message);
