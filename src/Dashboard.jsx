@@ -80,102 +80,129 @@ const calculateStreak = (habit) => {
     return streak;
 };
 
-// --- COMPOSANT FOCUS HABIT MODAL ---
-const FocusHabitModal = ({ habit, onClose }) => {
-    // Calcul complet des stats
-    const currentStreak = calculateStreak(habit);
-    
-    // Pour les stats du composant Modal, on réutilise toLocalYYYYMMDD
-    const toLocalYYYYMMDD = (d) => {
-        let dateObj;
-        if (typeof d === 'string' && d.length === 10) {
-            dateObj = new Date(d + 'T12:00:00');
-        } else {
-            dateObj = new Date(d);
-        }
-        if (isNaN(dateObj.getTime())) return null;
-        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+// --- COMPOSANT ROUTINE FOCUS MODAL ---
+const RoutineFocusModal = ({ habits, updateHabit, onClose }) => {
+    // Trier les habitudes : non complétées d'abord
+    const [localHabits, setLocalHabits] = useState(() => {
+        return [...habits].sort((a, b) => {
+            const aDone = calculateStreak(a) > 0 && a.history?.includes(new Date().toLocaleDateString('fr-CA')); // Simplification
+            const bDone = calculateStreak(b) > 0 && b.history?.includes(new Date().toLocaleDateString('fr-CA'));
+            if (aDone === bDone) return 0;
+            return aDone ? 1 : -1;
+        });
+    });
+
+    const [animatingId, setAnimatingId] = useState(null);
+
+    const handleCheck = async (habit) => {
+        setAnimatingId(habit.id);
+        
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; 
+        
+        const newHistory = [...(habit.history || []), todayStr];
+        updateHabit({ ...habit, history: newHistory }); 
+
+        try {
+            await supabase.from('habit_logs').insert({ habit_id: habit.id, date: todayStr, completed: true });
+        } catch (err) { console.error(err); }
+
+        setTimeout(() => {
+            setLocalHabits(prev => {
+                const updated = prev.map(h => h.id === habit.id ? { ...h, history: newHistory } : h);
+                return updated.sort((a, b) => {
+                    const aDone = a.history?.includes(todayStr);
+                    const bDone = b.history?.includes(todayStr);
+                    if (aDone === bDone) return 0;
+                    return aDone ? 1 : -1;
+                });
+            });
+            setAnimatingId(null);
+        }, 600);
     };
 
-    const historyDates = (habit.history || []).map(toLocalYYYYMMDD).filter(Boolean);
-    const uniqueHistory = [...new Set(historyDates)];
-    
-    // Calcul meilleure série (approximatif pour affichage simple)
-    let maxStreak = 0;
-    let tempHistory = [...uniqueHistory].map(d => new Date(d + 'T12:00:00'));
-    tempHistory.sort((a,b) => a.getTime() - b.getTime());
-    
-    if (tempHistory.length > 0) {
-        let currentS = 1;
-        let maxS = 1;
-        for (let i = 1; i < tempHistory.length; i++) {
-            const diff = (tempHistory[i].getTime() - tempHistory[i-1].getTime()) / (1000 * 3600 * 24);
-            if (diff <= 1.5) { 
-                currentS++;
-            } else {
-                if (currentS > maxS) maxS = currentS;
-                currentS = 1;
-            }
-        }
-        if (currentS > maxS) maxS = currentS;
-        maxStreak = Math.max(maxS, currentStreak);
-    }
-
-    // Heatmap 30 jours
-    const last30Days = [];
-    for(let i=29; i>=0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        // Utilisation du même format pour éviter les bugs UTC
-        const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        last30Days.push({
-            date: d,
-            done: uniqueHistory.includes(dStr)
-        });
-    }
+    const todayStr = new Date().toLocaleDateString('fr-CA');
+    const completedCount = localHabits.filter(h => h.history?.includes(todayStr)).length;
+    const progress = localHabits.length > 0 ? (completedCount / localHabits.length) * 100 : 0;
 
     return createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-lg relative z-10 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
-                <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
-                    <X size={20} />
-                </button>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
+            <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-md transition-opacity" onClick={onClose}></div>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-white/20 dark:border-slate-800/50 w-full max-w-md relative z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
                 
-                <div className="flex flex-col items-center mb-8">
-                    <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-[2rem] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4 transform -rotate-6">
-                        <DynamicIcon name={habit.icon} size={48} />
+                {/* En-tête */}
+                <div className="p-6 pb-4 border-b border-slate-100/50 dark:border-slate-800/50 flex items-center justify-between shrink-0">
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Routine du jour</h2>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">{completedCount} sur {localHabits.length} terminées</p>
                     </div>
-                    <h2 className="text-3xl font-black text-slate-800 dark:text-white text-center tracking-tighter">{habit.name}</h2>
-                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-2">{habit.category || 'Routine'}</p>
+                    <button onClick={onClose} className="p-2 bg-slate-100/50 dark:bg-slate-800/50 rounded-full text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+                        <X size={20} />
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center">
-                        <Flame size={24} className="text-orange-500 mb-2"/>
-                        <span className="text-3xl font-black text-slate-800 dark:text-white">{currentStreak}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Série actuelle</span>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50 flex flex-col items-center">
-                        <Trophy size={24} className="text-yellow-500 mb-2"/>
-                        <span className="text-3xl font-black text-slate-800 dark:text-white">{maxStreak}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Record absolu</span>
+                {/* Jauge de progression */}
+                <div className="px-6 py-2 shrink-0">
+                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-slate-800 dark:bg-slate-200 rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
                     </div>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700/50">
-                    <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <Calendar size={14}/> Les 30 derniers jours
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5 justify-center">
-                        {last30Days.map((d, i) => (
+                {/* Liste des habitudes */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-hide">
+                    {localHabits.map((habit) => {
+                        const isDone = habit.history?.includes(todayStr);
+                        const streak = calculateStreak(habit);
+                        const isAnimating = animatingId === habit.id;
+
+                        return (
                             <div 
-                                key={i} 
-                                className={`w-6 h-6 rounded-md ${d.done ? 'bg-blue-500 shadow-sm shadow-blue-500/20' : 'bg-slate-200 dark:bg-slate-700'} transition-all`}
-                                title={d.date.toLocaleDateString()}
-                            ></div>
-                        ))}
-                    </div>
+                                key={habit.id}
+                                onClick={() => !isDone && handleCheck(habit)}
+                                className={`group relative p-4 rounded-2xl border transition-all duration-300 flex items-center gap-4
+                                    ${isDone 
+                                        ? 'bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-60' 
+                                        : 'bg-white dark:bg-slate-800/80 border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
+                                    }
+                                    ${isAnimating ? 'scale-95 opacity-50' : 'scale-100'}
+                                `}
+                            >
+                                {/* Checkbox / Icône */}
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300
+                                    ${isDone ? 'bg-slate-200 dark:bg-slate-700 text-slate-400' : 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 group-hover:bg-slate-800 group-hover:text-white dark:group-hover:bg-slate-200 dark:group-hover:text-slate-900'}
+                                `}>
+                                    {isDone ? <Check size={24} strokeWidth={3} /> : <DynamicIcon name={habit.icon} size={24} />}
+                                </div>
+
+                                {/* Infos */}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`font-bold text-base truncate transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-300/50 dark:decoration-slate-600/50' : 'text-slate-800 dark:text-slate-100'}`}>
+                                        {habit.name}
+                                    </h3>
+                                    {streak > 0 && (
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <div className={`w-1.5 h-1.5 rounded-full ${streak >= 3 ? 'bg-slate-800 dark:bg-slate-300 shadow-[0_0_8px_rgba(0,0,0,0.5)] dark:shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                            <span className={`text-[10px] font-bold uppercase tracking-widest ${streak >= 3 ? 'text-slate-800 dark:text-slate-300' : 'text-slate-400'}`}>
+                                                Série : {streak}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {/* Confetti ou effet visuel au clic (simulé via un scale bg) */}
+                                {isAnimating && (
+                                    <div className="absolute inset-0 bg-slate-800/5 dark:bg-white/5 rounded-2xl animate-ping opacity-0"></div>
+                                )}
+                            </div>
+                        );
+                    })}
+                    
+                    {localHabits.length === 0 && (
+                        <div className="text-center py-10 opacity-50">
+                            <Coffee size={32} className="mx-auto mb-3" />
+                            <p className="text-sm font-bold uppercase tracking-widest">Rien de prévu aujourd'hui</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>,
@@ -192,36 +219,23 @@ const DynamicIcon = ({ name, size = 18, className = "" }) => {
     return <IconComponent size={size} className={className} />;
 };
 
-// --- COMPOSANT HABIT STRIP ---
+// --- COMPOSANT HABIT STRIP (WIDGET RÉSUMÉ) ---
 const HabitStrip = ({ habits, updateHabit, setView }) => {
     const todayIndex = new Date().getDay(); 
     
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
         return habits.filter(h => {
-            // SÉCURITÉ ANTI-CRASH
             if (!h.frequency || !Array.isArray(h.frequency)) {
                  if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                     const lastDateStr = h.history && h.history.length > 0 ? h.history[h.history.length - 1] : null;
-                     const todayStr = new Date().toLocaleDateString('fr-CA'); // Format YYYY-MM-DD local
-                     
-                     let isDoneToday = false;
-                     if(lastDateStr) {
-                         const lastDate = new Date(lastDateStr);
-                         const today = new Date();
-                         isDoneToday = lastDate.toDateString() === today.toDateString() || lastDateStr.includes(todayStr);
-                     }
-
-                     return h.days_of_week.includes(todayIndex) && !isDoneToday;
+                     return h.days_of_week.includes(todayIndex);
                  }
                  return false;
             }
-
             let isScheduledToday = false;
             if (h.days_of_week && Array.isArray(h.days_of_week)) {
                 isScheduledToday = h.days_of_week.includes(todayIndex);
-            } 
-            else {
+            } else {
                 isScheduledToday = h.frequency.some(d => {
                     if (!d) return false;
                     const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
@@ -229,138 +243,74 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                     return map[norm] === todayIndex;
                 });
             }
-            
-            if (!isScheduledToday) return false;
-
-            const lastDate = h.history && h.history.length > 0 ? new Date(h.history[h.history.length - 1]) : null;
-            const isDoneToday = lastDate && new Date().toDateString() === lastDate.toDateString();
-            
-            return !isDoneToday;
+            return isScheduledToday;
         });
     }, [habits, todayIndex]);
 
-    // ÉTATS
-    const [hidingIds, setHidingIds] = useState([]);
-    const [hiddenIds, setHiddenIds] = useState([]); 
-    const [focusHabit, setFocusHabit] = useState(null);
-    const scrollContainerRef = useRef(null);
+    const todayStr = new Date().toLocaleDateString('fr-CA');
+    const completedHabits = todayHabits.filter(h => h.history?.includes(todayStr));
+    const isAllDone = todayHabits.length > 0 && completedHabits.length === todayHabits.length;
+    
+    const [isFocusModalOpen, setIsFocusModalOpen] = useState(false);
 
-    const scroll = (direction) => {
-        if (scrollContainerRef.current) {
-            const amount = direction === 'left' ? -300 : 300;
-            scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
-        }
-    };
-
-    const handlePass = (id, e) => {
-        e.stopPropagation();
-        if (e.currentTarget) e.currentTarget.blur();
-        setHidingIds(prev => [...prev, id]);
-        setTimeout(() => {
-            setHiddenIds(prev => [...prev, id]);
-        }, 300);
-    };
-
-    const handleCheck = async (habit, e) => {
-        e.stopPropagation();
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const todayStr = `${year}-${month}-${day}`; 
-
-        // REVENIR AU FORMAT YYYY-MM-DD local pour la validation !
-        const newHistory = [...(habit.history || []), todayStr];
-        updateHabit({ ...habit, history: newHistory }); 
-
-        try {
-            await supabase.from('habit_logs').insert({
-                habit_id: habit.id,
-                date: todayStr,
-                completed: true
-            });
-        } catch (err) {
-            console.error("Erreur sync log:", err);
-        }
-    };
-
-    const activeHabits = todayHabits.filter(h => !hiddenIds.includes(h.id));
-
-    if (activeHabits.length === 0) {
+    if (todayHabits.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-10 opacity-50 bg-white/20 dark:bg-slate-900/20 rounded-[2rem] border border-slate-100/50 dark:border-slate-800/50">
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3 shadow-inner"><Coffee size={32} className="text-slate-400"/></div>
-                <span className="text-sm font-black text-slate-500 uppercase tracking-widest">
-                    {todayHabits.length === 0 ? "Repos aujourd'hui" : "Tout est fait !"}
-                </span>
+            <div className="flex flex-col items-center justify-center py-6 opacity-40">
+                <Coffee size={24} className="text-slate-400 mb-2"/>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Repos aujourd'hui</span>
             </div>
         );
     }
 
     return (
-        <div className="relative group/strip">
-            {activeHabits.length > 2 && (
-                <>
-                    <button onClick={() => scroll('left')} className="absolute -left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 opacity-0 group-hover/strip:opacity-100 transition-opacity hover:scale-110">
-                        <ChevronLeft size={20} />
-                    </button>
-                    <button onClick={() => scroll('right')} className="absolute -right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 opacity-0 group-hover/strip:opacity-100 transition-opacity hover:scale-110">
-                        <ChevronRight size={20} />
-                    </button>
-                </>
-            )}
-            
-            <div ref={scrollContainerRef} className="flex overflow-x-auto pb-6 pt-2 snap-x scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                {activeHabits.map(h => {
-                    const isHiding = hidingIds.includes(h.id);
-                    const streak = calculateStreak(h);
-                    return (
-                        <div 
-                            key={h.id} 
-                            onClick={() => setFocusHabit(h)}
-                            className={`cursor-pointer snap-center shrink-0 flex items-center group relative overflow-hidden transition-all duration-500 ease-out
-                            ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-72 mr-5 opacity-100 scale-100 bg-white dark:bg-slate-900 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-100 dark:border-slate-800 hover:border-blue-500/30 dark:hover:border-blue-500/30 hover:shadow-blue-500/10 hover:-translate-y-1 p-3 gap-4'}`}
-                        >
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-[1rem] text-slate-600 dark:text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 dark:group-hover:bg-blue-500/10 dark:group-hover:text-blue-400 transition-colors shrink-0 relative">
-                                <DynamicIcon name={h.icon} size={24} strokeWidth={2.5} />
-                                {streak > 2 && (
-                                    <div className="absolute -top-2 -right-2 bg-gradient-to-br from-orange-400 to-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-md shadow-orange-500/20 border border-white dark:border-slate-900">
-                                        🔥{streak}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <p className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate pr-2 tracking-tight">{h.name}</p>
-                                {streak > 0 && (
-                                    <div className="flex items-center justify-between mt-1">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                                            <Flame size={10} className="text-orange-500"/>
-                                            {streak} jour{streak > 1 ? 's' : ''}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <button 
-                                onClick={(e) => handleCheck(h, e)} 
-                                className="w-10 h-10 bg-white dark:bg-slate-800 text-slate-300 dark:text-slate-600 rounded-full hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm border-2 border-slate-100 dark:border-slate-700 hover:border-transparent hover:shadow-lg hover:shadow-blue-500/30 group/btn"
-                            >
-                                <Check size={20} strokeWidth={3} className="transition-transform group-hover/btn:scale-110"/>
-                            </button>
-                        </div>
-                    );
-                })}
-                <div onClick={() => setView('habits')} className="snap-center shrink-0 w-24 h-[76px] flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors gap-2">
-                    <Plus size={20} className="text-slate-400"/>
-                    <span className="text-slate-400 font-black text-[10px] tracking-widest uppercase">Gérer</span>
+        <>
+            <div 
+                onClick={() => setIsFocusModalOpen(true)}
+                className={`group cursor-pointer relative overflow-hidden rounded-[1.5rem] border p-4 transition-all duration-300 flex items-center justify-between
+                ${isAllDone 
+                    ? 'bg-slate-50/50 dark:bg-slate-800/30 border-transparent' 
+                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
+            >
+                {/* Bg gradient on hover */}
+                {!isAllDone && <div className="absolute inset-0 bg-gradient-to-r from-slate-100/50 to-transparent dark:from-slate-800/50 opacity-0 group-hover:opacity-100 transition-opacity"></div>}
+                
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors
+                        ${isAllDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'}
+                    `}>
+                        {isAllDone ? <Check size={20} strokeWidth={3} /> : <Zap size={20} strokeWidth={2.5} />}
+                    </div>
+                    <div>
+                        <h3 className={`font-bold text-sm tracking-tight ${isAllDone ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
+                            {isAllDone ? "Routine terminée" : "Routine du jour"}
+                        </h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            {completedHabits.length} sur {todayHabits.length}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative z-10 flex items-center gap-2">
+                    <span className={`text-xs font-bold ${isAllDone ? 'text-slate-400' : 'text-slate-900 dark:text-white'} opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 hidden sm:block`}>
+                        {isAllDone ? "Voir" : "Commencer"}
+                    </span>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors
+                        ${isAllDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-900'}
+                    `}>
+                        <ChevronRight size={16} strokeWidth={3} />
+                    </div>
                 </div>
             </div>
 
-            {focusHabit && <FocusHabitModal habit={focusHabit} onClose={() => setFocusHabit(null)} />}
-        </div>
+            {isFocusModalOpen && (
+                <RoutineFocusModal 
+                    habits={todayHabits} 
+                    updateHabit={updateHabit} 
+                    onClose={() => setIsFocusModalOpen(false)} 
+                />
+            )}
+        </>
     );
 };
 
