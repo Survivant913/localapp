@@ -117,11 +117,10 @@ export default function DashboardCalendar({ data }) {
     const handleToday = () => setOffsetDays(0);
 
     return (
-        <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl mb-8 group transition-all relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl mb-8 group transition-all relative overflow-hidden">
             {/* Decorative background elements */}
             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute -right-10 -top-10 opacity-[0.02] text-indigo-500 pointer-events-none"><CalendarIcon size={200}/></div>
 
             <div className="flex justify-between items-center mb-8 relative z-10">
                 <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
