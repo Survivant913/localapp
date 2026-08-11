@@ -430,7 +430,12 @@ export default function Dashboard({ data, updateData, setView }) {
     const getNextCalendarEvents = () => {
         try {
             const now = new Date(); const today = new Date(); today.setHours(0,0,0,0);
-            const calEvents = (data.calendar_events || []).map(e => ({ id: e.id, title: e.title, start_time: e.start_time, is_todo: false, is_all_day: e.is_all_day }));
+            const validEvents = (data.calendar_events || []).filter(e => {
+                const isOwner = e.user_id === data.profile?.id;
+                const isDeclined = (e.my_status || e.status) === 'declined';
+                return isOwner || !isDeclined;
+            });
+            const calEvents = validEvents.map(e => ({ id: e.id, title: e.title, start_time: e.start_time, is_todo: false, is_all_day: e.is_all_day }));
             return calEvents.filter(e => {
                 const evtDate = new Date(e.start_time);
                 if (e.is_all_day) return evtDate >= today;

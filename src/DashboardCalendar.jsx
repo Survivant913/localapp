@@ -29,14 +29,18 @@ export default function DashboardCalendar({ data, filter }) {
 
         // 1. Calendar Events
         (data.calendar_events || []).forEach(e => {
-            if (e.start_time) {
-                events.push({
-                    type: 'calendar',
-                    title: e.title,
-                    date: new Date(e.start_time).toLocaleDateString('fr-CA'),
-                    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-                    icon: <CalendarIcon size={12} />
-                });
+            const isOwner = e.user_id === data.profile?.id;
+            const isDeclined = (e.my_status || e.status) === 'declined';
+            if (isOwner || !isDeclined) {
+                if (e.start_time) {
+                    events.push({
+                        type: 'calendar',
+                        title: e.title,
+                        date: new Date(e.start_time).toLocaleDateString('fr-CA'),
+                        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+                        icon: <CalendarIcon size={12} />
+                    });
+                }
             }
         });
 
