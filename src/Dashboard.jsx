@@ -144,9 +144,11 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                         
                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                             <p className="font-black text-sm text-slate-800 dark:text-slate-200 truncate pr-2 tracking-tight">{h.name}</p>
-                            <div className="flex items-center justify-between mt-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{streak > 0 ? `${streak} jours` : 'Nouveau'}</span>
-                            </div>
+                            {streak > 0 && (
+                                <div className="flex items-center justify-between mt-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{streak} jour{streak > 1 ? 's' : ''} de suite</span>
+                                </div>
+                            )}
                         </div>
                         
                         {/* Bouton d'action "Check" */}
