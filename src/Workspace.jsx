@@ -1668,7 +1668,15 @@ const ChatModule = ({ venture, currentUserEmail }) => {
 
 export default function Workspace({ data, updateData, workspaceFocus, setWorkspaceFocus }) {
     const rawVentures = data?.ventures || [];
-    const ventures = rawVentures.map(v => ({ ...v, isShared: v.user_id !== data?.profile?.id }));
+    const myEmail = data?.profile?.email?.toLowerCase();
+    const myId = data?.profile?.id;
+    const myShares = new Set((data?.venture_shares || [])
+        .filter(s => s.user_email?.toLowerCase() === myEmail)
+        .map(s => s.venture_id));
+        
+    const ventures = rawVentures
+        .filter(v => v.user_id === myId || myShares.has(v.id))
+        .map(v => ({ ...v, isShared: v.user_id !== myId }));
     const [activeVenture, setActiveVenture] = useState(null);
     const loading = false;
     const [newVentureTitle, setNewVentureTitle] = useState("");

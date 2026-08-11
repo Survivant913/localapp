@@ -90,7 +90,14 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
         });
 
         // 2b. Workspace Projets (Ventures)
+        const myEmail = data?.profile?.email?.toLowerCase();
+        const myId = data?.profile?.id;
+        const myShares = new Set((data?.venture_shares || [])
+            .filter(s => s.user_email?.toLowerCase() === myEmail)
+            .map(s => s.venture_id));
+
         (data.ventures || []).forEach(v => {
+            if (v.user_id !== myId && !myShares.has(v.id)) return;
             if (v.title?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'workspace',
