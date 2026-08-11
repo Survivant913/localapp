@@ -1,4 +1,4 @@
-import { Bell, Trash2, Check, ExternalLink, X, Calendar, MessageSquare, FolderKanban, Info } from 'lucide-react';
+import { Bell, Trash2, Check, ExternalLink, X, Calendar, MessageSquare, FolderKanban, Info, Box, Book, CheckSquare, Wallet } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -7,8 +7,12 @@ export default function NotificationCenter({ notifications, onClose, onClearAll,
     const getIconForType = (type) => {
         if (type.includes('agenda') || type.includes('calendar')) return <Calendar size={18} className="text-emerald-500" />;
         if (type.includes('chat') || type.includes('message')) return <MessageSquare size={18} className="text-blue-500" />;
-        if (type.includes('workspace') || type.includes('projet')) return <FolderKanban size={18} className="text-purple-500" />;
-        return <Info size={18} className="text-indigo-500" />;
+        if (type.includes('workspace')) return <Box size={18} className="text-indigo-500" />;
+        if (type.includes('projet') || type.includes('project')) return <FolderKanban size={18} className="text-purple-500" />;
+        if (type.includes('journal') || type.includes('carnet')) return <Book size={18} className="text-amber-500" />;
+        if (type.includes('todo') || type.includes('tache')) return <CheckSquare size={18} className="text-cyan-500" />;
+        if (type.includes('budget') || type.includes('finance')) return <Wallet size={18} className="text-rose-500" />;
+        return <Bell size={18} className="text-slate-500" />;
     };
 
     const formatTime = (dateString) => {
