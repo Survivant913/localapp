@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Settings, Moon, Sun, Upload, 
   RefreshCw, CheckCircle2, Building2, Image as ImageIcon, Trash2,
-  Palette
+  Palette, LayoutDashboard
 } from 'lucide-react';
 
 export default function DataSettings({ data, loadExternalData, toggleTheme, darkMode }) {
