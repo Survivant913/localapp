@@ -67,16 +67,58 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
             }
         });
 
-        // 3. Notes (Carnet)
+        // 2b. Workspace Projets (Ventures)
+        (data.ventures || []).forEach(v => {
+            if (v.name?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'workspace',
+                    title: v.name,
+                    subtitle: 'Projet Workspace',
+                    type: 'venture',
+                    icon: <Box size={16}/>,
+                    score: 85
+                });
+            }
+        });
+
+        // 3. Notes (Bloc-notes)
         (data.notes || []).forEach(n => {
             if (n.title?.toLowerCase().includes(q) || n.content?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'notes',
                     title: n.title || 'Note sans titre',
-                    subtitle: 'Note',
+                    subtitle: 'Bloc-notes',
                     type: 'note',
                     icon: <StickyNote size={16}/>,
                     score: 60
+                });
+            }
+        });
+
+        // 3b. Carnet (Dossiers)
+        (data.journal_folders || []).forEach(f => {
+            if (f.name?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'journal',
+                    title: f.name,
+                    subtitle: 'Dossier (Carnet)',
+                    type: 'journal_folder',
+                    icon: <Book size={16}/>,
+                    score: 75
+                });
+            }
+        });
+
+        // 3c. Carnet (Pages)
+        (data.journal_pages || []).forEach(p => {
+            if (p.title?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'journal',
+                    title: p.title || 'Page sans titre',
+                    subtitle: 'Page (Carnet)',
+                    type: 'journal_page',
+                    icon: <StickyNote size={16}/>,
+                    score: 70
                 });
             }
         });
