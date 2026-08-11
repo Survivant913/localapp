@@ -1482,14 +1482,23 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
     useEffect(() => { fetchVentures(); }, []);
 
     useEffect(() => {
-        const handleOpenWorkspaceProject = (e) => {
-            const v = ventures.find(ven => String(ven.id) === String(e.detail.projectId));
-            if (v) {
-                setActiveVenture(v);
+        if (ventures.length > 0) {
+            const pending = localStorage.getItem('pendingDeepLink');
+            if (pending) {
+                try {
+                    const data = JSON.parse(pending);
+                    if (data.type === 'venture' && Date.now() - data.timestamp < 10000) {
+                        const v = ventures.find(ven => String(ven.id) === String(data.itemId));
+                        if (v) {
+                            setActiveVenture(v);
+                            localStorage.removeItem('pendingDeepLink');
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erreur lecture deep link:", e);
+                }
             }
-        };
-        window.addEventListener('open-workspace-project', handleOpenWorkspaceProject);
-        return () => window.removeEventListener('open-workspace-project', handleOpenWorkspaceProject);
+        }
     }, [ventures]);
 
     const fetchVentures = async () => {

@@ -145,18 +145,12 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
     }, [query, data]);
 
     const handleSelect = (item) => {
+        if (item.type === 'venture' || item.type === 'journal_folder' || item.type === 'journal_page') {
+            localStorage.setItem('pendingDeepLink', JSON.stringify({ type: item.type, itemId: item.itemId, timestamp: Date.now() }));
+        }
+        
         setView(item.id);
         onClose();
-        
-        setTimeout(() => {
-            if (item.type === 'venture') {
-                window.dispatchEvent(new CustomEvent('open-workspace-project', { detail: { projectId: item.itemId } }));
-            } else if (item.type === 'journal_folder') {
-                window.dispatchEvent(new CustomEvent('open-journal-item', { detail: { folderId: item.itemId } }));
-            } else if (item.type === 'journal_page') {
-                window.dispatchEvent(new CustomEvent('open-journal-item', { detail: { pageId: item.itemId } }));
-            }
-        }, 100);
     };
 
     if (!isOpen) return null;

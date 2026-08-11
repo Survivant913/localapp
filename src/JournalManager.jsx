@@ -106,22 +106,34 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- SYNCHRONISATION TEMPS RÉEL ---
     
     useEffect(() => {
-        const handleOpenJournalItem = (e) => {
-            if (e.detail.folderId) {
-                setCurrentFolderId(e.detail.folderId);
-                setActivePageId(null);
-            }
-            if (e.detail.pageId) {
-                const page = allPages.find(p => String(p.id) === String(e.detail.pageId));
-                if (page) {
-                    setCurrentFolderId(page.folder_id);
-                    setActivePageId(e.detail.pageId);
+        if (allFolders.length > 0) {
+            const pending = localStorage.getItem('pendingDeepLink');
+            if (pending) {
+                try {
+                    const data = JSON.parse(pending);
+                    // Check if the link is fresh (less than 10 seconds old)
+                    if (Date.now() - data.timestamp < 10000) {
+                        if (data.type === 'journal_folder') {
+                            setCurrentFolderId(data.itemId);
+                            setActivePageId(null);
+                            localStorage.removeItem('pendingDeepLink');
+                        } else if (data.type === 'journal_page' && allPages.length > 0) {
+                            const page = allPages.find(p => String(p.id) === String(data.itemId));
+                            if (page) {
+                                setCurrentFolderId(page.folder_id);
+                                setActivePageId(data.itemId);
+                                localStorage.removeItem('pendingDeepLink');
+                            }
+                        }
+                    } else {
+                        localStorage.removeItem('pendingDeepLink');
+                    }
+                } catch (e) {
+                    console.error("Erreur lecture deep link:", e);
                 }
             }
-        };
-        window.addEventListener('open-journal-item', handleOpenJournalItem);
-        return () => window.removeEventListener('open-journal-item', handleOpenJournalItem);
-    }, [allPages]);
+        }
+    }, [allFolders, allPages]);
 
     useEffect(() => {
         const channel = new BroadcastChannel('app-sync');
