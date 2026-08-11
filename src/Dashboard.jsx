@@ -613,7 +613,7 @@ export default function Dashboard({ data, updateData, setView }) {
                 )}
             </div>
 
-            {showTimeline && <DashboardCalendar data={data} />}
+            {showTimeline && <DashboardCalendar data={data} filter={dashboardFilter} />}
 
             {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

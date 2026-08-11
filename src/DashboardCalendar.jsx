@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, CheckCircle2, Target, Wallet, Calendar as CalendarIcon } from 'lucide-react';
 
-export default function DashboardCalendar({ data }) {
+export default function DashboardCalendar({ data, filter }) {
     const [offsetDays, setOffsetDays] = useState(0);
 
     const timeline = useMemo(() => {
@@ -73,17 +73,37 @@ export default function DashboardCalendar({ data }) {
             }
         });
 
+        const isRelevant = (item) => {
+            const hiddenAccounts = data.settings?.hidden_accounts || [];
+            const accId = String(item.accountId || item.account_id || '');
+            const targetId = String(item.targetAccountId || item.target_account_id || '');
+            
+            if (!filter || filter === 'total') {
+                if (accId && hiddenAccounts.includes(accId)) return false;
+                if (targetId && hiddenAccounts.includes(targetId)) return false;
+                return true;
+            }
+            return accId === String(filter) || targetId === String(filter);
+        };
+
         // 4. Budget (Scheduled)
         if (data.budget && data.budget.scheduled) {
             data.budget.scheduled.forEach(s => {
-                if (s.date && s.status !== 'paid') {
-                    events.push({
-                        type: 'scheduled',
-                        title: s.description || 'Opération',
-                        date: s.date,
-                        color: s.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-                        icon: <Wallet size={12} />
-                    });
+                if (s.date && s.status !== 'paid' && isRelevant(s)) {
+                    let dStr;
+                    try {
+                        const d = new Date(s.date);
+                        if (!isNaN(d.getTime())) dStr = d.toLocaleDateString('fr-CA');
+                    } catch(e){}
+                    if (dStr) {
+                        events.push({
+                            type: 'scheduled',
+                            title: s.description || 'Opération',
+                            date: dStr,
+                            color: s.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+                            icon: <Wallet size={12} />
+                        });
+                    }
                 }
             });
         }
@@ -91,15 +111,22 @@ export default function DashboardCalendar({ data }) {
         // 5. Budget (Recurring)
         if (data.budget && data.budget.recurring) {
             data.budget.recurring.forEach(r => {
-                if (r.nextDueDate || r.next_due_date) {
-                    const ndd = r.nextDueDate || r.next_due_date;
-                    events.push({
-                        type: 'recurring',
-                        title: r.description || 'Récurrent',
-                        date: ndd,
-                        color: r.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
-                        icon: <Wallet size={12} />
-                    });
+                const ndd = r.nextDueDate || r.next_due_date;
+                if (ndd && isRelevant(r)) {
+                    let dStr;
+                    try {
+                        const d = new Date(ndd);
+                        if (!isNaN(d.getTime())) dStr = d.toLocaleDateString('fr-CA');
+                    } catch(e){}
+                    if (dStr) {
+                        events.push({
+                            type: 'recurring',
+                            title: r.description || 'Récurrent',
+                            date: dStr,
+                            color: r.type === 'income' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+                            icon: <Wallet size={12} />
+                        });
+                    }
                 }
             });
         }
@@ -110,7 +137,7 @@ export default function DashboardCalendar({ data }) {
         });
 
         return days;
-    }, [data, offsetDays]);
+    }, [data, offsetDays, filter]);
 
     const handlePrev = () => setOffsetDays(prev => prev - 7);
     const handleNext = () => setOffsetDays(prev => prev + 7);
