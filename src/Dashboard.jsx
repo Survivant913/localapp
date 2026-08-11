@@ -5,7 +5,7 @@ import * as AllIcons from 'lucide-react';
 import { 
     LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
     CheckSquare, StickyNote, Plus, FolderKanban, 
-    Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft,
+    Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft, ArrowRight,
     Repeat, RotateCcw, Check, Coffee, Activity
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
@@ -722,52 +722,93 @@ export default function Dashboard({ data, updateData, setView }) {
                 {/* COLONNE DROITE */}
                 <div className="lg:col-span-4 space-y-8">
                     {showAgenda && (
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl group transition-all" onClick={() => setView('planning')}>
-                        <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
-                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><Clock size={20}/></div>
-                                Agenda
-                            </h3>
-                        </div>
-                        <div className="space-y-4">
-                            {nextCalendarEvents.length === 0 ? (
-                                <p className="text-slate-400 text-sm font-bold italic py-8 uppercase opacity-50 tracking-widest text-center">Calendrier vierge</p>
-                            ) : (
-                                nextCalendarEvents.map((evt, index) => {
-                                    const d = new Date(evt.start_time);
-                                    const dayLabel = getDayCounterLabel(evt.start_time);
-                                    const isToday = dayLabel.text === 'Auj.';
-                                    const isNext = index === 0;
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
+                        <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-500 pointer-events-none"><Clock size={100} className="rotate-12"/></div>
+                        <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-                                    return (
-                                        <div key={`${evt.type}-${evt.id}`} className={`relative overflow-hidden flex gap-5 items-center p-4 rounded-3xl transition-all cursor-pointer group/item shadow-sm ${isNext ? 'bg-indigo-50/50 dark:bg-indigo-900/20 ring-1 ring-indigo-200 dark:ring-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/40' : isToday ? 'bg-white dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm hover:shadow-md hover:ring-slate-300 dark:hover:ring-slate-600' : 'hover:bg-slate-50 dark:hover:bg-slate-800 border border-transparent'}`}>
-                                            
-                                            {/* BARRE LUMINEUSE POUR LE PROCHAIN */}
-                                            {isNext && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>}
-                                            
-                                            {/* BARRE DISCRÈTE POUR LE RESTE D'AUJOURD'HUI */}
-                                            {!isNext && isToday && <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-300 dark:bg-slate-600"></div>}
-                                            
-                                            <div className={`flex flex-col items-center justify-center w-14 h-14 ${evt.is_todo ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-purple-50 text-purple-600 border-purple-100'} dark:bg-opacity-20 rounded-2xl border shrink-0 transition-transform group-hover/item:scale-110 shadow-sm shadow-indigo-500/5`}>
-                                                <span className="text-[10px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
-                                                <span className="text-xl font-black leading-none mt-1">{d.getDate()}</span>
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center justify-between">
-                                                    <p className={`text-sm font-black truncate tracking-tighter ${isNext ? 'text-indigo-900 dark:text-indigo-100' : 'text-slate-800 dark:text-white'}`}>{evt.title}</p>
-                                                    <div className="flex items-center gap-1">
-                                                        {isNext && <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-indigo-500 text-white shadow-sm uppercase tracking-widest animate-pulse">Prochain</span>}
-                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${dayLabel.color} shadow-sm`}>{dayLabel.text}</span>
+                        <div className="flex justify-between items-center mb-8 relative z-10">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
+                                <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20"><Clock size={20} strokeWidth={2.5}/></div>
+                                Agenda Focus
+                            </h3>
+                            <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                                <ArrowRight size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-6 relative z-10">
+                            {nextCalendarEvents.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-10 opacity-40">
+                                    <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3"><Clock size={32} /></div>
+                                    <p className="text-sm font-black uppercase tracking-widest text-center">Calendrier vierge</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col">
+                                    {/* PREMIER EVENEMENT (PROCHAIN) */}
+                                    {nextCalendarEvents.length > 0 && (() => {
+                                        const evt = nextCalendarEvents[0];
+                                        const d = new Date(evt.start_time);
+                                        const dayLabel = getDayCounterLabel(evt.start_time);
+                                        return (
+                                            <div key={`${evt.type}-${evt.id}`} className="mb-6 relative overflow-hidden rounded-[2rem] p-6 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 dark:border-indigo-500/10 shadow-lg shadow-indigo-500/5 group/next transition-all hover:shadow-indigo-500/10 cursor-pointer">
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 group-hover/next:bg-indigo-500/20 transition-all"></div>
+                                                
+                                                <div className="flex justify-between items-start mb-4 relative z-10">
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-indigo-500/20 animate-pulse">
+                                                        <span className="w-1.5 h-1.5 bg-white rounded-full"></span> Prochainement
+                                                    </span>
+                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg shadow-sm uppercase tracking-widest ${dayLabel.color}`}>{dayLabel.text}</span>
+                                                </div>
+
+                                                <div className="flex gap-5 items-center relative z-10">
+                                                    <div className={`flex flex-col items-center justify-center w-16 h-16 ${evt.is_todo ? 'bg-orange-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'} rounded-[1.5rem] shadow-xl shrink-0 transition-transform group-hover/next:scale-110 group-hover/next:rotate-3`}>
+                                                        <span className="text-[11px] font-black uppercase leading-none opacity-80">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                        <span className="text-2xl font-black leading-none mt-1">{d.getDate()}</span>
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-lg font-black text-slate-800 dark:text-white truncate tracking-tight">{evt.title}</p>
+                                                        <p className="text-[11px] font-black uppercase mt-1 flex items-center gap-1.5 text-indigo-600/80 dark:text-indigo-400/80">
+                                                            <Clock size={12} strokeWidth={3} />
+                                                            {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                            {evt.is_todo && <CheckCircle2 size={12} className="text-orange-500 ml-1"/>}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                <p className={`text-[11px] font-bold uppercase mt-1 flex items-center gap-1 ${isNext ? 'text-indigo-500/80 dark:text-indigo-400/80' : 'text-slate-400'}`}>
-                                                    {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                                                    {evt.is_todo && <CheckCircle2 size={10} className="text-orange-500"/>}
-                                                </p>
                                             </div>
+                                        );
+                                    })()}
+
+                                    {/* AUTRES EVENEMENTS */}
+                                    {nextCalendarEvents.length > 1 && (
+                                        <div className="relative pl-6 space-y-5">
+                                            <div className="absolute left-[1.35rem] top-2 bottom-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                                            {nextCalendarEvents.slice(1).map((evt, index) => {
+                                                const d = new Date(evt.start_time);
+                                                const dayLabel = getDayCounterLabel(evt.start_time);
+                                                return (
+                                                    <div key={`${evt.type}-${evt.id}`} className="relative flex items-center gap-4 cursor-pointer group/item">
+                                                        <div className="absolute -left-[1.65rem] w-3 h-3 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 group-hover/item:border-indigo-500 group-hover/item:scale-125 transition-all"></div>
+                                                        
+                                                        <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 transition-transform group-hover/item:scale-105 shadow-sm`}>
+                                                            <span className="text-[9px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                            <span className="text-lg font-black leading-none mt-0.5">{d.getDate()}</span>
+                                                        </div>
+                                                        <div className="min-w-0 flex-1 bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-transparent group-hover/item:border-slate-200 dark:group-hover/item:border-slate-700 group-hover/item:shadow-sm transition-all">
+                                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                                <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
+                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border shadow-sm uppercase tracking-widest shrink-0 ${dayLabel.color.replace('bg-', 'bg-opacity-10 text-').replace('text-white', '')} border-current opacity-70`}>{dayLabel.text}</span>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                                                                {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                                {evt.is_todo && <CheckCircle2 size={10} className="text-orange-400"/>}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                    );
-                                })
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
