@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, FolderKanban, StickyNote, CheckSquare, Settings, LayoutDashboard, Box, Wallet, Calendar as CalendarIcon, X, ChevronRight, Activity, CalendarRange, Target, Users, Book } from 'lucide-react';
+import { Search, FolderKanban, StickyNote, CheckSquare, Settings, LayoutDashboard, Box, Wallet, Calendar as CalendarIcon, X, ChevronRight, Activity, CalendarRange, Target, Users, Book, MessageSquare } from 'lucide-react';
 
 export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle }) {
     const [query, setQuery] = useState('');
@@ -59,10 +59,14 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
         const modules = [
             { id: 'dashboard', title: 'Tableau de bord', type: 'module', icon: <LayoutDashboard size={16}/> },
             { id: 'workspace', title: 'Workspace', type: 'module', icon: <Box size={16}/> },
+            { id: 'chat', title: 'Messages', type: 'module', icon: <MessageSquare size={16}/> },
             { id: 'planning', title: 'Agenda', type: 'module', icon: <CalendarRange size={16}/> },
             { id: 'calendar', title: 'Calendrier Financier', type: 'module', icon: <CalendarIcon size={16}/> },
             { id: 'projects', title: 'Mes Projets', type: 'module', icon: <FolderKanban size={16}/> },
+            { id: 'goals', title: 'Objectifs', type: 'module', icon: <Target size={16}/> },
+            { id: 'habits', title: 'Suivi Habitudes', type: 'module', icon: <Activity size={16}/> },
             { id: 'budget', title: 'Budget & Finance', type: 'module', icon: <Wallet size={16}/> },
+            { id: 'clients', title: 'Gestion Client', type: 'module', icon: <Users size={16}/> },
             { id: 'notes', title: 'Bloc-notes', type: 'module', icon: <StickyNote size={16}/> },
             { id: 'journal', title: 'Carnet', type: 'module', icon: <Book size={16}/> },
             { id: 'todo', title: 'Tâches Rapides', type: 'module', icon: <CheckSquare size={16}/> },
@@ -167,6 +171,75 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
                     type: 'task',
                     icon: <CheckSquare size={16}/>,
                     score: 50
+                });
+            }
+        });
+
+        // 5. Objectifs (Goals)
+        (data.goals || []).forEach(g => {
+            if (g.title?.toLowerCase().includes(q) || g.description?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'goals',
+                    title: g.title,
+                    subtitle: 'Objectif',
+                    type: 'goal',
+                    icon: <Target size={16}/>,
+                    score: 75
+                });
+            }
+        });
+
+        // 6. Habitudes (Habits)
+        (data.habits || []).forEach(h => {
+            if (h.name?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'habits',
+                    title: h.name,
+                    subtitle: 'Habitude',
+                    type: 'habit',
+                    icon: <Activity size={16}/>,
+                    score: 75
+                });
+            }
+        });
+
+        // 7. Clients
+        (data.clients || []).forEach(c => {
+            if (c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.company?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'clients',
+                    title: c.name || c.company,
+                    subtitle: 'Client',
+                    type: 'client',
+                    icon: <Users size={16}/>,
+                    score: 75
+                });
+            }
+        });
+
+        // 8. Factures & Devis
+        (data.invoices || []).forEach(i => {
+            if (i.client_name?.toLowerCase().includes(q) || i.invoice_number?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'clients',
+                    title: `Facture ${i.invoice_number}`,
+                    subtitle: i.client_name,
+                    type: 'invoice',
+                    icon: <Wallet size={16}/>,
+                    score: 65
+                });
+            }
+        });
+        
+        (data.quotes || []).forEach(quote => {
+            if (quote.client_name?.toLowerCase().includes(q) || quote.quote_number?.toLowerCase().includes(q)) {
+                res.push({
+                    id: 'clients',
+                    title: `Devis ${quote.quote_number}`,
+                    subtitle: quote.client_name,
+                    type: 'quote',
+                    icon: <StickyNote size={16}/>,
+                    score: 65
                 });
             }
         });
