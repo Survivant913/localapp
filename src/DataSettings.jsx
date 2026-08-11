@@ -19,6 +19,16 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showGoals, setShowGoals] = useState(data.settings?.showGoals ?? false);
     const [showProjects, setShowProjects] = useState(data.settings?.showProjects ?? false);
     const [showHabits, setShowHabits] = useState(data.settings?.showHabits ?? false);
+    
+    const [showDashboard, setShowDashboard] = useState(data.settings?.showDashboard ?? true);
+    const [showWorkspace, setShowWorkspace] = useState(data.settings?.showWorkspace ?? true);
+    const [showChat, setShowChat] = useState(data.settings?.showChat ?? true);
+    const [showPlanning, setShowPlanning] = useState(data.settings?.showPlanning ?? true);
+    const [showCalendar, setShowCalendar] = useState(data.settings?.showCalendar ?? true);
+    const [showBudget, setShowBudget] = useState(data.settings?.showBudget ?? true);
+    const [showNotesSide, setShowNotesSide] = useState(data.settings?.showNotesSide ?? true);
+    const [showJournal, setShowJournal] = useState(data.settings?.showJournal ?? true);
+    const [showTodo, setShowTodo] = useState(data.settings?.showTodo ?? true);
 
     // VISIBILITÉ DASHBOARD
     const [dcSolde, setDcSolde] = useState(data.settings?.dcSolde ?? true);
@@ -57,6 +67,16 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowGoals(data.settings.showGoals ?? false);
             setShowProjects(data.settings.showProjects ?? false);
             setShowHabits(data.settings.showHabits ?? false);
+            
+            setShowDashboard(data.settings.showDashboard ?? true);
+            setShowWorkspace(data.settings.showWorkspace ?? true);
+            setShowChat(data.settings.showChat ?? true);
+            setShowPlanning(data.settings.showPlanning ?? true);
+            setShowCalendar(data.settings.showCalendar ?? true);
+            setShowBudget(data.settings.showBudget ?? true);
+            setShowNotesSide(data.settings.showNotesSide ?? true);
+            setShowJournal(data.settings.showJournal ?? true);
+            setShowTodo(data.settings.showTodo ?? true);
             
             setDcSolde(data.settings.dcSolde ?? true);
             setDcOperations(data.settings.dcOperations ?? true);
@@ -114,6 +134,15 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 showGoals,
                 showProjects,
                 showHabits,
+                showDashboard,
+                showWorkspace,
+                showChat,
+                showPlanning,
+                showCalendar,
+                showBudget,
+                showNotesSide,
+                showJournal,
+                showTodo,
                 dcSolde,
                 dcOperations,
                 dcTimeline,
@@ -255,56 +284,35 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                     <div>
                         <div className="mb-4">
                             <h4 className="font-bold text-slate-700 dark:text-slate-200">Modules de la Barre Latérale</h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Personnalisez votre espace en affichant ou masquant certains modules (masqués par défaut).</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Personnalisez votre espace en affichant ou masquant certains modules.</p>
                         </div>
-                        <div className="space-y-3 max-w-md">
-                            {/* Toggle Gestion Client */}
-                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Gestion Client</p>
-                                    <p className="text-xs text-slate-500">Factures, devis, catalogue</p>
-                                </div>
-                                <div className="relative inline-flex items-center">
-                                    <input type="checkbox" checked={showClients} onChange={(e) => setShowClients(e.target.checked)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                </div>
-                            </label>
-
-                            {/* Toggle Objectifs */}
-                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Objectifs</p>
-                                    <p className="text-xs text-slate-500">Suivi de vos objectifs à long terme</p>
-                                </div>
-                                <div className="relative inline-flex items-center">
-                                    <input type="checkbox" checked={showGoals} onChange={(e) => setShowGoals(e.target.checked)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                </div>
-                            </label>
-
-                            {/* Toggle Projets */}
-                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Mes Projets</p>
-                                    <p className="text-xs text-slate-500">Gestion de projets</p>
-                                </div>
-                                <div className="relative inline-flex items-center">
-                                    <input type="checkbox" checked={showProjects} onChange={(e) => setShowProjects(e.target.checked)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                </div>
-                            </label>
-
-                            {/* Toggle Habitudes */}
-                            <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Suivi Habitudes</p>
-                                    <p className="text-xs text-slate-500">CrǸer et suivre vos habitudes au quotidien</p>
-                                </div>
-                                <div className="relative inline-flex items-center">
-                                    <input type="checkbox" checked={showHabits} onChange={(e) => setShowHabits(e.target.checked)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                </div>
-                            </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { label: 'Tableau de bord', desc: 'Vue principale', state: showDashboard, setter: setShowDashboard },
+                                { label: 'Workspace', desc: 'Espaces de travail', state: showWorkspace, setter: setShowWorkspace },
+                                { label: 'Messages', desc: 'Chat et discussions', state: showChat, setter: setShowChat },
+                                { label: 'Agenda', desc: 'Planning', state: showPlanning, setter: setShowPlanning },
+                                { label: 'Calendrier Financier', desc: 'Échéances et deadlines', state: showCalendar, setter: setShowCalendar },
+                                { label: 'Mes Projets', desc: 'Gestion de projets', state: showProjects, setter: setShowProjects },
+                                { label: 'Objectifs', desc: 'Suivi de vos objectifs', state: showGoals, setter: setShowGoals },
+                                { label: 'Suivi Habitudes', desc: 'Créer et suivre vos habitudes', state: showHabits, setter: setShowHabits },
+                                { label: 'Budget & Finance', desc: 'Trésorerie globale', state: showBudget, setter: setShowBudget },
+                                { label: 'Gestion Client', desc: 'Factures, devis, catalogue', state: showClients, setter: setShowClients },
+                                { label: 'Bloc-notes', desc: 'Prise de notes', state: showNotesSide, setter: setShowNotesSide },
+                                { label: 'Carnet', desc: 'Journal', state: showJournal, setter: setShowJournal },
+                                { label: 'Tâches Rapides', desc: 'To-Do list', state: showTodo, setter: setShowTodo }
+                            ].map((mod, i) => (
+                                <label key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{mod.label}</p>
+                                        <p className="text-xs text-slate-500">{mod.desc}</p>
+                                    </div>
+                                    <div className="relative inline-flex items-center">
+                                        <input type="checkbox" checked={mod.state} onChange={(e) => mod.setter(e.target.checked)} className="sr-only peer" />
+                                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                    </div>
+                                </label>
+                            ))}
                         </div>
                     </div>
                 </div>

@@ -69,12 +69,25 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'todo', label: 'Tâches Rapides', icon: CheckSquare },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ].filter(item => {
-    if (item.id === 'clients') return settings?.showClients === true;
-    if (item.id === 'goals') return settings?.showGoals === true;
-    if (item.id === 'projects') return settings?.showProjects === true;
-    if (item.id === 'habits') return settings?.showHabits === true;
-    return true;
-  });
+      // Les anciens (par défaut false)
+      if (item.id === 'clients') return settings?.showClients === true;
+      if (item.id === 'goals') return settings?.showGoals === true;
+      if (item.id === 'projects') return settings?.showProjects === true;
+      if (item.id === 'habits') return settings?.showHabits === true;
+      
+      // Les nouveaux (par défaut true)
+      if (item.id === 'dashboard') return settings?.showDashboard !== false;
+      if (item.id === 'workspace') return settings?.showWorkspace !== false;
+      if (item.id === 'chat') return settings?.showChat !== false;
+      if (item.id === 'planning') return settings?.showPlanning !== false;
+      if (item.id === 'calendar') return settings?.showCalendar !== false;
+      if (item.id === 'budget') return settings?.showBudget !== false;
+      if (item.id === 'notes') return settings?.showNotesSide !== false;
+      if (item.id === 'journal') return settings?.showJournal !== false;
+      if (item.id === 'todo') return settings?.showTodo !== false;
+      
+      return true; // paramétres etc
+    });
 
   return (
     <>
