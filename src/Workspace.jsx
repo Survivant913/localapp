@@ -1685,6 +1685,12 @@ export default function Workspace({ data, updateData, workspaceFocus, setWorkspa
     const [showShareModal, setShowShareModal] = useState(false);
     const [currentUserEmail, setCurrentUserEmail] = useState('');
 
+    useEffect(() => {
+        if (data?.profile?.email) {
+            setCurrentUserEmail(data.profile.email);
+        }
+    }, [data?.profile?.email]);
+
 
 
     useEffect(() => {
@@ -1731,10 +1737,27 @@ export default function Workspace({ data, updateData, workspaceFocus, setWorkspa
         e.stopPropagation(); 
         if (v.isShared) {
             if (!window.confirm("Quitter ce projet partagé ?")) return;
-            await supabase.from('venture_shares').delete().match({ venture_id: v.id, user_email: currentUserEmail });
+            try {
+                const { error } = await supabase.from('venture_shares')
+                    .delete()
+                    .eq('venture_id', v.id);
+                if (error) {
+                    alert("Erreur de suppression : " + error.message);
+                    console.error("Delete share error:", error);
+                } else {
+                    alert("Projet quitté avec succès ! (Attendez le rafraîchissement)");
+                }
+            } catch (err) {
+                alert("Erreur réseau : " + err.message);
+            }
         } else {
             if (!window.confirm("Supprimer définitivement ce projet pour tout le monde ?")) return;
-            await supabase.from('ventures').delete().eq('id', v.id); 
+            try {
+                const { error } = await supabase.from('ventures').delete().eq('id', v.id);
+                if (error) throw error;
+            } catch (err) {
+                alert("Erreur lors de la suppression : " + err.message);
+            }
         }
         // App.jsx realtime will update ventures array automatically
     };

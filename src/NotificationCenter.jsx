@@ -12,8 +12,10 @@ export default function NotificationCenter({ notifications, onClose, onClearAll,
     };
 
     const formatTime = (dateString) => {
-        const date = parseISO(dateString);
-        if (isToday(date)) return format(date, "'Aujourd\\'hui à' HH:mm", { locale: fr });
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        if (isToday(date)) return format(date, "'Aujourd''hui à' HH:mm", { locale: fr });
         if (isYesterday(date)) return format(date, "'Hier à' HH:mm", { locale: fr });
         return format(date, "d MMM 'à' HH:mm", { locale: fr });
     };

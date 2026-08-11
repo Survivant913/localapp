@@ -925,7 +925,7 @@ export default function App() {
      await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite, category: g.category, priority: g.priority, motivation: g.motivation })); 
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
      
-     await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, name: v.name, status: v.status, created_at: v.created_at || new Date().toISOString() }));
+     await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, title: v.title, status: v.status, created_at: v.created_at || new Date().toISOString() }));
      
      // --- NOUVEAU : Sauvegarde automatique des graphiques d'analyse Workspace ---
      await upsertInBatches('venture_analytics', data.venture_analytics, 50, a => ({ id: a.id, venture_id: a.venture_id, title: a.title, chart_type: a.chart_type, target_value: a.target_value, show_trend: a.show_trend, data_points: a.data_points }));
