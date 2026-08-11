@@ -728,8 +728,8 @@ export default function Dashboard({ data, updateData, setView }) {
 
                         <div className="flex justify-between items-center mb-8 relative z-10">
                             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
-                                <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20"><Clock size={20} strokeWidth={2.5}/></div>
-                                Agenda Focus
+                                <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Clock size={20} strokeWidth={2}/></div>
+                                Agenda
                             </h3>
                             <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
                                 <ArrowRight size={18} />

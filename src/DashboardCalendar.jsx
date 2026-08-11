@@ -194,8 +194,8 @@ export default function DashboardCalendar({ data, filter }) {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
                     <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
-                        <div className="p-2.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/20"><CalendarIcon size={20} strokeWidth={2.5}/></div>
-                        Focus Agenda
+                        <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><CalendarIcon size={20} strokeWidth={2}/></div>
+                        Timeline
                     </h3>
                     <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-md">
                         <button onClick={() => setShowGlobalDetail(true)} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600" title="Vue détaillée globale"><List size={18}/></button>
@@ -322,11 +322,11 @@ export default function DashboardCalendar({ data, filter }) {
                     <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-3xl shadow-2xl relative z-10 border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-8 duration-300">
                         <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3">
-                                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white shadow-lg"><List size={24}/></div>
-                                    Vue Détaillée
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter">
+                                    <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><CalendarIcon size={24} strokeWidth={2}/></div>
+                                    Timeline
                                 </h3>
-                                <p className="text-slate-500 mt-2 font-medium">Vos prochains jours chargés</p>
+                                <p className="text-slate-500 mt-2 font-medium">Votre semaine en un coup d'œil</p>
                             </div>
                             <button onClick={() => setShowGlobalDetail(false)} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all"><X size={24}/></button>
                         </div>
