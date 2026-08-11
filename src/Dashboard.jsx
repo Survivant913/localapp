@@ -110,8 +110,8 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
 
     if (activeHabits.length === 0) {
         return (
-            <div className="flex items-center justify-center gap-3 py-6 opacity-50">
-                <Coffee size={24} className="text-slate-400"/>
+            <div className="flex flex-col items-center justify-center py-10 opacity-50 bg-white/20 dark:bg-slate-900/20 rounded-[2rem] border border-slate-100/50 dark:border-slate-800/50">
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3 shadow-inner"><Coffee size={32} className="text-slate-400"/></div>
                 <span className="text-sm font-black text-slate-500 uppercase tracking-widest">
                     {todayHabits.length === 0 ? "Repos aujourd'hui" : "Tout est fait !"}
                 </span>
@@ -120,33 +120,53 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     }
 
     return (
-        <div className="flex overflow-x-auto pb-4 pt-2 snap-x scrollbar-hide">
+        <div className="flex overflow-x-auto pb-6 pt-2 snap-x scrollbar-hide -mx-2 px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             {activeHabits.map(h => {
                 const isHiding = hidingIds.includes(h.id);
+                const streak = h.streak || 0;
                 return (
                     <div 
                         key={h.id} 
-                        className={`snap-center shrink-0 flex flex-col justify-between group relative overflow-hidden transition-all duration-300 ease-out
-                        ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-32 mr-4 opacity-100 scale-100 h-32 bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-800/80 rounded-2xl border border-slate-200/60 dark:border-slate-700 shadow-sm p-3 hover:border-blue-300 dark:hover:border-blue-500/50 hover:shadow-md hover:-translate-y-1'}`}
+                        className={`snap-center shrink-0 flex items-center group relative overflow-hidden transition-all duration-500 ease-out
+                        ${isHiding ? 'w-0 mr-0 opacity-0 scale-50 border-0 p-0' : 'w-72 mr-5 opacity-100 scale-100 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-[1.5rem] border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-xl hover:-translate-y-1 p-3 gap-4'}`}
                     >
-                        <div className="flex justify-between items-start min-w-[104px]">
-                            <span className="p-2 bg-blue-50/80 dark:bg-blue-900/30 rounded-[10px] text-lg text-blue-600 dark:text-blue-400 shadow-inner">
-                                <DynamicIcon name={h.icon} size={20} />
-                            </span>
-                            <button onClick={(e) => handlePass(h.id, e)} className="text-slate-300 hover:text-rose-500 p-1.5 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors" title="Masquer pour aujourd'hui">
-                                <EyeOff size={14}/>
-                            </button>
-                        </div>
-                        <p className="font-bold text-[10px] text-slate-800 dark:text-slate-200 line-clamp-3 leading-snug min-w-[104px] my-1 flex-1 flex items-center">{h.name}</p>
+                        {/* Barre lumineuse au hover */}
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         
-                        <button onClick={(e) => handleCheck(h, e)} className="w-full py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm min-w-[104px] shrink-0">
-                            <Check size={12} strokeWidth={3}/> Fait
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl text-blue-500 shadow-inner shrink-0 relative">
+                            <DynamicIcon name={h.icon} size={24} strokeWidth={2.5} />
+                            {streak > 2 && (
+                                <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm animate-pulse border border-white dark:border-slate-900">
+                                    🔥{streak}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <p className="font-black text-sm text-slate-800 dark:text-slate-200 truncate pr-2 tracking-tight">{h.name}</p>
+                            <div className="flex items-center justify-between mt-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{streak > 0 ? `${streak} jours` : 'Nouveau'}</span>
+                            </div>
+                        </div>
+                        
+                        {/* Bouton Masquer (Subtil au hover) */}
+                        <button onClick={(e) => handlePass(h.id, e)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 p-1.5 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all scale-75 group-hover:scale-100" title="Masquer pour aujourd'hui">
+                            <EyeOff size={14} strokeWidth={3}/>
+                        </button>
+                        
+                        {/* Bouton d'action "Check" */}
+                        <button 
+                            onClick={(e) => handleCheck(h, e)} 
+                            className="w-12 h-12 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 rounded-xl hover:bg-blue-500 hover:text-white dark:hover:bg-blue-500 dark:hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm border border-slate-100 dark:border-slate-800 hover:border-transparent hover:shadow-blue-500/30 group/btn"
+                        >
+                            <Check size={24} strokeWidth={3} className="transition-transform group-hover/btn:scale-110"/>
                         </button>
                     </div>
                 );
             })}
-            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-12 h-32 flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                <span className="text-slate-400 font-black text-[10px] -rotate-90 whitespace-nowrap tracking-widest uppercase">Gérer</span>
+            <div onClick={() => setView('habits')} className="snap-center shrink-0 w-24 h-[84px] flex flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors gap-2">
+                <Plus size={20} className="text-slate-400"/>
+                <span className="text-slate-400 font-black text-[10px] tracking-widest uppercase">Gérer</span>
             </div>
         </div>
     );
@@ -626,11 +646,19 @@ export default function Dashboard({ data, updateData, setView }) {
                     
                     {/* --- ZONE HABITUDES --- */}
                     {showRoutines && habits.length > 0 && (
-                        <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-[2.5rem] border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest mb-4 ml-2">
-                                <Activity size={20} className="text-blue-500"/> Routines du jour
-                            </h3>
-                            <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                        <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] border border-slate-100/80 dark:border-slate-800/80 p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <div className="flex justify-between items-center mb-6 relative z-10">
+                                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest ml-2 md:ml-0">
+                                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-lg shadow-blue-500/20"><Activity size={18} strokeWidth={2.5}/></div>
+                                    Routines du jour
+                                </h3>
+                            </div>
+                            
+                            <div className="relative z-10">
+                                <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                            </div>
                         </div>
                     )}
 
