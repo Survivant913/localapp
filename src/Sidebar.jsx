@@ -211,13 +211,13 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
         {/* Footer & Logout */}
         <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120] relative z-10 flex flex-col gap-4">
-          <div className="flex gap-2 w-full justify-between mt-auto">
+          <div className={`flex gap-2 w-full mt-auto ${isCollapsed ? 'flex-col items-center' : 'justify-between'}`}>
             <button 
               onClick={handleLogout}
               className={`
-                flex-1 flex items-center justify-center gap-2 rounded-lg transition-all
+                flex items-center justify-center gap-2 rounded-lg transition-all
                 text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-800 hover:border-red-500/20
-                ${isCollapsed ? 'p-0 w-10 h-10' : 'p-2.5'}
+                ${isCollapsed ? 'p-0 w-10 h-10 shrink-0' : 'flex-1 p-2.5'}
               `}
               title="Déconnexion"
             >
