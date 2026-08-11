@@ -23,6 +23,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showDashboard, setShowDashboard] = useState(data.settings?.showDashboard ?? true);
     const [showWorkspace, setShowWorkspace] = useState(data.settings?.showWorkspace ?? true);
     const [showChat, setShowChat] = useState(data.settings?.showChat ?? true);
+    const [notificationsEnabled, setNotificationsEnabled] = useState(data.settings?.notifications_enabled ?? true);
     const [showPlanning, setShowPlanning] = useState(data.settings?.showPlanning ?? true);
     const [showCalendar, setShowCalendar] = useState(data.settings?.showCalendar ?? true);
     const [showBudget, setShowBudget] = useState(data.settings?.showBudget ?? true);
@@ -72,6 +73,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowDashboard(data.settings.showDashboard ?? true);
             setShowWorkspace(data.settings.showWorkspace ?? true);
             setShowChat(data.settings.showChat ?? true);
+            setNotificationsEnabled(data.settings.notifications_enabled ?? true);
             setShowPlanning(data.settings.showPlanning ?? true);
             setShowCalendar(data.settings.showCalendar ?? true);
             setShowBudget(data.settings.showBudget ?? true);
@@ -139,6 +141,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 showDashboard,
                 showWorkspace,
                 showChat,
+                notifications_enabled: notificationsEnabled,
                 showPlanning,
                 showCalendar,
                 showBudget,
@@ -294,6 +297,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 { label: 'Tableau de bord', desc: 'Vue principale', state: showDashboard, setter: setShowDashboard },
                                 { label: 'Workspace', desc: 'Espaces de travail', state: showWorkspace, setter: setShowWorkspace },
                                 { label: 'Messages', desc: 'Chat et discussions', state: showChat, setter: setShowChat },
+                                { label: 'Notifications', desc: 'Activer les alertes', state: notificationsEnabled, setter: setNotificationsEnabled },
                                 { label: 'Agenda', desc: 'Planning', state: showPlanning, setter: setShowPlanning },
                                 { label: 'Calendrier Financier', desc: 'Échéances et deadlines', state: showCalendar, setter: setShowCalendar },
                                 { label: 'Mes Projets', desc: 'Gestion de projets', state: showProjects, setter: setShowProjects },

@@ -3,11 +3,11 @@ import {
   LayoutDashboard, Calendar, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
   Users, Box, Target, Book, CalendarRange, Clock, Activity,
-  MessageSquare, Search 
+  MessageSquare, Search, Bell
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings, onSearchClick }) {
+export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings, onSearchClick, unreadNotificationsCount, toggleNotifications }) {
   // MODIFICATION ICI : useState(true) pour que la sidebar soit fermée au démarrage
   const [_isCollapsed, setIsCollapsed] = useState(true);
   const isCollapsed = _isCollapsed && !isMobileOpen;
@@ -211,29 +211,44 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
 
         {/* Footer & Logout */}
         <div className="p-4 mt-auto border-t border-slate-800/60 bg-[#0B1120] relative z-10 flex flex-col gap-4">
-          <div className={`flex gap-2 ${isCollapsed ? 'flex-col items-center' : ''}`}>
+          <div className="flex gap-2 w-full justify-between mt-auto">
             <button 
               onClick={handleLogout}
               className={`
-                flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer border border-slate-800 hover:border-red-500/20
-                ${isCollapsed ? 'w-10 h-10 p-0' : 'flex-1 px-4 py-2.5'}
+                flex-1 flex items-center justify-center gap-2 rounded-lg transition-all
+                text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-800 hover:border-red-500/20
+                ${isCollapsed ? 'p-0 w-10 h-10' : 'p-2.5'}
               `}
-              style={{ WebkitTapHighlightColor: 'transparent' }}
               title="Déconnexion"
             >
-              <LogOut size={16} />
+              <LogOut size={18} />
               {!isCollapsed && <span className="text-xs font-semibold">Déconnexion</span>}
             </button>
             <button 
               onClick={() => setView('zen')}
               className={`
-                rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-slate-800 hover:border-emerald-500/20
-                ${isCollapsed ? 'w-10 h-10 flex items-center justify-center p-0' : 'p-2.5'}
+                rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all border border-slate-800 hover:border-emerald-500/20 relative
+                ${isCollapsed ? 'w-10 h-10 flex items-center justify-center p-0' : 'p-2.5 w-10 shrink-0'}
               `}
               title="Mode Zen"
             >
               <Coffee size={18} />
             </button>
+            {settings?.notifications_enabled !== false && (
+                <button 
+                  onClick={toggleNotifications}
+                  className={`
+                    rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-slate-800 hover:border-indigo-500/20 relative flex items-center justify-center
+                    ${isCollapsed ? 'w-10 h-10 p-0' : 'p-2.5 w-10 shrink-0'}
+                  `}
+                  title="Notifications"
+                >
+                  <Bell size={18} />
+                  {unreadNotificationsCount > 0 && (
+                      <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+                  )}
+                </button>
+            )}
           </div>
 
           {!isCollapsed && (

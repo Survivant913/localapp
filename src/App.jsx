@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
+import NotificationCenter from './NotificationCenter';
 import Dashboard from './Dashboard';
 import GlobalSearch from './GlobalSearch';
 import CalendarView from './CalendarView';
@@ -63,6 +64,7 @@ export default function App() {
  const [isSearchOpen, setIsSearchOpen] = useState(false);
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isWorkspaceFocus, setIsWorkspaceFocus] = useState(false);
+   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
  const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
@@ -89,7 +91,8 @@ export default function App() {
    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
    ventures: [], venture_shares: [],
    venture_analytics: [], // --- NOUVEAU : Ajout de la table d'analyse
-   account_shares: [] // --- INITIALISATION POUR ÉVITER LES BUGS ---
+   account_shares: [], // --- INITIALISATION POUR ÉVITER LES BUGS ---
+   notifications: []
  });
 
  const dataRef = useRef(data);
@@ -289,10 +292,10 @@ export default function App() {
         })
         .subscribe();
 
-    // --- NOUVEAU: �COUTEUR GLOBAL BUDGET AVEC BROADCAST ---
+    // --- NOUVEAU: COUTEUR GLOBAL BUDGET AVEC BROADCAST ---
     const budgetChannel = supabase.channel('budget-sync-master', { config: { broadcast: { ack: true, self: false } } })
         .on('broadcast', { event: 'custom_sync' }, (payload) => {
-            console.log("Broadcast re�u:", payload);
+            console.log("Broadcast reu:", payload);
             const { table, accountId } = payload.payload;
             
             setTimeout(async () => {
@@ -430,7 +433,7 @@ export default function App() {
           })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'todos' }, (payload) => {
             if (payload.eventType === 'DELETE') {
-                // BUG SUPABASE FIX: Les UPDATE peuvent envoyer un faux DELETE � cause du EXISTS dans RLS
+                // BUG SUPABASE FIX: Les UPDATE peuvent envoyer un faux DELETE  cause du EXISTS dans RLS
                 supabase.from('todos').select('*').eq('id', payload.old.id).single().then(({ data: existingTodo }) => {
                     if (existingTodo) {
                         setData(prev => {
@@ -653,7 +656,8 @@ export default function App() {
         supabase.from('account_shares').select('*'),
           supabase.from('todo_list_shares').select('*'),
           supabase.from('project_shares').select('*'),
-          supabase.from('venture_shares').select('*')
+          supabase.from('venture_shares').select('*'),
+          supabase.from('notifications').select('*').order('created_at', { ascending: false })
         ]);
 
      const [
@@ -675,7 +679,8 @@ export default function App() {
         { data: account_shares },
         { data: todo_list_shares },
         { data: project_shares },
-        { data: venture_shares }
+        { data: venture_shares },
+        { data: notifications }
         ] = results;
 
      let newDBTransactions = [];
@@ -816,9 +821,7 @@ export default function App() {
           const parts = (all_participants || []).filter(p => String(p.event_id) === String(ev.id));
           const myPart = parts.find(p => p.user_email.toLowerCase() === userEmail.toLowerCase());
           return { ...ev, participants: parts, my_status: myPart ? myPart.status : (ev.user_id === userId ? 'accepted' : 'pending') };
-       })
-       // LE .FILTER A ÉTÉ RETIRÉ ICI AUSSI,
-       ,
+       }),
        budget: {
          accounts: validAccounts, 
          transactions: mappedTransactions.sort((a,b) => new Date(b.date) - new Date(a.date)),
@@ -829,6 +832,7 @@ export default function App() {
        ventures: ventures || [], 
        venture_analytics: venture_analytics || [], // --- NOUVEAU
        account_shares: account_shares || [], // PARTAGES DE COMPTES
+       notifications: notifications || [], // NOTIFICATIONS
        profile: { ...(profile || {}), email: userEmail }, 
        settings: { ...(profile?.settings || {}), theme: loadedTheme },
        customLabels: profile?.custom_labels || {}, mainNote: profile?.settings?.mainNote || ""
@@ -921,13 +925,6 @@ export default function App() {
      await upsertInBatches('goals', data.goals, 50, g => ({ id: g.id, user_id: user.id, title: g.title, deadline: g.deadline, status: g.status, is_favorite: g.is_favorite, category: g.category, priority: g.priority, motivation: g.motivation })); 
      await upsertInBatches('goal_milestones', data.goal_milestones, 50, m => ({ id: m.id, user_id: user.id, goal_id: m.goal_id, title: m.title, is_completed: m.is_completed }));
      
-     // --- CORRECTION SAUVEGARDE POUR NE PAS VOLER LES DROITS ---
-     // SÉCURITÉ ANTI-ÉCRASEMENT : On commente ces 3 lignes. C'est JournalManager qui gère ses propres sauvegardes en direct.
-     // App.jsx n'a plus le droit d'écraser le journal avec ses anciennes données en arrière-plan.
-     // await upsertInBatches('journal_folders', data.journal_folders, 50, f => ({ id: f.id, user_id: f.user_id || user.id, name: f.name, parent_id: f.parent_id }));
-     // await upsertInBatches('journal_pages', data.journal_pages, 50, p => ({ id: p.id, user_id: p.user_id || user.id, folder_id: p.folder_id, title: p.title, content: p.content, updated_at: p.updated_at }));
-     // await upsertInBatches('journal_shares', data.journal_shares, 50, s => ({ id: s.id, folder_id: s.folder_id, user_email: s.user_email }));
-     
      await upsertInBatches('ventures', data.ventures, 50, v => ({ id: v.id, user_id: user.id, name: v.name, status: v.status, created_at: v.created_at || new Date().toISOString() }));
      
      // --- NOUVEAU : Sauvegarde automatique des graphiques d'analyse Workspace ---
@@ -953,6 +950,27 @@ export default function App() {
        setNotifMessage("Erreur : " + (err.message || "Sauvegarde échouée")); 
    } finally { setIsSaving(false); }
  };
+
+   // --- GESTION DES NOTIFICATIONS ---
+   const handleClearAllNotifications = async () => {
+       if (!window.confirm("Tout supprimer ?")) return;
+       setData(prev => ({ ...prev, notifications: [] }));
+       await supabase.from('notifications').delete().eq('user_email', session?.user?.email);
+   };
+   
+   const handleMarkAllRead = async () => {
+       const unreadIds = (data.notifications || []).filter(n => !n.is_read).map(n => n.id);
+       if (unreadIds.length === 0) return;
+       setData(prev => ({ ...prev, notifications: (prev.notifications || []).map(n => ({ ...n, is_read: true })) }));
+       await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds);
+   };
+   
+   const handleMarkRead = async (notifId) => {
+       setData(prev => ({ ...prev, notifications: (prev.notifications || []).map(n => String(n.id) === String(notifId) ? { ...n, is_read: true } : n) }));
+       await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
+   };
+
+   const unreadNotificationsCount = (data.notifications || []).filter(n => !n.is_read).length;
 
  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
  if (!session) return <Login />;
@@ -1001,18 +1019,42 @@ export default function App() {
 
      {currentView === 'zen' && <ZenMode data={data} updateData={updateData} close={() => setView('dashboard')} />}
      
-     {!isWorkspaceFocus && <Sidebar 
-       currentView={currentView} 
-       setView={setView} 
-       isMobileOpen={isMobileMenuOpen} 
-       toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-       onSearchClick={() => setIsSearchOpen(true)}
-       labels={data.customLabels} 
-       darkMode={data.settings?.theme === 'dark'} 
-       toggleTheme={toggleTheme} 
-       unreadCount={unreadCount} 
-       settings={data.settings}
-       />}
+     {!isWorkspaceFocus && (
+        <>
+            <Sidebar 
+             currentView={currentView} 
+             setView={setView} 
+             isMobileOpen={isMobileMenuOpen} 
+             toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+             labels={data.customLabels}
+             darkMode={data.settings?.theme === 'dark'}
+             toggleTheme={toggleTheme}
+             unreadCount={unreadCount}
+             settings={data.settings}
+             onSearchClick={() => setIsSearchOpen(true)}
+             unreadNotificationsCount={unreadNotificationsCount}
+             toggleNotifications={() => setIsNotificationCenterOpen(!isNotificationCenterOpen)}
+           />
+           {isNotificationCenterOpen && (
+               <NotificationCenter 
+                   notifications={data.notifications || []}
+                   onClose={() => setIsNotificationCenterOpen(false)}
+                   onClearAll={handleClearAllNotifications}
+                   onMarkAllRead={handleMarkAllRead}
+                   onMarkRead={handleMarkRead}
+                   navigateTo={(url) => {
+                       setIsNotificationCenterOpen(false);
+                       const params = new URLSearchParams(url.split('?')[1]);
+                       if (params.get('module')) {
+                           if (params.get('module') === 'workspace') setView('projects');
+                           else if (params.get('module') === 'journal') setView('journal');
+                           else setView(params.get('module'));
+                       }
+                   }}
+               />
+           )}
+        </>
+     )}
      
      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
        {!isWorkspaceFocus && <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
