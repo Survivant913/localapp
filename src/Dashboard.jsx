@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 // AJOUT : Import de supabase pour la synchronisation parfaite avec le Tracker
 import { supabase } from './supabaseClient';
 import * as AllIcons from 'lucide-react';
@@ -15,9 +16,21 @@ import DashboardCalendar from './DashboardCalendar';
 const calculateStreak = (habit) => {
     if (!habit.history || habit.history.length === 0) return 0;
     
-    const historyDates = habit.history.map(dStr => new Date(dStr).toDateString());
-    const uniqueHistory = [...new Set(historyDates)].map(dStr => new Date(dStr));
-    uniqueHistory.sort((a, b) => b.getTime() - a.getTime()); // Décroissant
+    // Normalise toutes les dates en YYYY-MM-DD local
+    const toLocalYYYYMMDD = (d) => {
+        let dateObj;
+        if (typeof d === 'string' && d.length === 10) {
+            // Si c'est déjà YYYY-MM-DD, forcer midi pour éviter les décalages UTC
+            dateObj = new Date(d + 'T12:00:00');
+        } else {
+            dateObj = new Date(d);
+        }
+        if (isNaN(dateObj.getTime())) return null;
+        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    };
+
+    const historyDates = habit.history.map(toLocalYYYYMMDD).filter(Boolean);
+    const uniqueHistory = [...new Set(historyDates)].sort((a, b) => b.localeCompare(a)); // Décroissant YYYY-MM-DD
     
     let streak = 0;
     let currentDate = new Date();
@@ -35,26 +48,24 @@ const calculateStreak = (habit) => {
                 return map[norm] === dayIdx;
             });
         }
-        return true; // Par défaut tous les jours
+        return true; 
     };
 
     let historyIdx = 0;
     let daysChecked = 0;
     
-    while (daysChecked < 365) { // On remonte max 1 an
-        const currentStr = currentDate.toDateString();
-        const doneToday = historyIdx < uniqueHistory.length && uniqueHistory[historyIdx].toDateString() === currentStr;
+    while (daysChecked < 365) { 
+        const currentStr = toLocalYYYYMMDD(currentDate);
+        const doneToday = historyIdx < uniqueHistory.length && uniqueHistory[historyIdx] === currentStr;
 
         if (isScheduled(currentDate)) {
             if (doneToday) {
                 streak++;
                 historyIdx++;
             } else {
-                // Si c'est aujourd'hui et non fait, on ne casse pas la série car le jour n'est pas fini
                 if (daysChecked > 0) break; 
             }
         } else {
-            // Pas prévu aujourd'hui. Mais si fait quand même, bonus !
             if (doneToday) {
                 streak++;
                 historyIdx++;
@@ -72,25 +83,34 @@ const calculateStreak = (habit) => {
 // --- COMPOSANT FOCUS HABIT MODAL ---
 const FocusHabitModal = ({ habit, onClose }) => {
     // Calcul complet des stats
-    const historyDates = (habit.history || []).map(dStr => new Date(dStr).toDateString());
-    const uniqueHistory = [...new Set(historyDates)];
     const currentStreak = calculateStreak(habit);
     
-    // Calcul meilleure série
+    // Pour les stats du composant Modal, on réutilise toLocalYYYYMMDD
+    const toLocalYYYYMMDD = (d) => {
+        let dateObj;
+        if (typeof d === 'string' && d.length === 10) {
+            dateObj = new Date(d + 'T12:00:00');
+        } else {
+            dateObj = new Date(d);
+        }
+        if (isNaN(dateObj.getTime())) return null;
+        return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+    };
+
+    const historyDates = (habit.history || []).map(toLocalYYYYMMDD).filter(Boolean);
+    const uniqueHistory = [...new Set(historyDates)];
+    
+    // Calcul meilleure série (approximatif pour affichage simple)
     let maxStreak = 0;
-    let currentTempStreak = 0;
-    let tempDate = new Date();
-    tempDate.setFullYear(tempDate.getFullYear() - 1); // remonte 1 an
-    let tempHistory = [...uniqueHistory].map(d => new Date(d));
+    let tempHistory = [...uniqueHistory].map(d => new Date(d + 'T12:00:00'));
     tempHistory.sort((a,b) => a.getTime() - b.getTime());
     
-    // Simplification : on regarde juste les séquences consécutives dans l'historique
     if (tempHistory.length > 0) {
         let currentS = 1;
         let maxS = 1;
         for (let i = 1; i < tempHistory.length; i++) {
             const diff = (tempHistory[i].getTime() - tempHistory[i-1].getTime()) / (1000 * 3600 * 24);
-            if (diff <= 1.5) { // Consécutif (ou même jour)
+            if (diff <= 1.5) { 
                 currentS++;
             } else {
                 if (currentS > maxS) maxS = currentS;
@@ -106,14 +126,16 @@ const FocusHabitModal = ({ habit, onClose }) => {
     for(let i=29; i>=0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
+        // Utilisation du même format pour éviter les bugs UTC
+        const dStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         last30Days.push({
             date: d,
-            done: uniqueHistory.includes(d.toDateString())
+            done: uniqueHistory.includes(dStr)
         });
     }
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 w-full max-w-lg relative z-10 shadow-2xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
                 <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
@@ -156,7 +178,8 @@ const FocusHabitModal = ({ habit, onClose }) => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
@@ -246,7 +269,8 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         const day = String(now.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`; 
 
-        const newHistory = [...(habit.history || []), new Date().toISOString()];
+        // REVENIR AU FORMAT YYYY-MM-DD local pour la validation !
+        const newHistory = [...(habit.history || []), todayStr];
         updateHabit({ ...habit, history: newHistory }); 
 
         try {
