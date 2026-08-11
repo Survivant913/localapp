@@ -100,6 +100,7 @@ export default function App() {
 
  const [unsavedChanges, setUnsavedChanges] = useState(false);
  const [isSaving, setIsSaving] = useState(false);
+ const recentUpdatesRef = useRef({});
 
  // --- NOUVEAU BLOC : CALCUL INITIAL DES MESSAGES NON LUS ---
  useEffect(() => {
@@ -190,6 +191,9 @@ export default function App() {
              }
          } 
          else if (payload.eventType === 'UPDATE') {
+             const lastUpdate = recentUpdatesRef.current?.[payload.new.id] || 0;
+             if (Date.now() - lastUpdate < 3000) return { ...prev }; // Ignorer les updates de la BDD si on vient juste de modifier (anti rubber-banding)
+
              const isOwner = payload.new.user_id === userId;
              const isInvited = (payload.new.invited_email || "").toLowerCase().includes(userEmail);
              
@@ -907,10 +911,13 @@ export default function App() {
            const { error } = await supabase.from(table).insert(insertPayload);
            if (error) throw error;
        } 
-       else if (action === 'update' && table && id && payload) {
-           const { error } = await supabase.from(table).update(payload).eq('id', id);
-           if (error) throw error;
-       }
+        else if (action === 'update' && table && id && payload) {
+            if (table === 'calendar_events') {
+                recentUpdatesRef.current[id] = Date.now();
+            }
+            const { error } = await supabase.from(table).update(payload).eq('id', id);
+            if (error) throw error;
+        }
        else if ((action === 'delete' || (!action && table && id)) || (filter)) {
            if (filter && filter.column && filter.value) {
                await supabase.from(table).delete().eq(filter.column, filter.value);
