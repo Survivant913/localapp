@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, CheckCircle2, Target, Wallet, Calendar as CalendarIcon, X, List } from 'lucide-react';
 
 export default function DashboardCalendar({ data, filter }) {
@@ -312,9 +313,9 @@ export default function DashboardCalendar({ data, filter }) {
                 `}</style>
             </div>
 
-            {/* Modal Focus Global (Agenda) MOVED OUTSIDE CONTAINER */}
-            {showGlobalDetail && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8">
+            {/* Modal Focus Global (Agenda) MOVED TO PORTAL */}
+            {showGlobalDetail && typeof document !== 'undefined' && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowGlobalDetail(false)}></div>
                     <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-3xl shadow-2xl relative z-10 border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-8 duration-300">
                         <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
@@ -361,7 +362,8 @@ export default function DashboardCalendar({ data, filter }) {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </>
     );
