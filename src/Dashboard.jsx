@@ -149,11 +149,6 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                             </div>
                         </div>
                         
-                        {/* Bouton Masquer (Subtil au hover) */}
-                        <button onClick={(e) => handlePass(h.id, e)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 p-1.5 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all scale-75 group-hover:scale-100" title="Masquer pour aujourd'hui">
-                            <EyeOff size={14} strokeWidth={3}/>
-                        </button>
-                        
                         {/* Bouton d'action "Check" */}
                         <button 
                             onClick={(e) => handleCheck(h, e)} 
@@ -651,8 +646,8 @@ export default function Dashboard({ data, updateData, setView }) {
                             
                             <div className="flex justify-between items-center mb-6 relative z-10">
                                 <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest ml-2 md:ml-0">
-                                    <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-lg shadow-blue-500/20"><Activity size={18} strokeWidth={2.5}/></div>
-                                    Routines du jour
+                                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Activity size={18} strokeWidth={2.5}/></div>
+                                    Routines
                                 </h3>
                             </div>
                             
