@@ -1,0 +1,83 @@
+const StrategyModule = ({ venture }) => {
+    const [view, setView] = useState('canvas');
+    const [data, setData] = useState({});
+    const [loading, setLoading] = useState(true);
+    const saveTimeoutRef = useRef({}); 
+
+    const SECTIONS_CANVAS = [
+        { id: 'partners', label: 'Partenaires Clés', icon: Share2, col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+        { id: 'activities', label: 'Activités Clés', icon: Activity, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'valueProps', label: 'Propositions de Valeur', icon: Sun, col: 'md:col-span-2 md:row-span-2', color: 'red' },
+        { id: 'relationships', label: 'Relations Client', icon: Users, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'segments', label: 'Segments Clients', icon: Target, col: 'md:col-span-2 md:row-span-2', color: 'green' },
+        { id: 'resources', label: 'Ressources Clés', icon: Box, col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+        { id: 'channels', label: 'Canaux', icon: Menu, col: 'md:col-span-2 md:row-span-1', color: 'green' },
+        { id: 'cost', label: 'Structure de Coûts', icon: DollarSign, col: 'md:col-span-5 md:row-span-1', color: 'red' },
+        { id: 'revenue', label: 'Flux de Revenus', icon: BarChart2, col: 'md:col-span-5 md:row-span-1', color: 'green' },
+    ];
+    const SECTIONS_SWOT = [
+        { id: 'strengths', label: 'Forces', icon: Check, color: 'green' },
+        { id: 'weaknesses', label: 'Faiblesses', icon: X, color: 'red' },
+        { id: 'opportunities', label: 'Opportunités', icon: Zap, color: 'blue' },
+        { id: 'threats', label: 'Menaces', icon: AlertTriangle, color: 'yellow' },
+    ];
+
+    const channelRef = useRef(null);
+
+    useEffect(() => {
+        if (!venture) return;
+        const loadStrategy = async () => {
+            const { data: rows } = await supabase.from('venture_strategies').select('*').eq('venture_id', venture.id);
+            const formatted = {};
+            if (rows) rows.forEach(row => formatted[row.section_id] = row.content);
+            setData(formatted);
+            setLoading(false);
+        };
+        loadStrategy();
+        const channel = supabase.channel(`venture_strategies_${venture.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setData(prev => ({ ...prev, [payload.sectionId]: payload.newItems }));
+            })
+            .subscribe();
+            
+        channelRef.current = channel;
+        return () => supabase.removeChannel(channel);
+    }, [venture]);
+
+    const handleUpdate = (sectionId, newItems) => {
+        setData(prev => ({ ...prev, [sectionId]: newItems }));
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { sectionId, newItems } });
+        
+        if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
+        saveTimeoutRef.current[sectionId] = setTimeout(async () => {
+            const type = SECTIONS_CANVAS.find(s => s.id === sectionId) ? 'canvas' : 'swot';
+            await supabase.from('venture_strategies').upsert({ venture_id: venture.id, type, section_id: sectionId, content: newItems }, { onConflict: 'venture_id, section_id' });
+        }, 1000);
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+            <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-6 shrink-0">
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                    <button onClick={() => setView('canvas')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'canvas' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>Business Model</button>
+                    <button onClick={() => setView('swot')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${view === 'swot' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>SWOT</button>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div className={`grid gap-4 ${view === 'canvas' ? 'grid-cols-1 md:grid-cols-10 auto-rows-[400px]' : 'grid-cols-1 md:grid-cols-2 auto-rows-[400px]'}`}>
+                    {(view === 'canvas' ? SECTIONS_CANVAS : SECTIONS_SWOT).map(s => (
+                        <div key={s.id} className={`${s.col || ''} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden`}>
+                            <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center gap-2 text-xs uppercase mb-2 shrink-0"><s.icon size={14} className="text-indigo-500"/> {s.label}</h3>
+                            <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
+                                {data[s.id]?.map(i => <PostIt key={i.id} item={i} color={s.color} update={(id, f, v) => handleUpdate(s.id, data[s.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(s.id, data[s.id].filter(x => x.id !== id))} />)}
+                            </div>
+                            <button onClick={() => handleUpdate(s.id, [...(data[s.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0"><Plus size={12} className="inline mr-1"/> Ajouter</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};

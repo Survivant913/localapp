@@ -1666,17 +1666,18 @@ const ChatModule = ({ venture, currentUserEmail }) => {
     );
 };
 
-export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
-    const [ventures, setVentures] = useState([]);
+export default function Workspace({ data, updateData, workspaceFocus, setWorkspaceFocus }) {
+    const rawVentures = data?.ventures || [];
+    const ventures = rawVentures.map(v => ({ ...v, isShared: v.user_id !== data?.profile?.id }));
     const [activeVenture, setActiveVenture] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const loading = false;
     const [newVentureTitle, setNewVentureTitle] = useState("");
     const [activeModuleId, setActiveModuleId] = useState('editor');
     const [isExporting, setIsExporting] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [currentUserEmail, setCurrentUserEmail] = useState('');
 
-    useEffect(() => { fetchVentures(); }, []);
+
 
     useEffect(() => {
         if (ventures.length > 0) {
@@ -1698,51 +1699,20 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
         }
     }, [ventures]);
 
-    const fetchVentures = async () => {
-        try { 
-            setLoading(true);
-            const { data: userData } = await supabase.auth.getUser();
-            const userEmail = userData?.user?.email;
-            if (userEmail) setCurrentUserEmail(userEmail);
-
-            let allVentures = [];
-            
-            // Projets possédés
-            const { data: ownedData, error } = await supabase.from('ventures').select('*').eq('user_id', userData.user.id).order('last_modified', { ascending: false }); 
-            if (!error && ownedData) {
-                allVentures = [...ownedData];
-            }
-
-            // Projets partagés
-            if (userEmail) {
-                const { data: sharedIds } = await supabase.from('venture_shares').select('venture_id').eq('user_email', userEmail);
-                if (sharedIds && sharedIds.length > 0) {
-                    const ids = sharedIds.map(s => s.venture_id);
-                    const { data: sharedData } = await supabase.from('ventures').select('*').in('id', ids);
-                    if (sharedData) {
-                        const ownedIds = new Set(allVentures.map(v => v.id));
-                        sharedData.forEach(v => {
-                            if (!ownedIds.has(v.id)) {
-                                v.isShared = true;
-                                allVentures.push(v);
-                            }
-                        });
-                    }
-                }
-            }
-
-            allVentures.sort((a, b) => new Date(b.last_modified) - new Date(a.last_modified));
-            setVentures(allVentures);
-        } 
-        catch (error) { console.error(error); } finally { setLoading(false); }
-    };
+    // --- NOUVEAU : EJECTION AUTOMATIQUE GHOST KILLER ---
+    useEffect(() => {
+        if (activeVenture && !ventures.find(v => String(v.id) === String(activeVenture.id))) {
+            setActiveVenture(null);
+            setWorkspaceFocus(false);
+        }
+    }, [ventures, activeVenture, setWorkspaceFocus]);
 
     const createVenture = async () => {
         if (!newVentureTitle.trim()) return;
         try { 
             const { data } = await supabase.from('ventures').insert([{ title: newVentureTitle, status: 'Idea' }]).select(); 
             if (data && data.length > 0) {
-                setVentures(prev => prev.find(v => v.id === data[0].id) ? prev : [data[0], ...prev]);
+                // Rely on App.jsx realtime sync for new ventures, or just let it flow down
             }
             setNewVentureTitle(""); 
         } 
@@ -1758,7 +1728,7 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
             if (!window.confirm("Supprimer définitivement ce projet pour tout le monde ?")) return;
             await supabase.from('ventures').delete().eq('id', v.id); 
         }
-        setVentures(ventures.filter(ven => ven.id !== v.id));
+        // App.jsx realtime will update ventures array automatically
     };
 
     // --- EXPORT PDF V4 : PREMIUM EDITION ---

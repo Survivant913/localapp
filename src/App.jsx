@@ -87,7 +87,7 @@ export default function App() {
    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
    events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'blue' }, customLabels: {},
    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
-   ventures: [],
+   ventures: [], venture_shares: [],
    venture_analytics: [], // --- NOUVEAU : Ajout de la table d'analyse
    account_shares: [] // --- INITIALISATION POUR ÉVITER LES BUGS ---
  });
@@ -471,11 +471,28 @@ export default function App() {
         })
         .subscribe();
     
+    const ventureChannel = supabase.channel('app-ventures')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'venture_shares' }, async (payload) => {
+            const [venRes, shareRes] = await Promise.all([
+                supabase.from('ventures').select('*'),
+                supabase.from('venture_shares').select('*')
+            ]);
+            if (venRes.data && shareRes.data) {
+                setData(prev => ({ ...prev, ventures: venRes.data, venture_shares: shareRes.data }));
+            }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ventures' }, async (payload) => {
+            const { data: venData } = await supabase.from('ventures').select('*');
+            if (venData) setData(prev => ({ ...prev, ventures: venData }));
+        })
+        .subscribe();
+
     budgetChannelRef.current = budgetChannel;
 
     return () => { 
         supabase.removeChannel(journalChannel); 
         supabase.removeChannel(budgetChannel);
+        supabase.removeChannel(ventureChannel);
     };
  }, [session]);
 
@@ -634,8 +651,9 @@ export default function App() {
         supabase.from('journal_favorites').select('*'), // MODIFICATION ICI : On charge les favoris
         supabase.from('venture_analytics').select('*'), // --- NOUVEAU : Chargement des graphiques Workspace
         supabase.from('account_shares').select('*'),
-        supabase.from('todo_list_shares').select('*'),
-          supabase.from('project_shares').select('*')
+          supabase.from('todo_list_shares').select('*'),
+          supabase.from('project_shares').select('*'),
+          supabase.from('venture_shares').select('*')
         ]);
 
      const [
@@ -656,7 +674,8 @@ export default function App() {
         { data: venture_analytics }, // --- NOUVEAU
         { data: account_shares },
         { data: todo_list_shares },
-          { data: project_shares }
+        { data: project_shares },
+        { data: venture_shares }
         ] = results;
 
      let newDBTransactions = [];
@@ -775,6 +794,7 @@ export default function App() {
        todoLists: todo_lists || [], 
        todo_list_shares: todo_list_shares || [],
          project_shares: project_shares || [],
+         venture_shares: venture_shares || [],
          notes: mappedNotes, projects: mappedProjects, events: events || [],
        goals: goals || [], goal_milestones: goal_milestones || [], 
        journal_folders: journal_folders || [], journal_pages: journal_pages || [],

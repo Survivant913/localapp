@@ -27,6 +27,28 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
         }
     }, [isOpen]);
 
+    const hasJournalAccess = (itemId, isPage = false) => {
+        let currFolderId = itemId;
+        if (isPage) {
+            const page = (data.journal_pages || []).find(p => String(p.id) === String(itemId));
+            if (!page) return false;
+            currFolderId = page.folder_id;
+        }
+        let currFolder = (data.journal_folders || []).find(f => String(f.id) === String(currFolderId));
+        let safety = 0;
+        while (currFolder && safety < 10) {
+            if (currFolder.user_id === data.profile?.id) return true;
+            const isShared = (data.journal_shares || []).some(s => 
+                String(s.folder_id) === String(currFolder.id) && 
+                s.user_email?.toLowerCase() === data.profile?.email?.toLowerCase()
+            );
+            if (isShared) return true;
+            currFolder = (data.journal_folders || []).find(f => String(f.id) === String(currFolder.parent_id));
+            safety++;
+        }
+        return false;
+    };
+
     const results = useMemo(() => {
         if (!query.trim()) return [];
         
@@ -98,6 +120,7 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
 
         // 3b. Carnet (Dossiers)
         (data.journal_folders || []).forEach(f => {
+            if (!hasJournalAccess(f.id, false)) return;
             if (f.name?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'journal',
@@ -113,6 +136,7 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
 
         // 3c. Carnet (Pages)
         (data.journal_pages || []).forEach(p => {
+            if (!hasJournalAccess(p.id, true)) return;
             if (p.title?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'journal',

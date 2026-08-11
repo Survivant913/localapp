@@ -506,11 +506,11 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     // --- LOGIQUE D'AFFICHAGE SÉCURISÉE ---
     // NOUVEAU: On n'affiche dans les favoris que les pages auxquelles on a REELLEMENT accès
     const favoritePages = allPages.filter(p => isPageFavorite(p.id) && hasAccessToItem(p));
-    const rootFolders = allFolders.filter(f => !f.parent_id); 
+    const rootFolders = allFolders.filter(f => !f.parent_id && hasAccessToItem(f)); 
     const subFoldersInCurrent = allFolders.filter(f => f.parent_id === currentFolderId);
     const pagesInCurrent = allPages.filter(p => p.folder_id === currentFolderId);
-    const searchFolders = allFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    const searchPages = allPages.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const searchFolders = allFolders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) && hasAccessToItem(f));
+    const searchPages = allPages.filter(p => (p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || p.content?.toLowerCase().includes(searchQuery.toLowerCase())) && hasAccessToItem(p));
     const displayedFolders = searchQuery ? searchFolders : subFoldersInCurrent;
     const displayedPages = searchQuery ? searchPages : pagesInCurrent;
 

@@ -1,0 +1,279 @@
+const AVAILABLE_ICONS = {
+    Activity, Target, DollarSign, BarChart2, Share2, Menu, 
+    Sun, Zap, AlertTriangle, Check, X, Box, Wallet, Clock, Trophy, Swords, Settings, LayoutList, PieChart, Users
+};
+
+const DEFAULT_BOARD_STRUCTURE = [
+    {
+        id: 'canvas',
+        title: 'Business Model',
+        windows: [
+            { id: 'partners', label: 'Partenaires Cl�s', icon: 'Share2', col: 'md:col-span-2 md:row-span-2', color: 'blue' },
+            { id: 'activities', label: 'Activit�s Cl�s', icon: 'Activity', col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+            { id: 'valueProps', label: 'Propositions de Valeur', icon: 'Sun', col: 'md:col-span-2 md:row-span-2', color: 'red' },
+            { id: 'relationships', label: 'Relations Client', icon: 'Users', col: 'md:col-span-2 md:row-span-1', color: 'green' },
+            { id: 'segments', label: 'Segments Clients', icon: 'Target', col: 'md:col-span-2 md:row-span-2', color: 'green' },
+            { id: 'resources', label: 'Ressources Cl�s', icon: 'Box', col: 'md:col-span-2 md:row-span-1', color: 'yellow' },
+            { id: 'channels', label: 'Canaux', icon: 'Menu', col: 'md:col-span-2 md:row-span-1', color: 'green' },
+            { id: 'cost', label: 'Structure de Co�ts', icon: 'DollarSign', col: 'md:col-span-5 md:row-span-1', color: 'red' },
+            { id: 'revenue', label: 'Flux de Revenus', icon: 'BarChart2', col: 'md:col-span-5 md:row-span-1', color: 'green' },
+        ]
+    },
+    {
+        id: 'swot',
+        title: 'SWOT',
+        windows: [
+            { id: 'strengths', label: 'Forces', icon: 'Check', col: 'md:col-span-5 md:row-span-1', color: 'green' },
+            { id: 'weaknesses', label: 'Faiblesses', icon: 'X', col: 'md:col-span-5 md:row-span-1', color: 'red' },
+            { id: 'opportunities', label: 'Opportunit�s', icon: 'Zap', col: 'md:col-span-5 md:row-span-1', color: 'blue' },
+            { id: 'threats', label: 'Menaces', icon: 'AlertTriangle', col: 'md:col-span-5 md:row-span-1', color: 'yellow' },
+        ]
+    }
+];
+
+const StrategyModule = ({ venture }) => {
+    const [data, setData] = useState({});
+    const [structure, setStructure] = useState(DEFAULT_BOARD_STRUCTURE);
+    const [activeBoardId, setActiveBoardId] = useState('canvas');
+    const [loading, setLoading] = useState(true);
+    
+    // UI states
+    const [isEditingBoard, setIsEditingBoard] = useState(null);
+    const [isEditingWindow, setIsEditingWindow] = useState(null);
+    const [newBoardName, setNewBoardName] = useState('');
+    const [windowForm, setWindowForm] = useState({ label: '', icon: 'Box', color: 'blue', col: 'md:col-span-5' });
+
+    const saveTimeoutRef = useRef({}); 
+    const channelRef = useRef(null);
+
+    useEffect(() => {
+        if (!venture) return;
+        const loadStrategy = async () => {
+            const { data: rows } = await supabase.from('venture_strategies').select('*').eq('venture_id', venture.id);
+            const formatted = {};
+            if (rows) {
+                rows.forEach(row => {
+                    formatted[row.section_id] = row.content;
+                });
+            }
+            if (formatted['__board_structure__']) {
+                setStructure(formatted['__board_structure__']);
+                if (formatted['__board_structure__'].length > 0 && !formatted['__board_structure__'].find(b => b.id === activeBoardId)) {
+                    setActiveBoardId(formatted['__board_structure__'][0].id);
+                }
+            } else {
+                // Initialize default
+                setStructure(DEFAULT_BOARD_STRUCTURE);
+                handleUpdate('__board_structure__', DEFAULT_BOARD_STRUCTURE);
+            }
+            setData(formatted);
+            setLoading(false);
+        };
+        loadStrategy();
+
+        const channel = supabase.channel(\enture_strategies_, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'update' }, ({ payload }) => {
+                setData(prev => ({ ...prev, [payload.sectionId]: payload.newItems }));
+                if (payload.sectionId === '__board_structure__') {
+                    setStructure(payload.newItems);
+                }
+            })
+            .subscribe();
+            
+        channelRef.current = channel;
+        return () => supabase.removeChannel(channel);
+    }, [venture]);
+
+    const handleUpdate = (sectionId, newItems) => {
+        setData(prev => ({ ...prev, [sectionId]: newItems }));
+        if (sectionId === '__board_structure__') setStructure(newItems);
+        
+        channelRef.current?.send({ type: 'broadcast', event: 'update', payload: { sectionId, newItems } });
+        
+        if (saveTimeoutRef.current[sectionId]) clearTimeout(saveTimeoutRef.current[sectionId]);
+        saveTimeoutRef.current[sectionId] = setTimeout(async () => {
+            const type = 'custom_board';
+            await supabase.from('venture_strategies').upsert({ venture_id: venture.id, type, section_id: sectionId, content: newItems }, { onConflict: 'venture_id, section_id' });
+        }, 1000);
+    };
+
+    // --- BOARDS (TABS) ---
+    const handleAddBoard = () => {
+        const newBoard = { id: 'board_' + Date.now(), title: 'Nouveau Tableau', windows: [] };
+        const newStruct = [...structure, newBoard];
+        handleUpdate('__board_structure__', newStruct);
+        setActiveBoardId(newBoard.id);
+    };
+    
+    const handleRenameBoard = (boardId) => {
+        if (!newBoardName.trim()) return;
+        const newStruct = structure.map(b => b.id === boardId ? { ...b, title: newBoardName } : b);
+        handleUpdate('__board_structure__', newStruct);
+        setIsEditingBoard(null);
+    };
+
+    const handleDeleteBoard = (boardId) => {
+        if (!confirm('Supprimer ce tableau ? Les fen�tres seront supprim�es mais les post-its resteront en base.')) return;
+        const newStruct = structure.filter(b => b.id !== boardId);
+        handleUpdate('__board_structure__', newStruct);
+        if (activeBoardId === boardId) setActiveBoardId(newStruct[0]?.id || null);
+    };
+
+    // --- WINDOWS ---
+    const handleSaveWindow = () => {
+        const board = structure.find(b => b.id === activeBoardId);
+        if (!board) return;
+        
+        let newWindows;
+        if (isEditingWindow === 'new') {
+            const newWin = { id: 'win_' + Date.now(), ...windowForm };
+            newWindows = [...board.windows, newWin];
+        } else {
+            newWindows = board.windows.map(w => w.id === isEditingWindow ? { ...w, ...windowForm } : w);
+        }
+        
+        const newStruct = structure.map(b => b.id === activeBoardId ? { ...b, windows: newWindows } : b);
+        handleUpdate('__board_structure__', newStruct);
+        setIsEditingWindow(null);
+    };
+
+    const handleDeleteWindow = (winId) => {
+        if (!confirm('Supprimer cette fen�tre ?')) return;
+        const board = structure.find(b => b.id === activeBoardId);
+        if (!board) return;
+        const newWindows = board.windows.filter(w => w.id !== winId);
+        const newStruct = structure.map(b => b.id === activeBoardId ? { ...b, windows: newWindows } : b);
+        handleUpdate('__board_structure__', newStruct);
+        setIsEditingWindow(null);
+    };
+
+    if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
+
+    const activeBoard = structure.find(b => b.id === activeBoardId);
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+            <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center px-6 shrink-0 gap-2 overflow-x-auto scrollbar-none">
+                {structure.map(board => (
+                    <div key={board.id} className="flex items-center group">
+                        {isEditingBoard === board.id ? (
+                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-1">
+                                <input 
+                                    autoFocus
+                                    type="text" 
+                                    className="bg-white dark:bg-slate-900 text-sm px-2 py-1 rounded outline-none border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white"
+                                    value={newBoardName}
+                                    onChange={e => setNewBoardName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleRenameBoard(board.id)}
+                                />
+                                <button onClick={() => handleRenameBoard(board.id)} className="p-1 text-green-500 hover:bg-green-50 rounded"><Check size={14}/></button>
+                                <button onClick={() => handleDeleteBoard(board.id)} className="p-1 text-red-500 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
+                                <button onClick={() => setIsEditingBoard(null)} className="p-1 text-slate-400 hover:bg-slate-200 rounded"><X size={14}/></button>
+                            </div>
+                        ) : (
+                            <button 
+                                onClick={() => setActiveBoardId(board.id)} 
+                                onDoubleClick={() => { setNewBoardName(board.title); setIsEditingBoard(board.id); }}
+                                className={\px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 }
+                            >
+                                {board.title}
+                                <Settings size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" onClick={(e) => { e.stopPropagation(); setNewBoardName(board.title); setIsEditingBoard(board.id); }} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+                <button onClick={handleAddBoard} className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-colors"><Plus size={16}/></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                {activeBoard ? (
+                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 auto-rows-[400px]">
+                        {activeBoard.windows.map(win => {
+                            const Icon = AVAILABLE_ICONS[win.icon] || Box;
+                            return (
+                                <div key={win.id} className={ bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden relative group\}>
+                                    <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center justify-between text-xs uppercase mb-2 shrink-0">
+                                        <div className="flex items-center gap-2"><Icon size={14} className={\	ext-\-500\}/> {win.label}</div>
+                                        <button onClick={() => { setWindowForm({ label: win.label, icon: win.icon, color: win.color, col: win.col || 'md:col-span-5' }); setIsEditingWindow(win.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all"><Settings size={12}/></button>
+                                    </h3>
+                                    <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
+                                        {data[win.id]?.map(i => <PostIt key={i.id} item={i} color={win.color} update={(id, f, v) => handleUpdate(win.id, data[win.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(win.id, data[win.id].filter(x => x.id !== id))} />)}
+                                    </div>
+                                    <button onClick={() => handleUpdate(win.id, [...(data[win.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0"><Plus size={12} className="inline mr-1"/> Ajouter</button>
+                                </div>
+                            );
+                        })}
+                        <div onClick={() => { setWindowForm({ label: 'Nouvelle Fen�tre', icon: 'Box', color: 'blue', col: 'md:col-span-5' }); setIsEditingWindow('new'); }} className="md:col-span-2 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-xl flex items-center justify-center cursor-pointer text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all min-h-[200px]">
+                            <div className="flex flex-col items-center"><Plus size={24} className="mb-2"/> <span className="text-sm font-bold">Nouvelle Fen�tre</span></div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="h-full flex items-center justify-center text-slate-400">Aucun tableau s�lectionn�</div>
+                )}
+            </div>
+
+            {/* MODAL EDIT WINDOW */}
+            {isEditingWindow && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 w-full max-w-md">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">{isEditingWindow === 'new' ? 'Nouvelle Fen�tre' : 'Modifier la Fen�tre'}</h2>
+                        
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Nom de la fen�tre</label>
+                                <input type="text" value={windowForm.label} onChange={e => setWindowForm(prev => ({...prev, label: e.target.value}))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Largeur (Colonnes sur 10)</label>
+                                <select value={windowForm.col} onChange={e => setWindowForm(prev => ({...prev, col: e.target.value}))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                                    <option value="md:col-span-2">20% (Tr�s petit)</option>
+                                    <option value="md:col-span-3">30% (Petit)</option>
+                                    <option value="md:col-span-4">40%</option>
+                                    <option value="md:col-span-5">50% (Moiti�)</option>
+                                    <option value="md:col-span-6">60%</option>
+                                    <option value="md:col-span-7">70%</option>
+                                    <option value="md:col-span-8">80% (Grand)</option>
+                                    <option value="md:col-span-10">100% (Pleine largeur)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Couleur</label>
+                                <div className="flex gap-2">
+                                    {['blue', 'red', 'green', 'yellow', 'purple', 'indigo'].map(c => (
+                                        <button key={c} onClick={() => setWindowForm(prev => ({...prev, color: c}))} className={\w-8 h-8 rounded-full bg-\-500 border-2 \ transition-all\}></button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Ic�ne</label>
+                                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1">
+                                    {Object.keys(AVAILABLE_ICONS).map(iconName => {
+                                        const Icon = AVAILABLE_ICONS[iconName];
+                                        return (
+                                            <button key={iconName} onClick={() => setWindowForm(prev => ({...prev, icon: iconName}))} className={\p-2 rounded-lg border }>
+                                                <Icon size={18}/>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-800">
+                            {isEditingWindow !== 'new' ? (
+                                <button onClick={() => handleDeleteWindow(isEditingWindow)} className="px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold rounded-lg transition-colors">Supprimer</button>
+                            ) : <div></div>}
+                            <div className="flex gap-2">
+                                <button onClick={() => setIsEditingWindow(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg font-bold transition-colors">Annuler</button>
+                                <button onClick={handleSaveWindow} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-colors">Sauvegarder</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
