@@ -184,7 +184,7 @@ export default function DashboardCalendar({ data, filter }) {
                                 {day.isToday && <div className="absolute -top-2 -right-2 w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping opacity-75"></div>}
                                 {day.isToday && <div className="absolute -top-2 -right-2 w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-lg shadow-indigo-500/50"></div>}
                             </div>
-                            <div className="flex-1 space-y-2.5">
+                            <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[260px] scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 {day.events.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center h-full opacity-30 py-6">
                                         <span className={`w-1.5 h-1.5 rounded-full ${day.isToday ? 'bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600'} inline-block mb-1 group-hover/day:scale-150 transition-all`}></span>
