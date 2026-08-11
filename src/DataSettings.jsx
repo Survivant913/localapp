@@ -20,6 +20,16 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showProjects, setShowProjects] = useState(data.settings?.showProjects ?? false);
     const [showHabits, setShowHabits] = useState(data.settings?.showHabits ?? false);
 
+    // VISIBILITÉ DASHBOARD
+    const [dcSolde, setDcSolde] = useState(data.settings?.dcSolde ?? true);
+    const [dcOperations, setDcOperations] = useState(data.settings?.dcOperations ?? true);
+    const [dcTimeline, setDcTimeline] = useState(data.settings?.dcTimeline ?? true);
+    const [dcRoutines, setDcRoutines] = useState(data.settings?.dcRoutines ?? true);
+    const [dcNotes, setDcNotes] = useState(data.settings?.dcNotes ?? true);
+    const [dcProjets, setDcProjets] = useState(data.settings?.dcProjets ?? true);
+    const [dcPriorites, setDcPriorites] = useState(data.settings?.dcPriorites ?? true);
+    const [dcAgenda, setDcAgenda] = useState(data.settings?.dcAgenda ?? true);
+
     // On utilise des noms de variables génériques pour le formulaire
     const [companyData, setCompanyData] = useState({
         user_name: '', 
@@ -47,6 +57,15 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowGoals(data.settings.showGoals ?? false);
             setShowProjects(data.settings.showProjects ?? false);
             setShowHabits(data.settings.showHabits ?? false);
+            
+            setDcSolde(data.settings.dcSolde ?? true);
+            setDcOperations(data.settings.dcOperations ?? true);
+            setDcTimeline(data.settings.dcTimeline ?? true);
+            setDcRoutines(data.settings.dcRoutines ?? true);
+            setDcNotes(data.settings.dcNotes ?? true);
+            setDcProjets(data.settings.dcProjets ?? true);
+            setDcPriorites(data.settings.dcPriorites ?? true);
+            setDcAgenda(data.settings.dcAgenda ?? true);
         }
         
         if (data.profile) {
@@ -94,7 +113,15 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 showClients,
                 showGoals,
                 showProjects,
-                showHabits
+                showHabits,
+                dcSolde,
+                dcOperations,
+                dcTimeline,
+                dcRoutines,
+                dcNotes,
+                dcProjets,
+                dcPriorites,
+                dcAgenda
             },
             profile: { 
                 ...(data.profile || {}), 
@@ -271,7 +298,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                             <label className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer">
                                 <div>
                                     <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Suivi Habitudes</p>
-                                    <p className="text-xs text-slate-500">Créer et suivre vos habitudes au quotidien</p>
+                                    <p className="text-xs text-slate-500">CrǸer et suivre vos habitudes au quotidien</p>
                                 </div>
                                 <div className="relative inline-flex items-center">
                                     <input type="checkbox" checked={showHabits} onChange={(e) => setShowHabits(e.target.checked)} className="sr-only peer" />
@@ -283,8 +310,43 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 </div>
             </div>
 
+            {/* --- SECTION DASHBOARD CONFIG --- */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden mt-8">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                        <LayoutDashboard size={20} className="text-indigo-500"/> Configuration du Dashboard
+                    </h3>
+                </div>
+                <div className="p-8">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Choisissez les modules que vous souhaitez afficher sur votre tableau de bord principal.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[
+                            { label: "Trésorerie Globale", desc: "Solde et graphique d'évolution", state: dcSolde, setter: setDcSolde },
+                            { label: "Opérations à venir", desc: "Transactions programmées", state: dcOperations, setter: setDcOperations },
+                            { label: "Timeline (Calendrier)", desc: "Vue chronologique des événements", state: dcTimeline, setter: setDcTimeline },
+                            { label: "Routines du jour", desc: "Habitudes quotidiennes", state: dcRoutines, setter: setDcRoutines },
+                            { label: "Notes Épinglées", desc: "Vos mémos importants", state: dcNotes, setter: setDcNotes },
+                            { label: "Projets Actifs", desc: "Suivi des projets en cours", state: dcProjets, setter: setDcProjets },
+                            { label: "Agenda", desc: "Vos prochains rendez-vous", state: dcAgenda, setter: setDcAgenda },
+                            { label: "Priorités", desc: "Tâches urgentes", state: dcPriorites, setter: setDcPriorites }
+                        ].map((mod, i) => (
+                            <label key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{mod.label}</p>
+                                    <p className="text-xs text-slate-500">{mod.desc}</p>
+                                </div>
+                                <div className="relative inline-flex items-center">
+                                    <input type="checkbox" checked={mod.state} onChange={(e) => mod.setter(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                                </div>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {/* --- SECTION ENTREPRISE --- */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden mt-8">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                     <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                         <Building2 size={20} className="text-amber-500"/> Mon Entreprise

@@ -231,6 +231,16 @@ export default function Dashboard({ data, updateData, setView }) {
     const [dashboardFilter, setDashboardFilter] = useState('total');
     const [focusedProject, setFocusedProject] = useState(null);
     
+    const dc = data.settings || {};
+    const showSolde = dc.dcSolde ?? true;
+    const showOperations = dc.dcOperations ?? true;
+    const showTimeline = dc.dcTimeline ?? true;
+    const showRoutines = dc.dcRoutines ?? true;
+    const showNotes = dc.dcNotes ?? true;
+    const showProjets = dc.dcProjets ?? true;
+    const showPriorites = dc.dcPriorites ?? true;
+    const showAgenda = dc.dcAgenda ?? true;
+
     const isPrivacyMode = data.settings?.privacyMode || false;
     const togglePrivacyMode = () => {
         updateData({ ...data, settings: { ...data.settings, privacyMode: !isPrivacyMode } });
@@ -522,6 +532,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* METRICS ROW */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {showSolde && (
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
                     <div className="relative z-10 flex justify-between items-start mb-10">
                         <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
@@ -560,7 +571,9 @@ export default function Dashboard({ data, updateData, setView }) {
                         )}
                     </div>
                 </div>
+                )}
 
+                {showOperations && (
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
                     <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
                         <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
@@ -597,16 +610,17 @@ export default function Dashboard({ data, updateData, setView }) {
                         )}
                     </div>
                 </div>
+                )}
             </div>
 
-            <DashboardCalendar data={data} />
+            {showTimeline && <DashboardCalendar data={data} />}
 
             {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-8 space-y-8">
                     
                     {/* --- ZONE HABITUDES --- */}
-                    {habits.length > 0 && (
+                    {showRoutines && habits.length > 0 && (
                         <div className="bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-[2.5rem] border border-slate-100 dark:border-slate-800 p-6 shadow-sm">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest mb-4 ml-2">
                                 <Activity size={20} className="text-blue-500"/> Routines du jour
@@ -616,6 +630,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
 
                     {/* --- ZONE NOTES ÉPINGLÉES --- */}
+                    {showNotes && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         {pinnedNotes.map(n => (
                             <div key={n.id} className={`p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all shadow-sm`} onClick={() => setView('notes')}>
@@ -625,9 +640,10 @@ export default function Dashboard({ data, updateData, setView }) {
                             </div>
                         ))}
                     </div>
+                    )}
 
                     {/* --- ZONE PROJETS ACTIFS --- */}
-                    {activeProjects.length > 0 && (
+                    {showProjets && activeProjects.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
@@ -700,6 +716,7 @@ export default function Dashboard({ data, updateData, setView }) {
 
                 {/* COLONNE DROITE */}
                 <div className="lg:col-span-4 space-y-8">
+                    {showAgenda && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl group transition-all" onClick={() => setView('planning')}>
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
@@ -749,8 +766,9 @@ export default function Dashboard({ data, updateData, setView }) {
                             )}
                         </div>
                     </div>
+                    )}
 
-                    {urgentTodos.length > 0 && (
+                    {showPriorites && urgentTodos.length > 0 && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
                         <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500"><Flag size={80} className="-rotate-12"/></div>
                         <div className="flex justify-between items-center mb-8 relative z-10">
