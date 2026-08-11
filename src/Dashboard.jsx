@@ -9,6 +9,7 @@ import {
     Repeat, RotateCcw, Check, Coffee, Activity
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
+import DashboardCalendar from './DashboardCalendar';
 
 // --- COMPOSANT DYNAMIC ICON ---
 const DynamicIcon = ({ name, size = 18, className = "" }) => {
@@ -597,6 +598,8 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                 </div>
             </div>
+
+            <DashboardCalendar data={data} />
 
             {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
