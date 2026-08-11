@@ -195,7 +195,7 @@ export default function DashboardCalendar({ data, filter }) {
                                     </div>
                                 ) : (
                                     <>
-                                        {day.events.slice(0, 3).map((evt, i) => (
+                                        {day.events.slice(0, 2).map((evt, i) => (
                                             <div key={i} onClick={() => setFocusedDay(day)} className={`px-3.5 py-3 rounded-2xl text-[10px] font-bold flex flex-col gap-1.5 ${evt.color} shadow-sm group-hover/day:shadow-md transition-all duration-300 hover:scale-105 hover:-rotate-1 cursor-pointer relative overflow-hidden border border-white/40 dark:border-white/5`}>
                                                 <div className="absolute top-0 right-0 p-1 opacity-[0.15] transform translate-x-1 -translate-y-1 rotate-12 scale-150">
                                                     {evt.icon}
@@ -206,12 +206,12 @@ export default function DashboardCalendar({ data, filter }) {
                                                 <span className="truncate leading-snug relative z-10 font-black">{evt.title}</span>
                                             </div>
                                         ))}
-                                        {day.events.length > 3 && (
+                                        {day.events.length > 2 && (
                                             <button 
                                                 onClick={() => setFocusedDay(day)}
                                                 className="w-full py-2 mt-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400 transition-all border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800"
                                             >
-                                                + {day.events.length - 3} autres...
+                                                + {day.events.length - 2} autres...
                                             </button>
                                         )}
                                     </>
