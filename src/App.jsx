@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
+import GlobalSearch from './GlobalSearch';
 import CalendarView from './CalendarView';
 import ProjectsManager from './ProjectsManager';
 import BudgetManager from './BudgetManager';
@@ -59,6 +60,7 @@ export default function App() {
  const [session, setSession] = useState(null);
  const [loading, setLoading] = useState(true);
  const [currentView, setView] = useState('dashboard');
+ const [isSearchOpen, setIsSearchOpen] = useState(false);
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isWorkspaceFocus, setIsWorkspaceFocus] = useState(false);
  const [isLocked, setIsLocked] = useState(false);
@@ -984,6 +986,7 @@ export default function App() {
        setView={setView} 
        isMobileOpen={isMobileMenuOpen} 
        toggleMobile={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+       onSearchClick={() => setIsSearchOpen(true)}
        labels={data.customLabels} 
        darkMode={data.settings?.theme === 'dark'} 
        toggleTheme={toggleTheme} 
@@ -1003,6 +1006,14 @@ export default function App() {
          </div>
        </main>
      </div>
+
+     <GlobalSearch 
+         data={data} 
+         setView={setView} 
+         isOpen={isSearchOpen} 
+         onClose={() => setIsSearchOpen(false)} 
+         onToggle={() => setIsSearchOpen(prev => !prev)} 
+     />
    </div>
  );
 }
