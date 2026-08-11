@@ -78,9 +78,39 @@ export default function HabitTracker({ }) {
                 .gte('date', getLocalYYYYMMDD(d))
                 .limit(10000); 
 
-            setCategories(cats || []);
-            setHabits(habs || []);
-            setLogs(lgs || []);
+            const catsData = cats || [];
+            const habsData = habs || [];
+            const lgsData = lgs || [];
+
+            setCategories(catsData);
+            setHabits(habsData);
+            setLogs(lgsData);
+
+            // AUTO-REPAIR: Sync missing logs to habit.history
+            const logsByHabit = {};
+            for (const lg of lgsData) {
+                if (!logsByHabit[lg.habit_id]) logsByHabit[lg.habit_id] = [];
+                logsByHabit[lg.habit_id].push(lg.date);
+            }
+            
+            let repairedHabits = false;
+            const syncedHabs = habsData.map(h => {
+                const existing = h.history || [];
+                const logged = logsByHabit[h.id] || [];
+                const merged = [...new Set([...existing, ...logged])];
+                if (merged.length !== existing.length) {
+                    repairedHabits = true;
+                    // Mettre à jour en arrière-plan sans bloquer
+                    supabase.from('habits').update({ history: merged }).eq('id', h.id).then();
+                    return { ...h, history: merged };
+                }
+                return h;
+            });
+
+            if (repairedHabits) {
+                setHabits(syncedHabs);
+            }
+
         } catch (e) {
             console.error("Erreur chargement habitudes:", e);
         } finally {
@@ -101,6 +131,14 @@ export default function HabitTracker({ }) {
                 newLogs = newLogs.filter(l => l.id !== existingLog.id);
                 setLogs(newLogs); 
                 await supabase.from('habit_logs').delete().eq('id', existingLog.id);
+
+                // SYNC HISTORY FOR DASHBOARD
+                const targetHabit = habits.find(h => h.id === habitId);
+                if (targetHabit) {
+                    const newHistory = (targetHabit.history || []).filter(d => d !== dateStr);
+                    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history: newHistory } : h));
+                    await supabase.from('habits').update({ history: newHistory }).eq('id', habitId);
+                }
             } else {
                 const tempId = Date.now(); 
                 const newEntry = { id: tempId, habit_id: habitId, date: dateStr, completed: true };
@@ -113,6 +151,14 @@ export default function HabitTracker({ }) {
                 
                 if (inserted) {
                     setLogs(prev => prev.map(l => l.id === tempId ? inserted : l));
+                }
+
+                // SYNC HISTORY FOR DASHBOARD
+                const targetHabit = habits.find(h => h.id === habitId);
+                if (targetHabit) {
+                    const newHistory = [...new Set([...(targetHabit.history || []), dateStr])];
+                    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, history: newHistory } : h));
+                    await supabase.from('habits').update({ history: newHistory }).eq('id', habitId);
                 }
             }
         } catch (error) {
