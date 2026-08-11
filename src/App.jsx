@@ -181,23 +181,30 @@ export default function App() {
        setData(prev => {
          let currentEvts = [...prev.calendar_events];
          if (payload.eventType === 'INSERT') {
-           const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
-           if (isForMe && !currentEvts.some(e => String(e.id) === String(payload.new.id))) {
-               currentEvts.push({ ...payload.new, participants: [] });
-           }
+             const isForMe = payload.new.user_id === userId || (payload.new.invited_email && payload.new.invited_email.toLowerCase().includes(userEmail));
+             if (isForMe && !currentEvts.some(e => String(e.id) === String(payload.new.id))) {
+                 const parts = (prev.all_participants || []).filter(p => String(p.event_id) === String(payload.new.id));
+                 const myPart = parts.find(p => p.user_email?.toLowerCase() === userEmail);
+                 const computedMyStatus = myPart ? myPart.status : (payload.new.user_id === userId ? 'accepted' : 'pending');
+                 currentEvts.push({ ...payload.new, participants: parts, my_status: computedMyStatus });
+             }
          } 
          else if (payload.eventType === 'UPDATE') {
-           const isOwner = payload.new.user_id === userId;
-           const isInvited = (payload.new.invited_email || "").toLowerCase().includes(userEmail);
-           
-           if (isOwner || isInvited) {
-             const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
-             if (idx !== -1) {
-                 currentEvts[idx] = { ...payload.new, participants: currentEvts[idx].participants || [], my_status: currentEvts[idx].my_status };
+             const isOwner = payload.new.user_id === userId;
+             const isInvited = (payload.new.invited_email || "").toLowerCase().includes(userEmail);
+             
+             if (isOwner || isInvited) {
+               const idx = currentEvts.findIndex(e => String(e.id) === String(payload.new.id));
+               const parts = (prev.all_participants || []).filter(p => String(p.event_id) === String(payload.new.id));
+               const myPart = parts.find(p => p.user_email?.toLowerCase() === userEmail);
+               const computedMyStatus = myPart ? myPart.status : (isOwner ? 'accepted' : 'pending');
+               
+               if (idx !== -1) {
+                   currentEvts[idx] = { ...payload.new, participants: parts, my_status: computedMyStatus };
+               } else {
+                   currentEvts.push({ ...payload.new, participants: parts, my_status: computedMyStatus });
+               }
              } else {
-                 currentEvts.push({ ...payload.new, participants: [] });
-             }
-           } else {
              // Si je suis retiré ou que je n'ai plus accès, suppression locale immédiate
              currentEvts = currentEvts.filter(e => String(e.id) !== String(payload.new.id));
            }
