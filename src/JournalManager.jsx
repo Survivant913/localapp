@@ -111,17 +111,34 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
             if (pending) {
                 try {
                     const data = JSON.parse(pending);
-                    // Check if the link is fresh (less than 10 seconds old)
                     if (Date.now() - data.timestamp < 10000) {
+                        
+                        let targetFolderId = null;
+                        let targetPageId = null;
+
                         if (data.type === 'journal_folder') {
-                            setCurrentFolderId(data.itemId);
-                            setActivePageId(null);
-                            localStorage.removeItem('pendingDeepLink');
+                            targetFolderId = data.itemId;
                         } else if (data.type === 'journal_page' && allPages.length > 0) {
                             const page = allPages.find(p => String(p.id) === String(data.itemId));
                             if (page) {
-                                setCurrentFolderId(page.folder_id);
-                                setActivePageId(data.itemId);
+                                targetFolderId = page.folder_id;
+                                targetPageId = data.itemId;
+                            }
+                        }
+
+                        if (targetFolderId) {
+                            // Find root notebook ID
+                            let currFolder = allFolders.find(f => String(f.id) === String(targetFolderId));
+                            let safety = 0;
+                            while (currFolder && currFolder.parent_id && safety < 10) {
+                                currFolder = allFolders.find(f => String(f.id) === String(currFolder.parent_id));
+                                safety++;
+                            }
+                            
+                            if (currFolder) {
+                                setActiveNotebookId(currFolder.id);
+                                setCurrentFolderId(targetFolderId);
+                                setActivePageId(targetPageId);
                                 localStorage.removeItem('pendingDeepLink');
                             }
                         }
