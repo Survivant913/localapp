@@ -7,7 +7,7 @@ import {
     LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
     CheckSquare, StickyNote, Plus, FolderKanban, 
     Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft, ArrowRight,
-    Repeat, RotateCcw, Check, Coffee, Activity, ChevronLeft, ChevronRight, Flame, Trophy, X
+    Repeat, RotateCcw, Check, Coffee, Activity, ChevronLeft, ChevronRight, Flame, Trophy, X, Zap
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 import DashboardCalendar from './DashboardCalendar';
