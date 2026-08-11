@@ -1481,6 +1481,17 @@ export default function Workspace({ workspaceFocus, setWorkspaceFocus }) {
 
     useEffect(() => { fetchVentures(); }, []);
 
+    useEffect(() => {
+        const handleOpenWorkspaceProject = (e) => {
+            const v = ventures.find(ven => String(ven.id) === String(e.detail.projectId));
+            if (v) {
+                setActiveVenture(v);
+            }
+        };
+        window.addEventListener('open-workspace-project', handleOpenWorkspaceProject);
+        return () => window.removeEventListener('open-workspace-project', handleOpenWorkspaceProject);
+    }, [ventures]);
+
     const fetchVentures = async () => {
         try { 
             setLoading(true);

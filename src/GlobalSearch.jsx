@@ -69,10 +69,11 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
 
         // 2b. Workspace Projets (Ventures)
         (data.ventures || []).forEach(v => {
-            if (v.name?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q)) {
+            if (v.title?.toLowerCase().includes(q) || v.description?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'workspace',
-                    title: v.name,
+                    itemId: v.id,
+                    title: v.title,
                     subtitle: 'Projet Workspace',
                     type: 'venture',
                     icon: <Box size={16}/>,
@@ -100,6 +101,7 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
             if (f.name?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'journal',
+                    itemId: f.id,
                     title: f.name,
                     subtitle: 'Dossier (Carnet)',
                     type: 'journal_folder',
@@ -114,6 +116,7 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
             if (p.title?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q)) {
                 res.push({
                     id: 'journal',
+                    itemId: p.id,
                     title: p.title || 'Page sans titre',
                     subtitle: 'Page (Carnet)',
                     type: 'journal_page',
@@ -144,6 +147,16 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
     const handleSelect = (item) => {
         setView(item.id);
         onClose();
+        
+        setTimeout(() => {
+            if (item.type === 'venture') {
+                window.dispatchEvent(new CustomEvent('open-workspace-project', { detail: { projectId: item.itemId } }));
+            } else if (item.type === 'journal_folder') {
+                window.dispatchEvent(new CustomEvent('open-journal-item', { detail: { folderId: item.itemId } }));
+            } else if (item.type === 'journal_page') {
+                window.dispatchEvent(new CustomEvent('open-journal-item', { detail: { pageId: item.itemId } }));
+            }
+        }, 100);
     };
 
     if (!isOpen) return null;
