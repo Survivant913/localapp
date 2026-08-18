@@ -48,12 +48,25 @@ function useAutoSave(value, delay = 1000, callback) {
 // ==========================================
 const PostIt = ({ item, update, remove, color }) => {
     const textareaRef = useRef(null);
-    useLayoutEffect(() => {
+
+    const adjustHeight = () => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'; 
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
+    };
+
+    useLayoutEffect(() => {
+        adjustHeight();
     }, [item.text]);
+
+    useEffect(() => {
+        if (!textareaRef.current) return;
+        const resizeObserver = new ResizeObserver(() => adjustHeight());
+        resizeObserver.observe(textareaRef.current);
+        return () => resizeObserver.disconnect();
+    }, []);
+
 
     return (
         <div className={`p-2 rounded border mb-2 text-xs group relative shrink-0 ${color === 'blue' ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : color === 'red' ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : color === 'green' ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'}`}>
@@ -77,12 +90,24 @@ const PostIt = ({ item, update, remove, color }) => {
 const MindmapNode = ({ node, selectedId, setSelectedId, updateLabel, handleMouseDown, toggleCollapse, hasChildren, isVisible }) => {
     const textareaRef = useRef(null);
     
-    useLayoutEffect(() => {
+    const adjustHeight = () => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
+    };
+
+    useLayoutEffect(() => {
+        adjustHeight();
     }, [node.label, isVisible]);
+
+    useEffect(() => {
+        if (!textareaRef.current) return;
+        const resizeObserver = new ResizeObserver(() => adjustHeight());
+        resizeObserver.observe(textareaRef.current);
+        return () => resizeObserver.disconnect();
+    }, [isVisible]);
+
 
     if (!isVisible) return null;
 
