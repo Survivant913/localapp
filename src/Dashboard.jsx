@@ -709,6 +709,9 @@ export default function Dashboard({ data, updateData, setView }) {
     const urgentTodos = todos.filter(t => !t.completed && (t.priority === 'high' || t.priority === 'warm')).slice(0, 5);
     const todayDate = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+    const isLeftColumnVisible = (showRoutines && habits.length > 0) || showNotes || (showProjets && activeProjects.length > 0);
+    const isRightColumnVisible = showAgenda || (showPriorites && urgentTodos.length > 0);
+
     return (
         <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
@@ -825,7 +828,8 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* MAIN CONTENT */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 space-y-8">
+                {isLeftColumnVisible && (
+                <div className={`space-y-8 ${isRightColumnVisible ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
                     
                     {/* --- ZONE HABITUDES --- */}
                     {showRoutines && habits.length > 0 && (
@@ -929,9 +933,11 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                     )}
                 </div>
+                )}
 
                 {/* COLONNE DROITE */}
-                <div className="lg:col-span-4 space-y-8">
+                {isRightColumnVisible && (
+                <div className={`space-y-8 ${isLeftColumnVisible ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
                     {showAgenda && (
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
                         <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-500 pointer-events-none"><Clock size={100} className="rotate-12"/></div>
@@ -1058,6 +1064,7 @@ export default function Dashboard({ data, updateData, setView }) {
                     </div>
                     )}
                 </div>
+                )}
             </div>
         </div>
     );
