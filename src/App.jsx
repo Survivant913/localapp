@@ -64,6 +64,7 @@ export default function App() {
  const [isSearchOpen, setIsSearchOpen] = useState(false);
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isWorkspaceFocus, setIsWorkspaceFocus] = useState(false);
+  const [navigationId, setNavigationId] = useState(null);
    const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
  const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
@@ -1043,7 +1044,7 @@ export default function App() {
      case 'habits': return <HabitTracker data={data} updateData={updateData} />;
      case 'chat': return <ChatManager user={session.user} />; 
      case 'clients': return <ClientHub data={data} updateData={updateData} />;
-     case 'workspace': return <Workspace data={data} updateData={updateData} workspaceFocus={isWorkspaceFocus} setWorkspaceFocus={setIsWorkspaceFocus} />;
+     case 'workspace': return <Workspace data={data} updateData={updateData} workspaceFocus={isWorkspaceFocus} setWorkspaceFocus={setIsWorkspaceFocus} navigationId={navigationId} setNavigationId={setNavigationId} />;
      case 'settings': return <DataSettings data={data} loadExternalData={updateData} darkMode={data.settings?.theme === 'dark'} toggleTheme={toggleTheme} />;
      case 'planning': return <PlanningManager data={data} updateData={updateData} />;
      default: return <Dashboard data={data} updateData={updateData} setView={setView} />;
@@ -1099,10 +1100,11 @@ export default function App() {
                    navigateTo={(url) => {
                        setIsNotificationCenterOpen(false);
                        const params = new URLSearchParams(url.split('?')[1]);
+                       if (params.get('id')) {
+                           setNavigationId(params.get('id'));
+                       }
                        if (params.get('module')) {
-                           if (params.get('module') === 'workspace') setView('projects');
-                           else if (params.get('module') === 'journal') setView('journal');
-                           else setView(params.get('module'));
+                           setView(params.get('module'));
                        }
                    }}
                />

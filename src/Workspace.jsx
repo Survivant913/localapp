@@ -1691,7 +1691,7 @@ const ChatModule = ({ venture, currentUserEmail }) => {
     );
 };
 
-export default function Workspace({ data, updateData, workspaceFocus, setWorkspaceFocus }) {
+export default function Workspace({ data, updateData, workspaceFocus, setWorkspaceFocus, navigationId, setNavigationId }) {
     const rawVentures = data?.ventures || [];
     const myEmail = data?.profile?.email?.toLowerCase();
     const myId = data?.profile?.id;
@@ -1716,7 +1716,15 @@ export default function Workspace({ data, updateData, workspaceFocus, setWorkspa
         }
     }, [data?.profile?.email]);
 
-
+    useEffect(() => {
+        if (navigationId && ventures.length > 0) {
+            const v = ventures.find(ven => String(ven.id) === String(navigationId));
+            if (v) {
+                setActiveVenture(v);
+                if (setNavigationId) setNavigationId(null);
+            }
+        }
+    }, [navigationId, ventures, setNavigationId]);
 
     useEffect(() => {
         if (ventures.length > 0) {
