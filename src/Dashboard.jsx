@@ -826,227 +826,242 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {showTimeline && <DashboardCalendar data={data} filter={dashboardFilter} />}
 
-                        {/* MAIN CONTENT - MASONRY LAYOUT */}
-            <div className="columns-1 md:columns-2 xl:columns-3 gap-8 w-full">
-                
-                {/* --- ZONE HABITUDES --- */}
-                {showRoutines && habits.length > 0 && (
-                    <div className="break-inside-avoid mb-8 bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] border border-slate-100/80 dark:border-slate-800/80 p-6 md:p-8 shadow-2xl relative overflow-hidden group">
-                        <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                        
-                        <div className="flex justify-between items-center mb-6 relative z-10">
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest ml-2 md:ml-0">
-                                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Activity size={18} strokeWidth={2.5}/></div>
-                                Routines
-                            </h3>
+            {/* MAIN CONTENT */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {isLeftColumnVisible && (
+                <div className={`space-y-8 ${isRightColumnVisible ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
+                    
+                    {/* --- ZONE HABITUDES --- */}
+                    {showRoutines && habits.length > 0 && (
+                        <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] border border-slate-100/80 dark:border-slate-800/80 p-6 md:p-8 shadow-2xl relative overflow-hidden group">
+                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                            
+                            <div className="flex justify-between items-center mb-6 relative z-10">
+                                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest ml-2 md:ml-0">
+                                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Activity size={18} strokeWidth={2.5}/></div>
+                                    Routines
+                                </h3>
+                            </div>
+                            
+                            <div className="relative z-10">
+                                <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                            </div>
                         </div>
-                        
-                        <div className="relative z-10">
-                            <HabitStrip habits={habits} updateHabit={updateHabit} setView={setView} />
+                    )}
+
+                    {/* --- ZONE NOTES ÉPINGLÉES --- */}
+                    {showNotes && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        {pinnedNotes.map(n => (
+                            <div key={n.id} className={`p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all shadow-sm`} onClick={() => setView('notes')}>
+                                <div className="absolute top-6 right-8 opacity-20"><StickyNote size={28}/></div>
+                                <h4 className="font-black text-xl mb-4 tracking-tighter uppercase">{n.title}</h4>
+                                <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
+                            </div>
+                        ))}
+                    </div>
+                    )}
+
+                    {/* --- ZONE PROJETS ACTIFS --- */}
+                    {showProjets && activeProjects.length > 0 && (
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
+                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
+                                Projets Actifs
+                            </h3>
+                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all">FOCUS</button>
+                        </div>
+                        <div className="space-y-4">
+                            {activeProjects.length === 0 ? (
+                                <p className="text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase">Aucun projet actif</p>
+                            ) : (
+                                activeProjects.map(p => {
+                                    const cost = parseFloat(p.cost || 0);
+                                    let budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, currentBalance);
+                                    const fundingPercentage = cost > 0 ? Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100) : 0;
+                                    const isFunded = budgetAvailable >= cost;
+                                    const safeProgress = Math.min(100, Math.max(0, p.progress || 0));
+                                    const safeFunding = Math.min(100, Math.max(0, fundingPercentage));
+                                    const globalScore = cost > 0 ? (safeProgress + safeFunding) / 2 : safeProgress;
+
+                                    return (
+                                        <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group" onClick={() => setView('projects')}>
+                                            <div className="flex items-center gap-5 mb-6">
+                                                <div className="relative w-16 h-16 shrink-0">
+                                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                                                        <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                                        <path className="text-blue-500 transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                                    </svg>
+                                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black dark:text-white">{Math.round(globalScore)}%</span>
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="font-black text-slate-800 dark:text-white text-base truncate">{p.title}</h4>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className={`w-2 h-2 shrink-0 rounded-full ${p.status === 'in_progress' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
+                                                        <p className="text-xs text-slate-400 font-bold uppercase truncate tracking-tighter">{p.description || "Aucun descriptif"}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                        <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
+                                                        <span className="dark:text-white">{Math.round(safeProgress)}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                                        <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
+                                                    </div>
+                                                </div>
+                                                {cost > 0 && (
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                            <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
+                                                            <span className={isFunded ? "text-green-500" : "text-orange-500"}>{Math.round(safeFunding)}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                                                            <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${safeFunding}%` }}></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
+                    )}
+                </div>
                 )}
 
-                {/* --- ZONE NOTES ÉPINGLÉES --- */}
-                {showNotes && pinnedNotes.map(n => (
-                    <div key={n.id} className={`break-inside-avoid mb-8 p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all`} onClick={() => setView('notes')}>
-                        <div className="absolute top-6 right-8 opacity-20"><StickyNote size={28}/></div>
-                        <h4 className="font-black text-xl mb-4 tracking-tighter uppercase">{n.title}</h4>
-                        <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
-                    </div>
-                ))}
+                {/* COLONNE DROITE */}
+                {isRightColumnVisible && (
+                <div className={`space-y-8 ${isLeftColumnVisible ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
+                    {showAgenda && (
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
+                        <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-500 pointer-events-none"><Clock size={100} className="rotate-12"/></div>
+                        <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-                {/* --- ZONE PROJETS ACTIFS --- */}
-                {showProjets && activeProjects.length > 0 && (
-                <div className="break-inside-avoid mb-8 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
-                    <div className="flex justify-between items-center mb-8">
-                        <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
-                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
-                            Projets Actifs
-                        </h3>
-                        <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all">FOCUS</button>
-                    </div>
-                    <div className="space-y-4">
-                        {activeProjects.map(p => {
-                            const cost = parseFloat(p.cost || 0);
-                            let budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, currentBalance);
-                            const fundingPercentage = cost > 0 ? Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100) : 0;
-                            const isFunded = budgetAvailable >= cost;
-                            const safeProgress = Math.min(100, Math.max(0, p.progress || 0));
-                            const safeFunding = Math.min(100, Math.max(0, fundingPercentage));
-                            const globalScore = cost > 0 ? (safeProgress + safeFunding) / 2 : safeProgress;
+                        <div className="flex justify-between items-center mb-8 relative z-10">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
+                                <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Clock size={20} strokeWidth={2}/></div>
+                                Agenda
+                            </h3>
+                            <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                                <ArrowRight size={18} />
+                            </button>
+                        </div>
 
-                            return (
-                                <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group" onClick={() => setView('projects')}>
-                                    <div className="flex items-center gap-5 mb-6">
-                                        <div className="relative w-16 h-16 shrink-0">
-                                            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                                <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                                                <path className="text-blue-500 transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                                            </svg>
-                                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black dark:text-white">{Math.round(globalScore)}%</span>
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <h4 className="font-black text-slate-800 dark:text-white text-base truncate">{p.title}</h4>
-                                            <div className="flex items-center gap-2 mt-0.5">
-                                                <span className={`w-2 h-2 shrink-0 rounded-full ${p.status === 'in_progress' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-                                                <p className="text-xs text-slate-400 font-bold uppercase truncate tracking-tighter">{p.description || "Aucun descriptif"}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                                <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
-                                                <span className="dark:text-white">{Math.round(safeProgress)}%</span>
-                                            </div>
-                                            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                                                <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
-                                            </div>
-                                        </div>
-                                        {cost > 0 && (
-                                            <div className="space-y-1">
-                                                <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                                    <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
-                                                    <span className={isFunded ? "text-green-500" : "text-orange-500"}>{Math.round(safeFunding)}%</span>
+                        <div className="space-y-6 relative z-10">
+                            {nextCalendarEvents.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-10 opacity-40">
+                                    <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3"><Clock size={32} /></div>
+                                    <p className="text-sm font-black uppercase tracking-widest text-center">Calendrier vierge</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col">
+                                    {/* PREMIER EVENEMENT (PROCHAIN) */}
+                                    {nextCalendarEvents.length > 0 && (() => {
+                                        const evt = nextCalendarEvents[0];
+                                        const d = new Date(evt.start_time);
+                                        const dayLabel = getDayCounterLabel(evt.start_time);
+                                        return (
+                                            <div key={`${evt.type}-${evt.id}`} className="mb-6 relative overflow-hidden rounded-[2rem] p-6 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 dark:border-indigo-500/10 shadow-lg shadow-indigo-500/5 group/next transition-all hover:shadow-indigo-500/10 cursor-pointer">
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 group-hover/next:bg-indigo-500/20 transition-all"></div>
+                                                
+                                                <div className="flex justify-between items-start mb-4 relative z-10">
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-indigo-500/20 animate-pulse">
+                                                        <span className="w-1.5 h-1.5 bg-white rounded-full"></span> Prochainement
+                                                    </span>
+                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg shadow-sm uppercase tracking-widest ${dayLabel.color}`}>{dayLabel.text}</span>
                                                 </div>
-                                                <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                                                    <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${safeFunding}%` }}></div>
+
+                                                <div className="flex gap-5 items-center relative z-10">
+                                                    <div className={`flex flex-col items-center justify-center w-16 h-16 ${evt.is_todo ? 'bg-orange-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'} rounded-[1.5rem] shadow-xl shrink-0 transition-transform group-hover/next:scale-110 group-hover/next:rotate-3`}>
+                                                        <span className="text-[11px] font-black uppercase leading-none opacity-80">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                        <span className="text-2xl font-black leading-none mt-1">{d.getDate()}</span>
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-lg font-black text-slate-800 dark:text-white truncate tracking-tight">{evt.title}</p>
+                                                        <p className="text-[11px] font-black uppercase mt-1 flex items-center gap-1.5 text-indigo-600/80 dark:text-indigo-400/80">
+                                                            <Clock size={12} strokeWidth={3} />
+                                                            {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                            {evt.is_todo && <CheckCircle2 size={12} className="text-orange-500 ml-1"/>}
+                                                        </p>
+                                                    </div>
                                                 </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* AUTRES EVENEMENTS */}
+                                    {nextCalendarEvents.length > 1 && (
+                                        <div className="relative pl-6 space-y-5">
+                                            <div className="absolute left-[1.35rem] top-2 bottom-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                                            {nextCalendarEvents.slice(1).map((evt, index) => {
+                                                const d = new Date(evt.start_time);
+                                                const dayLabel = getDayCounterLabel(evt.start_time);
+                                                return (
+                                                    <div key={`${evt.type}-${evt.id}`} className="relative flex items-center gap-4 cursor-pointer group/item">
+                                                        <div className="absolute -left-[1.65rem] w-3 h-3 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 group-hover/item:border-indigo-500 group-hover/item:scale-125 transition-all"></div>
+                                                        
+                                                        <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 transition-transform group-hover/item:scale-105 shadow-sm`}>
+                                                            <span className="text-[9px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                            <span className="text-lg font-black leading-none mt-0.5">{d.getDate()}</span>
+                                                        </div>
+                                                        <div className="min-w-0 flex-1 bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-transparent group-hover/item:border-slate-200 dark:group-hover/item:border-slate-700 group-hover/item:shadow-sm transition-all">
+                                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                                <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
+                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border shadow-sm uppercase tracking-widest shrink-0 ${dayLabel.color.replace('bg-', 'bg-opacity-10 text-').replace('text-white', '')} border-current opacity-70`}>{dayLabel.text}</span>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                                                                {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                                                {evt.is_todo && <CheckCircle2 size={10} className="text-orange-400"/>}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    )}
+
+                    {showPriorites && urgentTodos.length > 0 && (
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col group transition-all">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-[0.2em]">
+                                <Target size={16} className="text-orange-500" />
+                                Action Requise
+                            </h3>
+                            <span className="text-[10px] font-bold text-slate-400 tracking-widest">{urgentTodos.length} TÂCHE{urgentTodos.length > 1 ? 'S' : ''}</span>
+                        </div>
+                        <div className="flex flex-col gap-3">
+                            {urgentTodos.map(t => (
+                                <div key={t.id} className="group/task flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700" onClick={() => toggleTodo(t.id)}>
+                                    <button className="shrink-0 w-6 h-6 mt-0.5 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover/task:border-slate-800 dark:group-hover/task:border-white transition-all text-transparent group-hover/task:text-slate-800 dark:group-hover/task:text-white">
+                                        <Check size={12} strokeWidth={3} />
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-snug truncate block group-hover/task:text-slate-900 dark:group-hover/task:text-white transition-colors">{t.text}</span>
+                                        {t.priority === 'high' && (
+                                            <div className="mt-2 flex items-center">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </div>
-                )}
-
-                {/* --- AGENDA --- */}
-                {showAgenda && (
-                <div className="break-inside-avoid mb-8 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
-                    <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-500 pointer-events-none"><Clock size={100} className="rotate-12"/></div>
-                    <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
-
-                    <div className="flex justify-between items-center mb-8 relative z-10">
-                        <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
-                            <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Clock size={20} strokeWidth={2}/></div>
-                            Agenda
-                        </h3>
-                        <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                            <ArrowRight size={18} />
+                            ))}
+                        </div>
+                        <button onClick={() => setView('todo')} className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-slate-100 dark:border-slate-700">
+                            Voir toutes les tâches
                         </button>
                     </div>
-
-                    <div className="space-y-6 relative z-10">
-                        {nextCalendarEvents.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-10 opacity-40">
-                                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3"><Clock size={32} /></div>
-                                <p className="text-sm font-black uppercase tracking-widest text-center">Calendrier vierge</p>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col">
-                                {/* PREMIER EVENEMENT */}
-                                {nextCalendarEvents.length > 0 && (() => {
-                                    const evt = nextCalendarEvents[0];
-                                    const d = new Date(evt.start_time);
-                                    const dayLabel = getDayCounterLabel(evt.start_time);
-                                    return (
-                                        <div key={`${evt.type}-${evt.id}`} className="mb-6 relative overflow-hidden rounded-[2rem] p-6 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 dark:border-indigo-500/10 shadow-lg shadow-indigo-500/5 group/next transition-all hover:shadow-indigo-500/10 cursor-pointer">
-                                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 group-hover/next:bg-indigo-500/20 transition-all"></div>
-                                            
-                                            <div className="flex justify-between items-start mb-4 relative z-10">
-                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-indigo-500/20 animate-pulse">
-                                                    <span className="w-1.5 h-1.5 bg-white rounded-full"></span> Prochainement
-                                                </span>
-                                                <span className={`text-[10px] font-black px-2 py-1 rounded-lg shadow-sm uppercase tracking-widest ${dayLabel.color}`}>{dayLabel.text}</span>
-                                            </div>
-
-                                            <div className="flex gap-5 items-center relative z-10">
-                                                <div className={`flex flex-col items-center justify-center w-16 h-16 ${evt.is_todo ? 'bg-orange-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'} rounded-[1.5rem] shadow-xl shrink-0 transition-transform group-hover/next:scale-110 group-hover/next:rotate-3`}>
-                                                    <span className="text-[11px] font-black uppercase leading-none opacity-80">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
-                                                    <span className="text-2xl font-black leading-none mt-1">{d.getDate()}</span>
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-lg font-black text-slate-800 dark:text-white truncate tracking-tight">{evt.title}</p>
-                                                    <p className="text-[11px] font-black uppercase mt-1 flex items-center gap-1.5 text-indigo-600/80 dark:text-indigo-400/80">
-                                                        <Clock size={12} strokeWidth={3} />
-                                                        {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                                                        {evt.is_todo && <CheckCircle2 size={12} className="text-orange-500 ml-1"/>}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-
-                                {/* AUTRES EVENEMENTS */}
-                                {nextCalendarEvents.length > 1 && (
-                                    <div className="relative pl-6 space-y-5">
-                                        <div className="absolute left-[1.35rem] top-2 bottom-4 w-px bg-slate-200 dark:bg-slate-700"></div>
-                                        {nextCalendarEvents.slice(1).map((evt, index) => {
-                                            const d = new Date(evt.start_time);
-                                            const dayLabel = getDayCounterLabel(evt.start_time);
-                                            return (
-                                                <div key={`${evt.type}-${evt.id}`} className="relative flex items-center gap-4 cursor-pointer group/item">
-                                                    <div className="absolute -left-[1.65rem] w-3 h-3 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 group-hover/item:border-indigo-500 group-hover/item:scale-125 transition-all"></div>
-                                                    
-                                                    <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 transition-transform group-hover/item:scale-105 shadow-sm`}>
-                                                        <span className="text-[9px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
-                                                        <span className="text-lg font-black leading-none mt-0.5">{d.getDate()}</span>
-                                                    </div>
-                                                    <div className="min-w-0 flex-1 bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-transparent group-hover/item:border-slate-200 dark:group-hover/item:border-slate-700 group-hover/item:shadow-sm transition-all">
-                                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                                            <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
-                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border shadow-sm uppercase tracking-widest shrink-0 ${dayLabel.color.replace('bg-', 'bg-opacity-10 text-').replace('text-white', '')} border-current opacity-70`}>{dayLabel.text}</span>
-                                                        </div>
-                                                        <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                                                            {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                                                            {evt.is_todo && <CheckCircle2 size={10} className="text-orange-400"/>}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-                )}
-
-                {/* --- PRIORITES --- */}
-                {showPriorites && urgentTodos.length > 0 && (
-                <div className="break-inside-avoid mb-8 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col group transition-all">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-[0.2em]">
-                            <Target size={16} className="text-orange-500" />
-                            Action Requise
-                        </h3>
-                        <span className="text-[10px] font-bold text-slate-400 tracking-widest">{urgentTodos.length} TÂCHE{urgentTodos.length > 1 ? 'S' : ''}</span>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                        {urgentTodos.map(t => (
-                            <div key={t.id} className="group/task flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700" onClick={() => toggleTodo(t.id)}>
-                                <button className="shrink-0 w-6 h-6 mt-0.5 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover/task:border-slate-800 dark:group-hover/task:border-white transition-all text-transparent group-hover/task:text-slate-800 dark:group-hover/task:text-white">
-                                    <Check size={12} strokeWidth={3} />
-                                </button>
-                                <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-snug truncate block group-hover/task:text-slate-900 dark:group-hover/task:text-white transition-colors">{t.text}</span>
-                                    {t.priority === 'high' && (
-                                        <div className="mt-2 flex items-center">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <button onClick={() => setView('todo')} className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-slate-100 dark:border-slate-700">
-                        Voir toutes les tâches
-                    </button>
+                    )}
                 </div>
                 )}
             </div>

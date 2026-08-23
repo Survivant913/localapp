@@ -3,6 +3,8 @@ import { supabase } from './supabaseClient';
 import Login from './Login';
 import Sidebar from './Sidebar';
 import NotificationCenter from './NotificationCenter';
+import ContactsPanel from './ContactsPanel';
+import FloatingChatsManager from './FloatingChatsManager';
 import Dashboard from './Dashboard';
 import GlobalSearch from './GlobalSearch';
 import CalendarView from './CalendarView';
@@ -64,9 +66,20 @@ export default function App() {
  const [isSearchOpen, setIsSearchOpen] = useState(false);
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
    const [isWorkspaceFocus, setIsWorkspaceFocus] = useState(false);
-  const [navigationId, setNavigationId] = useState(null);
+   const [navigationId, setNavigationId] = useState(null);
    const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
- const [isLocked, setIsLocked] = useState(false);
+   const [isContactsOpen, setIsContactsOpen] = useState(false);
+   const [activeFloatingChats, setActiveFloatingChats] = useState(() => {
+       const saved = localStorage.getItem('activeFloatingChats');
+       return saved ? JSON.parse(saved) : [];
+   });
+   const [onlineUsers, setOnlineUsers] = useState(new Set());
+
+   useEffect(() => {
+       localStorage.setItem('activeFloatingChats', JSON.stringify(activeFloatingChats));
+   }, [activeFloatingChats]);
+
+   const [isLocked, setIsLocked] = useState(false);
  const [notifMessage, setNotifMessage] = useState(null);
  const isLoaded = useRef(false);
  const budgetChannelRef = useRef(null);
@@ -143,8 +156,37 @@ export default function App() {
 
    if (currentView === 'chat') setUnreadCount(0);
 
-   const channel = supabase.channel('global-chat-notifications')
-       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+   // Subscribe to global presence
+   const presenceChannel = supabase.channel('online-users', {
+       config: { presence: { key: session.user.email } }
+   });
+   
+   presenceChannel.on('presence', { event: 'sync' }, () => {
+       const state = presenceChannel.presenceState();
+       const online = new Set();
+       for (const key in state) {
+           online.add(key);
+       }
+       setOnlineUsers(online);
+   });
+   
+   presenceChannel.subscribe(async (status) => {
+       if (status === 'SUBSCRIBED') {
+           await presenceChannel.track({ email: session.user.email, online_at: new Date().toISOString() });
+       }
+   });
+
+    // Cleanup: Suppression silencieuse des vieux messages (plus de 24h)
+    const cleanupOldMessages = async () => {
+        try {
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            await supabase.from('direct_messages').delete().lt('created_at', twentyFourHoursAgo);
+        } catch (e) {}
+    };
+    cleanupOldMessages();
+
+    const channel = supabase.channel('global-chat-notifications')
+       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
            if (payload.new.sender_id === session.user.id) return;
            
            if (currentView !== 'chat') {
@@ -154,6 +196,32 @@ export default function App() {
                if (Notification.permission === 'granted') {
                    new Notification("Nouveau Message", {
                        body: payload.new.content || "Vous avez reçu un message",
+                       silent: true 
+                   });
+               }
+           }
+       })
+       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
+           // Si c'est moi l'expéditeur (sur un autre onglet par exemple), on ignore
+           if (payload.new.sender_email === session.user.email) return;
+
+           // Vérifier si je suis le destinataire
+           if (payload.new.receiver_email === session.user.email) {
+               const friendEmail = payload.new.sender_email;
+               
+               // Ouvrir la bulle de discussion automatiquement
+               setActiveFloatingChats(prev => {
+                   if (!prev.includes(friendEmail)) return [...prev, friendEmail];
+                   return prev;
+               });
+               
+               // Jouer le son
+               try { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => {}); } catch(e) {}
+               
+               // Notification navigateur
+               if (Notification.permission === 'granted') {
+                   new Notification(`Message de ${friendEmail.split('@')[0]}`, {
+                       body: payload.new.content,
                        silent: true 
                    });
                }
@@ -169,7 +237,11 @@ export default function App() {
             }
         })
        .subscribe();
-   return () => { supabase.removeChannel(channel); };
+       // Cleanup subscriptions
+       return () => {
+           supabase.removeChannel(channel);
+           supabase.removeChannel(presenceChannel);
+       };
  }, [session, currentView]);
 
  // --- GREFFE : ÉCOUTEUR TEMPS RÉEL CALENDRIER (SÉCURITÉ & DISPARITION INSTANTANÉE) ---
@@ -971,7 +1043,7 @@ export default function App() {
      await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: t.user_id || user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes, list_id: t.list_id || t.listId }));
      await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: l.user_id || user.id, name: l.name, color: l.color })); 
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: n.user_id || user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
-     await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: p.user_id || user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, objectives: p.objectives, internal_notes: p.notes }));
+     await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: p.user_id || user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, internal_notes: p.notes }));
      // --- RETOUR DE LA CATEGORIE DANS LA SAUVEGARDE RECURRING ---
      await upsertInBatches('recurring', data.budget.recurring, 50, r => ({ id: r.id, user_id: user.id, amount: r.amount, type: r.type, description: r.description, day_of_month: r.dayOfMonth, end_date: r.endDate, next_due_date: r.nextDueDate, account_id: r.accountId, target_account_id: r.targetAccountId, category: r.category || 'autre' }));
      // --- RETOUR DE LA CATEGORIE DANS LA SAUVEGARDE SCHEDULED ---
@@ -1023,6 +1095,17 @@ export default function App() {
    const handleMarkRead = async (notifId) => {
        setData(prev => ({ ...prev, notifications: (prev.notifications || []).map(n => String(n.id) === String(notifId) ? { ...n, is_read: true } : n) }));
        await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
+   };
+
+   const handleStartFloatingChat = (email) => {
+       setActiveFloatingChats(prev => {
+           if (!prev.includes(email)) return [...prev, email];
+           return prev;
+       });
+   };
+
+   const handleCloseFloatingChat = (email) => {
+       setActiveFloatingChats(prev => prev.filter(e => e !== email));
    };
 
    const unreadNotificationsCount = (data.notifications || []).filter(n => !n.is_read).length;
@@ -1089,6 +1172,7 @@ export default function App() {
              onSearchClick={() => setIsSearchOpen(true)}
              unreadNotificationsCount={unreadNotificationsCount}
              toggleNotifications={() => setIsNotificationCenterOpen(!isNotificationCenterOpen)}
+             toggleContacts={() => setIsContactsOpen(!isContactsOpen)}
            />
            {isNotificationCenterOpen && (
                <NotificationCenter 
@@ -1109,6 +1193,22 @@ export default function App() {
                    }}
                />
            )}
+           
+           {isContactsOpen && (
+               <ContactsPanel 
+                   isOpen={isContactsOpen}
+                   user={session?.user}
+                   onClose={() => setIsContactsOpen(false)}
+                   onStartChat={handleStartFloatingChat}
+                   onlineUsers={onlineUsers}
+               />
+           )}
+           
+           <FloatingChatsManager 
+               activeChats={activeFloatingChats}
+               user={session?.user}
+               onCloseChat={handleCloseFloatingChat}
+           />
         </>
      )}
      

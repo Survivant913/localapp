@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings, onSearchClick, unreadNotificationsCount, toggleNotifications }) {
+export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobile, labels, darkMode, toggleTheme, unreadCount, settings, onSearchClick, unreadNotificationsCount, toggleNotifications, toggleContacts }) {
   // MODIFICATION ICI : useState(true) pour que la sidebar soit fermée au démarrage
   const [_isCollapsed, setIsCollapsed] = useState(true);
   const isCollapsed = _isCollapsed && !isMobileOpen;
@@ -234,6 +234,16 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
             >
               <Coffee size={18} />
             </button>
+                  <button 
+                    onClick={toggleContacts}
+                    className={`
+                      rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all border border-slate-800 hover:border-indigo-500/20 relative flex items-center justify-center
+                      ${isCollapsed ? 'w-10 h-10 p-0' : 'p-2.5 w-10 shrink-0'}
+                    `}
+                    title="Contacts"
+                  >
+                    <Users size={18} />
+                  </button>
             {settings?.notifications_enabled !== false && (
                 <button 
                   onClick={toggleNotifications}
