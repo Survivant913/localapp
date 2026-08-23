@@ -1032,35 +1032,34 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
 
                     {showPriorites && urgentTodos.length > 0 && (
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden">
-                        <div className="absolute -left-4 -top-4 p-8 opacity-5 text-rose-500"><Flag size={80} className="-rotate-12"/></div>
-                        <div className="flex justify-between items-center mb-8 relative z-10">
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest text-center md:text-left">
-                                <div className="p-2 bg-rose-50 dark:bg-rose-900/20 rounded-xl text-rose-600"><Flag size={20}/></div>
-                                Priorités
+                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col group transition-all">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-[0.2em]">
+                                <Target size={16} className="text-orange-500" />
+                                Action Requise
                             </h3>
-                            <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-lg shadow-rose-500/20">{urgentTodos.length}</span>
+                            <span className="text-[10px] font-bold text-slate-400 tracking-widest">{urgentTodos.length} TÂCHE{urgentTodos.length > 1 ? 'S' : ''}</span>
                         </div>
-                        <div className="space-y-4 relative z-10">
-                            {urgentTodos.length === 0 ? (
-                                <p className="text-slate-400 text-sm font-bold italic py-6 text-center opacity-50 uppercase tracking-widest">Aucune tâche urgente</p>
-                            ) : (
-                                urgentTodos.map(t => (
-                                    <div key={t.id} className="group flex items-center gap-5 p-5 bg-white dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-700 hover:border-rose-500/30 transition-all cursor-pointer shadow-sm shadow-indigo-500/5" onClick={() => toggleTodo(t.id)}>
-                                        <button className="shrink-0 w-7 h-7 rounded-xl border-2 border-slate-200 dark:border-slate-600 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-500 transition-all text-transparent group-hover:text-white shadow-inner">
-                                            <CheckCircle2 size={14} />
-                                        </button>
-                                        <div className="flex-1 min-w-0">
-                                            <span className="text-sm font-black text-slate-800 dark:text-slate-100 truncate block tracking-tighter">{t.text}</span>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest px-1.5 py-0.5 border border-rose-500/30 rounded bg-rose-500/5 shadow-sm">Urgent</span>
+                        <div className="flex flex-col gap-3">
+                            {urgentTodos.map(t => (
+                                <div key={t.id} className="group/task flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700" onClick={() => toggleTodo(t.id)}>
+                                    <button className="shrink-0 w-6 h-6 mt-0.5 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover/task:border-slate-800 dark:group-hover/task:border-white transition-all text-transparent group-hover/task:text-slate-800 dark:group-hover/task:text-white">
+                                        <Check size={12} strokeWidth={3} />
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-snug truncate block group-hover/task:text-slate-900 dark:group-hover/task:text-white transition-colors">{t.text}</span>
+                                        {t.priority === 'high' && (
+                                            <div className="mt-2 flex items-center">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
-                                ))
-                            )}
+                                </div>
+                            ))}
                         </div>
-                        <button onClick={() => setView('todo')} className="w-full mt-10 py-5 bg-slate-900 dark:bg-slate-800 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-3xl hover:bg-black transition-all shadow-xl active:scale-95 shadow-sm shadow-indigo-500/10">Explorer les tâches</button>
+                        <button onClick={() => setView('todo')} className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-slate-100 dark:border-slate-700">
+                            Voir toutes les tâches
+                        </button>
                     </div>
                     )}
                 </div>
