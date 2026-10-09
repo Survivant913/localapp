@@ -302,9 +302,12 @@ export default function PlanningManager({ data, updateData }) {
                 updated = updated.map(ev => String(ev.id) === String(targetId) ? { ...ev, title: formData.title, color: formData.color, start_time: startObj.toISOString(), end_time: endObj.toISOString(), recurrence_group_id: null, is_all_day: formData.isAllDay, invited_email: formData.invitedEmail, status: resetStat ? 'pending' : ev.status } : ev);
             }
             
-            // Effectuer la sauvegarde en arrière-plan avec les données fraîchement calculées
+            // Effectuer la sauvegarde en arrière-plan avec les données fraîchement calculées (en nettoyant les champs virtuels)
             const toSave = updated.filter(ev => String(ev.id) === String(targetId) || (mode === 'series' && ev.recurrence_group_id === formData.recurrenceGroupId));
-            toSave.forEach(ev => supabase.from('calendar_events').update({ ...ev, organizer_email: data.profile?.email }).eq('id', ev.id).then());
+            toSave.forEach(ev => {
+                const { participants, my_status, ...cleanEv } = ev;
+                supabase.from('calendar_events').update({ ...cleanEv, organizer_email: data.profile?.email }).eq('id', ev.id).then();
+            });
             
             return { ...prev, calendar_events: updated };
         });

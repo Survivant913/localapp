@@ -3,7 +3,8 @@ import {
     Wallet, TrendingUp, TrendingDown, CreditCard, PiggyBank, LineChart, 
     ShieldCheck, Plus, ChevronUp, ChevronDown, ShoppingCart, Trash2, 
     Edit, CheckCircle2, X, Repeat, CalendarClock, List, Archive, AlertCircle, ArrowRightLeft,
-    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users, Eye, EyeOff } from 'lucide-react';
+    PieChart, Home, Navigation, Heart, Coffee, Laptop, Building, MoreHorizontal, Battery, ArrowDownCircle, ArrowUpCircle, Users, Eye, EyeOff, Calendar } from 'lucide-react';
+import CalendarView from './CalendarView';
 
 const CATEGORIES = [
     { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30', hex: '#f97316' },
@@ -19,7 +20,7 @@ const CATEGORIES = [
     { id: 'salaire', label: 'Revenu / Chiffre d\'Affaires', icon: Wallet, color: 'text-green-500 bg-green-100 dark:bg-green-900/30', hex: '#22c55e' }
 ];
 
-export default function BudgetManager({ data, updateData }) {
+export default function BudgetManager({ data, updateData, initialTab }) {
     if (!data) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -39,7 +40,7 @@ export default function BudgetManager({ data, updateData }) {
     
     const planner = { items: [], safetyBases: {}, ...budgetData.planner };
 
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTab] = useState(initialTab || 'dashboard');
     
     const [amount, setAmount] = useState('');
     const [desc, setDesc] = useState('');
@@ -733,6 +734,7 @@ export default function BudgetManager({ data, updateData }) {
                     <button onClick={() => setActiveTab('planner')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'planner' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PiggyBank size={16} /> Planificateur</button>
                     <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'analytics' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-b-2 border-rose-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PieChart size={16} /> Analyses</button>
                     <button onClick={() => setActiveTab('forecast')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'forecast' ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border-b-2 border-teal-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><LineChart size={16} /> Prévisions</button>
+                    <button onClick={() => setActiveTab('calendar')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'calendar' ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><Calendar size={16} /> Calendrier</button>
                     <button onClick={() => {setActiveTab('add-transaction'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-transaction' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Transaction</button>
                     <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-scheduled' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Planifié</button>
                     <button onClick={() => {setActiveTab('add-recurring'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-recurring' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Récurrent</button>
@@ -1240,6 +1242,13 @@ export default function BudgetManager({ data, updateData }) {
                             ))}
                         </div>
                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center italic">* Cette projection est basée sur votre solde actuel, vos opérations récurrentes mensuelles et les opérations planifiées uniques.</p>
+                    </div>
+                )}
+
+                {/* --- CALENDRIER FINANCIER / DEADLINE --- */}
+                {activeTab === 'calendar' && (
+                    <div className="p-6">
+                        <CalendarView data={data} updateData={updateData} />
                     </div>
                 )}
 

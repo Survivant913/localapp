@@ -55,13 +55,19 @@ export default function ProjectsManager({ data, updateData }) {
     const parseAmount = (val) => { if (!val) return 0; const cleanVal = val.toString().replace(/,/g, '.').replace(/\s/g, ''); const floatVal = parseFloat(cleanVal); return isNaN(floatVal) ? 0 : floatVal; };
     const formatCurrency = (val) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val);
 
-    const getAccountBalance = (accId) => {
-        return (data.budget?.transactions || [])
+        const getAccountBalance = (accId) => {
+        const rawBalance = (data.budget?.transactions || [])
             .filter(t => String(t.accountId) === String(accId)) 
             .reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount) : acc - parseFloat(t.amount), 0);
+        const safetyBase = data.budget?.planner?.safetyBases?.[accId] || 0;
+        return rawBalance - safetyBase;
     };
     
-    const currentTotalBalance = (data.budget?.transactions || []).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount) : acc - parseFloat(t.amount), 0);
+    const currentTotalBalance = (() => {
+        const rawTotal = (data.budget?.transactions || []).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount) : acc - parseFloat(t.amount), 0);
+        const totalSafetyBase = Object.values(data.budget?.planner?.safetyBases || {}).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+        return rawTotal - totalSafetyBase;
+    })();
 
     const calculateProgress = (objectives) => {
         if (!objectives || objectives.length === 0) return 0;

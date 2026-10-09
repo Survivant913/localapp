@@ -7,12 +7,15 @@ import {
     LayoutDashboard, Wallet, TrendingUp, TrendingDown, 
     CheckSquare, StickyNote, Plus, FolderKanban, 
     Calendar, Eye, EyeOff, CheckCircle2, List, Target, Euro, Flag, Clock, ArrowRightLeft, ArrowRight,
-    Repeat, RotateCcw, Check, Coffee, Activity, ChevronLeft, ChevronRight, Flame, Trophy, X, Zap
+    Repeat, RotateCcw, Check, Coffee, Activity, ChevronLeft, ChevronRight, Flame, Trophy, X, Zap, Sparkles
 } from 'lucide-react'; 
 import FocusProjectModal from './FocusProjectModal';
 import DashboardCalendar from './DashboardCalendar';
 
 // --- UTILITAIRE : CALCUL DE LA SÉRIE (STREAK) EN TEMPS RÉEL ---
+const getHabitDays = (h) => Array.isArray(h?.days_of_week) ? h.days_of_week : (h?.days_of_week?.days || [0,1,2,3,4,5,6]);
+const getHabitImportance = (h) => Array.isArray(h?.days_of_week) ? 1 : (h?.days_of_week?.importance || 1);
+
 const calculateStreak = (habit) => {
     if (!habit.history || habit.history.length === 0) return 0;
     
@@ -123,7 +126,9 @@ const RoutineFocusModal = ({ habits, updateHabit, onClose }) => {
 
     const todayStr = new Date().toLocaleDateString('fr-CA');
     const completedCount = localHabits.filter(h => h.history?.includes(todayStr)).length;
-    const progress = localHabits.length > 0 ? (completedCount / localHabits.length) * 100 : 0;
+    const totalImp = localHabits.reduce((acc, h) => acc + getHabitImportance(h), 0);
+    const completedImp = localHabits.filter(h => h.history?.includes(todayStr)).reduce((acc, h) => acc + getHabitImportance(h), 0);
+    const progress = totalImp > 0 ? (completedImp / totalImp) * 100 : 0;
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
@@ -225,26 +230,13 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
     
     const todayHabits = useMemo(() => {
         if (!Array.isArray(habits)) return [];
-        return habits.filter(h => {
-            if (!h.frequency || !Array.isArray(h.frequency)) {
-                 if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                     return h.days_of_week.includes(todayIndex);
-                 }
-                 return false;
-            }
-            let isScheduledToday = false;
-            if (h.days_of_week && Array.isArray(h.days_of_week)) {
-                isScheduledToday = h.days_of_week.includes(todayIndex);
-            } else {
-                isScheduledToday = h.frequency.some(d => {
-                    if (!d) return false;
-                    const norm = typeof d === 'string' ? d.toLowerCase().trim().substring(0, 3) : ''; 
-                    const map = { 'dim': 0, 'sun': 0, 'lun': 1, 'mon': 1, 'mar': 2, 'tue': 2, 'mer': 3, 'wed': 3, 'jeu': 4, 'thu': 4, 'ven': 5, 'fri': 5, 'sam': 6, 'sat': 6 };
-                    return map[norm] === todayIndex;
-                });
-            }
-            return isScheduledToday;
-        });
+        return habits.filter(h => getHabitDays(h).includes(todayIndex));
+    }, [habits, todayIndex]);
+
+    const tomorrowHabits = useMemo(() => {
+        if (!Array.isArray(habits)) return [];
+        const tomorrowIndex = (todayIndex + 1) % 7;
+        return habits.filter(h => getHabitDays(h).includes(tomorrowIndex));
     }, [habits, todayIndex]);
 
     const todayStr = new Date().toLocaleDateString('fr-CA');
@@ -309,6 +301,25 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
                     updateHabit={updateHabit} 
                     onClose={() => setIsFocusModalOpen(false)} 
                 />
+            )}
+
+            {tomorrowHabits.length > 0 && (
+                <div className="mt-4 p-4 rounded-[1.5rem] bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
+                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <Sparkles size={12} className="text-purple-500"/> Prévu demain
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                        {tomorrowHabits.map(h => (
+                            <div key={h.id} className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 rounded-md shadow-sm border border-slate-100 dark:border-slate-700">
+                                <DynamicIcon name={h.icon} size={12} className="text-slate-400" />
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{h.name}</span>
+                                {getHabitImportance(h) > 1 && (
+                                    <span className="text-[8px] font-black text-amber-500 ml-1">x{getHabitImportance(h)}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             )}
         </>
     );
@@ -675,8 +686,15 @@ export default function Dashboard({ data, updateData, setView }) {
     };
 
     const getAccountBalanceForProject = (accId) => {
-        return transactions.filter(t => String(t.accountId || t.account_id) === String(accId)).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+        const rawBalance = transactions.filter(t => String(t.accountId || t.account_id) === String(accId)).reduce((acc, t) => t.type === 'income' ? acc + parseFloat(t.amount || 0) : acc - parseFloat(t.amount || 0), 0);
+        const safetyBase = data.budget?.planner?.safetyBases?.[accId] || 0;
+        return rawBalance - safetyBase;
     };
+
+    const availableForProjectsGlobal = (() => {
+        const totalSafetyBase = Object.values(data.budget?.planner?.safetyBases || {}).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+        return currentBalance - totalSafetyBase;
+    })();
 
     const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
     const activeProjects = projects.filter(p => p.status !== 'done' && p.status !== 'on_hold').sort((a, b) => {
@@ -715,7 +733,7 @@ export default function Dashboard({ data, updateData, setView }) {
     return (
         <div className="space-y-6 fade-in p-6 pb-24 md:pb-20 w-full transition-all duration-300">
             {focusedProject && (
-                <FocusProjectModal project={focusedProject} onClose={() => setFocusedProject(null)} updateProject={updateProjectFromFocus} accounts={accounts} availableForProjects={currentBalance} getAccountBalance={getAccountBalanceForProject} />
+                <FocusProjectModal project={focusedProject} onClose={() => setFocusedProject(null)} updateProject={updateProjectFromFocus} accounts={accounts} availableForProjects={availableForProjectsGlobal} getAccountBalance={getAccountBalanceForProject} />
             )}
 
             {/* HEADER */}
@@ -878,7 +896,7 @@ export default function Dashboard({ data, updateData, setView }) {
                             ) : (
                                 activeProjects.map(p => {
                                     const cost = parseFloat(p.cost || 0);
-                                    let budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, currentBalance);
+                                    let budgetAvailable = p.linkedAccountId ? getAccountBalanceForProject(p.linkedAccountId) : Math.max(0, availableForProjectsGlobal);
                                     const fundingPercentage = cost > 0 ? Math.min(100, (Math.max(0, budgetAvailable) / cost) * 100) : 0;
                                     const isFunded = budgetAvailable >= cost;
                                     const safeProgress = Math.min(100, Math.max(0, p.progress || 0));

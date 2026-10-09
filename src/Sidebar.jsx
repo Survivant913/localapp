@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, Calendar, FolderKanban, Wallet, 
+  LayoutDashboard, FolderKanban, Wallet, 
   StickyNote, CheckSquare, Settings, LogOut, X, Coffee, Menu,
   Users, Box, Target, Book, CalendarRange, Clock, Activity,
   MessageSquare, Search, Bell
@@ -55,7 +55,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
     { id: 'workspace', label: 'Workspace', icon: Box }, 
     { id: 'chat', label: 'Messages', icon: MessageSquare, badge: unreadCount },
     { id: 'planning', label: 'Agenda', icon: CalendarRange },
-    { id: 'calendar', label: 'Calendrier Financier / Deadline', icon: Calendar }, 
     { id: 'projects', label: 'Mes Projets', icon: FolderKanban },
     { id: 'goals', label: 'Objectifs', icon: Target },
     { id: 'habits', label: 'Suivi Habitudes', icon: Activity },
@@ -80,7 +79,6 @@ export default function Sidebar({ currentView, setView, isMobileOpen, toggleMobi
       if (item.id === 'workspace') return settings?.showWorkspace !== false;
       if (item.id === 'chat') return settings?.showChat !== false;
       if (item.id === 'planning') return settings?.showPlanning !== false;
-      if (item.id === 'calendar') return settings?.showCalendar !== false;
       if (item.id === 'budget') return settings?.showBudget !== false;
       if (item.id === 'notes') return settings?.showNotesSide !== false;
       if (item.id === 'journal') return settings?.showJournal !== false;

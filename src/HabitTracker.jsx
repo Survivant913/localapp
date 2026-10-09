@@ -47,6 +47,9 @@ const COLOR_MAP = {
     'bg-gray-400': 'text-gray-400'
 };
 
+const getHabitDays = (h) => Array.isArray(h?.days_of_week) ? h.days_of_week : (h?.days_of_week?.days || [0,1,2,3,4,5,6]);
+const getHabitImportance = (h) => Array.isArray(h?.days_of_week) ? 1 : (h?.days_of_week?.importance || 1);
+
 export default function HabitTracker({ }) {
     const [activeTab, setActiveTab] = useState('daily'); 
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -195,11 +198,11 @@ export default function HabitTracker({ }) {
     };
 
     // --- LOGIQUE AMÉLIORÉE : AJOUT / MODIFICATION ---
-    const addHabit = async (name, categoryId, daysOfWeek, icon) => {
+    const addHabit = async (name, categoryId, daysOfWeek, icon, importance) => {
         const payload = { 
             name, 
             category_id: (categoryId === "" || categoryId === "null") ? null : categoryId, 
-            days_of_week: daysOfWeek,
+            days_of_week: { days: daysOfWeek, importance: importance || 1 },
             icon: icon || null 
         };
 
@@ -274,7 +277,7 @@ export default function HabitTracker({ }) {
             catHabits.forEach(h => {
                 dates.forEach(d => {
                     const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
-                    const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+                    const scheduledDays = getHabitDays(h);
                     const isScheduled = scheduledDays.includes(d.dayIndex);
                     
                     if (isDone) {
@@ -300,7 +303,7 @@ export default function HabitTracker({ }) {
 
             dates.forEach(d => {
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
-                const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+                const scheduledDays = getHabitDays(h);
                 const isScheduled = scheduledDays.includes(d.dayIndex);
 
                 if (isDone) {
@@ -326,7 +329,7 @@ export default function HabitTracker({ }) {
 
             habits.forEach(h => {
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === dObj.str);
-                const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+                const scheduledDays = getHabitDays(h);
                 const isScheduled = scheduledDays.includes(dObj.dayIndex);
 
                 if (isDone) {
@@ -355,9 +358,13 @@ export default function HabitTracker({ }) {
     const currentDayIndex = selectedDate.getDay();
 
     const visibleHabits = habits.filter(h => {
-        const scheduledDays = h.days_of_week || [0,1,2,3,4,5,6];
+        const scheduledDays = getHabitDays(h);
         return scheduledDays.includes(currentDayIndex);
     });
+
+    const tomorrowDateObj = new Date(selectedDate); tomorrowDateObj.setDate(tomorrowDateObj.getDate() + 1);
+    const tomorrowDayIndex = tomorrowDateObj.getDay();
+    const tomorrowHabits = habits.filter(h => getHabitDays(h).includes(tomorrowDayIndex));
     
     const uncategorizedVisibleHabits = visibleHabits.filter(h => !h.category_id);
     const categorizedVisibleHabits = categories.map(cat => ({
@@ -369,8 +376,11 @@ export default function HabitTracker({ }) {
 
     const dailyProgress = useMemo(() => {
         if (visibleHabits.length === 0) return 0;
-        const done = visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length;
-        return Math.round((done / visibleHabits.length) * 100);
+        const totalImp = visibleHabits.reduce((acc, h) => acc + getHabitImportance(h), 0);
+        const doneImp = visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr))
+                                     .reduce((acc, h) => acc + getHabitImportance(h), 0);
+        if (totalImp === 0) return 0;
+        return Math.round((doneImp / totalImp) * 100);
     }, [visibleHabits, logs, dateStr]);
 
     return (
@@ -470,6 +480,26 @@ export default function HabitTracker({ }) {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                        
+                        {/* Aperçu Demain */}
+                        {tomorrowHabits.length > 0 && isToday && (
+                            <div className="mt-16 pt-10 pb-10 border-t border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                                <h4 className="font-black text-2xl text-slate-700 dark:text-white flex items-center gap-3 mb-8">
+                                    Prévu pour Demain
+                                </h4>
+                                <div className="flex flex-wrap gap-4">
+                                    {tomorrowHabits.map(h => (
+                                        <div key={h.id} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-3 flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity">
+                                            <DynamicIcon name={h.icon} size={18} className="text-slate-400" />
+                                            <span className="font-bold text-slate-600 dark:text-slate-300 text-sm">{h.name}</span>
+                                            {getHabitImportance(h) > 1 && (
+                                                <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-md ml-2">x{getHabitImportance(h)}</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -582,7 +612,7 @@ export default function HabitTracker({ }) {
                                             </div>
                                             <div className="flex gap-1 mt-2">
                                                 {['D','L','M','M','J','V','S'].map((d, i) => (
-                                                    <span key={i} className={`text-[8px] w-4 h-4 flex items-center justify-center rounded-md font-black ${(h.days_of_week||[0,1,2,3,4,5,6]).includes(i) ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'text-slate-300 dark:text-slate-600'}`}>{d}</span>
+                                                    <span key={i} className={`text-[8px] w-4 h-4 flex items-center justify-center rounded-md font-black ${(getHabitDays(h)).includes(i) ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'text-slate-300 dark:text-slate-600'}`}>{d}</span>
                                                 ))}
                                             </div>
                                         </div>
@@ -660,14 +690,16 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
     const [categoryId, setCategoryId] = useState('');
     const [selectedDays, setSelectedDays] = useState([0,1,2,3,4,5,6]); 
     const [selectedIcon, setSelectedIcon] = useState('');
+    const [importance, setImportance] = useState(1);
 
     // Si on clique sur "Éditer", on pré-remplit les champs
     useEffect(() => {
         if (editingHabit) {
             setName(editingHabit.name);
             setCategoryId(editingHabit.category_id || '');
-            setSelectedDays(editingHabit.days_of_week || [0,1,2,3,4,5,6]);
+            setSelectedDays(Array.isArray(editingHabit?.days_of_week) ? editingHabit.days_of_week : (editingHabit?.days_of_week?.days || [0,1,2,3,4,5,6]));
             setSelectedIcon(editingHabit.icon || '');
+            setImportance(Array.isArray(editingHabit?.days_of_week) ? 1 : (editingHabit?.days_of_week?.importance || 1));
         }
     }, [editingHabit]);
 
@@ -682,11 +714,12 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if(name) { 
-            onAdd(name, categoryId, selectedDays, selectedIcon); 
+            onAdd(name, categoryId, selectedDays, selectedIcon, importance); 
             setName('');
             setCategoryId('');
             setSelectedDays([0,1,2,3,4,5,6]); 
             setSelectedIcon('');
+            setImportance(1);
         }
     };
 
@@ -694,18 +727,18 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
         <form onSubmit={handleSubmit} className={`pt-8 border-t space-y-6 ${editingHabit ? 'border-amber-400 dark:border-amber-600' : 'border-slate-100 dark:border-slate-800'}`}>
             {editingHabit && <div className="text-xs font-black text-amber-500 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-md w-fit">Mode Modification</div>}
             <div className="space-y-4">
-                <div className="flex gap-2">
+                <div className="flex flex-col md:flex-row gap-2">
                     <input 
                         value={name} 
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nom de l'habitude..." 
-                        className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" 
+                        className="flex-1 w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" 
                         required
                     />
                     <select 
                         value={categoryId} 
                         onChange={(e) => setCategoryId(e.target.value)}
-                        className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold w-1/3"
+                        className="p-4 w-full md:w-1/3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold"
                     >
                         <option value="">Sans Domaine</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -728,22 +761,34 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex items-center justify-between">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-4">Fréquence</span>
-                        <div className="flex gap-1">
+                <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+                    <div className="flex-1 w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Fréquence</span>
+                        <div className="flex flex-wrap gap-1 justify-end">
                             {['D','L','M','M','J','V','S'].map((d, i) => (
-                                <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 ${selectedDays.includes(i) ? 'bg-blue-600 text-white shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>{d}</button>
+                                <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 shrink-0 ${selectedDays.includes(i) ? 'bg-blue-600 text-white shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>{d}</button>
                             ))}
                         </div>
                     </div>
-                    {editingHabit ? (
-                        <div className="flex gap-2">
-                            <button type="button" onClick={onCancelEdit} className="p-4 bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-300 transition-all font-black text-xs uppercase tracking-widest">Annuler</button>
-                            <button type="submit" className="px-6 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 shadow-xl shadow-emerald-500/30 transition-all font-black text-xs uppercase tracking-widest">Sauver</button>
+                    <div className="flex-1 w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Importance</span>
+                        <div className="flex flex-wrap gap-1 justify-end">
+                            {[1, 2, 3, 4, 5].map((val) => (
+                                <button key={val} type="button" onClick={() => setImportance(val)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 shrink-0 ${importance === val ? (val >= 4 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-blue-600 text-white shadow-lg shadow-blue-500/30') : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>x{val}</button>
+                            ))}
                         </div>
+                    </div>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2 mt-4">
+                    {editingHabit ? (
+                        <>
+                            <button type="button" onClick={onCancelEdit} className="p-4 bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-300 transition-all font-black text-xs uppercase tracking-widest shrink-0">Annuler</button>
+                            <button type="submit" className="px-6 py-4 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 shadow-xl shadow-emerald-500/30 transition-all font-black text-xs uppercase tracking-widest shrink-0">Sauver</button>
+                        </>
                     ) : (
-                        <button type="submit" className="p-5 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95"><Plus size={24}/></button>
+                        <button type="submit" className="p-4 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 shrink-0 w-full sm:w-auto">
+                            <Plus size={18}/> Ajouter
+                        </button>
                     )}
                 </div>
             </div>

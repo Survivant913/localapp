@@ -7,7 +7,7 @@ import ContactsPanel from './ContactsPanel';
 import FloatingChatsManager from './FloatingChatsManager';
 import Dashboard from './Dashboard';
 import GlobalSearch from './GlobalSearch';
-import CalendarView from './CalendarView';
+
 import ProjectsManager from './ProjectsManager';
 import BudgetManager from './BudgetManager';
 import NotesManager from './NotesManager';
@@ -1117,7 +1117,7 @@ export default function App() {
  const renderContent = () => {
    switch(currentView) {
      case 'dashboard': return <Dashboard data={data} updateData={updateData} setView={setView} />;
-     case 'calendar': return <CalendarView data={data} updateData={updateData} />;
+     case 'calendar': return <BudgetManager data={data} updateData={updateData} initialTab="calendar" />;
      case 'projects': return <ProjectsManager data={data} updateData={updateData} />;
      case 'budget': return <BudgetManager data={data} updateData={updateData} />;
      case 'notes': return <NotesManager data={data} updateData={updateData} />;

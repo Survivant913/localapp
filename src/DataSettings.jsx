@@ -25,7 +25,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [showChat, setShowChat] = useState(data.settings?.showChat ?? true);
     const [notificationsEnabled, setNotificationsEnabled] = useState(data.settings?.notifications_enabled ?? true);
     const [showPlanning, setShowPlanning] = useState(data.settings?.showPlanning ?? true);
-    const [showCalendar, setShowCalendar] = useState(data.settings?.showCalendar ?? true);
+
     const [showBudget, setShowBudget] = useState(data.settings?.showBudget ?? true);
     const [showNotesSide, setShowNotesSide] = useState(data.settings?.showNotesSide ?? true);
     const [showJournal, setShowJournal] = useState(data.settings?.showJournal ?? true);
@@ -75,7 +75,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             setShowChat(data.settings.showChat ?? true);
             setNotificationsEnabled(data.settings.notifications_enabled ?? true);
             setShowPlanning(data.settings.showPlanning ?? true);
-            setShowCalendar(data.settings.showCalendar ?? true);
+
             setShowBudget(data.settings.showBudget ?? true);
             setShowNotesSide(data.settings.showNotesSide ?? true);
             setShowJournal(data.settings.showJournal ?? true);
@@ -143,7 +143,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                 showChat,
                 notifications_enabled: notificationsEnabled,
                 showPlanning,
-                showCalendar,
+
                 showBudget,
                 showNotesSide,
                 showJournal,
@@ -299,7 +299,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 { label: 'Messages', desc: 'Chat et discussions', state: showChat, setter: setShowChat },
                                 { label: 'Notifications', desc: 'Activer les alertes', state: notificationsEnabled, setter: setNotificationsEnabled },
                                 { label: 'Agenda', desc: 'Planning', state: showPlanning, setter: setShowPlanning },
-                                { label: 'Calendrier Financier', desc: 'Échéances et deadlines', state: showCalendar, setter: setShowCalendar },
+
                                 { label: 'Mes Projets', desc: 'Gestion de projets', state: showProjects, setter: setShowProjects },
                                 { label: 'Objectifs', desc: 'Suivi de vos objectifs', state: showGoals, setter: setShowGoals },
                                 { label: 'Suivi Habitudes', desc: 'Créer et suivre vos habitudes', state: showHabits, setter: setShowHabits },
