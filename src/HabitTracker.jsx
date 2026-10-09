@@ -279,12 +279,13 @@ export default function HabitTracker({ }) {
                     const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
                     const scheduledDays = getHabitDays(h);
                     const isScheduled = scheduledDays.includes(d.dayIndex);
+                    const imp = getHabitImportance(h);
                     
                     if (isDone) {
-                        totalDone++;
-                        totalPossible++;
+                        totalDone += imp;
+                        totalPossible += imp;
                     } else if (isScheduled && !h.is_archived) {
-                        totalPossible++;
+                        totalPossible += imp;
                     }
                 });
             });
@@ -305,12 +306,13 @@ export default function HabitTracker({ }) {
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === d.str);
                 const scheduledDays = getHabitDays(h);
                 const isScheduled = scheduledDays.includes(d.dayIndex);
+                const imp = getHabitImportance(h);
 
                 if (isDone) {
-                    totalDone++;
-                    totalPossible++;
+                    totalDone += imp;
+                    totalPossible += imp;
                 } else if (isScheduled) {
-                    totalPossible++;
+                    totalPossible += imp;
                 }
             });
 
@@ -331,12 +333,13 @@ export default function HabitTracker({ }) {
                 const isDone = logs.some(l => l.habit_id === h.id && l.date === dObj.str);
                 const scheduledDays = getHabitDays(h);
                 const isScheduled = scheduledDays.includes(dObj.dayIndex);
+                const imp = getHabitImportance(h);
 
                 if (isDone) {
-                    doneCount++;
-                    activeHabitsCount++;
+                    doneCount += imp;
+                    activeHabitsCount += imp;
                 } else if (isScheduled) {
-                    activeHabitsCount++;
+                    activeHabitsCount += imp;
                 }
             });
 
