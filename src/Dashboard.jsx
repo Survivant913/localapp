@@ -306,7 +306,7 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
             {tomorrowHabits.length > 0 && (
                 <div className="mt-4 p-4 rounded-[1.5rem] bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
                     <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <Sparkles size={12} className="text-purple-500"/> Prévu demain
+                        Prévu demain
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {tomorrowHabits.map(h => (
