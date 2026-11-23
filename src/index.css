@@ -72,11 +72,23 @@ body {
 
 /* Print Styles */
 @media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body, html {
     height: auto !important;
     overflow: visible !important;
     background: white !important;
     color: black !important;
+  }
+
+  mark {
+    background-color: #fef08a;
+    color: #000 !important;
+    padding: 0 2px;
+    border-radius: 2px;
   }
   
   /* Masquer tous les éléments d'interface inutiles à l'impression */

@@ -143,7 +143,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
                     <div className="flex-1"></div>
                     <div className="flex items-center gap-2">
                         <button onClick={onToggleZenMode} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-all" title="Mode Zen (Focus)"><Maximize2 size={18}/></button>
-                        <button onClick={onPrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Imprimer"><Printer size={18}/></button>
+                        <button onClick={() => onPrint && onPrint(editor?.getHTML(), titleRef.current?.value)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 transition-colors" title="Imprimer"><Printer size={18}/></button>
                     </div>
                 </div>
             )}
@@ -179,6 +179,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
 
             <style>{`
                 .ProseMirror { outline: none !important; min-height: 500px; }
+                .ProseMirror mark { background-color: #fef08a; color: #09090b; padding: 0 2px; border-radius: 2px; }
                 .ProseMirror p.is-editor-empty:first-child::before {
                     content: attr(data-placeholder);
                     float: left;

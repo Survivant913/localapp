@@ -456,14 +456,15 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
     );
 
     // --- IMPRESSION PARFAITE A4 ---
-    const handlePrint = () => {
+    const handlePrint = (liveContent, liveTitle) => {
         if (!activePageId) return;
         const page = allPages.find(p => p.id === activePageId);
         if (!page) return;
 
         const printWindow = window.open('', '_blank');
-        const content = page.content || '';
-        const title = page.title || 'Sans titre';
+        if (!printWindow) return alert("Veuillez autoriser les pop-ups pour imprimer.");
+        const content = (typeof liveContent === 'string' ? liveContent : page.content) || '';
+        const title = (typeof liveTitle === 'string' && liveTitle.trim() ? liveTitle : page.title) || 'Sans titre';
         const date = format(new Date(), 'd MMMM yyyy', { locale: fr });
 
         printWindow.document.write(`
@@ -479,6 +480,7 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     h1 { font-size: 24pt; font-weight: 700; margin: 0; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 30px; }
                     .meta { color: #555 !important; font-style: italic; margin-bottom: 10px; font-size: 9pt; text-align: right; }
                     .content { text-align: justify; }
+                    mark { background-color: #fef08a; color: #000 !important; padding: 0 2px; border-radius: 2px; }
                     blockquote { border-left: 4px solid #333 !important; padding: 10px 15px !important; margin: 20px 0 !important; background: #f9f9f9 !important; font-style: italic !important; }
                     ul { list-style-type: disc; padding-left: 20px; }
                     ol { list-style-type: decimal; padding-left: 20px; }
