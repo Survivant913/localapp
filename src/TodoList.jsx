@@ -50,10 +50,10 @@ export default function TodoList({ data, updateData }) {
         .map(s => String(s.list_id));
     
     const allLists = [
-        { id: 'default', name: 'To-Do', color: 'indigo' }, 
-        ...todoListsFromData.filter(l => 
+        { id: 'default', name: 'To-Do', color: 'zinc' },
+        ...todoListsFromData.filter(l => l.id !== 'default' && (
             !l.user_id || l.user_id === data.profile?.id || 
-            sharedListIds.includes(String(l.id))
+            sharedListIds.includes(String(l.id)))
         )
     ];
 

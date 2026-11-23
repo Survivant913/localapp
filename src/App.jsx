@@ -981,6 +981,15 @@ export default function App() {
              const insertPayload = { ...payload }; delete insertPayload.accountId; delete insertPayload.targetAccountId; delete insertPayload.listId; delete insertPayload.linkedProjectId;
              if (table === 'account_shares') insertPayload.owner_id = session?.user?.id;
              else if (table !== 'journal_shares' && table !== 'todo_list_shares') insertPayload.user_id = session?.user?.id;
+           if (table === 'todos' && (insertPayload.list_id === 'default' || !insertPayload.list_id)) {
+               insertPayload.list_id = 'default';
+               try {
+                   await supabase.from('todo_lists').upsert(
+                       { id: 'default', name: 'To-Do', color: 'zinc', user_id: session?.user?.id },
+                       { onConflict: 'id', ignoreDuplicates: true }
+                   );
+               } catch (_) {}
+           }
            const { error } = await supabase.from(table).insert(insertPayload);
            if (error) throw error;
        } 
@@ -1040,8 +1049,11 @@ export default function App() {
      await upsertInBatches('quotes', data.quotes, 50, q => ({ id: q.id, user_id: user.id, number: q.number, client_id: q.client_id, client_name: q.client_name, client_address: q.client_address, date: q.date, due_date: q.dueDate, items: q.items, total: q.total, status: q.status, notes: q.notes }));
      await upsertInBatches('invoices', data.invoices, 50, i => ({ id: i.id, user_id: user.id, number: i.number, client_id: i.client_id, client_name: i.client_name, client_address: i.client_address, date: i.date, due_date: i.dueDate, items: i.items, total: i.total, status: i.status, target_account_id: i.target_account_id, notes: i.notes }));
      await upsertInBatches('catalog_items', data.catalog, 50, c => ({ id: c.id, user_id: user.id, name: c.name, price: c.price }));
-     await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: t.user_id || user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes, list_id: t.list_id || t.listId }));
-     await upsertInBatches('todo_lists', data.todoLists, 50, l => ({ id: l.id, user_id: l.user_id || user.id, name: l.name, color: l.color })); 
+     const listsToUpsert = (data.todoLists || []).some(l => l.id === 'default')
+         ? data.todoLists
+         : [{ id: 'default', name: 'To-Do', color: 'zinc', user_id: user.id }, ...(data.todoLists || [])];
+     await upsertInBatches('todo_lists', listsToUpsert, 50, l => ({ id: l.id, user_id: l.user_id || user.id, name: l.name, color: l.color }));
+     await upsertInBatches('todos', data.todos, 50, t => ({ id: t.id, user_id: t.user_id || user.id, text: t.text, completed: t.completed, status: t.status, priority: t.priority, deadline: t.deadline, scheduled_date: t.scheduled_date, duration_minutes: t.duration_minutes, list_id: t.list_id || t.listId || 'default' }));
      await upsertInBatches('notes', data.notes, 50, n => ({ id: n.id, user_id: n.user_id || user.id, title: n.title, content: n.content, color: n.color, is_pinned: n.isPinned, linked_project_id: n.linkedProjectId, created_at: n.created_at || new Date().toISOString() }));
      await upsertInBatches('projects', data.projects, 50, p => ({ id: p.id, user_id: p.user_id || user.id, title: p.title, description: p.description, status: p.status, priority: p.priority, deadline: p.deadline, progress: p.progress, cost: p.cost, linked_account_id: p.linkedAccountId, internal_notes: p.notes }));
      // --- RETOUR DE LA CATEGORIE DANS LA SAUVEGARDE RECURRING ---
