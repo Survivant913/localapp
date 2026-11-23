@@ -11,7 +11,6 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [appName, setAppName] = useState(data.customLabels?.appName || 'Mon Espace');
     
     // Sécurisation : on s'assure qu'une couleur est toujours définie (défaut 'blue')
-    const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'mono');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
 
     // VISIBILITÉ SIDEBAR
@@ -132,7 +131,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             customLabels: { ...(data.customLabels || {}), appName, userName: companyData.user_name },
             settings: { 
                 ...(data.settings || {}), 
-                accentColor,
+                accentColor: 'mono',
                 grayShade,
                 showClients,
                 showGoals,
@@ -190,17 +189,6 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         if ((theme === 'dark' && !darkMode) || (theme === 'light' && darkMode)) toggleTheme();
     };
 
-    // --- OPTIONS DE COULEURS (FIXÉES EN HEXADÉCIMAL) ---
-    const accents = [
-        { id: 'mono',    hex: '#ffffff', label: 'Brut' },
-        { id: 'blue',    hex: '#2563eb', label: 'Océan' },
-        { id: 'violet',  hex: '#7c3aed', label: 'Cosmic' },
-        { id: 'emerald', hex: '#059669', label: 'Finance' },
-        { id: 'amber',   hex: '#f59e0b', label: 'Energy' },
-        { id: 'rose',    hex: '#e11d48', label: 'Passion' },
-        { id: 'indigo',  hex: '#4f46e5', label: 'Royal' },
-    ];
-
     return (
         <div className="fade-in p-6 pb-24 md:pb-20 max-w-6xl mx-auto space-y-8">
             
@@ -248,40 +236,9 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
 
                     <hr className="border-zinc-200 dark:border-zinc-800"/>
 
-                    {/* Couleur d'Accentuation */}
-                    <div>
-                        <div className="mb-4">
-                            <h4 className="font-bold text-slate-700 dark:text-slate-200">Couleur Principale</h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Cette couleur s'appliquera aux boutons, graphiques et icônes actifs.</p>
-                        </div>
-                        <div className="flex flex-wrap gap-4">
-                            {accents.map((acc) => (
-                                <button 
-                                    key={acc.id}
-                                    onClick={() => setAccentColor(acc.id)}
-                                    className={`
-                                        group relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all w-24
-                                        ${accentColor === acc.id 
-                                            ? 'border-slate-800 dark:border-white bg-slate-50 dark:bg-zinc-800' 
-                                            : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                                        }
-                                    `}
-                                >
-                                    {/* CORRECTION COULEUR : Style inline pour éviter l'override du thème */}
-                                    <div 
-                                        className={`w-8 h-8 rounded-full shadow-sm ${accentColor === acc.id ? 'scale-110 ring-2 ring-offset-2 ring-slate-300 dark:ring-slate-600' : ''}`}
-                                        style={{ backgroundColor: acc.hex }}
-                                    ></div>
-                                    <span className={`text-xs font-medium ${accentColor === acc.id ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>{acc.label}</span>
-                                    {accentColor === acc.id && <div className="absolute top-2 right-2 text-green-500"><CheckCircle2 size={12}/></div>}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
                     {/* Nom de l'App */}
-                    <div className="pt-4">
-                        <label className="text-xs font-bold text-slate-500 block mb-2">Nom de l'application (Barre latérale)</label>
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 block mb-2">Nom de l'application (Barre latérale)</label>
                         <input type="text" value={appName} onChange={(e) => setAppName(e.target.value)} className="w-full max-w-md px-4 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none dark:text-white text-sm" />
                     </div>
 
