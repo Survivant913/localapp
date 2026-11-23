@@ -252,10 +252,10 @@ export default function TodoList({ data, updateData }) {
     };
 
     return (
-        <div className={`flex h-screen transition-all duration-300 ${isDark ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900'}`}>
+        <div className={`flex h-screen transition-all duration-200 ${isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-zinc-100 text-zinc-900'}`}>
             
             {/* SIDEBAR RÉTRACTABLE (LOGIQUE INTACTE) */}
-            <aside className={`border-r hidden md:flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <aside className={`border-r hidden md:flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} ${isDark ? 'bg-[#09090b] border-zinc-800/80' : 'bg-white border-zinc-200'}`}>
                 <div className="p-4 flex flex-col h-full">
                     <div className={`flex items-center gap-3 mb-8 ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
                         {!isSidebarCollapsed && (
@@ -276,7 +276,7 @@ export default function TodoList({ data, updateData }) {
                             <div key={list.id} className="group relative">
                                 <button
                                     onClick={() => setActiveListId(list.id)}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeListId === list.id ? (isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600') : (isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-50')} ${isSidebarCollapsed ? 'justify-center' : ''}`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeListId === list.id ? (isDark ? 'bg-white text-[#09090b] font-semibold' : 'bg-zinc-900 text-white font-semibold') : (isDark ? 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100' : 'text-zinc-500 hover:bg-zinc-100')} ${isSidebarCollapsed ? 'justify-center' : ''}`}
                                     title={list.name}
                                 >
                                     <Hash size={18} className="shrink-0" />
@@ -308,7 +308,7 @@ export default function TodoList({ data, updateData }) {
                         <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0">
                             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                                 <circle cx="50" cy="50" r={radius} stroke={isDark ? "rgba(255,255,255,0.05)" : "#e2e8f0"} strokeWidth="8" fill="none" />
-                                <circle cx="50" cy="50" r={radius} stroke="currentColor" strokeWidth="8" fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className="text-indigo-500 transition-all duration-1000 ease-out" strokeLinecap="round" />
+                                <circle cx="50" cy="50" r={radius} stroke="currentColor" strokeWidth="8" fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className="text-zinc-900 dark:text-white transition-all duration-1000 ease-out" strokeLinecap="round" />
                             </svg>
                             <span className="absolute text-sm font-bold">{stats.percentage}%</span>
                         </div>
@@ -328,8 +328,8 @@ export default function TodoList({ data, updateData }) {
                             </button>
                         )}
                         <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
-                            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><List size={16} /> Liste</button>
-                            <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'kanban' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><LayoutDashboard size={16} /> Kanban</button>
+                            <button onClick={() => setViewMode('list')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'list' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}><List size={15} /> Liste</button>
+                            <button onClick={() => setViewMode('kanban')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'kanban' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}><LayoutDashboard size={15} /> Kanban</button>
                         </div>
                     </div>
                 </header>
@@ -338,7 +338,7 @@ export default function TodoList({ data, updateData }) {
                     
                     {/* FORMULAIRE (MODIFIÉ POUR PRENDRE EN CHARGE L'ÉDITION) */}
                     <div className="mb-8 w-full">
-                        <form onSubmit={handleSaveTask} className={`rounded-2xl border p-2 shadow-xl transition-all ${isDark ? 'bg-slate-900/40 border-white/5 focus-within:border-indigo-500/50' : 'bg-white border-slate-200 focus-within:border-indigo-400'} ${editingTaskId ? 'ring-2 ring-indigo-500 border-transparent' : ''}`}>
+                        <form onSubmit={handleSaveTask} className={`rounded-2xl border p-2 transition-all ${isDark ? 'bg-[#111113] border-zinc-800 focus-within:border-zinc-600' : 'bg-white border-zinc-200 focus-within:border-zinc-400'} ${editingTaskId ? 'ring-1 ring-white border-transparent' : ''}`}>
                             <div className="flex items-center gap-3 px-4 py-2">
                                 <input 
                                     type="text" 
@@ -359,7 +359,7 @@ export default function TodoList({ data, updateData }) {
                                 )}
                                 <button 
                                     type="submit" 
-                                    className={`p-3 text-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg ${editingTaskId ? 'bg-green-500 shadow-green-500/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}
+                                    className="p-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl hover:opacity-90 active:scale-95 transition-all"
                                 >
                                     {editingTaskId ? <CheckCircle2 size={20} /> : <Plus size={20} />}
                                 </button>
@@ -385,7 +385,7 @@ export default function TodoList({ data, updateData }) {
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex gap-2 bg-slate-900/10 dark:bg-slate-900/50 p-1 rounded-lg">
                                     {['all', 'active', 'completed'].map(f => (
-                                        <button key={f} onClick={() => setFilter(f)} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${filter === f ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>
+                                        <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
                                             {f === 'all' ? 'Toutes' : f === 'active' ? 'À faire' : 'Terminées'}
                                         </button>
                                     ))}
@@ -396,7 +396,7 @@ export default function TodoList({ data, updateData }) {
                             {filteredTodos.map(todo => {
                                 const pConf = priorityConfig[todo.priority] || priorityConfig.medium;
                                 return (
-                                    <div key={todo.id} className={`group flex items-center gap-4 p-4 rounded-2xl border transition-all ${todo.completed ? 'opacity-50' : ''} ${isDark ? 'bg-slate-900/40 border-white/5 hover:border-white/10' : 'bg-white border-slate-100 hover:border-indigo-200 shadow-sm'}`}>
+                                    <div key={todo.id} className={`group flex items-center gap-4 p-4 rounded-xl border transition-all ${todo.completed ? 'opacity-45' : ''} ${isDark ? 'bg-[#111113] border-zinc-800 hover:border-zinc-700' : 'bg-white border-zinc-200 hover:border-zinc-400'}`}>
                                         <button onClick={() => toggleTodo(todo.id)} className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${todo.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 hover:border-green-500'}`}>
                                             {todo.completed && <CheckCircle2 size={16} />}
                                         </button>
@@ -436,7 +436,7 @@ export default function TodoList({ data, updateData }) {
                                         {column.title}
                                     </h3>
                                     
-                                    <div className={`flex-1 rounded-3xl p-4 border-2 border-dashed transition-colors duration-200 ${isDark ? 'bg-slate-900/20 border-white/5 hover:bg-slate-900/40' : 'bg-slate-50 border-slate-200/50 hover:bg-slate-100/50'}`}>
+                                    <div className={`flex-1 rounded-2xl p-3.5 border border-dashed transition-colors duration-200 ${isDark ? 'bg-[#111113]/50 border-zinc-800 hover:border-zinc-700' : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100/60'}`}>
                                         {todos
                                             .filter(t => (t.listId || t.list_id || 'default') === activeListId && (column.id === 'done' ? t.completed : !t.completed && (t.status === column.id || (!t.status && column.id === 'todo'))))
                                             .map(todo => (
@@ -444,7 +444,7 @@ export default function TodoList({ data, updateData }) {
                                                     key={todo.id} 
                                                     draggable="true"
                                                     onDragStart={(e) => handleDragStart(e, todo.id)}
-                                                    className={`p-4 rounded-2xl border shadow-xl relative group mb-4 cursor-default active:scale-95 transition-all ${isDark ? 'bg-slate-800 border-white/5' : 'bg-white border-slate-200'}`}
+                                                    className={`p-4 rounded-xl border relative group mb-3 cursor-default active:scale-[0.99] transition-all ${isDark ? 'bg-[#141416] border-zinc-800 hover:border-zinc-600' : 'bg-white border-zinc-200'}`}
                                                 >
                                                     <div className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1">
                                                         <GripVertical size={16} className="text-slate-500" />
@@ -487,7 +487,7 @@ export default function TodoList({ data, updateData }) {
             {/* MODAL DE PARTAGE */}
             {showShareModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowShareModal(false)}>
-                    <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+                    <div className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${isDark ? 'bg-[#111113] border-zinc-800' : 'bg-white border-zinc-200'}`} onClick={e => e.stopPropagation()}>
                         <div className={`px-6 py-4 flex items-center justify-between border-b ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
                             <h3 className="font-black flex items-center gap-2"><Users size={18}/> Partager la liste</h3>
                             <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>

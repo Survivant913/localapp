@@ -261,55 +261,55 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
 
     return (
         <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}></div>
-            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl relative z-10 border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose}></div>
+            <div className="bg-white dark:bg-[#111113] rounded-2xl w-full max-w-2xl shadow-2xl relative z-10 border border-zinc-200 dark:border-zinc-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col">
                 
                 {/* Search Header */}
-                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-4 bg-slate-50/50 dark:bg-slate-800/30">
-                    <Search className="text-slate-400 shrink-0 ml-2" size={24} />
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-4 bg-zinc-50 dark:bg-[#09090b]">
+                    <Search className="text-zinc-500 shrink-0 ml-2" size={20} />
                     <input
                         ref={inputRef}
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Rechercher projets, notes, tâches ou modules..."
-                        className="flex-1 bg-transparent border-none focus:ring-0 text-xl text-slate-800 dark:text-white placeholder-slate-400 font-medium h-12 outline-none"
+                        className="flex-1 bg-transparent border-none focus:ring-0 text-lg text-zinc-900 dark:text-white placeholder-zinc-500 font-medium h-10 outline-none"
                     />
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all mr-1">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-all mr-1">
+                        <X size={18} />
                     </button>
                 </div>
 
                 {/* Results Area */}
-                <div className="max-h-[60vh] overflow-y-auto custom-scrollbar bg-white dark:bg-slate-900 relative">
+                <div className="max-h-[60vh] overflow-y-auto custom-scrollbar bg-white dark:bg-[#111113] relative">
                     {query.trim() === '' ? (
-                        <div className="p-12 text-center text-slate-400 flex flex-col items-center">
-                            <Search size={48} className="opacity-20 mb-4" />
-                            <p className="font-medium">Que cherchez-vous aujourd'hui ?</p>
-                            <p className="text-sm opacity-60 mt-1">Tapez un mot-clé pour lancer la recherche.</p>
+                        <div className="p-12 text-center text-zinc-500 flex flex-col items-center">
+                            <Search size={40} className="opacity-20 mb-4" />
+                            <p className="font-medium text-zinc-300">Que cherchez-vous aujourd'hui ?</p>
+                            <p className="text-xs opacity-60 mt-1">Tapez un mot-clé pour lancer la recherche.</p>
                         </div>
                     ) : results.length === 0 ? (
-                        <div className="p-12 text-center text-slate-400">
+                        <div className="p-12 text-center text-zinc-500">
                             <p className="font-medium">Aucun résultat trouvé pour "{query}"</p>
                         </div>
                     ) : (
-                        <div className="p-3 space-y-1">
+                        <div className="p-2.5 space-y-1">
                             {results.map((item, idx) => (
                                 <button
                                     key={idx}
                                     onClick={() => handleSelect(item)}
-                                    className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 group transition-all text-left border border-transparent hover:border-indigo-100 dark:hover:border-indigo-800/50"
+                                    className="w-full flex items-center justify-between p-3.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 group transition-all text-left border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800"
                                 >
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className="p-3 bg-slate-100 dark:bg-slate-800 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-800/50 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 rounded-xl transition-colors shrink-0">
+                                    <div className="flex items-center gap-3.5 min-w-0">
+                                        <div className="p-2.5 bg-zinc-100 dark:bg-zinc-900 group-hover:bg-zinc-900 dark:group-hover:bg-white text-zinc-500 dark:text-zinc-400 group-hover:text-white dark:group-hover:text-[#09090b] rounded-lg transition-colors shrink-0 border border-zinc-200 dark:border-zinc-800">
                                             {item.icon}
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="font-bold text-slate-800 dark:text-white text-base group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors truncate">{item.title}</p>
-                                            {item.subtitle && <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mt-1 truncate">{item.subtitle}</p>}
+                                            <p className="font-semibold text-zinc-900 dark:text-white text-sm transition-colors truncate">{item.title}</p>
+                                            {item.subtitle && <p className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 mt-0.5 truncate">{item.subtitle}</p>}
                                         </div>
                                     </div>
-                                    <ChevronRight size={18} className="text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transform -translate-x-4 group-hover:translate-x-0 transition-all shrink-0" />
+                                    <ChevronRight size={16} className="text-zinc-400 dark:text-zinc-600 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all shrink-0" />
                                 </button>
                             ))}
                         </div>
@@ -317,9 +317,9 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
                 </div>
                 
                 {/* Footer Shortcuts hint */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex justify-center items-center gap-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">
-                    <span className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300 font-sans shadow-sm border border-slate-300 dark:border-slate-600">ESC</kbd> pour fermer</span>
-                    <span className="flex items-center gap-2"><kbd className="px-2 py-1 bg-slate-200 dark:bg-slate-700 rounded-md text-slate-600 dark:text-slate-300 font-sans shadow-sm border border-slate-300 dark:border-slate-600">CTRL+K</kbd> pour rechercher</span>
+                <div className="p-3 bg-zinc-50 dark:bg-[#09090b] border-t border-zinc-200 dark:border-zinc-800 flex justify-center items-center gap-6 text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0">
+                    <span className="flex items-center gap-2"><kbd className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-900 rounded text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-800">ESC</kbd> pour fermer</span>
+                    <span className="flex items-center gap-2"><kbd className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-900 rounded text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-800">CTRL+K</kbd> pour rechercher</span>
                 </div>
             </div>
 
@@ -331,11 +331,11 @@ export default function GlobalSearch({ data, setView, isOpen, onClose, onToggle 
                     background: transparent;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: #cbd5e1;
-                    border-radius: 10px;
+                    background-color: #d4d4d8;
+                    border-radius: 9999px;
                 }
                 :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: #475569;
+                    background-color: #27272a;
                 }
             `}</style>
         </div>

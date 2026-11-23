@@ -71,24 +71,24 @@ export default function ClientHub({ data, updateData }) {
             .reduce((sum, q) => sum + (q.total || 0), 0);
 
         return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 animate-in slide-in-from-top-4">
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between group hover:border-orange-200 dark:hover:border-orange-900/50 transition-colors">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6 animate-in slide-in-from-top-4">
+                <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors">
                     <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">En attente de paiement</p>
-                        <p className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(pendingPayment)}</p>
+                        <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1">En attente de paiement</p>
+                        <p className="text-3xl font-mono font-bold text-zinc-900 dark:text-white">{formatCurrency(pendingPayment)}</p>
                     </div>
-                    <div className="p-4 bg-orange-50 dark:bg-orange-900/20 text-orange-500 rounded-full">
-                        <Clock size={24}/>
+                    <div className="p-3.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-xl">
+                        <Clock size={20}/>
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between group hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
+                <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between group hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors">
                     <div>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Devis à facturer</p>
-                        <p className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
+                        <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Devis à facturer</p>
+                        <p className="text-3xl font-mono font-bold text-zinc-900 dark:text-white">{formatCurrency(acceptedQuotes)}</p>
                     </div>
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-full">
-                        <FileText size={24}/>
+                    <div className="p-3.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-xl">
+                        <FileText size={20}/>
                     </div>
                 </div>
             </div>
@@ -666,25 +666,25 @@ export default function ClientHub({ data, updateData }) {
         return (
             <div className="space-y-6">
                 <FinancialSummary />
-                <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="flex justify-between items-center bg-white dark:bg-[#111113] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
                     <div className="flex items-center gap-4">
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-white capitalize flex items-center gap-2">
-                            {type === 'quote' ? <FileText className="text-blue-500"/> : <Wallet className="text-emerald-500"/>}
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white capitalize flex items-center gap-2">
+                            {type === 'quote' ? <FileText size={18}/> : <Wallet size={18}/>}
                             {type === 'quote' ? 'Mes Devis' : 'Mes Factures'}
                         </h3>
-                        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700"></div>
-                        <div className="flex gap-2">
+                        <div className="h-5 w-[1px] bg-zinc-200 dark:bg-zinc-800"></div>
+                        <div className="flex gap-1.5">
                             {['all', 'Draft', 'Sent', ...(type === 'invoice' ? ['Paid'] : ['Accepted', 'Invoiced', 'Rejected'])].map(s => (
-                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${filterStatus === s ? 'bg-slate-900 text-white dark:bg-white dark:text-black' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{s === 'all' ? 'Tout' : (statusLabels[s] || s)}</button>
+                                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${filterStatus === s ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#09090b]' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}>{s === 'all' ? 'Tout' : (statusLabels[s] || s)}</button>
                             ))}
                         </div>
                     </div>
-                    <button onClick={() => openEditor(null)} className="bg-amber-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20"><Plus size={16}/> Créer</button>
+                    <button onClick={() => openEditor(null)} className="bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold hover:opacity-90 transition-all"><Plus size={15}/> Créer</button>
                 </div>
                 {isCreating && <DocumentEditor type={type} initialDoc={docToEdit} onClose={closeEditor} />}
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
-                    <table className="w-full text-left text-sm text-slate-700 dark:text-slate-300">
-                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-500 uppercase font-bold text-xs">
+                <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                    <table className="w-full text-left text-sm text-zinc-700 dark:text-zinc-300">
+                        <thead className="bg-zinc-50 dark:bg-[#09090b] border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 uppercase font-mono font-bold text-[11px]">
                             <tr>
                                 <th className="p-4">Numéro</th>
                                 <th className="p-4">Client</th>
@@ -736,10 +736,10 @@ export default function ClientHub({ data, updateData }) {
     return (
         <div className="fade-in p-6 pb-24 max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 className="text-3xl font-bold text-slate-800 dark:text-white font-serif tracking-tight">Espace Client</h2>
-                <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">Espace Client</h2>
+                <div className="flex bg-white dark:bg-[#111113] p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
                     {['clients', 'quotes', 'invoices', 'catalog'].map(tab => (
-                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab ? 'bg-slate-900 text-white dark:bg-white dark:text-black shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
+                        <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === tab ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
                             {tab === 'clients' && 'Clients'}
                             {tab === 'quotes' && 'Devis'}
                             {tab === 'invoices' && 'Factures'}

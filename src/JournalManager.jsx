@@ -605,26 +605,26 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
 
     // --- VUE CONTENU ---
     return (
-        <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        <div className="flex h-full w-full bg-zinc-50 dark:bg-[#09090b] overflow-hidden">
             {/* SIDEBAR */}
-            <div className={`${(isSidebarOpen && !isZenMode) ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
+            <div className={`${(isSidebarOpen && !isZenMode) ? 'w-80' : 'w-0'} bg-white dark:bg-[#09090b] border-r border-zinc-200 dark:border-zinc-800/80 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50 dark:bg-[#09090b]">
                     <div className="relative mb-3">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
-                        <input type="text" placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 rounded-lg text-sm outline-none transition-all" />
-                        {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><X size={14}/></button>}
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={15}/>
+                        <input type="text" placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-8 py-2 bg-zinc-100 dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 focus:border-zinc-500 rounded-lg text-sm outline-none transition-all text-zinc-900 dark:text-white" />
+                        {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1 rounded-full"><X size={14}/></button>}
                     </div>
                     <div className="flex items-center gap-2 mb-3">
-                        <button onClick={navigateUp} className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                            {currentFolderId === activeNotebookId ? <Home size={16}/> : <ArrowLeft size={16}/>}
+                        <button onClick={navigateUp} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300">
+                            {currentFolderId === activeNotebookId ? <Home size={15}/> : <ArrowLeft size={15}/>}
                         </button>
-                        <div className="font-bold text-slate-800 dark:text-white truncate flex-1">{searchQuery ? 'Résultats' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
+                        <div className="font-bold text-sm text-zinc-900 dark:text-white truncate flex-1">{searchQuery ? 'Résultats' : (allFolders.find(f => f.id === currentFolderId)?.name || 'Dossier')}</div>
                     </div>
                     {!searchQuery && (
-                        <div className="flex items-center gap-1 text-[10px] text-slate-400 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-500 overflow-x-auto whitespace-nowrap mb-4 scrollbar-none">
                             {breadcrumbs.map((f, i) => (
                                 <span key={f.id} className="flex items-center shrink-0">
-                                    <span onClick={() => navigateToFolder(f.id)} className="hover:text-indigo-500 cursor-pointer">{f.name}</span>
+                                    <span onClick={() => navigateToFolder(f.id)} className="hover:text-zinc-900 dark:hover:text-white cursor-pointer">{f.name}</span>
                                     {i < breadcrumbs.length - 1 && <ChevronRight size={10} className="mx-1 opacity-50"/>}
                                 </span>
                             ))}
@@ -632,8 +632,8 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
                     )}
                     {!searchQuery && (
                         <div className="flex gap-2">
-                            <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition-all flex items-center justify-center gap-1"><FolderPlus size={14}/> Dossier</button>
-                            <button onClick={() => createItem('page')} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 shadow-md shadow-indigo-200 dark:shadow-none"><Plus size={14}/> Page</button>
+                            <button onClick={() => createItem('folder')} className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111113] rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all flex items-center justify-center gap-1"><FolderPlus size={14}/> Dossier</button>
+                            <button onClick={() => createItem('page')} className="flex-1 py-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg text-xs font-semibold hover:opacity-90 flex items-center justify-center gap-1"><Plus size={14}/> Page</button>
                         </div>
                     )}
                 </div>
@@ -685,13 +685,13 @@ export default function JournalManager({ data, updateData, currentUserEmail }) {
 
             {/* DIVISEUR */}
             {!isZenMode && (
-                <div className="flex flex-col items-center py-4 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 w-4 shrink-0 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer transition-colors" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-                    <div className="w-1 h-8 bg-slate-300 dark:bg-slate-700 rounded-full my-auto"></div>
+                <div className="flex flex-col items-center py-4 bg-zinc-100 dark:bg-[#09090b] border-r border-zinc-200 dark:border-zinc-800 w-3 shrink-0 hover:bg-zinc-200 dark:hover:bg-zinc-900 cursor-pointer transition-colors" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                    <div className="w-1 h-8 bg-zinc-300 dark:bg-zinc-700 rounded-full my-auto"></div>
                 </div>
             )}
 
             {/* ÉDITEUR PRINCIPAL */}
-            <div className={`flex-1 flex flex-col ${isZenMode ? 'bg-slate-100 dark:bg-slate-900' : 'bg-slate-100 dark:bg-slate-900'} relative min-w-0 transition-colors duration-500`}>
+            <div className="flex-1 flex flex-col bg-zinc-100 dark:bg-[#09090b] relative min-w-0 transition-colors duration-300">
                 
                 {activePageId ? (
                     <ErrorBoundary>

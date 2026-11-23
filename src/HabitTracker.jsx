@@ -387,18 +387,18 @@ export default function HabitTracker({ }) {
     }, [visibleHabits, logs, dateStr]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <div className="flex flex-col h-full bg-zinc-100 dark:bg-[#09090b] transition-colors duration-200">
             {/* HEADER */}
-            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 shrink-0 z-30">
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
-                    <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'daily' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        <CheckCircle2 size={18}/> AUJOURD'HUI
+            <div className="bg-white dark:bg-[#111113] border-b border-zinc-200 dark:border-zinc-800 px-6 md:px-8 py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 shrink-0 z-30">
+                <div className="flex bg-zinc-100 dark:bg-[#09090b] p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <button onClick={() => setActiveTab('daily')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-mono font-bold transition-all ${activeTab === 'daily' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
+                        <CheckCircle2 size={15}/> AUJOURD'HUI
                     </button>
-                    <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'stats' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        <BarChart2 size={18}/> ANALYSE
+                    <button onClick={() => setActiveTab('stats')} className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-mono font-bold transition-all ${activeTab === 'stats' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
+                        <BarChart2 size={15}/> ANALYSE
                     </button>
-                    <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === 'settings' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        <Settings size={20}/>
+                    <button onClick={() => setActiveTab('settings')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${activeTab === 'settings' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>
+                        <Settings size={16}/>
                     </button>
                 </div>
             </div>
@@ -407,43 +407,43 @@ export default function HabitTracker({ }) {
                 
                 {/* VUE QUOTIDIENNE */}
                 {activeTab === 'daily' && (
-                    <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col md:flex-row items-center gap-10">
-                            <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
+                    <div className="w-full max-w-[1600px] mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <div className="bg-white dark:bg-[#111113] rounded-2xl p-6 md:p-7 border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-center gap-8">
+                            <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
                                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10" fill="none" className="text-slate-100 dark:text-slate-800" />
-                                    <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="10" fill="none" strokeDasharray="263.89" strokeDashoffset={263.89 - (dailyProgress / 100) * 263.89} className="text-blue-600 transition-all duration-1000 ease-out" strokeLinecap="round" />
+                                    <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="9" fill="none" className="text-zinc-200 dark:text-zinc-800" />
+                                    <circle cx="50" cy="50" r="42" stroke="currentColor" strokeWidth="9" fill="none" strokeDasharray="263.89" strokeDashoffset={263.89 - (dailyProgress / 100) * 263.89} className="text-zinc-900 dark:text-white transition-all duration-1000 ease-out" strokeLinecap="round" />
                                 </svg>
                                 <div className="absolute flex flex-col items-center">
-                                    <span className="text-3xl font-black dark:text-white">{dailyProgress}%</span>
+                                    <span className="text-2xl font-mono font-bold dark:text-white">{dailyProgress}%</span>
                                 </div>
                             </div>
                             <div className="flex-1 text-center md:text-left">
-                                <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
-                                    <button onClick={() => changeDate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400"><ChevronLeft size={20}/></button>
-                                    <h3 className="font-black text-3xl capitalize dark:text-white">
+                                <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                                    <button onClick={() => changeDate(-1)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg transition-colors text-zinc-500"><ChevronLeft size={18}/></button>
+                                    <h3 className="font-bold text-2xl capitalize dark:text-white">
                                         {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                                     </h3>
-                                    <button onClick={() => changeDate(1)} className={`p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400 ${isToday ? 'invisible' : ''}`} disabled={isToday}><ChevronRight size={20}/></button>
+                                    <button onClick={() => changeDate(1)} className={`p-2 hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg transition-colors text-zinc-500 ${isToday ? 'invisible' : ''}`} disabled={isToday}><ChevronRight size={18}/></button>
                                 </div>
-                                <p className="text-slate-500 font-medium text-lg">Focus du jour : {visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length} / {visibleHabits.length} tâches accomplies.</p>
+                                <p className="text-zinc-500 font-mono text-sm">Focus du jour : {visibleHabits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length} / {visibleHabits.length} tâches accomplies.</p>
                             </div>
                         </div>
 
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-20 gap-4">
-                                <Loader2 className="animate-spin text-blue-600 w-12 h-12"/>
+                                <Loader2 className="animate-spin text-zinc-900 dark:text-white w-10 h-10"/>
                             </div>
                         ) : visibleHabits.length === 0 ? (
-                            <div className="text-center py-24 bg-white dark:bg-slate-900 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800">
-                                <Zap className="text-slate-200 dark:text-slate-700 mx-auto mb-6" size={64}/>
-                                <h3 className="text-xl font-black text-slate-700 dark:text-slate-300">Aucune habitude programmée</h3>
+                            <div className="text-center py-20 bg-white dark:bg-[#111113] rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800">
+                                <Zap className="text-zinc-300 dark:text-zinc-700 mx-auto mb-4" size={48}/>
+                                <h3 className="text-lg font-bold text-zinc-700 dark:text-zinc-300">Aucune habitude programmée</h3>
                             </div>
                         ) : (
-                            <div className="space-y-12">
+                            <div className="space-y-10">
                                 {uncategorizedVisibleHabits.length > 0 && (
-                                    <div className="animate-in fade-in duration-700">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="animate-in fade-in duration-500">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {uncategorizedVisibleHabits.map(h => (
                                                  <HabitCard 
                                                     key={h.id} 
@@ -451,8 +451,6 @@ export default function HabitTracker({ }) {
                                                     isDone={logs.some(l => l.habit_id === h.id && l.date === dateStr)} 
                                                     isProcessing={processingHabits.has(h.id)} 
                                                     onToggle={() => toggleHabit(h.id)}
-                                                    colorClass="border-amber-500/30 shadow-amber-500/5"
-                                                    iconColor="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                                                 />
                                             ))}
                                         </div>
@@ -460,17 +458,17 @@ export default function HabitTracker({ }) {
                                 )}
 
                                 {categorizedVisibleHabits.map(cat => (
-                                    <div key={cat.id} className="animate-in fade-in duration-700">
-                                        <div className="flex items-center justify-between px-2 mb-6 border-b border-slate-100 dark:border-slate-800 pb-2">
-                                            <h4 className="font-black text-lg text-slate-700 dark:text-white flex items-center gap-3">
-                                                <span className={`w-3 h-3 rounded-full ${cat.color || 'bg-blue-500'}`}></span>
+                                    <div key={cat.id} className="animate-in fade-in duration-500">
+                                        <div className="flex items-center justify-between px-1 mb-4 border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                                            <h4 className="font-bold text-base text-zinc-800 dark:text-white flex items-center gap-2.5">
+                                                <span className={`w-2.5 h-2.5 rounded-full ${cat.color || 'bg-zinc-400'}`}></span>
                                                 {cat.name}
                                             </h4>
-                                            <span className="text-xs font-black bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full text-slate-500">
+                                            <span className="text-xs font-mono bg-zinc-100 dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 px-2.5 py-0.5 rounded-md text-zinc-500">
                                                 {cat.habits.filter(h => logs.some(l => l.habit_id === h.id && l.date === dateStr)).length}/{cat.habits.length}
                                             </span>
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {cat.habits.map(h => (
                                                 <HabitCard 
                                                     key={h.id} 
@@ -488,17 +486,17 @@ export default function HabitTracker({ }) {
                         
                         {/* Aperçu Demain */}
                         {tomorrowHabits.length > 0 && isToday && (
-                            <div className="mt-16 pt-10 pb-10 border-t border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                                <h4 className="font-black text-2xl text-slate-700 dark:text-white flex items-center gap-3 mb-8">
+                            <div className="mt-12 pt-8 pb-8 border-t border-zinc-200 dark:border-zinc-800">
+                                <h4 className="font-bold text-lg text-zinc-800 dark:text-white flex items-center gap-3 mb-5">
                                     Prévu pour Demain
                                 </h4>
-                                <div className="flex flex-wrap gap-4">
+                                <div className="flex flex-wrap gap-3">
                                     {tomorrowHabits.map(h => (
-                                        <div key={h.id} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-3 flex items-center gap-3 opacity-70 hover:opacity-100 transition-opacity">
-                                            <DynamicIcon name={h.icon} size={18} className="text-slate-400" />
-                                            <span className="font-bold text-slate-600 dark:text-slate-300 text-sm">{h.name}</span>
+                                        <div key={h.id} className="bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 flex items-center gap-2.5 opacity-75 hover:opacity-100 transition-opacity">
+                                            <DynamicIcon name={h.icon} size={16} className="text-zinc-500" />
+                                            <span className="font-medium text-zinc-700 dark:text-zinc-300 text-sm">{h.name}</span>
                                             {getHabitImportance(h) > 1 && (
-                                                <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-md ml-2">x{getHabitImportance(h)}</span>
+                                                <span className="text-[10px] font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded ml-1">x{getHabitImportance(h)}</span>
                                             )}
                                         </div>
                                     ))}
@@ -510,63 +508,58 @@ export default function HabitTracker({ }) {
 
                 {/* VUE ANALYSE */}
                 {activeTab === 'stats' && (
-                    <div className="w-full max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-500">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                            
-                            <div className="bg-slate-200/50 dark:bg-slate-800 p-1 rounded-xl flex gap-1 border border-slate-300 dark:border-slate-700 shadow-inner flex-wrap">
-                                {/* MODIFICATION ICI : Ajout du 4, limite max à 60 */}
+                    <div className="w-full max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div className="bg-zinc-200/70 dark:bg-[#111113] p-1 rounded-xl flex gap-1 border border-zinc-200 dark:border-zinc-800 flex-wrap">
                                 {[4, 7, 10, 15, 21, 30, 40, 50, 60].map(d => (
-                                    <button key={d} onClick={() => setStatRange(d)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statRange === d ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-white shadow-md' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}>{d} Jours</button>
+                                    <button key={d} onClick={() => setStatRange(d)} className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all ${statRange === d ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'}`}>{d} Jours</button>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
-                            <div className="h-96 w-full flex items-end justify-between gap-1 md:gap-3">
+                        <div className="bg-white dark:bg-[#111113] p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                            <div className="h-80 w-full flex items-end justify-between gap-1 md:gap-2">
                                 {stats.consistencyData.map((val, i) => (
                                     <div key={i} className="flex-1 flex flex-col justify-end group relative h-full">
-                                        <div className={`w-full rounded-t-lg md:rounded-t-xl transition-all duration-700 ease-out hover:brightness-110 ${val >= 80 ? 'bg-gradient-to-t from-emerald-600 to-emerald-400' : val >= 50 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : val > 0 ? 'bg-slate-300 dark:bg-slate-700' : 'bg-slate-100 dark:bg-slate-800 h-2'}`} style={{ height: val > 0 ? `${Math.max(val, 5)}%` : '8px' }}></div>
-                                        <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
-                                            <div className="bg-slate-900 text-white text-[10px] px-3 py-2 rounded-lg shadow-2xl whitespace-nowrap font-black uppercase tracking-tighter">
-                                                {new Date(stats.dates[i]).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})} <span className="ml-2 text-blue-400">{val}%</span>
+                                        <div className={`w-full rounded-t-md transition-all duration-500 ease-out hover:brightness-110 ${val >= 80 ? 'bg-zinc-900 dark:bg-white' : val >= 50 ? 'bg-zinc-500 dark:bg-zinc-400' : val > 0 ? 'bg-zinc-300 dark:bg-zinc-700' : 'bg-zinc-100 dark:bg-zinc-900 h-2'}`} style={{ height: val > 0 ? `${Math.max(val, 5)}%` : '8px' }}></div>
+                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col items-center z-20 pointer-events-none">
+                                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] text-[10px] px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap font-mono font-bold uppercase">
+                                                {new Date(stats.dates[i]).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'})} <span className="ml-1.5">{val}%</span>
                                             </div>
-                                            <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1"></div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                             {stats.domainStats.map(cat => {
-                                const textColor = cat.color ? COLOR_MAP[cat.color] : 'text-blue-500';
                                 return (
-                                    <div key={'cat-'+cat.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center truncate w-full">{cat.name}</span>
-                                        <div className="relative w-24 h-24 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <div key={'cat-'+cat.id} className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center transition-all duration-200 group hover:border-zinc-400 dark:hover:border-zinc-600">
+                                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4 text-center truncate w-full">{cat.name}</span>
+                                        <div className="relative w-20 h-20 flex items-center justify-center">
                                             <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                                <path className="text-slate-100 dark:text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                                                <path className={`${cat.percent >= 100 ? 'text-emerald-500' : textColor} transition-all duration-1000 ease-in-out`} strokeDasharray={`${cat.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                                                <path className="text-zinc-200 dark:text-zinc-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
+                                                <path className="text-zinc-900 dark:text-white transition-all duration-1000 ease-in-out" strokeDasharray={`${cat.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
                                             </svg>
-                                            <span className="absolute text-xl font-black dark:text-white">{cat.percent}%</span>
+                                            <span className="absolute text-base font-mono font-bold dark:text-white">{cat.percent}%</span>
                                         </div>
                                     </div>
                                 );
                             })}
 
                             {stats.orphanStats.map(hab => (
-                                <div key={'hab-'+hab.id} className="bg-white dark:bg-slate-900 p-8 rounded-[2rem] border-2 border-dashed border-amber-200 dark:border-slate-800 flex flex-col items-center shadow-sm hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
-                                     <div className="absolute top-0 right-0 bg-amber-500 w-3 h-3 rounded-bl-xl"></div>
-                                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter mb-4 text-center truncate w-full flex justify-center items-center gap-2">
-                                         <DynamicIcon name={hab.icon} size={14} className="text-amber-500" />
+                                <div key={'hab-'+hab.id} className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800 flex flex-col items-center transition-all duration-200 group relative overflow-hidden">
+                                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter mb-4 text-center truncate w-full flex justify-center items-center gap-1.5">
+                                         <DynamicIcon name={hab.icon} size={13} className="text-zinc-400" />
                                          {hab.name}
                                      </span>
-                                     <div className="relative w-20 h-20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                     <div className="relative w-20 h-20 flex items-center justify-center">
                                         <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                            <path className="text-slate-100 dark:text-slate-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                                            <path className={`${hab.percent >= 100 ? 'text-amber-500' : 'text-slate-400'} transition-all duration-1000 ease-in-out`} strokeDasharray={`${hab.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                            <path className="text-zinc-200 dark:text-zinc-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                            <path className="text-zinc-900 dark:text-white transition-all duration-1000 ease-in-out" strokeDasharray={`${hab.percent}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                         </svg>
-                                        <span className="absolute text-sm font-black dark:text-white text-slate-600">{hab.percent}%</span>
+                                        <span className="absolute text-sm font-mono font-bold dark:text-white text-zinc-700">{hab.percent}%</span>
                                      </div>
                                 </div>
                             ))}
@@ -576,54 +569,53 @@ export default function HabitTracker({ }) {
 
                 {/* VUE REGLAGES (MODIFIÉE POUR INCLURE LES BOUTONS ÉDITER/REMETTRE À ZÉRO) */}
                 {activeTab === 'settings' && (
-                    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-500">
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="font-black text-xl mb-8 dark:text-white flex items-center gap-3"><List size={22} className="text-blue-500"/> Domaines</h3>
-                            <div className="space-y-3 mb-8">
+                    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in duration-300">
+                        <div className="bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                            <h3 className="font-bold text-lg mb-6 dark:text-white flex items-center gap-2.5"><List size={18}/> Domaines</h3>
+                            <div className="space-y-2.5 mb-6">
                                 {categories.map(c => (
-                                    <div key={c.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-3 h-3 rounded-full ${c.color || 'bg-gray-400'}`}></div>
-                                            <span className="font-bold text-slate-700 dark:text-slate-200">{c.name}</span>
+                                    <div key={c.id} className="flex justify-between items-center p-3.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-2.5 h-2.5 rounded-full ${c.color || 'bg-zinc-400'}`}></div>
+                                            <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">{c.name}</span>
                                         </div>
-                                        <button onClick={() => deleteCategory(c.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"><Trash2 size={16}/></button>
+                                        <button onClick={() => deleteCategory(c.id)} className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={15}/></button>
                                     </div>
                                 ))}
                             </div>
-                            <form onSubmit={(e) => { e.preventDefault(); const name = e.target.catName.value; const color = e.target.catColor.value; if(name) { addCategory(name, color); e.target.reset(); } }} className="flex gap-2 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                <input name="catName" placeholder="Nom..." className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold" required/>
-                                <select name="catColor" className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold">
+                            <form onSubmit={(e) => { e.preventDefault(); const name = e.target.catName.value; const color = e.target.catColor.value; if(name) { addCategory(name, color); e.target.reset(); } }} className="flex gap-2 pt-5 border-t border-zinc-200 dark:border-zinc-800">
+                                <input name="catName" placeholder="Nom..." className="flex-1 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-zinc-500 dark:text-white transition-all text-sm font-medium" required/>
+                                <select name="catColor" className="p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-zinc-500 dark:text-white cursor-pointer text-sm font-medium">
                                     <option value="bg-blue-500">Bleu</option>
                                     <option value="bg-green-500">Vert</option>
                                     <option value="bg-purple-500">Violet</option>
                                     <option value="bg-orange-500">Orange</option>
                                     <option value="bg-red-500">Rouge</option>
                                 </select>
-                                <button type="submit" className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all"><Plus size={20}/></button>
+                                <button type="submit" className="p-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl hover:opacity-90 transition-all"><Plus size={18}/></button>
                             </form>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="font-black text-xl mb-8 dark:text-white flex items-center gap-3"><Target size={22} className="text-emerald-500"/> Catalogue Habitudes</h3>
-                            <div className="space-y-3 mb-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                            <h3 className="font-bold text-lg mb-6 dark:text-white flex items-center gap-2.5"><Target size={18}/> Catalogue Habitudes</h3>
+                            <div className="space-y-2.5 mb-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                                 {activeHabitsForManagement.map(h => (
-                                    <div key={h.id} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group">
+                                    <div key={h.id} className="flex justify-between items-center p-3.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all group">
                                         <div>
-                                            <div className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                                <DynamicIcon name={h.icon} size={18} className="text-blue-500" />
+                                            <div className="font-semibold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                                                <DynamicIcon name={h.icon} size={16} className="text-zinc-400" />
                                                 {h.name}
                                             </div>
                                             <div className="flex gap-1 mt-2">
                                                 {['D','L','M','M','J','V','S'].map((d, i) => (
-                                                    <span key={i} className={`text-[8px] w-4 h-4 flex items-center justify-center rounded-md font-black ${(getHabitDays(h)).includes(i) ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40' : 'text-slate-300 dark:text-slate-600'}`}>{d}</span>
+                                                    <span key={i} className={`text-[8px] w-4 h-4 flex items-center justify-center rounded font-mono font-bold ${(getHabitDays(h)).includes(i) ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-400 dark:text-zinc-600'}`}>{d}</span>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                            {/* NOUVEAUX BOUTONS ACTIONS */}
-                                            <button onClick={() => resetHabitHistory(h.id)} className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-all" title="Remettre à zéro l'historique"><RotateCcw size={16}/></button>
-                                            <button onClick={() => startEditingHabit(h)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all" title="Modifier"><Edit2 size={16}/></button>
-                                            <button onClick={() => deleteHabit(h.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all" title="Supprimer complètement"><Trash2 size={16}/></button>
+                                            <button onClick={() => resetHabitHistory(h.id)} className="p-2 text-zinc-400 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-all" title="Remettre à zéro l'historique"><RotateCcw size={15}/></button>
+                                            <button onClick={() => startEditingHabit(h)} className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all" title="Modifier"><Edit2 size={15}/></button>
+                                            <button onClick={() => deleteHabit(h.id)} className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Supprimer complètement"><Trash2 size={15}/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -649,39 +641,37 @@ function HabitCard({ habit, isDone, isProcessing, onToggle, colorClass, iconColo
         <div 
             onClick={() => !isProcessing && onToggle()}
             className={`
-                group relative flex items-center justify-between p-6 rounded-3xl border-2 transition-all duration-300 cursor-pointer select-none active:scale-[0.98] overflow-hidden
+                group relative flex items-center justify-between p-5 rounded-2xl border transition-all duration-200 cursor-pointer select-none active:scale-[0.99] overflow-hidden
                 ${isDone 
-                    ? 'bg-white dark:bg-slate-900 border-emerald-500/30 shadow-xl shadow-emerald-500/10' 
-                    : `bg-white dark:bg-slate-900 border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-lg hover:shadow-2xl ${colorClass || ''}`
+                    ? 'bg-zinc-50 dark:bg-[#09090b] border-zinc-300 dark:border-zinc-700' 
+                    : `bg-white dark:bg-[#111113] border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 ${colorClass || ''}`
                 }
             `}
         >
-            {isDone && <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none"></div>}
-
-            <div className="flex items-center gap-5 relative z-10">
-                <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center transition-all duration-500 ${isDone ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110 rotate-3' : `${iconColor || 'bg-slate-100 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 group-hover:text-blue-600 group-hover:scale-110'}`}`}>
+            <div className="flex items-center gap-4 relative z-10">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 border ${isDone ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-[#09090b]' : `${iconColor || 'bg-zinc-100 dark:bg-[#09090b] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white'}`}`}>
                     {isProcessing ? (
-                        <Loader2 size={24} className="animate-spin" />
+                        <Loader2 size={20} className="animate-spin" />
                     ) : isDone ? (
-                        <Check size={28} strokeWidth={3} />
+                        <Check size={22} strokeWidth={3} />
                     ) : habit.icon ? (
-                        <DynamicIcon name={habit.icon} size={24} />
+                        <DynamicIcon name={habit.icon} size={20} />
                     ) : (
-                        <Zap size={24} />
+                        <Zap size={20} />
                     )}
                 </div>
                 <div>
-                     <span className={`text-lg font-bold block transition-all ${isDone ? 'text-slate-400 dark:text-slate-500 line-through opacity-60' : 'text-slate-800 dark:text-slate-100'}`}>
+                     <span className={`text-base font-semibold block transition-all ${isDone ? 'text-zinc-400 dark:text-zinc-500 line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
                         {habit.name}
                     </span>
-                    <span className="text-xs font-medium text-slate-400 group-hover:text-blue-500 transition-colors">
+                    <span className="text-[11px] font-mono text-zinc-500">
                         {isDone ? 'Complété' : 'À faire aujourd\'hui'}
                     </span>
                 </div>
             </div>
             
-            <div className={`relative z-10 w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all ${isDone ? 'bg-emerald-500 border-emerald-500 text-white scale-110' : 'border-slate-200 dark:border-slate-700 text-transparent group-hover:border-blue-400'}`}>
-                <Check size={16} strokeWidth={4} />
+            <div className={`relative z-10 w-7 h-7 rounded-lg border flex items-center justify-center transition-all ${isDone ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-[#09090b]' : 'border-zinc-300 dark:border-zinc-700 text-transparent group-hover:border-zinc-500'}`}>
+                <Check size={14} strokeWidth={3} />
             </div>
         </div>
     );
@@ -727,57 +717,57 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className={`pt-8 border-t space-y-6 ${editingHabit ? 'border-amber-400 dark:border-amber-600' : 'border-slate-100 dark:border-slate-800'}`}>
-            {editingHabit && <div className="text-xs font-black text-amber-500 uppercase tracking-widest bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-md w-fit">Mode Modification</div>}
+        <form onSubmit={handleSubmit} className={`pt-6 border-t space-y-5 ${editingHabit ? 'border-white' : 'border-zinc-200 dark:border-zinc-800'}`}>
+            {editingHabit && <div className="text-[10px] font-mono font-bold text-zinc-900 dark:text-white uppercase tracking-widest bg-zinc-200 dark:bg-zinc-800 px-3 py-1 rounded w-fit">Mode Modification</div>}
             <div className="space-y-4">
                 <div className="flex flex-col md:flex-row gap-2">
                     <input 
                         value={name} 
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nom de l'habitude..." 
-                        className="flex-1 w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white transition-all font-bold text-lg" 
+                        className="flex-1 w-full p-3 bg-zinc-50 dark:bg-[#09090b] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-zinc-500 dark:text-white transition-all font-semibold text-sm" 
                         required
                     />
                     <select 
                         value={categoryId} 
                         onChange={(e) => setCategoryId(e.target.value)}
-                        className="p-4 w-full md:w-1/3 bg-slate-50 dark:bg-slate-800 rounded-2xl outline-none border border-transparent focus:border-blue-500 dark:text-white cursor-pointer font-bold"
+                        className="p-3 w-full md:w-1/3 bg-zinc-50 dark:bg-[#09090b] rounded-xl outline-none border border-zinc-200 dark:border-zinc-800 focus:border-zinc-500 dark:text-white cursor-pointer font-semibold text-sm"
                     >
                         <option value="">Sans Domaine</option>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl">
+                <div className="bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl">
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
                         {PREMIUM_ICONS.map(iconName => (
                             <button 
                                 key={iconName} 
                                 type="button" 
                                 onClick={() => setSelectedIcon(iconName === selectedIcon ? '' : iconName)}
-                                className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${selectedIcon === iconName ? 'bg-blue-600 text-white scale-110 shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-blue-500'}`}
+                                className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all border ${selectedIcon === iconName ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-[#09090b]' : 'bg-white dark:bg-[#111113] border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                                 title={iconName}
                             >
-                                <DynamicIcon name={iconName} size={20} />
+                                <DynamicIcon name={iconName} size={18} />
                             </button>
                         ))}
                     </div>
                 </div>
 
-                <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
-                    <div className="flex-1 w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Fréquence</span>
+                <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
+                    <div className="flex-1 w-full bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0">Fréquence</span>
                         <div className="flex flex-wrap gap-1 justify-end">
                             {['D','L','M','M','J','V','S'].map((d, i) => (
-                                <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 shrink-0 ${selectedDays.includes(i) ? 'bg-blue-600 text-white shadow-lg' : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>{d}</button>
+                                <button key={i} type="button" onClick={() => toggleDay(i)} className={`w-7 h-7 rounded-md text-[10px] font-mono font-bold transition-all duration-150 shrink-0 ${selectedDays.includes(i) ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-white'}`}>{d}</button>
                             ))}
                         </div>
                     </div>
-                    <div className="flex-1 w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Importance</span>
+                    <div className="flex-1 w-full bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 p-3.5 rounded-xl flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0">Importance</span>
                         <div className="flex flex-wrap gap-1 justify-end">
                             {[1, 2, 3, 4, 5].map((val) => (
-                                <button key={val} type="button" onClick={() => setImportance(val)} className={`w-8 h-8 rounded-lg text-[10px] font-black transition-all duration-200 shrink-0 ${importance === val ? (val >= 4 ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-blue-600 text-white shadow-lg shadow-blue-500/30') : 'bg-white dark:bg-slate-700 text-slate-400 hover:bg-slate-100'}`}>x{val}</button>
+                                <button key={val} type="button" onClick={() => setImportance(val)} className={`w-7 h-7 rounded-md text-[10px] font-mono font-bold transition-all duration-150 shrink-0 ${importance === val ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-white'}`}>x{val}</button>
                             ))}
                         </div>
                     </div>
@@ -785,12 +775,12 @@ function HabitCreator({ categories, onAdd, editingHabit, onCancelEdit }) {
                 <div className="flex flex-wrap justify-end gap-2 mt-4">
                     {editingHabit ? (
                         <>
-                            <button type="button" onClick={onCancelEdit} className="p-4 bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300 rounded-2xl hover:bg-slate-300 transition-all font-black text-xs uppercase tracking-widest shrink-0">Annuler</button>
-                            <button type="submit" className="px-6 py-4 bg-emerald-500 text-white rounded-2xl hover:bg-emerald-600 shadow-xl shadow-emerald-500/30 transition-all font-black text-xs uppercase tracking-widest shrink-0">Sauver</button>
+                            <button type="button" onClick={onCancelEdit} className="px-4 py-2.5 bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 rounded-xl hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all font-mono font-bold text-xs uppercase tracking-wider shrink-0">Annuler</button>
+                            <button type="submit" className="px-5 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl hover:opacity-90 transition-all font-mono font-bold text-xs uppercase tracking-wider shrink-0">Sauver</button>
                         </>
                     ) : (
-                        <button type="submit" className="p-4 bg-blue-600 text-white rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-xs hover:bg-blue-700 shadow-xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 shrink-0 w-full sm:w-auto">
-                            <Plus size={18}/> Ajouter
+                        <button type="submit" className="px-5 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl flex items-center justify-center gap-2 font-mono font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-95 transition-all shrink-0 w-full sm:w-auto">
+                            <Plus size={16}/> Ajouter
                         </button>
                     )}
                 </div>

@@ -24,10 +24,10 @@ export default function ZenMode({ data, updateData, close }) {
     const themes = {
         minimal: { 
             name: 'Focus', 
-            bg: 'bg-slate-900', 
-            text: 'text-slate-300', 
-            caret: 'caret-slate-500', 
-            border: 'border-slate-700',
+            bg: 'bg-[#09090b]', 
+            text: 'text-zinc-300', 
+            caret: 'caret-white', 
+            border: 'border-zinc-800',
             font: 'font-mono' // Changé de sans à mono pour l'alignement
         },
         paper: { 
@@ -48,10 +48,10 @@ export default function ZenMode({ data, updateData, close }) {
         },
         midnight: { 
             name: 'Minuit', 
-            bg: 'bg-[#0f172a]', 
-            text: 'text-indigo-200', 
-            caret: 'caret-indigo-400', 
-            border: 'border-indigo-900',
+            bg: 'bg-[#111113]', 
+            text: 'text-zinc-200', 
+            caret: 'caret-zinc-400', 
+            border: 'border-zinc-800',
             font: 'font-mono' // Changé de sans à mono
         }
     };

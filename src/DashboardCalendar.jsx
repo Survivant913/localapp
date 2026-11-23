@@ -184,32 +184,26 @@ export default function DashboardCalendar({ data, filter }) {
     
     return (
         <>
-            <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-100/50 dark:border-slate-800/50 shadow-2xl mb-8 group transition-all relative overflow-hidden flex flex-col">
-                {/* Decorative background elements */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none"></div>
-                <div className="absolute -right-20 -top-20 opacity-[0.02] text-indigo-500 pointer-events-none"><CalendarIcon size={300}/></div>
-                <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-purple-500/5 dark:bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
+            <div className="bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 group transition-all relative overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 relative z-10">
-                    <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
-                        <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><CalendarIcon size={20} strokeWidth={2}/></div>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10">
+                    <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2.5 tracking-wider uppercase">
+                        <div className="p-2 bg-zinc-100 dark:bg-[#09090b] rounded-lg text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800"><CalendarIcon size={18} strokeWidth={2}/></div>
                         Timeline
                     </h3>
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-md">
-                        <button onClick={() => setShowGlobalDetail(true)} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600" title="Vue détaillée globale"><List size={18}/></button>
-                        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                        <button onClick={handleToday} className="px-4 py-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600">Aujourd'hui</button>
-                        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
-                        <button onClick={handlePrev} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600"><ChevronLeft size={18}/></button>
-                        <button onClick={handleNext} className="p-2 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-600"><ChevronRight size={18}/></button>
+                    <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-[#09090b] p-1 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        <button onClick={() => setShowGlobalDetail(true)} className="p-2 hover:bg-white dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-all" title="Vue détaillée globale"><List size={16}/></button>
+                        <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 mx-0.5"></div>
+                        <button onClick={handleToday} className="px-3 py-1.5 hover:bg-white dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider transition-all">Auj.</button>
+                        <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 mx-0.5"></div>
+                        <button onClick={handlePrev} className="p-2 hover:bg-white dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-all"><ChevronLeft size={16}/></button>
+                        <button onClick={handleNext} className="p-2 hover:bg-white dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-all"><ChevronRight size={16}/></button>
                     </div>
                 </div>
 
                 {/* Date Strip (Top) */}
-                <div className="relative z-10 -mx-4 px-4 sm:mx-0 sm:px-0 mb-8">
-                    <div ref={dateStripRef} className="flex gap-3 overflow-x-auto pb-4 pt-2 scrollbar-hide snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <div className="relative z-10 -mx-4 px-4 sm:mx-0 sm:px-0 mb-6">
+                    <div ref={dateStripRef} className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-hide snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                         {timeline.map((day, idx) => {
                             const isSelected = day.dateStr === selectedDateStr;
                             const hasEvents = day.events.length > 0;
@@ -218,29 +212,29 @@ export default function DashboardCalendar({ data, filter }) {
                                     key={idx} 
                                     onClick={() => setSelectedDateStr(day.dateStr)}
                                     className={`
-                                        w-[72px] shrink-0 snap-start rounded-[1.5rem] p-3 transition-all duration-300 relative cursor-pointer flex flex-col items-center justify-center
+                                        w-[68px] shrink-0 snap-start rounded-xl p-2.5 transition-all duration-150 relative cursor-pointer flex flex-col items-center justify-center border
                                         ${isSelected 
-                                            ? 'bg-slate-800 dark:bg-white shadow-xl shadow-slate-800/10 scale-110 z-10 ring-4 ring-slate-100 dark:ring-slate-800' 
-                                            : 'bg-white/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md border border-slate-200/50 dark:border-slate-700/50'
+                                            ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white' 
+                                            : 'bg-zinc-50 dark:bg-[#09090b] hover:border-zinc-400 dark:hover:border-zinc-600 border-zinc-200 dark:border-zinc-800'
                                         }
                                     `}
                                 >
-                                    <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 transition-colors ${isSelected ? 'text-slate-300 dark:text-slate-500' : (day.isToday ? 'text-indigo-500' : 'text-slate-400')}`}>{day.dayName.replace('.', '')}</span>
-                                    <span className={`text-2xl font-black tracking-tighter transition-colors ${isSelected ? 'text-white dark:text-slate-900' : (day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-200')}`}>{day.dayNum}</span>
+                                    <span className={`text-[10px] font-mono uppercase tracking-wider block mb-0.5 transition-colors ${isSelected ? 'text-zinc-400 dark:text-zinc-600' : (day.isToday ? 'text-zinc-900 dark:text-white font-bold' : 'text-zinc-500')}`}>{day.dayName.replace('.', '')}</span>
+                                    <span className={`text-xl font-bold font-mono tracking-tight transition-colors ${isSelected ? 'text-white dark:text-[#09090b]' : (day.isToday ? 'text-zinc-900 dark:text-white' : 'text-zinc-700 dark:text-zinc-300')}`}>{day.dayNum}</span>
                                     
                                     {/* Indicateurs d'événements */}
-                                    <div className="h-1.5 flex gap-0.5 mt-2 justify-center w-full">
+                                    <div className="h-1.5 flex gap-0.5 mt-1.5 justify-center w-full">
                                         {hasEvents ? (
                                             day.events.slice(0, 3).map((evt, i) => (
-                                                <div key={i} className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/50 dark:bg-slate-900/40' : (evt.color.includes('emerald') ? 'bg-emerald-400' : evt.color.includes('rose') ? 'bg-rose-400' : evt.color.includes('orange') ? 'bg-orange-400' : evt.color.includes('purple') ? 'bg-purple-400' : 'bg-blue-400')}`}></div>
+                                                <div key={i} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/60 dark:bg-[#09090b]/50' : 'bg-zinc-400 dark:bg-zinc-500'}`}></div>
                                             ))
                                         ) : (
                                             <div className="w-1 h-1 rounded-full bg-transparent"></div>
                                         )}
-                                        {day.events.length > 3 && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/50 dark:bg-slate-900/40' : 'bg-slate-300 dark:bg-slate-600'}`}></div>}
+                                        {day.events.length > 3 && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/60 dark:bg-[#09090b]/50' : 'bg-zinc-500'}`}></div>}
                                     </div>
 
-                                    {day.isToday && !isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full animate-ping opacity-50"></div>}
+                                    {day.isToday && !isSelected && <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-zinc-900 dark:bg-white rounded-full"></div>}
                                 </div>
                             );
                         })}
@@ -248,42 +242,42 @@ export default function DashboardCalendar({ data, filter }) {
                 </div>
 
                 {/* Focus Details Area (Bottom) */}
-                <div className="relative z-10 flex-1 min-h-[300px] bg-slate-50/50 dark:bg-slate-900/50 rounded-[2rem] p-6 md:p-8 border border-slate-200/50 dark:border-slate-700/50 overflow-hidden flex flex-col">
-                    <div className="flex items-end justify-between mb-8 pb-4 border-b border-slate-200/50 dark:border-slate-800/50">
+                <div className="relative z-10 flex-1 min-h-[260px] bg-zinc-50 dark:bg-[#09090b] rounded-xl p-5 md:p-6 border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col">
+                    <div className="flex items-end justify-between mb-6 pb-4 border-b border-zinc-200 dark:border-zinc-800">
                         <div>
-                            <p className="text-sm font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400 mb-1">Programme du jour</p>
-                            <h4 className="text-3xl font-black text-slate-800 dark:text-white capitalize">
+                            <p className="text-[11px] font-mono uppercase tracking-widest text-zinc-500 mb-1">Programme du jour</p>
+                            <h4 className="text-2xl font-bold text-zinc-900 dark:text-white capitalize">
                                 {new Date(selectedDateStr).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                             </h4>
                         </div>
                         <div className="text-right hidden sm:block">
-                            <p className="text-3xl font-black text-slate-300 dark:text-slate-700">{selectedDayData.events.length}</p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Événement{selectedDayData.events.length !== 1 ? 's' : ''}</p>
+                            <p className="text-2xl font-bold font-mono text-zinc-400 dark:text-zinc-600">{selectedDayData.events.length}</p>
+                            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Événement{selectedDayData.events.length !== 1 ? 's' : ''}</p>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
                         {selectedDayData.events.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center opacity-40 text-center py-12">
-                                <div className="p-4 bg-slate-200 dark:bg-slate-800 rounded-full mb-4">
-                                    <CheckCircle2 size={40} className="text-slate-500" />
+                            <div className="h-full flex flex-col items-center justify-center opacity-40 text-center py-10">
+                                <div className="p-3 bg-zinc-200 dark:bg-zinc-900 rounded-full mb-3 border border-zinc-300 dark:border-zinc-800">
+                                    <CheckCircle2 size={28} className="text-zinc-500" />
                                 </div>
-                                <p className="text-lg font-bold text-slate-600 dark:text-slate-300">Rien de prévu pour ce jour</p>
-                                <p className="text-sm font-medium mt-2">Profitez de votre temps libre !</p>
+                                <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-300">Rien de prévu pour ce jour</p>
+                                <p className="text-xs text-zinc-500 mt-1">Profitez de votre temps libre.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                                 {selectedDayData.events.map((evt, i) => (
-                                    <div key={i} className={`group flex items-start gap-4 p-5 rounded-2xl border border-white/40 dark:border-white/5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ${evt.color.replace('bg-', 'bg-gradient-to-br from-').replace('100', '50/80').replace('900/30', '900/20')} backdrop-blur-sm`}>
-                                        <div className="p-3 bg-white/60 dark:bg-black/20 rounded-[1rem] shrink-0 shadow-sm flex items-center justify-center">
-                                            {React.cloneElement(evt.icon, { size: 24, strokeWidth: 2 })}
+                                    <div key={i} className="group flex items-start gap-3.5 p-4 rounded-xl bg-white dark:bg-[#141416] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all duration-150">
+                                        <div className="p-2.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg shrink-0 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
+                                            {React.cloneElement(evt.icon, { size: 18, strokeWidth: 2 })}
                                         </div>
                                         <div className="flex-1 min-w-0 pt-0.5">
                                             <div className="flex justify-between items-start gap-2">
-                                                <p className="font-bold text-base text-slate-800 dark:text-slate-100 leading-tight mb-1.5 line-clamp-2">{evt.title}</p>
+                                                <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 leading-tight mb-1.5 line-clamp-2">{evt.title}</p>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/50 dark:bg-black/20 text-[10px] font-black uppercase tracking-widest opacity-80">
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                                                     {evt.type}
                                                 </span>
                                             </div>
@@ -306,11 +300,11 @@ export default function DashboardCalendar({ data, filter }) {
                         background: transparent;
                     }
                     .custom-scrollbar::-webkit-scrollbar-thumb {
-                        background-color: #cbd5e1;
-                        border-radius: 10px;
+                        background-color: #d4d4d8;
+                        border-radius: 9999px;
                     }
                     :global(.dark) .custom-scrollbar::-webkit-scrollbar-thumb {
-                        background-color: #475569;
+                        background-color: #27272a;
                     }
                 `}</style>
             </div>
@@ -318,43 +312,43 @@ export default function DashboardCalendar({ data, filter }) {
             {/* Modal Focus Global (Agenda) MOVED TO PORTAL */}
             {showGlobalDetail && typeof document !== 'undefined' && createPortal(
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowGlobalDetail(false)}></div>
-                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] w-full max-w-3xl shadow-2xl relative z-10 border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-8 duration-300">
-                        <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowGlobalDetail(false)}></div>
+                    <div className="bg-white dark:bg-[#111113] rounded-2xl w-full max-w-3xl shadow-2xl relative z-10 border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-6 duration-200">
+                        <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-[#09090b] shrink-0">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter">
-                                    <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><CalendarIcon size={24} strokeWidth={2}/></div>
+                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-3 tracking-tight">
+                                    <div className="p-2 bg-zinc-100 dark:bg-[#141416] rounded-lg text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800"><CalendarIcon size={20} strokeWidth={2}/></div>
                                     Timeline
                                 </h3>
-                                <p className="text-slate-500 mt-2 font-medium">Votre semaine en un coup d'œil</p>
+                                <p className="text-zinc-500 mt-1 text-xs font-mono uppercase tracking-wider">Votre semaine en un coup d'œil</p>
                             </div>
-                            <button onClick={() => setShowGlobalDetail(false)} className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-800 dark:hover:text-white transition-all"><X size={24}/></button>
+                            <button onClick={() => setShowGlobalDetail(false)} className="p-2.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-all"><X size={20}/></button>
                         </div>
-                        <div className="p-6 md:p-8 overflow-y-auto flex-1 space-y-8 bg-slate-50/30 dark:bg-slate-900/30 custom-scrollbar">
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-white dark:bg-[#111113] custom-scrollbar">
                             {timeline.filter(day => day.events.length > 0).length === 0 ? (
                                 <div className="text-center py-12 opacity-50">
-                                    <CalendarIcon size={48} className="mx-auto mb-4 opacity-50" />
-                                    <p className="font-bold">Aucun événement prévu.</p>
+                                    <CalendarIcon size={40} className="mx-auto mb-4 opacity-50" />
+                                    <p className="font-semibold text-sm">Aucun événement prévu.</p>
                                 </div>
                             ) : (
                                 timeline.filter(day => day.events.length > 0).map((day, idx) => (
                                     <div key={idx} className="flex gap-6">
                                         <div className="w-16 shrink-0 text-right pt-2">
-                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.dayName}</p>
-                                            <p className={`text-2xl font-black ${day.isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>{day.dayNum}</p>
+                                            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{day.dayName}</p>
+                                            <p className={`text-2xl font-bold font-mono ${day.isToday ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>{day.dayNum}</p>
                                         </div>
-                                        <div className="flex-1 space-y-3 relative">
+                                        <div className="flex-1 space-y-2.5 relative">
                                             {/* Ligne verticale de connexion */}
-                                            <div className="absolute -left-3 top-2 bottom-0 w-px bg-slate-200 dark:bg-slate-800"></div>
+                                            <div className="absolute -left-3 top-2 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800"></div>
                                             
                                             {day.events.map((evt, i) => (
-                                                <div key={i} className={`p-4 rounded-2xl flex items-center gap-4 ${evt.color} border border-white/40 dark:border-white/5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all`}>
-                                                    <div className="p-3 bg-white/50 dark:bg-black/20 rounded-xl shrink-0 shadow-inner">
+                                                <div key={i} className="p-3.5 rounded-xl flex items-center gap-3.5 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all">
+                                                    <div className="p-2.5 bg-white dark:bg-[#141416] border border-zinc-200 dark:border-zinc-800 rounded-lg shrink-0 text-zinc-700 dark:text-zinc-300">
                                                         {evt.icon}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-sm truncate">{evt.title}</p>
-                                                        <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold mt-1">{evt.type}</p>
+                                                        <p className="font-semibold text-sm text-zinc-900 dark:text-white truncate">{evt.title}</p>
+                                                        <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mt-0.5">{evt.type}</p>
                                                     </div>
                                                 </div>
                                             ))}

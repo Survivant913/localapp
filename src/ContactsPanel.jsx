@@ -93,30 +93,30 @@ export default function ContactsPanel({ isOpen, onClose, user, onStartChat, onli
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-y-0 right-0 w-full md:w-96 bg-white/90 dark:bg-slate-900/90 backdrop-blur-3xl shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800 animate-slide-in-right">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">
-                        <UserPlus size={20} />
+        <div className="fixed inset-y-0 right-0 w-full md:w-96 bg-white dark:bg-[#111113] shadow-2xl z-[100] flex flex-col border-l border-zinc-200 dark:border-zinc-800 animate-slide-in-right">
+            <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white uppercase tracking-widest flex items-center gap-2.5">
+                    <div className="p-2 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-lg">
+                        <UserPlus size={18} />
                     </div>
                     Contacts
                 </h2>
-                <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-xl transition-all">
-                    <X size={20} />
+                <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg transition-all">
+                    <X size={18} />
                 </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-5">
                 <form onSubmit={handleAddContact} className="flex gap-2">
                     <input 
                         type="email" 
                         value={newEmail}
                         onChange={(e) => setNewEmail(e.target.value)}
                         placeholder="Email du contact..."
-                        className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-800 dark:text-white outline-none focus:border-indigo-500"
+                        className="flex-1 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2 text-sm text-zinc-900 dark:text-white outline-none focus:border-zinc-500"
                         required
                     />
-                    <button type="submit" disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-900/20 transition-all disabled:opacity-50">
+                    <button type="submit" disabled={loading} className="px-4 py-2 bg-zinc-900 dark:bg-white hover:opacity-90 text-white dark:text-[#09090b] rounded-xl text-xs font-semibold transition-all disabled:opacity-40">
                         Ajouter
                     </button>
                 </form>

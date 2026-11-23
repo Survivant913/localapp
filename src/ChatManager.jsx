@@ -434,16 +434,16 @@ export default function ChatManager({ user }) {
     const prevPin = () => setCurrentPinIndex((prev) => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
 
     return (
-        <div className="flex h-full w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+        <div className="flex h-full w-full bg-zinc-100 dark:bg-[#09090b] overflow-hidden">
             {/* SIDEBAR */}
-            <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
+            <div className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-white dark:bg-[#09090b] border-r border-zinc-200 dark:border-zinc-800/80 transition-all duration-300 flex flex-col shrink-0 overflow-hidden`}>
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
                     <h2 className="font-bold text-lg dark:text-white truncate">Discussions</h2>
-                    <button onClick={() => setIsCreating(true)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 shrink-0"><Plus size={20}/></button>
+                    <button onClick={() => setIsCreating(true)} className="p-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg hover:opacity-90 shrink-0"><Plus size={18}/></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {rooms.map(room => (
-                        <div key={room.id} onClick={() => { setActiveRoom(room); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' : 'bg-white border-transparent hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800'}`}>
+                        <div key={room.id} onClick={() => { setActiveRoom(room); if (window.innerWidth < 768) setIsSidebarOpen(false); }} className={`group relative p-3 rounded-xl cursor-pointer transition-all border ${activeRoom?.id === room.id ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-[#09090b]' : 'bg-white dark:bg-[#111113] border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700'}`}>
                             <div className="flex justify-between items-start mb-1 pr-6">
                                 <span className={`font-bold truncate ${activeRoom?.id === room.id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-200'}`}>{room.name}</span>
                                 {room.status === 'pending' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Invité</span>}
@@ -468,10 +468,10 @@ export default function ChatManager({ user }) {
             </div>
 
             {/* CHAT */}
-            <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative min-w-0">
+            <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-[#09090b] relative min-w-0">
                 {activeRoom ? (
                     <>
-                        <div className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between shrink-0 z-20 shadow-sm">
+                        <div className="h-16 bg-white dark:bg-[#111113] border-b border-zinc-200 dark:border-zinc-800 flex items-center px-4 justify-between shrink-0 z-20">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-slate-600"><PanelLeft size={20}/></button>}
                                 <div className="flex flex-col truncate">
@@ -532,7 +532,7 @@ export default function ChatManager({ user }) {
                                     )}
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+                                <div className="p-4 bg-white dark:bg-[#111113] border-t border-zinc-200 dark:border-zinc-800">
                                     {(editingMessageId || replyingTo) && (
                                         <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-t-xl text-xs text-indigo-600 dark:text-indigo-400 border-b border-indigo-100 dark:border-indigo-800">
                                             <span className="flex items-center gap-1 font-bold">
@@ -544,7 +544,7 @@ export default function ChatManager({ user }) {
                                     )}
                                     <form onSubmit={handleSendMessage} className={`flex gap-2 ${(editingMessageId || replyingTo) ? 'bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded-b-xl' : ''}`}>
                                         <input type="text" value={newMessage} onChange={handleInputChange} placeholder={replyingTo ? "Votre réponse..." : "Écrivez votre message..."} className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-950 focus:border-indigo-500 border rounded-xl px-4 py-3 outline-none transition-all dark:text-white"/>
-                                        <button type="submit" className={`p-3 text-white rounded-xl transition-colors ${editingMessageId ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                        <button type="submit" className="px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl hover:opacity-90 transition-all">
                                             {editingMessageId ? <Check size={20}/> : <Send size={20}/>}
                                         </button>
                                     </form>
@@ -613,7 +613,7 @@ export default function ChatManager({ user }) {
             )}
             {isCreating && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl w-full max-w-sm">
+                    <div className="bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-xl w-full max-w-sm">
                         <h3 className="text-lg font-bold mb-4 dark:text-white">Nouveau Groupe</h3>
                         <input type="text" value={newChatName} onChange={e => setNewChatName(e.target.value)} className="w-full p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-lg dark:text-white" placeholder="Nom"/>
                         <input type="text" value={inviteEmails} onChange={e => setInviteEmails(e.target.value)} className="w-full p-2 mb-4 bg-slate-100 dark:bg-slate-800 rounded-lg dark:text-white" placeholder="Emails (séparés par virgule)"/>

@@ -31,29 +31,29 @@ export default function NotificationCenter({ notifications, onClose, onClearAll,
             
             {/* Drawer */}
             <div 
-                className="relative w-full max-w-md h-full flex flex-col bg-white/95 dark:bg-[#0B1120]/95 backdrop-blur-3xl shadow-[0_0_40px_rgba(0,0,0,0.1)] dark:shadow-[0_0_40px_rgba(0,0,0,0.5)] border-l border-slate-200/50 dark:border-slate-800/50 z-10 animate-in slide-in-from-right duration-300 ease-out"
+                className="relative w-full max-w-md h-full flex flex-col bg-white dark:bg-[#111113] shadow-2xl border-l border-zinc-200 dark:border-zinc-800 z-10 animate-in slide-in-from-right duration-200 ease-out"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* EN-TÊTE */}
-                <div className="px-6 py-5 border-b border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center shrink-0">
+                <div className="px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center shrink-0">
                     <div>
-                        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Notifications</h2>
-                        <p className="text-sm font-medium text-slate-500 mt-0.5">{notifications.filter(n => !n.is_read).length} non lu(s)</p>
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">Notifications</h2>
+                        <p className="text-xs font-mono text-zinc-500 mt-0.5">{notifications.filter(n => !n.is_read).length} non lu(s)</p>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5">
                         {notifications.length > 0 && (
                             <>
-                                <button onClick={onMarkAllRead} className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-colors" title="Tout marquer comme lu">
-                                    <Check size={18} strokeWidth={2.5} />
+                                <button onClick={onMarkAllRead} className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors" title="Tout marquer comme lu">
+                                    <Check size={16} strokeWidth={2.5} />
                                 </button>
-                                <button onClick={onClearAll} className="p-2.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors" title="Tout vider">
-                                    <Trash2 size={18} strokeWidth={2.5} />
+                                <button onClick={onClearAll} className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-red-500 rounded-lg transition-colors" title="Tout vider">
+                                    <Trash2 size={16} strokeWidth={2.5} />
                                 </button>
                             </>
                         )}
-                        <button onClick={onClose} className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors ml-2">
-                            <X size={18} strokeWidth={2.5} />
+                        <button onClick={onClose} className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-colors ml-1">
+                            <X size={16} strokeWidth={2.5} />
                         </button>
                     </div>
                 </div>

@@ -67,92 +67,92 @@ export default function ShareProjectModal({ project, shares, onClose, updateData
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-700">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-[#111113] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
-                            <Users size={20} />
+                        <div className="p-2.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-xl">
+                            <Users size={18} />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Partager le Projet</h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">{project.title}</p>
+                            <h2 className="text-base font-bold text-zinc-900 dark:text-white">Partager le Projet</h2>
+                            <p className="text-xs text-zinc-500 truncate max-w-[200px]">{project.title}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-xl transition-colors">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg transition-colors">
+                        <X size={18} />
                     </button>
                 </div>
 
                 <div className="p-6">
                     <div className="mb-6">
-                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Inviter quelqu'un</label>
+                        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-500 mb-2">Inviter quelqu'un</label>
                         <form onSubmit={handleInvite} className="flex gap-2">
                             <div className="relative flex-1">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail size={16} className="text-gray-400" />
+                                    <Mail size={15} className="text-zinc-500" />
                                 </div>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="Adresse email..."
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm text-gray-900 dark:text-white transition-all"
+                                    className="w-full pl-9 pr-4 py-2.5 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl focus:border-zinc-500 outline-none text-sm text-zinc-900 dark:text-white transition-all"
                                     required
                                 />
                             </div>
                             <button
                                 type="submit"
                                 disabled={loading || !email}
-                                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+                                className="px-4 py-2.5 bg-zinc-900 dark:bg-white hover:opacity-90 disabled:opacity-40 text-white dark:text-[#09090b] text-sm font-semibold rounded-xl transition-all"
                             >
                                 {loading ? '...' : 'Inviter'}
                             </button>
                         </form>
                         {error && <p className="text-red-500 text-xs mt-2 flex items-center gap-1"><X size={12}/> {error}</p>}
-                        {success && <p className="text-green-500 text-xs mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> {success}</p>}
+                        {success && <p className="text-emerald-500 text-xs mt-2 flex items-center gap-1"><CheckCircle2 size={12} /> {success}</p>}
                     </div>
 
                     <div>
-                        <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Membres actuels</h3>
+                        <h3 className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-wider mb-3">Membres actuels</h3>
                         <div className="space-y-2">
                             {/* Le créateur (Vous) */}
-                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900/50 rounded-xl border border-gray-100 dark:border-slate-700">
+                            <div className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                                    <div className="w-8 h-8 rounded-full bg-zinc-900 dark:bg-white flex items-center justify-center text-white dark:text-[#09090b] font-bold text-xs">
                                         Moi
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Vous</p>
-                                        <p className="text-xs text-gray-500">Propriétaire</p>
+                                        <p className="text-sm font-medium text-zinc-900 dark:text-white">Vous</p>
+                                        <p className="text-xs text-zinc-500">Propriétaire</p>
                                     </div>
                                 </div>
-                                <ShieldAlert size={16} className="text-blue-500" />
+                                <ShieldAlert size={15} className="text-zinc-400" />
                             </div>
 
                             {/* Les invités */}
                             {shares.map(share => (
-                                <div key={share.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                                <div key={share.id} className="flex items-center justify-between p-3 bg-white dark:bg-[#141416] rounded-xl border border-zinc-200 dark:border-zinc-800">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs uppercase">
+                                        <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 font-bold text-xs uppercase">
                                             {share.user_email.charAt(0)}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[150px]">{share.user_email}</p>
-                                            <p className="text-xs text-gray-500">Invité</p>
+                                            <p className="text-sm font-medium text-zinc-900 dark:text-white truncate max-w-[150px]">{share.user_email}</p>
+                                            <p className="text-xs text-zinc-500">Invité</p>
                                         </div>
                                     </div>
                                     <button 
                                         onClick={() => handleRemoveShare(share.id)}
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                                         title="Retirer l'accès"
                                     >
-                                        <Trash2 size={16} />
+                                        <Trash2 size={15} />
                                     </button>
                                 </div>
                             ))}
                             {shares.length === 0 && (
-                                <p className="text-sm text-center text-gray-500 dark:text-gray-400 py-4 italic">
+                                <p className="text-xs text-center text-zinc-500 py-4">
                                     Ce projet n'est partagé avec personne pour le moment.
                                 </p>
                             )}

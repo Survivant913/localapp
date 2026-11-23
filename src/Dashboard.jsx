@@ -132,29 +132,29 @@ const RoutineFocusModal = ({ habits, updateHabit, onClose }) => {
 
     return createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
-            <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-md transition-opacity" onClick={onClose}></div>
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-white/20 dark:border-slate-800/50 w-full max-w-md relative z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+            <div className="bg-white dark:bg-[#111113] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md relative z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 
                 {/* En-tête */}
-                <div className="p-6 pb-4 border-b border-slate-100/50 dark:border-slate-800/50 flex items-center justify-between shrink-0">
+                <div className="p-6 pb-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">
                     <div>
-                        <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Routine du jour</h2>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">{completedCount} sur {localHabits.length} terminées</p>
+                        <h2 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Routine du jour</h2>
+                        <p className="text-xs font-mono text-zinc-500 dark:text-zinc-400 mt-1">{completedCount} / {localHabits.length} terminées</p>
                     </div>
-                    <button onClick={onClose} className="p-2 bg-slate-100/50 dark:bg-slate-800/50 rounded-full text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
-                        <X size={20} />
+                    <button onClick={onClose} className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-all">
+                        <X size={18} />
                     </button>
                 </div>
 
                 {/* Jauge de progression */}
-                <div className="px-6 py-2 shrink-0">
-                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-slate-800 dark:bg-slate-200 rounded-full transition-all duration-700 ease-out" style={{ width: `${progress}%` }}></div>
+                <div className="px-6 py-3 shrink-0">
+                    <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-zinc-900 dark:bg-white rounded-full transition-all duration-500 ease-out" style={{ width: `${progress}%` }}></div>
                     </div>
                 </div>
 
                 {/* Liste des habitudes */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-3 scrollbar-hide">
+                <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-2.5 scrollbar-hide">
                     {localHabits.map((habit) => {
                         const isDone = habit.history?.includes(todayStr);
                         const streak = calculateStreak(habit);
@@ -164,40 +164,35 @@ const RoutineFocusModal = ({ habits, updateHabit, onClose }) => {
                             <div 
                                 key={habit.id}
                                 onClick={() => !isDone && handleCheck(habit)}
-                                className={`group relative p-4 rounded-2xl border transition-all duration-300 flex items-center gap-4
+                                className={`group relative p-3.5 rounded-xl border transition-all duration-200 flex items-center gap-4
                                     ${isDone 
-                                        ? 'bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-60' 
-                                        : 'bg-white dark:bg-slate-800/80 border-slate-200/50 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5 cursor-pointer'
+                                        ? 'bg-zinc-50 dark:bg-[#09090b] border-zinc-200/60 dark:border-zinc-800/50 opacity-50' 
+                                        : 'bg-white dark:bg-[#141416] border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 cursor-pointer'
                                     }
                                     ${isAnimating ? 'scale-95 opacity-50' : 'scale-100'}
                                 `}
                             >
                                 {/* Checkbox / Icône */}
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors duration-300
-                                    ${isDone ? 'bg-slate-200 dark:bg-slate-700 text-slate-400' : 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 group-hover:bg-slate-800 group-hover:text-white dark:group-hover:bg-slate-200 dark:group-hover:text-slate-900'}
+                                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 transition-colors duration-200 border
+                                    ${isDone ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400' : 'bg-zinc-100 dark:bg-[#09090b] border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 group-hover:bg-zinc-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-[#09090b]'}
                                 `}>
-                                    {isDone ? <Check size={24} strokeWidth={3} /> : <DynamicIcon name={habit.icon} size={24} />}
+                                    {isDone ? <Check size={20} strokeWidth={3} /> : <DynamicIcon name={habit.icon} size={20} />}
                                 </div>
 
                                 {/* Infos */}
                                 <div className="flex-1 min-w-0">
-                                    <h3 className={`font-bold text-base truncate transition-colors ${isDone ? 'text-slate-400 line-through decoration-slate-300/50 dark:decoration-slate-600/50' : 'text-slate-800 dark:text-slate-100'}`}>
+                                    <h3 className={`font-semibold text-sm truncate transition-colors ${isDone ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
                                         {habit.name}
                                     </h3>
                                     {streak > 0 && (
                                         <div className="flex items-center gap-1.5 mt-1">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${streak >= 3 ? 'bg-slate-800 dark:bg-slate-300 shadow-[0_0_8px_rgba(0,0,0,0.5)] dark:shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                            <span className={`text-[10px] font-bold uppercase tracking-widest ${streak >= 3 ? 'text-slate-800 dark:text-slate-300' : 'text-slate-400'}`}>
-                                                Série : {streak}
+                                            <div className={`w-1.5 h-1.5 rounded-full ${streak >= 3 ? 'bg-zinc-900 dark:bg-white' : 'bg-zinc-400 dark:bg-zinc-600'}`}></div>
+                                            <span className={`text-[10px] font-mono uppercase tracking-wider ${streak >= 3 ? 'text-zinc-900 dark:text-zinc-200' : 'text-zinc-500'}`}>
+                                                Série : {streak}j
                                             </span>
                                         </div>
                                     )}
                                 </div>
-                                
-                                {/* Confetti ou effet visuel au clic (simulé via un scale bg) */}
-                                {isAnimating && (
-                                    <div className="absolute inset-0 bg-slate-800/5 dark:bg-white/5 rounded-2xl animate-ping opacity-0"></div>
-                                )}
                             </div>
                         );
                     })}
@@ -258,39 +253,36 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
         <>
             <div 
                 onClick={() => setIsFocusModalOpen(true)}
-                className={`group cursor-pointer relative overflow-hidden rounded-[1.5rem] border p-4 transition-all duration-300 flex items-center justify-between
+                className={`group cursor-pointer relative overflow-hidden rounded-xl border p-4 transition-all duration-200 flex items-center justify-between
                 ${isAllDone 
-                    ? 'bg-slate-50/50 dark:bg-slate-800/30 border-transparent' 
-                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5'
+                    ? 'bg-zinc-50 dark:bg-[#09090b] border-zinc-200/60 dark:border-zinc-800/60 opacity-70' 
+                    : 'bg-white dark:bg-[#141416] border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600'
                 }`}
             >
-                {/* Bg gradient on hover */}
-                {!isAllDone && <div className="absolute inset-0 bg-gradient-to-r from-slate-100/50 to-transparent dark:from-slate-800/50 opacity-0 group-hover:opacity-100 transition-opacity"></div>}
-                
                 <div className="flex items-center gap-4 relative z-10">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors
-                        ${isAllDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'}
+                    <div className={`w-11 h-11 rounded-lg flex items-center justify-center transition-colors border
+                        ${isAllDone ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400' : 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-[#09090b]'}
                     `}>
-                        {isAllDone ? <Check size={20} strokeWidth={3} /> : <Zap size={20} strokeWidth={2.5} />}
+                        {isAllDone ? <Check size={18} strokeWidth={3} /> : <Zap size={18} strokeWidth={2.5} />}
                     </div>
                     <div>
-                        <h3 className={`font-bold text-sm tracking-tight ${isAllDone ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>
+                        <h3 className={`font-semibold text-sm tracking-tight ${isAllDone ? 'text-zinc-500' : 'text-zinc-900 dark:text-white'}`}>
                             {isAllDone ? "Routine terminée" : "Routine du jour"}
                         </h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            {completedHabits.length} sur {todayHabits.length}
+                        <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
+                            {completedHabits.length} / {todayHabits.length}
                         </p>
                     </div>
                 </div>
 
                 <div className="relative z-10 flex items-center gap-2">
-                    <span className={`text-xs font-bold ${isAllDone ? 'text-slate-400' : 'text-slate-900 dark:text-white'} opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 hidden sm:block`}>
+                    <span className={`text-xs font-medium ${isAllDone ? 'text-zinc-500' : 'text-zinc-900 dark:text-white'} opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 hidden sm:block`}>
                         {isAllDone ? "Voir" : "Commencer"}
                     </span>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors
-                        ${isAllDone ? 'bg-slate-100 dark:bg-slate-800 text-slate-400' : 'bg-slate-100 dark:bg-slate-800 group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-slate-900'}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors border border-zinc-200 dark:border-zinc-800
+                        ${isAllDone ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400' : 'bg-zinc-100 dark:bg-zinc-900 group-hover:bg-zinc-900 group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-[#09090b]'}
                     `}>
-                        <ChevronRight size={16} strokeWidth={3} />
+                        <ChevronRight size={15} strokeWidth={2.5} />
                     </div>
                 </div>
             </div>
@@ -304,17 +296,17 @@ const HabitStrip = ({ habits, updateHabit, setView }) => {
             )}
 
             {tomorrowHabits.length > 0 && (
-                <div className="mt-4 p-4 rounded-[1.5rem] bg-white/40 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <div className="mt-3 p-4 rounded-xl bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800">
+                    <h4 className="text-[10px] font-mono font-semibold text-zinc-500 uppercase tracking-widest mb-2.5 flex items-center gap-2">
                         Prévu demain
                     </h4>
                     <div className="flex flex-wrap gap-2">
                         {tomorrowHabits.map(h => (
-                            <div key={h.id} className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 rounded-md shadow-sm border border-slate-100 dark:border-slate-700">
-                                <DynamicIcon name={h.icon} size={12} className="text-slate-400" />
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{h.name}</span>
+                            <div key={h.id} className="flex items-center gap-1.5 px-2.5 py-1 bg-white dark:bg-[#141416] rounded-md border border-zinc-200 dark:border-zinc-800">
+                                <DynamicIcon name={h.icon} size={12} className="text-zinc-500" />
+                                <span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">{h.name}</span>
                                 {getHabitImportance(h) > 1 && (
-                                    <span className="text-[8px] font-black text-amber-500 ml-1">x{getHabitImportance(h)}</span>
+                                    <span className="text-[9px] font-mono font-bold text-zinc-500 ml-1">x{getHabitImportance(h)}</span>
                                 )}
                             </div>
                         ))}
@@ -368,11 +360,11 @@ const PremiumChart = ({ data, height = 80 }) => {
     const fillPolygon = `0,${height} ${pastPointsStr} ${todayX},${height}`;
 
     return (
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible text-zinc-900 dark:text-white" preserveAspectRatio="none">
             <defs>
                 <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
+                    <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
                 </linearGradient>
             </defs>
 
@@ -381,21 +373,21 @@ const PremiumChart = ({ data, height = 80 }) => {
 
             {/* Ligne du 0€ si on passe en négatif (repère visuel discret) */}
             {min < 0 && max > 0 && (
-                <line x1="0" y1={getY(0)} x2={width} y2={getY(0)} stroke="currentColor" className="text-slate-300 dark:text-slate-700" strokeWidth="0.5" strokeDasharray="2" opacity="0.8" />
+                <line x1="0" y1={getY(0)} x2={width} y2={getY(0)} stroke="currentColor" className="text-zinc-300 dark:text-zinc-700" strokeWidth="0.5" strokeDasharray="2" opacity="0.8" />
             )}
 
             {/* Ligne Verticale "Aujourd'hui" */}
-            <line x1={todayX} y1="0" x2={todayX} y2={height} stroke="currentColor" className="text-blue-500/30 dark:text-blue-400/30" strokeWidth="1" strokeDasharray="2 2" />
+            <line x1={todayX} y1="0" x2={todayX} y2={height} stroke="currentColor" className="text-zinc-400/40 dark:text-zinc-600/60" strokeWidth="1" strokeDasharray="2 2" />
 
             {/* Courbe Future (Prévision) - Compressée, Pointillée, Teinte différente */}
-            <polyline fill="none" stroke="currentColor" className="text-slate-400 dark:text-slate-500" strokeWidth="1.5" strokeDasharray="3 3" points={futurePointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline fill="none" stroke="currentColor" className="text-zinc-400 dark:text-zinc-600" strokeWidth="1.5" strokeDasharray="3 3" points={futurePointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
 
             {/* Courbe Passée (Réel) - Solide et lisse */}
-            <polyline fill="none" stroke="#3b82f6" strokeWidth="2.5" points={pastPointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline fill="none" stroke="currentColor" strokeWidth="2" points={pastPointsStr} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
 
-            {/* Marqueur "Aujourd'hui" lumineux */}
-            <circle cx={todayX} cy={todayY} r="3" className="fill-white dark:fill-slate-900 stroke-blue-500" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            <circle cx={todayX} cy={todayY} r="1.5" className="fill-blue-500 animate-pulse" vectorEffect="non-scaling-stroke" />
+            {/* Marqueur "Aujourd'hui" */}
+            <circle cx={todayX} cy={todayY} r="3" className="fill-white dark:fill-[#09090b] stroke-zinc-900 dark:stroke-white" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            <circle cx={todayX} cy={todayY} r="1.5" className="fill-zinc-900 dark:fill-white" vectorEffect="non-scaling-stroke" />
         </svg>
     );
 };
@@ -664,10 +656,10 @@ export default function Dashboard({ data, updateData, setView }) {
         const target = new Date(dateStr); target.setHours(0,0,0,0);
         const diffTime = target - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays === 0) return { text: 'Auj.', color: 'text-green-600 bg-green-100 dark:bg-emerald-900/30 dark:text-emerald-400' };
-        if (diffDays === 1) return { text: 'Demain', color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400' };
-        if (diffDays < 0) return { text: 'Passé', color: 'text-gray-400 bg-gray-100' };
-        return { text: `J-${diffDays}`, color: 'text-purple-600 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400' };
+        if (diffDays === 0) return { text: 'Auj.', color: 'text-[#09090b] bg-white border border-zinc-200' };
+        if (diffDays === 1) return { text: 'Demain', color: 'text-zinc-200 bg-zinc-800 border border-zinc-700' };
+        if (diffDays < 0) return { text: 'Passé', color: 'text-zinc-500 bg-zinc-900 border border-zinc-800' };
+        return { text: `J-${diffDays}`, color: 'text-zinc-300 bg-zinc-900 border border-zinc-800' };
     };
 
     const toggleTodo = (id) => {
@@ -738,64 +730,61 @@ export default function Dashboard({ data, updateData, setView }) {
 
             {/* HEADER */}
             <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1 bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl p-4 md:p-6 rounded-[2.5rem] shadow-2xl border border-white dark:border-white/5 flex flex-col justify-center relative overflow-hidden group">
-                    <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 items-center relative z-10 w-full">
+                <div className="flex-1 bg-white dark:bg-[#111113] p-4 md:px-6 md:py-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col justify-center relative overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-3 relative z-10 w-full">
                         <div className="flex justify-start">
-                            <select value={dashboardFilter} onChange={(e) => setDashboardFilter(e.target.value)} className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black outline-none text-slate-800 dark:text-white shadow-sm">
+                            <select value={dashboardFilter} onChange={(e) => setDashboardFilter(e.target.value)} className="px-3 py-1.5 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs font-mono font-semibold outline-none text-zinc-800 dark:text-zinc-200">
                                 <option value="total">GLOBAL</option>
                                 {accounts.filter(acc => !(data.profile?.settings?.hidden_accounts || []).includes(String(acc.id))).map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                             </select>
                         </div>
                         <div className="text-center">
-                            <p className="text-blue-600 dark:text-blue-400 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em]">{todayDate}</p>
+                            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-mono uppercase tracking-[0.2em]">{todayDate}</p>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <button onClick={() => setView('budget')} className="p-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-110 active:scale-95 transition-all"><Plus size={16}/></button>
-                            <button onClick={() => setView('todo')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><CheckSquare size={16}/></button>
-                            <button onClick={() => setView('notes')} className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm hover:bg-slate-50 transition-all"><StickyNote size={16}/></button>
+                            <button onClick={() => setView('budget')} className="p-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg hover:opacity-90 active:scale-95 transition-all"><Plus size={16}/></button>
+                            <button onClick={() => setView('todo')} className="p-2 bg-zinc-50 dark:bg-[#09090b] text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"><CheckSquare size={16}/></button>
+                            <button onClick={() => setView('notes')} className="p-2 bg-zinc-50 dark:bg-[#09090b] text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"><StickyNote size={16}/></button>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* METRICS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {showSolde && (
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-emerald-500/20">
-                    <div className="relative z-10 flex justify-between items-start mb-10">
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-100 dark:ring-emerald-800"><Wallet size={28}/></div>
-                        <button onClick={togglePrivacyMode} className="p-2 text-slate-300 dark:text-slate-600 hover:text-blue-500 transition-all">
-                            {isPrivacyMode ? <EyeOff size={22}/> : <Eye size={22}/>}
+                <div className="bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800 relative overflow-hidden flex flex-col group h-full transition-all hover:border-zinc-400 dark:hover:border-zinc-700">
+                    <div className="relative z-10 flex justify-between items-start mb-8">
+                        <div className="p-3 bg-zinc-100 dark:bg-[#09090b] rounded-xl text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800"><Wallet size={22}/></div>
+                        <button onClick={togglePrivacyMode} className="p-2 text-zinc-400 dark:text-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-all">
+                            {isPrivacyMode ? <EyeOff size={20}/> : <Eye size={20}/>}
                         </button>
                     </div>
                     <div className="relative z-10 mb-6">
-                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-2">{renderAmount(currentBalance)}</h3>
-                        <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center md:text-left">TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}</p>
+                        <h3 className="text-4xl md:text-5xl font-bold font-mono text-zinc-900 dark:text-white tracking-tight mb-2">{renderAmount(currentBalance)}</h3>
+                        <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-widest text-center md:text-left">TRÉSORERIE {dashboardFilter === 'total' ? 'GLOBALE' : 'COMPTE'}</p>
                         
-                        {/* L'ancien petit encart a été gardé pour la cohérence, mais la vraie star est en dessous */}
                         {!isPrivacyMode && (
-                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-slate-800/50 rounded-full border border-slate-100 dark:border-slate-700">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter opacity-70">Projeté fin de mois :</span>
-                                <span className={`text-xs font-black ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{renderAmount(projectedBalance)}</span>
+                            <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-zinc-100 dark:bg-[#09090b] rounded-lg border border-zinc-200 dark:border-zinc-800">
+                                <span className="text-[10px] font-mono text-zinc-500 uppercase">Fin de mois :</span>
+                                <span className={`text-xs font-mono font-bold ${balanceDiff >= 0 ? "text-emerald-500" : "text-rose-500"}`}>{renderAmount(projectedBalance)}</span>
                             </div>
                         )}
                     </div>
                     
                     {/* LE NOUVEAU GRAPHIQUE PREMIUM */}
-                    <div className="w-full mt-auto bg-slate-50/50 dark:bg-slate-800/30 rounded-3xl p-5 border border-slate-100 dark:border-slate-800/50 relative group/chart">
+                    <div className="w-full mt-auto bg-zinc-50 dark:bg-[#09090b] rounded-xl p-4 border border-zinc-200 dark:border-zinc-800 relative group/chart">
                         <div className="flex justify-between items-center mb-3">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Passé (30J)</span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-blue-500 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full ring-1 ring-blue-100 dark:ring-blue-900/50">Aujourd'hui</span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Prévu (+30J)</span>
+                            <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">Passé (30J)</span>
+                            <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-900 dark:text-white bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded">Aujourd'hui</span>
+                            <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 text-right">Prévu (+30J)</span>
                         </div>
                         <div className="h-20 w-full">
                             <PremiumChart data={premiumData} height={80} />
                         </div>
-                        {/* Info Bulle de projection (S'affiche au survol du graphique) */}
                         {!isPrivacyMode && (
-                            <div className="absolute -top-3 right-4 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-xl shadow-xl pointer-events-none z-20">
-                                Projection à 30J : <span className={forecast30Days >= currentBalance ? 'text-emerald-400 dark:text-emerald-600' : 'text-rose-400 dark:text-rose-600'}>{renderAmount(forecast30Days)}</span>
+                            <div className="absolute -top-3 right-4 opacity-0 group-hover/chart:opacity-100 transition-opacity duration-200 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] text-[10px] font-mono font-bold px-3 py-1.5 rounded-lg shadow-xl pointer-events-none z-20">
+                                Projection 30J : <span className={forecast30Days >= currentBalance ? 'text-emerald-400 dark:text-emerald-600' : 'text-rose-400 dark:text-rose-600'}>{renderAmount(forecast30Days)}</span>
                             </div>
                         )}
                     </div>
@@ -803,34 +792,34 @@ export default function Dashboard({ data, updateData, setView }) {
                 )}
 
                 {showOperations && (
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col group transition-all hover:border-purple-500/20">
-                    <div className="flex items-center gap-3 mb-8 text-purple-600 dark:text-purple-400">
-                        <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-xl"><Calendar size={22}/></div>
-                        <h3 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Opérations à venir</h3>
+                <div className="lg:col-span-2 bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col group transition-all hover:border-zinc-400 dark:hover:border-zinc-700">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-white"><Calendar size={18}/></div>
+                        <h3 className="text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Opérations à venir</h3>
                     </div>
-                    <div className="flex-1 flex flex-col gap-4">
+                    <div className="flex-1 flex flex-col gap-3">
                         {upcomingList.length === 0 ? (
-                            <div className="flex-1 flex items-center justify-center text-slate-400 italic py-4 font-bold opacity-30 tracking-widest uppercase text-center">Tranquillité totale</div>
+                            <div className="flex-1 flex items-center justify-center text-zinc-500 py-4 font-mono text-xs opacity-50 tracking-widest uppercase text-center">Tranquillité totale</div>
                         ) : (
                             upcomingList.map((e, idx) => {
                                 const impact = getFinancialImpact(e.data);
                                 const isNeutral = impact === 0;
                                 const isPositive = impact > 0;
                                 return (
-                                    <div key={idx} className="flex items-center justify-between p-4 md:p-6 bg-slate-50/50 dark:bg-slate-800/40 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 shadow-sm">
-                                        <div className="flex items-center gap-5 overflow-hidden">
-                                            <div className="p-3 bg-white dark:bg-slate-700 rounded-xl text-slate-500 shadow-sm shrink-0 border dark:border-slate-600">
-                                                {e.data.type === 'transfer' ? <ArrowRightLeft size={18} className="text-blue-500"/> : e.type === 'scheduled' ? <Calendar size={18}/> : <TrendingUp size={18}/>}
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all duration-200">
+                                        <div className="flex items-center gap-4 overflow-hidden">
+                                            <div className="p-2.5 bg-white dark:bg-[#141416] rounded-lg text-zinc-500 dark:text-zinc-400 shrink-0 border border-zinc-200 dark:border-zinc-800">
+                                                {e.data.type === 'transfer' ? <ArrowRightLeft size={16}/> : e.type === 'scheduled' ? <Calendar size={16}/> : <TrendingUp size={16}/>}
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{e.data.description}</p>
-                                                <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">
+                                                <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{e.data.description}</p>
+                                                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase mt-0.5">
                                                     <span>{e.date.toLocaleDateString()}</span>
-                                                    {e.type === 'recurring' && <span className="text-blue-500 font-black">• RÉCURRENCE</span>}
+                                                    {e.type === 'recurring' && <span className="text-zinc-300">• RÉCURRENCE</span>}
                                                 </div>
                                             </div>
                                         </div>
-                                        <span className={`font-black text-base shrink-0 pl-4 ${isNeutral ? 'text-blue-600' : isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        <span className={`font-mono font-bold text-sm shrink-0 pl-4 ${isNeutral ? 'text-zinc-400' : isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
                                             {isNeutral ? 'TRANS.' : renderAmount(impact, true)}
                                         </span>
                                     </div>
@@ -845,18 +834,16 @@ export default function Dashboard({ data, updateData, setView }) {
             {showTimeline && <DashboardCalendar data={data} filter={dashboardFilter} />}
 
             {/* MAIN CONTENT */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {isLeftColumnVisible && (
-                <div className={`space-y-8 ${isRightColumnVisible ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
+                <div className={`space-y-6 ${isRightColumnVisible ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
                     
                     {/* --- ZONE HABITUDES --- */}
                     {showRoutines && habits.length > 0 && (
-                        <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] border border-slate-100/80 dark:border-slate-800/80 p-6 md:p-8 shadow-2xl relative overflow-hidden group">
-                            <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                            
-                            <div className="flex justify-between items-center mb-6 relative z-10">
-                                <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-widest ml-2 md:ml-0">
-                                    <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Activity size={18} strokeWidth={2.5}/></div>
+                        <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 relative overflow-hidden">
+                            <div className="flex justify-between items-center mb-5 relative z-10">
+                                <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2.5 uppercase tracking-widest">
+                                    <div className="p-2 bg-zinc-100 dark:bg-[#09090b] rounded-lg text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800"><Activity size={16} strokeWidth={2.5}/></div>
                                     Routines
                                 </h3>
                             </div>
@@ -869,12 +856,12 @@ export default function Dashboard({ data, updateData, setView }) {
 
                     {/* --- ZONE NOTES ÉPINGLÉES --- */}
                     {showNotes && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {pinnedNotes.map(n => (
-                            <div key={n.id} className={`p-10 rounded-[2.5rem] border border-white/20 shadow-2xl ${n.color} text-slate-900 relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-all shadow-sm`} onClick={() => setView('notes')}>
-                                <div className="absolute top-6 right-8 opacity-20"><StickyNote size={28}/></div>
-                                <h4 className="font-black text-xl mb-4 tracking-tighter uppercase">{n.title}</h4>
-                                <p className="text-sm font-medium opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
+                            <div key={n.id} className={`p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 ${n.color} text-zinc-900 relative overflow-hidden cursor-pointer group hover:border-zinc-400 transition-all`} onClick={() => setView('notes')}>
+                                <div className="absolute top-5 right-6 opacity-20"><StickyNote size={22}/></div>
+                                <h4 className="font-bold text-base mb-2 tracking-tight uppercase">{n.title}</h4>
+                                <p className="text-sm opacity-80 leading-relaxed line-clamp-4">{n.content}</p>
                             </div>
                         ))}
                     </div>
@@ -882,17 +869,17 @@ export default function Dashboard({ data, updateData, setView }) {
 
                     {/* --- ZONE PROJETS ACTIFS --- */}
                     {showProjets && activeProjects.length > 0 && (
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl">
-                        <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 tracking-tighter uppercase">
-                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600"><FolderKanban size={22}/></div>
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2.5 tracking-wider uppercase">
+                                <div className="p-2 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-white"><FolderKanban size={18}/></div>
                                 Projets Actifs
                             </h3>
-                            <button onClick={handleAutoFocus} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-900/20 active:scale-95 transition-all">FOCUS</button>
+                            <button onClick={handleAutoFocus} className="px-4 py-1.5 bg-zinc-900 dark:bg-white hover:opacity-90 text-white dark:text-[#09090b] rounded-lg text-[10px] font-mono font-bold uppercase tracking-widest active:scale-95 transition-all">FOCUS</button>
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {activeProjects.length === 0 ? (
-                                <p className="text-center text-slate-400 py-10 font-bold italic opacity-50 tracking-widest uppercase">Aucun projet actif</p>
+                                <p className="text-center text-zinc-500 py-10 font-mono text-xs opacity-50 tracking-widest uppercase">Aucun projet actif</p>
                             ) : (
                                 activeProjects.map(p => {
                                     const cost = parseFloat(p.cost || 0);
@@ -904,41 +891,41 @@ export default function Dashboard({ data, updateData, setView }) {
                                     const globalScore = cost > 0 ? (safeProgress + safeFunding) / 2 : safeProgress;
 
                                     return (
-                                        <div key={p.id} className="bg-slate-50/50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-100 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer group" onClick={() => setView('projects')}>
-                                            <div className="flex items-center gap-5 mb-6">
-                                                <div className="relative w-16 h-16 shrink-0">
+                                        <div key={p.id} className="bg-zinc-50 dark:bg-[#09090b] p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all cursor-pointer group" onClick={() => setView('projects')}>
+                                            <div className="flex items-center gap-4 mb-5">
+                                                <div className="relative w-14 h-14 shrink-0">
                                                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                                        <path className="text-slate-200 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
-                                                        <path className="text-blue-500 transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                                                        <path className="text-zinc-200 dark:text-zinc-800" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                                                        <path className="text-zinc-900 dark:text-white transition-all duration-1000" strokeDasharray={`${globalScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                                                     </svg>
-                                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black dark:text-white">{Math.round(globalScore)}%</span>
+                                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold dark:text-white">{Math.round(globalScore)}%</span>
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <h4 className="font-black text-slate-800 dark:text-white text-base truncate">{p.title}</h4>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className={`w-2 h-2 shrink-0 rounded-full ${p.status === 'in_progress' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-                                                        <p className="text-xs text-slate-400 font-bold uppercase truncate tracking-tighter">{p.description || "Aucun descriptif"}</p>
+                                                    <h4 className="font-bold text-zinc-900 dark:text-white text-sm truncate">{p.title}</h4>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${p.status === 'in_progress' ? 'bg-white' : 'bg-zinc-500'}`}></span>
+                                                        <p className="text-xs text-zinc-500 truncate">{p.description || "Aucun descriptif"}</p>
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                                                <div className="space-y-1">
-                                                    <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                                                         <span className="flex items-center gap-1"><List size={10}/> Tâches</span>
                                                         <span className="dark:text-white">{Math.round(safeProgress)}%</span>
                                                     </div>
-                                                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                                                        <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
+                                                    <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-zinc-900 dark:bg-white transition-all duration-500" style={{ width: `${safeProgress}%` }}></div>
                                                     </div>
                                                 </div>
                                                 {cost > 0 && (
-                                                    <div className="space-y-1">
-                                                        <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex justify-between text-[10px] font-mono text-zinc-500 uppercase">
                                                             <span className="flex items-center gap-1"><Euro size={10}/> Budget</span>
-                                                            <span className={isFunded ? "text-green-500" : "text-orange-500"}>{Math.round(safeFunding)}%</span>
+                                                            <span className={isFunded ? "text-emerald-500" : "text-zinc-400"}>{Math.round(safeFunding)}%</span>
                                                         </div>
-                                                        <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
-                                                            <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${safeFunding}%` }}></div>
+                                                        <div className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                                            <div className={`h-full rounded-full transition-all duration-500 ${isFunded ? 'bg-emerald-500' : 'bg-zinc-500'}`} style={{ width: `${safeFunding}%` }}></div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -955,27 +942,24 @@ export default function Dashboard({ data, updateData, setView }) {
 
                 {/* COLONNE DROITE */}
                 {isRightColumnVisible && (
-                <div className={`space-y-8 ${isLeftColumnVisible ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
+                <div className={`space-y-6 ${isLeftColumnVisible ? 'lg:col-span-4' : 'lg:col-span-12'}`}>
                     {showAgenda && (
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-2xl relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
-                        <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-500 pointer-events-none"><Clock size={100} className="rotate-12"/></div>
-                        <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none"></div>
-
-                        <div className="flex justify-between items-center mb-8 relative z-10">
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
-                                <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700"><Clock size={20} strokeWidth={2}/></div>
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 relative overflow-hidden group transition-all" onClick={() => setView('planning')}>
+                        <div className="flex justify-between items-center mb-6 relative z-10">
+                            <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2.5 uppercase tracking-wider">
+                                <div className="p-2 bg-zinc-100 dark:bg-[#09090b] rounded-lg text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-800"><Clock size={18} strokeWidth={2}/></div>
                                 Agenda
                             </h3>
-                            <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
-                                <ArrowRight size={18} />
+                            <button onClick={(e) => { e.stopPropagation(); setView('planning'); }} className="p-2 hover:bg-zinc-100 dark:bg-[#09090b] text-zinc-500 hover:text-zinc-900 dark:hover:text-white rounded-lg transition-all border border-zinc-200 dark:border-zinc-800">
+                                <ArrowRight size={16} />
                             </button>
                         </div>
 
-                        <div className="space-y-6 relative z-10">
+                        <div className="space-y-5 relative z-10">
                             {nextCalendarEvents.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-10 opacity-40">
-                                    <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-3"><Clock size={32} /></div>
-                                    <p className="text-sm font-black uppercase tracking-widest text-center">Calendrier vierge</p>
+                                    <div className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-full mb-3"><Clock size={28} /></div>
+                                    <p className="text-xs font-mono uppercase tracking-widest text-center">Calendrier vierge</p>
                                 </div>
                             ) : (
                                 <div className="flex flex-col">
@@ -985,27 +969,25 @@ export default function Dashboard({ data, updateData, setView }) {
                                         const d = new Date(evt.start_time);
                                         const dayLabel = getDayCounterLabel(evt.start_time);
                                         return (
-                                            <div key={`${evt.type}-${evt.id}`} className="mb-6 relative overflow-hidden rounded-[2rem] p-6 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 dark:border-indigo-500/10 shadow-lg shadow-indigo-500/5 group/next transition-all hover:shadow-indigo-500/10 cursor-pointer">
-                                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 group-hover/next:bg-indigo-500/20 transition-all"></div>
-                                                
-                                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-indigo-500/20 animate-pulse">
-                                                        <span className="w-1.5 h-1.5 bg-white rounded-full"></span> Prochainement
+                                            <div key={`${evt.type}-${evt.id}`} className="mb-5 relative overflow-hidden rounded-xl p-4 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 group/next transition-all hover:border-zinc-400 dark:hover:border-zinc-600 cursor-pointer">
+                                                <div className="flex justify-between items-start mb-3.5 relative z-10">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] text-[10px] font-mono font-bold uppercase tracking-wider">
+                                                        <span className="w-1.5 h-1.5 bg-current rounded-full"></span> Prochainement
                                                     </span>
-                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-lg shadow-sm uppercase tracking-widest ${dayLabel.color}`}>{dayLabel.text}</span>
+                                                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${dayLabel.color}`}>{dayLabel.text}</span>
                                                 </div>
 
-                                                <div className="flex gap-5 items-center relative z-10">
-                                                    <div className={`flex flex-col items-center justify-center w-16 h-16 ${evt.is_todo ? 'bg-orange-500 text-white' : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white'} rounded-[1.5rem] shadow-xl shrink-0 transition-transform group-hover/next:scale-110 group-hover/next:rotate-3`}>
-                                                        <span className="text-[11px] font-black uppercase leading-none opacity-80">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
-                                                        <span className="text-2xl font-black leading-none mt-1">{d.getDate()}</span>
+                                                <div className="flex gap-4 items-center relative z-10">
+                                                    <div className="flex flex-col items-center justify-center w-14 h-14 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl shrink-0">
+                                                        <span className="text-[10px] font-mono uppercase leading-none opacity-75">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                        <span className="text-xl font-bold font-mono leading-none mt-1">{d.getDate()}</span>
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-lg font-black text-slate-800 dark:text-white truncate tracking-tight">{evt.title}</p>
-                                                        <p className="text-[11px] font-black uppercase mt-1 flex items-center gap-1.5 text-indigo-600/80 dark:text-indigo-400/80">
-                                                            <Clock size={12} strokeWidth={3} />
+                                                        <p className="text-base font-bold text-zinc-900 dark:text-white truncate tracking-tight">{evt.title}</p>
+                                                        <p className="text-[11px] font-mono uppercase mt-1 flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                                                            <Clock size={12} strokeWidth={2.5} />
                                                             {evt.is_all_day ? "Toute la journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                                                            {evt.is_todo && <CheckCircle2 size={12} className="text-orange-500 ml-1"/>}
+                                                            {evt.is_todo && <CheckCircle2 size={12} className="text-zinc-400 ml-1"/>}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1015,27 +997,27 @@ export default function Dashboard({ data, updateData, setView }) {
 
                                     {/* AUTRES EVENEMENTS */}
                                     {nextCalendarEvents.length > 1 && (
-                                        <div className="relative pl-6 space-y-5">
-                                            <div className="absolute left-[1.35rem] top-2 bottom-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+                                        <div className="relative pl-5 space-y-3">
+                                            <div className="absolute left-[1.05rem] top-2 bottom-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
                                             {nextCalendarEvents.slice(1).map((evt, index) => {
                                                 const d = new Date(evt.start_time);
                                                 const dayLabel = getDayCounterLabel(evt.start_time);
                                                 return (
-                                                    <div key={`${evt.type}-${evt.id}`} className="relative flex items-center gap-4 cursor-pointer group/item">
-                                                        <div className="absolute -left-[1.65rem] w-3 h-3 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 group-hover/item:border-indigo-500 group-hover/item:scale-125 transition-all"></div>
+                                                    <div key={`${evt.type}-${evt.id}`} className="relative flex items-center gap-3 cursor-pointer group/item">
+                                                        <div className="absolute -left-[1.35rem] w-2.5 h-2.5 rounded-full bg-white dark:bg-[#111113] border-2 border-zinc-300 dark:border-zinc-700 group-hover/item:border-white transition-all"></div>
                                                         
-                                                        <div className={`flex flex-col items-center justify-center w-12 h-12 ${evt.is_todo ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600' : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'} rounded-xl border border-slate-100 dark:border-slate-700 shrink-0 transition-transform group-hover/item:scale-105 shadow-sm`}>
-                                                            <span className="text-[9px] font-black uppercase leading-none">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
-                                                            <span className="text-lg font-black leading-none mt-0.5">{d.getDate()}</span>
+                                                        <div className="flex flex-col items-center justify-center w-11 h-11 bg-zinc-50 dark:bg-[#09090b] text-zinc-700 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-800 shrink-0">
+                                                            <span className="text-[9px] font-mono uppercase leading-none text-zinc-500">{d.toLocaleDateString('fr-FR', {weekday: 'short'}).replace('.', '')}</span>
+                                                            <span className="text-base font-bold font-mono leading-none mt-0.5">{d.getDate()}</span>
                                                         </div>
-                                                        <div className="min-w-0 flex-1 bg-slate-50/50 dark:bg-slate-800/30 p-3 rounded-2xl border border-transparent group-hover/item:border-slate-200 dark:group-hover/item:border-slate-700 group-hover/item:shadow-sm transition-all">
-                                                            <div className="flex items-center justify-between gap-2 mb-1">
-                                                                <p className="text-sm font-black text-slate-800 dark:text-white truncate tracking-tighter">{evt.title}</p>
-                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border shadow-sm uppercase tracking-widest shrink-0 ${dayLabel.color.replace('bg-', 'bg-opacity-10 text-').replace('text-white', '')} border-current opacity-70`}>{dayLabel.text}</span>
+                                                        <div className="min-w-0 flex-1 bg-zinc-50 dark:bg-[#09090b] p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 group-hover/item:border-zinc-400 dark:group-hover/item:border-zinc-600 transition-all">
+                                                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                                                                <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{evt.title}</p>
+                                                                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase shrink-0 ${dayLabel.color}`}>{dayLabel.text}</span>
                                                             </div>
-                                                            <p className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                                                            <p className="text-[10px] font-mono uppercase text-zinc-500 flex items-center gap-1">
                                                                 {evt.is_all_day ? "Journée" : d.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                                                                {evt.is_todo && <CheckCircle2 size={10} className="text-orange-400"/>}
+                                                                {evt.is_todo && <CheckCircle2 size={10} className="text-zinc-400"/>}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1050,32 +1032,32 @@ export default function Dashboard({ data, updateData, setView }) {
                     )}
 
                     {showPriorites && urgentTodos.length > 0 && (
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl flex flex-col group transition-all">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-[0.2em]">
-                                <Target size={16} className="text-orange-500" />
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col group transition-all">
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-2 uppercase tracking-[0.2em]">
+                                <Target size={15} className="text-zinc-400" />
                                 Action Requise
                             </h3>
-                            <span className="text-[10px] font-bold text-slate-400 tracking-widest">{urgentTodos.length} TÂCHE{urgentTodos.length > 1 ? 'S' : ''}</span>
+                            <span className="text-[10px] font-mono text-zinc-500 tracking-wider">{urgentTodos.length} TÂCHE{urgentTodos.length > 1 ? 'S' : ''}</span>
                         </div>
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-2">
                             {urgentTodos.map(t => (
-                                <div key={t.id} className="group/task flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700" onClick={() => toggleTodo(t.id)}>
-                                    <button className="shrink-0 w-6 h-6 mt-0.5 rounded-full border border-slate-300 dark:border-slate-600 flex items-center justify-center group-hover/task:border-slate-800 dark:group-hover/task:border-white transition-all text-transparent group-hover/task:text-slate-800 dark:group-hover/task:text-white">
-                                        <Check size={12} strokeWidth={3} />
+                                <div key={t.id} className="group/task flex items-start gap-3.5 p-3 rounded-xl bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 transition-all cursor-pointer" onClick={() => toggleTodo(t.id)}>
+                                    <button className="shrink-0 w-5 h-5 mt-0.5 rounded-full border border-zinc-300 dark:border-zinc-700 flex items-center justify-center group-hover/task:border-zinc-900 dark:group-hover/task:border-white transition-all text-transparent group-hover/task:text-zinc-900 dark:group-hover/task:text-white">
+                                        <Check size={11} strokeWidth={3} />
                                     </button>
                                     <div className="flex-1 min-w-0">
-                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-snug truncate block group-hover/task:text-slate-900 dark:group-hover/task:text-white transition-colors">{t.text}</span>
+                                        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 leading-snug truncate block group-hover/task:text-zinc-900 dark:group-hover/task:text-white transition-colors">{t.text}</span>
                                         {t.priority === 'high' && (
-                                            <div className="mt-2 flex items-center">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span>
+                                            <div className="mt-1.5 flex items-center">
+                                                <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-400 border border-zinc-700 px-1.5 py-0.2 rounded">Prioritaire</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => setView('todo')} className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all border border-slate-100 dark:border-slate-700">
+                        <button onClick={() => setView('todo')} className="mt-5 flex items-center justify-center gap-2 w-full py-3 bg-zinc-50 dark:bg-[#09090b] hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em] rounded-xl transition-all border border-zinc-200 dark:border-zinc-800">
                             Voir toutes les tâches
                         </button>
                     </div>

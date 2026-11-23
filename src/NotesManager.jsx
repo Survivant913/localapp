@@ -122,21 +122,21 @@ export default function NotesManager({ data, updateData }) {
                 {/* COLONNE GAUCHE : NOTE PRINCIPALE (SCRATCHPAD) */}
                 <div className="w-full xl:w-1/3 space-y-4 xl:sticky xl:top-6 h-full">
                     <div className="flex justify-between items-center px-2">
-                        <h3 className="font-black text-xl text-gray-800 dark:text-white flex items-center gap-3 uppercase tracking-wide">
-                            <StickyNote size={24} className="text-yellow-500 fill-yellow-500/20"/> Brouillon Rapide
+                        <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2.5 uppercase tracking-wider">
+                            <StickyNote size={18} className="text-zinc-500"/> Brouillon Rapide
                         </h3>
-                        {isSavingMain && <span className="text-xs font-bold text-gray-400 animate-pulse bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-md">Sauvegarde...</span>}
+                        {isSavingMain && <span className="text-[10px] font-mono text-zinc-400 animate-pulse bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-2 py-0.5 rounded">Sauvegarde...</span>}
                     </div>
                     
                     <div className="relative group h-full">
                         <textarea 
                             value={mainNote}
                             onChange={(e) => setMainNote(e.target.value)}
-                            className="w-full h-[300px] md:h-[500px] xl:h-[calc(100vh-180px)] p-8 bg-yellow-50 dark:bg-yellow-900/10 text-gray-800 dark:text-yellow-100 border-2 border-yellow-100 dark:border-yellow-900/30 rounded-[2rem] focus:ring-4 focus:ring-yellow-100 dark:focus:ring-yellow-900/20 focus:border-yellow-300 outline-none resize-none shadow-sm text-base leading-relaxed transition-all"
+                            className="w-full h-[300px] md:h-[500px] xl:h-[calc(100vh-180px)] p-6 bg-white dark:bg-[#111113] text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-2xl focus:border-zinc-500 outline-none resize-none text-sm leading-relaxed transition-all"
                             placeholder="Zone de réflexion libre... Écrivez ici tout ce qui vous passe par la tête."
                         ></textarea>
-                        <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            <div className="bg-yellow-200/80 dark:bg-yellow-900/80 backdrop-blur-sm text-yellow-900 dark:text-yellow-100 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest shadow-sm">
+                        <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <div className="bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] text-[10px] font-mono font-bold px-2.5 py-1 rounded uppercase tracking-widest">
                                 Auto-Save
                             </div>
                         </div>
@@ -144,18 +144,18 @@ export default function NotesManager({ data, updateData }) {
                 </div>
 
                 {/* COLONNE DROITE : FORMULAIRE + GRILLE NOTES */}
-                <div className="w-full xl:w-2/3 space-y-10">
+                <div className="w-full xl:w-2/3 space-y-8">
                     
                     {/* FORMULAIRE DE CRÉATION / ÉDITION */}
-                    <div className={`bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-slate-700 transition-all ${editingNoteId ? 'ring-2 ring-blue-500/30 bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                                {editingNoteId ? <Edit2 size={20} className="text-blue-600"/> : <Plus size={24} className="text-slate-900 dark:text-white"/>}
+                    <div className={`bg-white dark:bg-[#111113] p-6 md:p-7 rounded-2xl border border-zinc-200 dark:border-zinc-800 transition-all ${editingNoteId ? 'ring-1 ring-zinc-500' : ''}`}>
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                                {editingNoteId ? <Edit2 size={18}/> : <Plus size={20}/>}
                                 {editingNoteId ? 'Modifier la note' : 'Nouvelle Note'}
                             </h3>
                             {editingNoteId && (
-                                <button onClick={cancelEditing} className="text-sm font-bold text-red-500 hover:text-red-600 flex items-center gap-1 bg-red-50 dark:bg-red-900/10 px-3 py-1.5 rounded-xl hover:bg-red-100 transition-colors">
-                                    <X size={16}/> Annuler
+                                <button onClick={cancelEditing} className="text-xs font-mono font-bold text-red-500 flex items-center gap-1 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg hover:bg-red-500/20 transition-colors">
+                                    <X size={14}/> Annuler
                                 </button>
                             )}
                         </div>

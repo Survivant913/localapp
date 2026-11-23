@@ -8,15 +8,15 @@ import CalendarView from './CalendarView';
 
 const CATEGORIES = [
     { id: 'alim', label: 'Alimentation & Courses', icon: ShoppingCart, color: 'text-orange-500 bg-orange-100 dark:bg-orange-900/30', hex: '#f97316' },
-    { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-blue-500 bg-blue-100 dark:bg-blue-900/30', hex: '#3b82f6' },
+    { id: 'logement', label: 'Logement & Charges', icon: Home, color: 'text-zinc-900 dark:text-white bg-blue-100 dark:bg-blue-900/30', hex: '#3b82f6' },
     { id: 'abos', label: 'Abonnements & Logiciels', icon: Repeat, color: 'text-purple-500 bg-purple-100 dark:bg-purple-900/30', hex: '#a855f7' },
     { id: 'transports', label: 'Transports & Essence', icon: Navigation, color: 'text-teal-500 bg-teal-100 dark:bg-teal-900/30', hex: '#14b8a6' },
     { id: 'sante', label: 'Santé & Mutuelle', icon: Heart, color: 'text-red-500 bg-red-100 dark:bg-red-900/30', hex: '#ef4444' },
     { id: 'loisirs', label: 'Loisirs & Restaurants', icon: Coffee, color: 'text-yellow-500 bg-yellow-100 dark:bg-yellow-900/30', hex: '#eab308' },
-    { id: 'matos', label: 'Matériel Pro', icon: Laptop, color: 'text-indigo-500 bg-indigo-100 dark:bg-indigo-900/30', hex: '#6366f1' },
-    { id: 'urssaf', label: 'URSSAF & Impôts', icon: Building, color: 'text-gray-500 bg-gray-100 dark:bg-slate-800', hex: '#6b7280' },
-    { id: 'frais_bancaires', label: 'Frais bancaires', icon: CreditCard, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800', hex: '#64748b' },
-    { id: 'autre', label: 'Autre Dépense', icon: MoreHorizontal, color: 'text-slate-400 bg-slate-100 dark:bg-slate-800', hex: '#94a3b8' },
+    { id: 'matos', label: 'Matériel Pro', icon: Laptop, color: 'text-zinc-900 dark:text-white bg-indigo-100 dark:bg-indigo-900/30', hex: '#6366f1' },
+    { id: 'urssaf', label: 'URSSAF & Impôts', icon: Building, color: 'text-gray-500 bg-gray-100 dark:bg-[#141416]', hex: '#6b7280' },
+    { id: 'frais_bancaires', label: 'Frais bancaires', icon: CreditCard, color: 'text-slate-500 bg-slate-100 dark:bg-[#141416]', hex: '#64748b' },
+    { id: 'autre', label: 'Autre Dépense', icon: MoreHorizontal, color: 'text-slate-400 bg-slate-100 dark:bg-[#141416]', hex: '#94a3b8' },
     { id: 'salaire', label: 'Revenu / Chiffre d\'Affaires', icon: Wallet, color: 'text-green-500 bg-green-100 dark:bg-green-900/30', hex: '#22c55e' }
 ];
 
@@ -692,52 +692,52 @@ export default function BudgetManager({ data, updateData, initialTab }) {
         <div className="space-y-6 fade-in w-full pb-20">
             {/* 1. CARTES DU HAUT */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-6 rounded-xl text-white shadow-lg col-span-2">
+                <div className="bg-zinc-900 dark:bg-[#111113] p-6 rounded-2xl text-white border border-zinc-800 col-span-2">
                     <div className="flex justify-between items-start mb-4">
-                        <div><p className="text-blue-200 text-sm font-medium">Solde Total</p><h3 className="text-3xl font-bold mt-1">{formatCurrency(currentTotalBalance)}</h3></div>
-                        <div className="p-2 bg-white/20 rounded-lg"><Wallet size={24}/></div>
+                        <div><p className="text-zinc-400 text-xs font-mono uppercase tracking-wider">Solde Total</p><h3 className="text-3xl font-mono font-bold mt-1">{formatCurrency(currentTotalBalance)}</h3></div>
+                        <div className="p-2.5 bg-zinc-800 border border-zinc-700 rounded-xl"><Wallet size={20}/></div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-white/20 pt-4">
-                        {accounts.map(acc => (<div key={acc.id}><p className="text-xs text-blue-200 truncate">{acc.name}</p><p className="font-bold text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</p></div>))}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-zinc-800 pt-4">
+                        {accounts.map(acc => (<div key={acc.id}><p className="text-xs text-zinc-400 truncate">{acc.name}</p><p className="font-mono font-bold text-sm">{formatCurrency(getBalanceForAccount(acc.id))}</p></div>))}
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between">
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="flex items-center gap-2 mb-1">
-                                <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Prévision fin de mois</p>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-xs font-mono uppercase tracking-wider">Prévision fin de mois</p>
                                 <select 
                                     value={forecastAccount} 
                                     onChange={(e) => setForecastAccount(e.target.value)} 
-                                    className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded outline-none border border-transparent focus:border-blue-500 cursor-pointer shadow-sm"
+                                    className="text-[10px] font-mono bg-zinc-100 dark:bg-[#09090b] text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded outline-none border border-zinc-200 dark:border-zinc-800 cursor-pointer"
                                 >
                                     <option value="total">Global</option>
                                     {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                 </select>
                             </div>
-                            <h3 className={`text-2xl font-bold mt-1 ${endOfMonthForecast >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            <h3 className={`text-2xl font-mono font-bold mt-1 ${endOfMonthForecast >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {formatCurrency(endOfMonthForecast)}
                             </h3>
                         </div>
-                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg shrink-0"><TrendingUp size={24}/></div>
+                        <div className="p-2.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-xl shrink-0"><TrendingUp size={20}/></div>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">Projection incluant les opérations à venir ce mois-ci.</p>
+                    <p className="text-xs text-zinc-500 mt-3">Projection incluant les opérations à venir ce mois-ci.</p>
                 </div>
             </div>
 
             {/* 2. MENU ONGLETS */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-                <div className="flex border-b border-gray-100 dark:border-slate-700 overflow-x-auto">
-                    <button onClick={() => setActiveTab('dashboard')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>Vue d'ensemble</button>
-                    <button onClick={() => setActiveTab('accounts')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'accounts' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-b-2 border-orange-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><CreditCard size={16} /> Comptes</button>
-                    <button onClick={() => setActiveTab('planner')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'planner' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-b-2 border-purple-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PiggyBank size={16} /> Planificateur</button>
-                    <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'analytics' ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-b-2 border-rose-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><PieChart size={16} /> Analyses</button>
-                    <button onClick={() => setActiveTab('forecast')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'forecast' ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 border-b-2 border-teal-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><LineChart size={16} /> Prévisions</button>
-                    <button onClick={() => setActiveTab('calendar')} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'calendar' ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}><Calendar size={16} /> Calendrier</button>
-                    <button onClick={() => {setActiveTab('add-transaction'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-transaction' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Transaction</button>
-                    <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-scheduled' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Planifié</button>
-                    <button onClick={() => {setActiveTab('add-recurring'); setType('expense')}} className={`flex-1 py-3 px-4 text-sm font-medium whitespace-nowrap ${activeTab === 'add-recurring' ? 'bg-gray-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`}>+ Récurrent</button>
+            <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <div className="flex border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto bg-zinc-50 dark:bg-[#09090b] p-1 gap-1">
+                    <button onClick={() => setActiveTab('dashboard')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${activeTab === 'dashboard' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>Vue d'ensemble</button>
+                    <button onClick={() => setActiveTab('accounts')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-2 transition-all ${activeTab === 'accounts' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}><CreditCard size={15} /> Comptes</button>
+                    <button onClick={() => setActiveTab('planner')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-2 transition-all ${activeTab === 'planner' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}><PiggyBank size={15} /> Planificateur</button>
+                    <button onClick={() => setActiveTab('analytics')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-2 transition-all ${activeTab === 'analytics' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}><PieChart size={15} /> Analyses</button>
+                    <button onClick={() => setActiveTab('forecast')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-2 transition-all ${activeTab === 'forecast' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}><LineChart size={15} /> Prévisions</button>
+                    <button onClick={() => setActiveTab('calendar')} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center justify-center gap-2 transition-all ${activeTab === 'calendar' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}><Calendar size={15} /> Calendrier</button>
+                    <button onClick={() => {setActiveTab('add-transaction'); setType('expense')}} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${activeTab === 'add-transaction' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>+ Transaction</button>
+                    <button onClick={() => {setActiveTab('add-scheduled'); setType('expense')}} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${activeTab === 'add-scheduled' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>+ Planifié</button>
+                    <button onClick={() => {setActiveTab('add-recurring'); setType('expense')}} className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${activeTab === 'add-recurring' ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}>+ Récurrent</button>
                 </div>
 
                 {/* 3. CONTENU DYNAMIQUE DES ONGLETS */}
@@ -749,9 +749,9 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             {/* COLONNE GAUCHE */}
                             <div className="space-y-6">
                                 {/* RÉCURRENTS */}
-                                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
-                                    <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                        <Repeat size={18} className="text-orange-500"/> Récurrent (Mensuel)
+                                <div className="bg-zinc-50 dark:bg-[#09090b] p-5 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                                    <h3 className="font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                                        <Repeat size={16} className="text-zinc-500"/> Récurrent (Mensuel)
                                     </h3>
                                     {(!recurringList || recurringList.length === 0) && (
                                         <p className="text-gray-400 text-sm text-center py-4">Rien de récurrent.</p>
@@ -761,7 +761,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             const catDef = CATEGORIES.find(c => c.id === r.category) || CATEGORIES.find(c => c.id === 'autre');
                                             const CatIcon = catDef.icon;
                                             return (
-                                            <li key={r.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                                            <li key={r.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-zinc-800 rounded-lg">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-1.5 rounded-full ${r.type === 'income' ? 'bg-green-100 text-green-600' : r.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                                         {r.type === 'income' ? <TrendingUp size={14}/> : r.type === 'transfer' ? <ArrowRightLeft size={14}/> : <TrendingDown size={14}/>}
@@ -786,9 +786,9 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                 </div>
 
                                 {/* PLANIFIÉS */}
-                                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
-                                    <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                                        <CalendarClock size={18} className="text-purple-500"/> Planifié (Futur)
+                                <div className="bg-zinc-50 dark:bg-[#09090b] p-5 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                                    <h3 className="font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
+                                        <CalendarClock size={16} className="text-zinc-500"/> Planifié (Futur)
                                     </h3>
                                     {(!visibleScheduled || visibleScheduled.length === 0) && (
                                         <p className="text-gray-400 text-sm text-center py-4">Rien de prévu.</p>
@@ -798,7 +798,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             const catDef = CATEGORIES.find(c => c.id === s.category) || CATEGORIES.find(c => c.id === 'autre');
                                             const CatIcon = catDef.icon;
                                             return (
-                                            <li key={s.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                                            <li key={s.id} className="flex justify-between items-center text-sm p-3 bg-gray-50 dark:bg-zinc-800 rounded-lg">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-1.5 rounded-full ${s.type === 'income' ? 'bg-green-100 text-green-600' : s.type === 'transfer' ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>
                                                         {s.type === 'income' ? <TrendingUp size={14}/> : s.type === 'transfer' ? <ArrowRightLeft size={14}/> : <TrendingDown size={14}/>}
@@ -821,12 +821,12 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             </div>
 
                             {/* COLONNE DROITE : Historique */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-fit">
+                            <div className="bg-zinc-50 dark:bg-[#09090b] p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 h-fit">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                        <List size={18} className="text-blue-500"/> Historique
+                                    <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wider">
+                                        <List size={16} className="text-zinc-500"/> Historique
                                     </h3>
-                                    <button onClick={() => { setShowArchived(!showArchived); setHistoryLimit(5); }} className={`text-xs px-2 py-1 rounded border transition-colors ${showArchived ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-300'}`}>
+                                    <button onClick={() => { setShowArchived(!showArchived); setHistoryLimit(5); }} className={`text-xs font-mono px-2.5 py-1 rounded-lg border transition-colors ${showArchived ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#09090b] border-transparent' : 'bg-white text-zinc-600 border-zinc-200 dark:bg-[#111113] dark:border-zinc-800 dark:text-zinc-400'}`}>
                                         {showArchived ? 'Masquer archives' : 'Voir archives'}
                                     </button>
                                 </div>
@@ -841,7 +841,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             const catDef = CATEGORIES.find(c => c.id === t.category) || CATEGORIES.find(c => c.id === 'autre');
                                             const CatIcon = catDef.icon;
                                             return (
-                                            <li key={t.id} className={`flex justify-between items-center p-3 border-b border-gray-50 dark:border-slate-700 last:border-0 ${t.archived ? 'opacity-50 grayscale' : ''}`}>
+                                            <li key={t.id} className={`flex justify-between items-center p-3 border-b border-gray-50 dark:border-zinc-800 last:border-0 ${t.archived ? 'opacity-50 grayscale' : ''}`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className={`p-2 rounded-full ${catDef.color}`}>
                                                         <CatIcon size={14} />
@@ -850,14 +850,14 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                                         <span className="block font-medium text-gray-700 dark:text-gray-200 text-sm">{t.description} {t.archived && '(Archivé)'}</span>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-xs text-gray-400">{parseLocalDate(t.date).toLocaleDateString()}</span>
-                                                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-zinc-800 rounded text-gray-500 dark:text-gray-400">{accounts.find(a => a.id === t.accountId)?.name || 'Compte Inconnu'}</span>
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`font-bold text-sm ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>{t.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(t.amount))}</span>
                                                     <div className="flex gap-1">
-                                                        <button onClick={() => archiveTransaction(t.id)} className="text-gray-400 hover:text-blue-500 p-1" title={t.archived ? "Désarchiver" : "Archiver"}><Archive size={14}/></button>
+                                                        <button onClick={() => archiveTransaction(t.id)} className="text-gray-400 hover:text-zinc-900 dark:text-white p-1" title={t.archived ? "Désarchiver" : "Archiver"}><Archive size={14}/></button>
                                                         <button onClick={() => deleteItem('transactions', t.id)} className="text-gray-200 hover:text-red-400 p-1"><Trash2 size={14}/></button>
                                                     </div>
                                                 </div>
@@ -868,12 +868,12 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                                 <div className="flex gap-2 mt-2">
                                     {visibleTransactions.length > historyLimit && (
-                                        <button onClick={() => setHistoryLimit(prev => prev + 5)} className="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-slate-700">
+                                        <button onClick={() => setHistoryLimit(prev => prev + 5)} className="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-blue-600 hover:bg-gray-50 dark:hover:bg-zinc-800/50 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-zinc-800">
                                             Voir plus ({visibleTransactions.length - historyLimit} restantes)
                                         </button>
                                     )}
                                     {historyLimit > 5 && (
-                                        <button onClick={() => setHistoryLimit(prev => Math.max(5, prev - 5))} className="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-slate-700">
+                                        <button onClick={() => setHistoryLimit(prev => Math.max(5, prev - 5))} className="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-zinc-800/50 rounded-lg transition-colors border border-dashed border-gray-200 dark:border-zinc-800">
                                             Voir moins
                                         </button>
                                     )}
@@ -885,13 +885,13 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                 {/* --- COMPTES --- */}
                 {activeTab === 'accounts' && (
-                    <div className="p-6 bg-orange-50/30 dark:bg-orange-900/10">
+                    <div className="p-6 bg-zinc-50 dark:bg-[#09090b]">
                         <div className="max-w-xl mx-auto space-y-6">
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-orange-100 dark:border-slate-700 shadow-sm">
-                                <h3 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2"><CreditCard size={18} className="text-orange-600"/> Mes Comptes</h3>
+                            <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                                <h3 className="font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2"><CreditCard size={18}/> Mes Comptes</h3>
                                 <ul className="space-y-3 mb-6">
                                     {accounts.map(acc => (
-                                        <li key={acc.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-100 dark:border-slate-600">
+                                        <li key={acc.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800 rounded-lg border border-gray-100 dark:border-zinc-700">
                                             {editingAccountId === acc.id ? (
                                                 <div className="flex gap-2 flex-1 mr-2"><input type="text" value={editingAccountName} onChange={e => setEditingAccountName(e.target.value)} className="flex-1 px-2 py-1 border border-blue-300 rounded outline-none dark:bg-slate-600 dark:text-white" /><button onClick={saveEditAccount} className="text-green-600 hover:bg-green-50 p-1 rounded"><CheckCircle2 size={16}/></button></div>
                                             ) : (<span className="font-medium text-gray-700 dark:text-gray-200">{acc.name}</span>)}
@@ -902,7 +902,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                                           {(data.profile?.settings?.hidden_accounts || []).includes(String(acc.id)) ? <EyeOff size={14}/> : <Eye size={14}/>}
                                                       </button>
                                                       {(acc.user_id && data.profile?.id && acc.user_id !== data.profile.id) ? (
-                                                        <button onClick={() => leaveAccount(acc.id)} className="text-gray-400 hover:text-red-600 p-1 text-xs font-bold bg-gray-100 dark:bg-slate-700 rounded transition-colors" title="Quitter le compte partagé">Quitter</button>
+                                                        <button onClick={() => leaveAccount(acc.id)} className="text-gray-400 hover:text-red-600 p-1 text-xs font-bold bg-gray-100 dark:bg-zinc-800 rounded transition-colors" title="Quitter le compte partagé">Quitter</button>
                                                     ) : (
                                                         <>
                                                             <button onClick={() => setSharingAccountId(acc.id)} className="text-gray-400 hover:text-purple-600 p-1" title="Partager"><Users size={14}/></button>
@@ -919,9 +919,9 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                         </li>
                                     ))}
                                 </ul>
-                                <div className="flex gap-2 border-t border-gray-100 dark:border-slate-700 pt-4">
-                                    <input type="text" placeholder="Nouveau compte..." value={newAccountName} onChange={e => setNewAccountName(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-orange-500 dark:bg-slate-700 dark:text-white" />
-                                    <button onClick={addAccount} className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm flex items-center gap-2"><Plus size={16}/> Ajouter</button>
+                                <div className="flex gap-2 border-t border-gray-100 dark:border-zinc-800 pt-4">
+                                    <input type="text" placeholder="Nouveau compte..." value={newAccountName} onChange={e => setNewAccountName(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-orange-500 dark:bg-zinc-800 dark:text-white" />
+                                    <button onClick={addAccount} className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg hover:opacity-90 text-sm font-semibold flex items-center gap-2"><Plus size={16}/> Ajouter</button>
                                 </div>
                             </div>
                         </div>
@@ -930,34 +930,34 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                 {/* --- PLANIFICATEUR --- */}
                 {activeTab === 'planner' && (
-                    <div className="p-6 bg-purple-50/50 dark:bg-purple-900/10">
+                    <div className="p-6 bg-zinc-50 dark:bg-[#09090b]">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="space-y-6 lg:col-span-1">
-                                <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-purple-100 dark:border-slate-700 shadow-sm">
+                                <div className="bg-white dark:bg-[#141416] p-5 rounded-xl border border-purple-100 dark:border-zinc-800 shadow-sm">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2"><ShieldCheck size={18} className="text-purple-600"/> Base de sécurité</h3>
                                     <div className="mb-3">
                                         <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block uppercase">Compte</label>
-                                        <select value={plannerTargetId} onChange={(e) => setPlannerTargetId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-purple-500 dark:bg-slate-700 dark:text-white text-sm">
+                                        <select value={plannerTargetId} onChange={(e) => setPlannerTargetId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-purple-500 dark:bg-zinc-800 dark:text-white text-sm">
                                             {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(getBalanceForAccount(acc.id))})</option>)}
                                         </select>
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Montant minimum à garder sur <strong>ce compte spécifique</strong>. Les envies liées à ce compte utiliseront le surplus.</p>
                                     <div className="flex gap-2">
-                                        <input type="text" value={plannerBaseInput} onChange={e => setPlannerBaseInput(e.target.value)} className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-purple-500 dark:bg-slate-700 dark:text-white" placeholder="0" />
+                                        <input type="text" value={plannerBaseInput} onChange={e => setPlannerBaseInput(e.target.value)} className="flex-1 min-w-0 px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-purple-500 dark:bg-zinc-800 dark:text-white" placeholder="0" />
                                         <button onClick={savePlannerBase} className="shrink-0 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">Sauvegarder</button>
                                     </div>
                                     <div className={`mt-3 p-2 rounded-lg text-xs ${neededToReachBase > 0 ? 'bg-red-50 text-red-600 dark:bg-red-900/20' : 'bg-green-50 text-green-600 dark:bg-green-900/20'}`}>
                                         {neededToReachBase > 0 ? `⚠️ Manque ${formatCurrency(neededToReachBase)} sur ce compte` : "✅ Sécurité atteinte sur ce compte"}
                                     </div>
                                 </div>
-                                <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-purple-100 dark:border-slate-700 shadow-sm">
+                                <div className="bg-white dark:bg-[#141416] p-5 rounded-xl border border-purple-100 dark:border-zinc-800 shadow-sm">
                                     <h3 className="font-bold text-gray-800 dark:text-white mb-3 flex items-center gap-2"><Plus size={18} className="text-purple-600"/> Ajouter une envie</h3>
                                     <div className="space-y-3">
-                                        <input type="text" value={plannerItemName} onChange={e => setPlannerItemName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white text-sm" placeholder="Nom du projet ou de l'objectif" />
-                                        <input type="text" value={plannerItemCost} onChange={e => setPlannerItemCost(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white text-sm" placeholder="Coût (€)" />
+                                        <input type="text" value={plannerItemName} onChange={e => setPlannerItemName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white text-sm" placeholder="Nom du projet ou de l'objectif" />
+                                        <input type="text" value={plannerItemCost} onChange={e => setPlannerItemCost(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white text-sm" placeholder="Coût (€)" />
                                         <div>
                                             <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 block uppercase">Compte à débiter</label>
-                                            <select value={plannerItemAccount} onChange={(e) => setPlannerItemAccount(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-purple-500 dark:bg-slate-700 dark:text-white text-sm">
+                                            <select value={plannerItemAccount} onChange={(e) => setPlannerItemAccount(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-purple-500 dark:bg-zinc-800 dark:text-white text-sm">
                                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                             </select>
                                         </div>
@@ -968,12 +968,12 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             <div className="space-y-4 lg:col-span-2">
                                 <h3 className="font-bold text-gray-800 dark:text-white text-lg">Liste de souhaits (Par priorité)</h3>
                                 {processedPlannerItems.length === 0 ? (
-                                    <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-700">
+                                    <div className="text-center py-12 bg-white dark:bg-[#141416] rounded-xl border border-dashed border-gray-300 dark:border-zinc-800">
                                         <p className="text-gray-400">Aucune envie pour le moment.</p>
                                     </div>
                                 ) : (
                                     processedPlannerItems.map((item, index) => (
-                                        <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row gap-4 items-center">
+                                        <div key={item.id} className="bg-white dark:bg-[#141416] p-4 rounded-xl shadow-sm border border-gray-200 dark:border-zinc-800 flex flex-col sm:flex-row gap-4 items-center">
                                             <div className="flex flex-col gap-1">
                                                 <button onClick={() => movePlannerItem(index, 'up')} disabled={index === 0} className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-30"><ChevronUp size={18}/></button>
                                                 <button onClick={() => movePlannerItem(index, 'down')} disabled={index === processedPlannerItems.length - 1} className="p-1 text-gray-400 hover:text-purple-600 disabled:opacity-30"><ChevronDown size={18}/></button>
@@ -986,7 +986,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                                 <div className="flex items-center gap-2 mb-2 text-xs text-gray-400">
                                                     <Wallet size={12}/> <span>Sur : <strong>{item.targetAccName}</strong></span>
                                                 </div>
-                                                <div className="relative w-full h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                                                <div className="relative w-full h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
                                                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${item.pct >= 100 ? 'bg-green-500' : 'bg-purple-500'}`} style={{ width: `${item.pct}%` }}></div>
                                                 </div>
                                                 <div className="flex justify-between items-center text-xs">
@@ -1014,19 +1014,19 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                 {/* --- ONGLET ANALYSES ET STATISTIQUES --- */}
                 {activeTab === 'analytics' && (
-                    <div className="p-6 bg-rose-50/30 dark:bg-rose-900/10">
+                    <div className="p-6 bg-zinc-50 dark:bg-[#09090b]">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                            <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-xl">
-                                <PieChart size={24} className="text-rose-600"/> Statistiques Financières
+                            <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2 text-lg">
+                                <PieChart size={20}/> Statistiques Financières
                             </h3>
                             <div className="flex flex-wrap gap-3">
-                                <select value={statsPeriod} onChange={(e) => setStatsPeriod(parseInt(e.target.value))} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
+                                <select value={statsPeriod} onChange={(e) => setStatsPeriod(parseInt(e.target.value))} className="px-3 py-2 border border-rose-200 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-800 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
                                     <option value={30}>30 derniers jours</option>
                                     <option value={60}>60 derniers jours</option>
                                     <option value={90}>90 derniers jours</option>
                                     <option value={365}>Cette année</option>
                                 </select>
-                                <select value={statsAccountId} onChange={(e) => setStatsAccountId(e.target.value)} className="px-3 py-2 border border-rose-200 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
+                                <select value={statsAccountId} onChange={(e) => setStatsAccountId(e.target.value)} className="px-3 py-2 border border-rose-200 dark:border-zinc-700 rounded-lg text-sm bg-white dark:bg-zinc-800 dark:text-white outline-none focus:border-rose-500 shadow-sm cursor-pointer">
                                     <option value="total">Total (Tous les comptes)</option>
                                     {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                 </select>
@@ -1034,17 +1034,17 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                         </div>
 
                         {/* GRAPHIQUE VECTORIEL : Évolution -30j / +30j */}
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 mb-6">
-                            <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                <LineChart size={16} className="text-blue-500"/>
+                        <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 text-zinc-900 dark:text-white">
+                            <h4 className="text-xs font-mono font-bold text-zinc-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <LineChart size={15} className="text-zinc-900 dark:text-white"/>
                                 Évolution de la trésorerie (60 jours)
                             </h4>
                             {evolutionChartData.points.length > 0 && (
                                 <div className="w-full relative h-[240px] select-none">
                                     {/* Grille de fond (Lignes verticales pour marquer les semaines) */}
-                                    <div className="absolute inset-0 flex justify-between pointer-events-none opacity-5 dark:opacity-10">
+                                    <div className="absolute inset-0 flex justify-between pointer-events-none opacity-10">
                                         {[...Array(9)].map((_, i) => (
-                                            <div key={i} className="h-full border-l border-slate-500 border-dashed"></div>
+                                            <div key={i} className="h-full border-l border-zinc-500 border-dashed"></div>
                                         ))}
                                     </div>
                                     
@@ -1057,9 +1057,9 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                         {/* Dégradé lissé pour le passé */}
                                         <defs>
                                             <linearGradient id="pastGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4"/>
-                                                <stop offset="70%" stopColor="#3b82f6" stopOpacity="0.05"/>
-                                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/>
+                                                <stop offset="0%" stopColor="currentColor" stopOpacity="0.22"/>
+                                                <stop offset="70%" stopColor="currentColor" stopOpacity="0.04"/>
+                                                <stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
                                             </linearGradient>
                                         </defs>
                                         
@@ -1083,8 +1083,8 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             return (
                                                 <>
                                                     <path d={pastFill} fill="url(#pastGradient)" />
-                                                    <path d={pastPath} fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                                                    <path d={futurePath} fill="none" stroke="#64748b" strokeWidth="3" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
+                                                    <path d={pastPath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                    <path d={futurePath} fill="none" stroke="#71717a" strokeWidth="2" strokeDasharray="6 6" strokeLinecap="round" strokeLinejoin="round" className="opacity-70" />
                                                 </>
                                             );
                                         })()}
@@ -1108,7 +1108,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             {/* CASHFLOW */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col justify-center">
+                            <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col justify-center">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Flux de trésorerie</h4>
                                 <div className="space-y-6">
                                     <div>
@@ -1116,7 +1116,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             <span className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"><ArrowUpCircle size={16} className="text-green-500"/> Entrées</span>
                                             <span className="font-bold text-green-600 text-xl">{formatCurrency(analyticsData.totalIn)}</span>
                                         </div>
-                                        <div className="w-full h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="w-full h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                             <div className="h-full bg-green-500 rounded-full" style={{ width: analyticsData.totalIn === 0 && analyticsData.totalOut === 0 ? '0%' : `${(analyticsData.totalIn / (analyticsData.totalIn + analyticsData.totalOut)) * 100}%` }}></div>
                                         </div>
                                     </div>
@@ -1125,7 +1125,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             <span className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300"><ArrowDownCircle size={16} className="text-red-500"/> Sorties</span>
                                             <span className="font-bold text-red-600 text-xl">{formatCurrency(analyticsData.totalOut)}</span>
                                         </div>
-                                        <div className="w-full h-3 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="w-full h-3 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                             <div className="h-full bg-red-500 rounded-full" style={{ width: analyticsData.totalIn === 0 && analyticsData.totalOut === 0 ? '0%' : `${(analyticsData.totalOut / (analyticsData.totalIn + analyticsData.totalOut)) * 100}%` }}></div>
                                         </div>
                                     </div>
@@ -1139,10 +1139,10 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             </div>
 
                             {/* JAUGE RUNWAY (Corrigée pour le mode clair) */}
-                            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-6 rounded-xl shadow-sm dark:shadow-lg border border-gray-200 dark:border-slate-700 text-slate-800 dark:text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                            <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
                                 <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-6 w-full text-left z-10">Jauge de Survie (Runway)</h4>
                                 
-                                <div className="w-32 h-32 rounded-full border-8 border-slate-100 dark:border-slate-700 flex items-center justify-center mb-4 relative z-10"
+                                <div className="w-32 h-32 rounded-full border-8 border-slate-100 dark:border-zinc-800 flex items-center justify-center mb-4 relative z-10"
                                      style={{ borderColor: analyticsData.runwayMonths < 1 ? '#ef4444' : analyticsData.runwayMonths < 3 ? '#f59e0b' : '#10b981' }}>
                                     <div className="flex flex-col items-center">
                                         <span className="text-4xl font-black">{analyticsData.runwayMonths === 999 ? '∞' : Math.floor(analyticsData.runwayMonths)}</span>
@@ -1156,7 +1156,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             </div>
 
                             {/* TOP 5 GOUFFRES */}
-                            <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+                            <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Top 5 Dépenses</h4>
                                 {analyticsData.top5.length === 0 ? (
                                     <p className="text-sm text-gray-400 text-center py-4">Aucune dépense sur la période.</p>
@@ -1168,7 +1168,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             return (
                                                 <li key={t.id} className="flex items-center justify-between">
                                                     <div className="flex items-center gap-3 overflow-hidden">
-                                                        <div className={`p-2 rounded-full font-bold text-xs ${i === 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500 dark:bg-slate-700'}`}>#{i+1}</div>
+                                                        <div className={`p-2 rounded-full font-bold text-xs ${i === 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500 dark:bg-zinc-800'}`}>#{i+1}</div>
                                                         <div className="truncate">
                                                             <p className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{t.description}</p>
                                                             <p className="text-xs text-gray-400 flex items-center gap-1"><CatIcon size={10}/> {catDef.label}</p>
@@ -1183,7 +1183,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                             </div>
 
                             {/* RÉPARTITION PAR CATÉGORIE */}
-                            <div className="lg:col-span-3 bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+                            <div className="lg:col-span-3 bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
                                 <h4 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Répartition des sorties</h4>
                                 {analyticsData.totalOut === 0 ? (
                                     <p className="text-sm text-gray-400 text-center py-8">Aucune donnée à analyser.</p>
@@ -1204,7 +1204,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                                             <span className="text-xs text-gray-400">{round2(pct)}%</span>
                                                         </div>
                                                     </div>
-                                                    <div className="w-full h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                    <div className="w-full h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.hex }}></div>
                                                     </div>
                                                 </div>
@@ -1219,17 +1219,17 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                 {/* --- PRÉVISIONS (RESTAURÉ EXACTEMENT COMME L'ORIGINAL) --- */}
                 {activeTab === 'forecast' && (
-                    <div className="p-6 bg-teal-50/30 dark:bg-teal-900/10">
+                    <div className="p-6 bg-zinc-50 dark:bg-[#09090b]">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2"><LineChart size={20} className="text-teal-600"/> Projection sur 1 an</h3>
-                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1 border border-teal-200 rounded-lg text-sm bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:border-teal-500">
+                            <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2"><LineChart size={18}/> Projection sur 1 an</h3>
+                            <select value={forecastAccount} onChange={(e) => setForecastAccount(e.target.value)} className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm bg-white dark:bg-[#111113] dark:text-white outline-none">
                                 <option value="total">Total (Tous les comptes)</option>
                                 {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                             </select>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {forecastData.map((data, index) => (
-                                <div key={index} className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-teal-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
+                                <div key={index} className="bg-white dark:bg-[#111113] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 transition-all">
                                     <div className="flex justify-between items-center mb-3">
                                         <span className="font-bold text-gray-700 dark:text-gray-200 capitalize">{data.label}</span>
                                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${data.change >= 0 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'}`}>{data.change >= 0 ? '+' : ''}{formatCurrency(data.change)}</span>
@@ -1254,10 +1254,10 @@ export default function BudgetManager({ data, updateData, initialTab }) {
 
                 {/* --- FORMULAIRES DE SAISIE AVEC CATÉGORIES --- */}
                 {['add-transaction', 'add-scheduled', 'add-recurring'].includes(activeTab) && (
-                    <div className="p-6 bg-gray-50 dark:bg-slate-800">
+                    <div className="p-6 bg-zinc-50 dark:bg-[#09090b]">
                         <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4">{activeTab === 'add-transaction' && "Transaction immédiate"}{activeTab === 'add-scheduled' && "Planifié"}{activeTab === 'add-recurring' && "Récurrent"}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="flex gap-2 p-1 bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 w-fit h-fit">
+                            <div className="flex gap-2 p-1 bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 w-fit h-fit">
                                 <button onClick={() => setType('expense')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'expense' ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200' : 'text-gray-500 dark:text-gray-400'}`}>Dépense</button>
                                 <button onClick={() => setType('income')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'income' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200' : 'text-gray-500 dark:text-gray-400'}`}>Revenu</button>
                                 <button onClick={() => setType('transfer')} className={`px-4 py-1 rounded-md text-sm font-medium transition-colors ${type === 'transfer' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200' : 'text-gray-500 dark:text-gray-400'}`}>Virement</button>
@@ -1269,17 +1269,17 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="space-y-1">
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">De</label>
-                                                <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                                <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-zinc-500 bg-white dark:bg-zinc-800 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Vers</label>
-                                                <select value={targetAccountId} onChange={e => setTargetAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                                <select value={targetAccountId} onChange={e => setTargetAccountId(e.target.value)} className="w-full px-2 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-zinc-500 bg-white dark:bg-zinc-800 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="space-y-1">
                                             <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Compte cible</label>
-                                            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
+                                            <select value={selectedAccountId} onChange={e => setSelectedAccountId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-zinc-500 bg-white dark:bg-zinc-800 dark:text-white text-sm">{accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}</select>
                                         </div>
                                     )}
                                 </div>
@@ -1287,7 +1287,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                 {type !== 'transfer' && (
                                     <div className="space-y-1">
                                         <label className="text-[10px] text-gray-400 uppercase font-bold dark:text-gray-500">Catégorie</label>
-                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 bg-white dark:bg-slate-700 dark:text-white text-sm cursor-pointer">
+                                        <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none focus:border-zinc-500 bg-white dark:bg-zinc-800 dark:text-white text-sm cursor-pointer">
                                             {CATEGORIES.filter(c => type === 'income' ? c.id === 'salaire' || c.id === 'autre' : c.id !== 'salaire').map(c => (
                                                 <option key={c.id} value={c.id}>{c.label}</option>
                                             ))}
@@ -1298,25 +1298,25 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input type="text" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />
-                            <input type="text" placeholder="Montant (€)" value={amount} onChange={e => setAmount(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />
-                            {activeTab === 'add-scheduled' && <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />}
+                            <input type="text" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white" />
+                            <input type="text" placeholder="Montant (€)" value={amount} onChange={e => setAmount(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white" />
+                            {activeTab === 'add-scheduled' && <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white" />}
                             {activeTab === 'add-recurring' && (
                                 <div className="space-y-3">
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-600 dark:text-gray-400 text-sm">Le</span>
-                                        <input type="number" min="1" max="31" value={recurDay} onChange={e => setRecurDay(e.target.value)} className="w-16 px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none dark:bg-slate-700 dark:text-white" />
+                                        <input type="number" min="1" max="31" value={recurDay} onChange={e => setRecurDay(e.target.value)} className="w-16 px-2 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none dark:bg-zinc-800 dark:text-white" />
                                         <span className="text-gray-600 dark:text-gray-400 text-sm">du mois</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <label className="text-xs text-gray-500 dark:text-gray-400 mb-1">Date de fin (Optionnel)</label>
-                                        <input type="date" value={recurEndDate} onChange={e => setRecurEndDate(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg outline-none text-sm text-gray-600 dark:text-gray-300 dark:bg-slate-700" />
+                                        <input type="date" value={recurEndDate} onChange={e => setRecurEndDate(e.target.value)} className="px-4 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg outline-none text-sm text-gray-600 dark:text-gray-300 dark:bg-zinc-800" />
                                     </div>
                                 </div>
                             )}
                         </div>
                         <div className="mt-4 text-right">
-                            <button onClick={activeTab === 'add-transaction' ? addTransaction : activeTab === 'add-scheduled' ? addScheduled : activeTab === 'add-recurring' ? addRecurring : () => {}} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Confirmer</button>
+                            <button onClick={activeTab === 'add-transaction' ? addTransaction : activeTab === 'add-scheduled' ? addScheduled : activeTab === 'add-recurring' ? addRecurring : () => {}} className="px-6 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl hover:opacity-90 font-semibold text-sm">Confirmer</button>
                         </div>
                     </div>
                 )}
@@ -1324,13 +1324,13 @@ export default function BudgetManager({ data, updateData, initialTab }) {
             {/* MODAL DE PARTAGE */}
             {sharingAccountId && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-[#111113] rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200">
                         <div className="p-6">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-3">
                                     <Users className="text-purple-500" /> Partager ce compte
                                 </h2>
-                                <button onClick={() => setSharingAccountId(null)} className="p-2 bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white rounded-xl transition-colors">
+                                <button onClick={() => setSharingAccountId(null)} className="p-2 bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white rounded-xl transition-colors">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -1338,7 +1338,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                 <div>
                                     <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1">Inviter quelqu'un</label>
                                     <div className="flex gap-2">
-                                        <input type="email" value={shareEmail} onChange={e => setShareEmail(e.target.value)} placeholder="Email de la personne..." className="flex-1 px-4 py-2 border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 rounded-xl outline-none focus:border-purple-500 dark:text-white" />
+                                        <input type="email" value={shareEmail} onChange={e => setShareEmail(e.target.value)} placeholder="Email de la personne..." className="flex-1 px-4 py-2 border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800 rounded-xl outline-none focus:border-purple-500 dark:text-white" />
                                         <button onClick={addShare} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-colors">Inviter</button>
                                     </div>
                                 </div>
@@ -1350,7 +1350,7 @@ export default function BudgetManager({ data, updateData, initialTab }) {
                                             <p className="text-sm text-gray-400 italic">Ce compte est privé. Personne d'autre n'y a accès.</p>
                                         )}
                                         {(data?.account_shares || []).filter(s => String(s?.account_id) === String(sharingAccountId)).map(share => (
-                                            <li key={share?.id} className="flex justify-between items-center bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border border-gray-100 dark:border-slate-600">
+                                            <li key={share?.id} className="flex justify-between items-center bg-gray-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-gray-100 dark:border-zinc-700">
                                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{share?.user_email}</span>
                                                 <button onClick={() => removeShare(share?.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 p-1.5 rounded-lg transition-colors"><Trash2 size={14}/></button>
                                             </li>

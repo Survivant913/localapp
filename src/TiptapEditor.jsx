@@ -112,7 +112,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
     return (
         <div className="flex flex-col h-full w-full relative">
             {!isZenMode && editor && (
-                <div className="border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-black z-20 sticky top-0 min-h-[3.5rem] shadow-sm">
+                <div className="border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center gap-2 p-2 bg-white dark:bg-[#111113] z-20 sticky top-0 min-h-[3.5rem]">
                     <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} isActive={editor.isActive('paragraph')} icon={Pilcrow} title="Texte Normal" />
                     <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                     <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })} icon={Heading} title="Titre 2" />
@@ -160,7 +160,7 @@ function TiptapEditorCore({ pageId, initialTitle, initialContent, onUpdate, curr
             
             <div className={`flex-1 overflow-y-auto ${isZenMode ? 'custom-scrollbar-none' : ''}`}>
                 <div className={`mx-auto py-12 ${isZenMode ? 'w-full max-w-7xl px-8' : 'w-full px-4 md:px-12 max-w-4xl'}`}>
-                    <div className="bg-white dark:bg-black shadow-xl border border-slate-200 dark:border-slate-800 rounded-lg min-h-[1122px] px-12 py-16 flex flex-col relative">
+                    <div className="bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 rounded-2xl min-h-[1122px] px-12 py-16 flex flex-col relative">
                         {header}
                         <input 
                             ref={titleRef} 

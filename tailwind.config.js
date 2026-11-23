@@ -9,9 +9,16 @@ export default {
     extend: {
       colors: {
         slate: {
-          750: '#2d3748',
-          850: '#1a202c',
-          950: '#0d1117',
+          750: '#27272a',
+          850: '#141416',
+          950: '#09090b',
+        },
+        brutal: {
+          bg: '#09090b',
+          surface: '#111113',
+          card: '#141416',
+          border: '#27272a',
+          muted: '#71717a',
         },
       },
       fontFamily: {

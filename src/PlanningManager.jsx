@@ -360,33 +360,33 @@ export default function PlanningManager({ data, updateData }) {
     const durationOptions = []; for (let m = 15; m <= 720; m += 15) { const h = Math.floor(m / 60); const min = m % 60; durationOptions.push(<option key={m} value={m}>{h > 0 ? `${h}h` : ''}{min > 0 ? ` ${min}` : h === 0 ? ' min' : ''}</option>); }
 
     return (
-        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-gray-50 dark:bg-slate-950 font-sans">
+        <div className="fade-in flex flex-col md:flex-row h-full w-full overflow-hidden bg-zinc-100 dark:bg-[#09090b] font-sans">
             <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col min-w-0 transition-all duration-300">
-                <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-xl flex flex-col overflow-hidden relative">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur z-30 sticky top-0">
+                <div className="flex-1 bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col overflow-hidden relative">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-[#111113]/90 backdrop-blur z-30 sticky top-0">
                         <div className="flex items-center gap-4 md:gap-6">
-                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white capitalize flex items-center gap-2"><Calendar className="text-blue-500" size={24}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
-                            <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-xl p-1 shadow-inner border border-gray-200 dark:border-slate-700">
-                                <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm text-slate-600 dark:text-slate-400"><ChevronLeft size={18}/></button>
-                                <button onClick={handleToday} className="px-4 text-xs font-bold text-slate-600 dark:text-slate-300 mx-1">Aujourd'hui</button>
-                                <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-lg shadow-sm text-slate-600 dark:text-slate-400"><ChevronRight size={18}/></button>
+                            <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white capitalize flex items-center gap-2.5"><Calendar className="text-zinc-900 dark:text-white" size={20}/>{format(currentWeekStart, 'MMMM yyyy', { locale: fr })}</h2>
+                            <div className="flex items-center bg-zinc-100 dark:bg-[#09090b] rounded-xl p-1 border border-zinc-200 dark:border-zinc-800">
+                                <button onClick={handlePreviousWeek} className="p-1.5 hover:bg-white dark:hover:bg-zinc-900 rounded-lg text-zinc-600 dark:text-zinc-400"><ChevronLeft size={17}/></button>
+                                <button onClick={handleToday} className="px-3 text-xs font-mono font-bold text-zinc-700 dark:text-zinc-300 mx-1">Aujourd'hui</button>
+                                <button onClick={handleNextWeek} className="p-1.5 hover:bg-white dark:hover:bg-zinc-900 rounded-lg text-zinc-600 dark:text-zinc-400"><ChevronRight size={17}/></button>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={cleanPastEvents} className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-xs transition-colors border border-transparent hover:border-red-200" title="Nettoyer l'historique"><Trash2 size={16}/> Nettoyer</button>
-                            <button onClick={() => openCreateModal()} className="py-2 px-4 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-xs hover:shadow-lg transition-all flex items-center justify-center gap-2"><Plus size={16}/> Planifier</button>
+                            <button onClick={cleanPastEvents} className="flex items-center gap-2 px-3 py-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl font-semibold text-xs transition-colors border border-transparent hover:border-red-500/20" title="Nettoyer l'historique"><Trash2 size={15}/> Nettoyer</button>
+                            <button onClick={() => openCreateModal()} className="py-2 px-4 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl font-semibold text-xs hover:opacity-90 transition-all flex items-center justify-center gap-2"><Plus size={15}/> Planifier</button>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none bg-white dark:bg-slate-900">
+                    <div className="flex-1 overflow-y-auto relative custom-scrollbar select-none bg-white dark:bg-[#111113]">
                         <div className="flex w-full h-full min-h-[1440px]">
-                            <div className="w-16 flex-shrink-0 border-r border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900 sticky left-0 z-20">
-                                <div className="h-14 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900"></div>
-                                <div className="h-24 border-b-4 border-gray-200 dark:border-slate-800 flex flex-col justify-center items-center p-2 text-[10px] font-bold text-slate-400 bg-white dark:bg-slate-900 shadow-sm z-10"><span>ALL</span><span>DAY</span></div>
-                                {Array.from({length: 24}).map((_, i) => (<div key={i} className="h-[60px] relative w-full border-b border-transparent"><span className="absolute -top-2.5 right-2 text-xs font-bold text-slate-400">{i}:00</span></div>))}
+                            <div className="w-16 flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b] sticky left-0 z-20">
+                                <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111113]"></div>
+                                <div className="h-24 border-b-2 border-zinc-200 dark:border-zinc-800 flex flex-col justify-center items-center p-2 text-[10px] font-mono font-bold text-zinc-500 bg-white dark:bg-[#111113] z-10"><span>ALL</span><span>DAY</span></div>
+                                {Array.from({length: 24}).map((_, i) => (<div key={i} className="h-[60px] relative w-full border-b border-transparent"><span className="absolute -top-2.5 right-2 text-[11px] font-mono font-semibold text-zinc-500">{i}:00</span></div>))}
                             </div>
 
-                            <div className="flex-1 grid grid-cols-7 divide-x divide-gray-200 dark:divide-slate-800">
+                            <div className="flex-1 grid grid-cols-7 divide-x divide-zinc-200 dark:divide-zinc-800">
                                 {weekDays.map((day, dayIndex) => {
                                     const isToday = isSameDay(day, new Date());
                                     // CORRECTION ICI : Ne pas afficher les événements refusés pour les invités
@@ -399,24 +399,24 @@ export default function PlanningManager({ data, updateData }) {
                                     
                                     const layoutItems = getLayoutForDay(rawEvents);
                                     return (
-                                        <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-slate-900">
-                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-gray-200 dark:border-slate-800 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur z-30 ${isToday ? 'bg-blue-50/80 dark:bg-blue-900/20' : ''}`}>
-                                                <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>{format(day, 'EEE', { locale: fr })}</span>
-                                                <span className={`text-lg font-bold mt-0.5 ${isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-slate-800 dark:text-white'}`}>{format(day, 'd')}</span>
+                                        <div key={dayIndex} className="relative min-w-0 bg-white dark:bg-[#111113]">
+                                            <div className={`h-14 flex flex-col items-center justify-center border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white/95 dark:bg-[#111113]/95 backdrop-blur z-30 ${isToday ? 'bg-zinc-50 dark:bg-[#141416]' : ''}`}>
+                                                <span className={`text-[10px] font-mono uppercase tracking-wider ${isToday ? 'text-zinc-900 dark:text-white font-bold' : 'text-zinc-500'}`}>{format(day, 'EEE', { locale: fr })}</span>
+                                                <span className={`text-sm font-mono font-bold mt-0.5 ${isToday ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] w-7 h-7 rounded-lg flex items-center justify-center' : 'text-zinc-800 dark:text-zinc-200'}`}>{format(day, 'd')}</span>
                                             </div>
-                                            <div className={`h-24 border-b-4 border-gray-200 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/20 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-blue-50/50 dark:hover:bg-blue-900/20 ring-inset ring-2 ring-transparent hover:ring-blue-500/30' : ''}`} onDragOver={e => { e.preventDefault(); setPreviewSlot(null); }} 
+                                            <div className={`h-24 border-b-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#09090b]/40 p-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar transition-colors ${draggedItem ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900/50' : ''}`} onDragOver={e => { e.preventDefault(); setPreviewSlot(null); }} 
                                               onDrop={e => { e.preventDefault(); if (draggedItem) { const st = setMinutes(setHours(day, 0), 0); const et = setMinutes(setHours(day, 23), 59); updateData(prev => ({ ...prev, calendar_events: (prev.calendar_events || []).map(ev => String(ev.id) === String(draggedItem.data.id) ? { ...ev, start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } : ev) }), { table: 'calendar_events', id: draggedItem.data.id, action: 'update', data: { start_time: st.toISOString(), end_time: et.toISOString(), is_all_day: true } }); } setDraggedItem(null); }}>
                                                 {rawEvents.filter(i => isItemAllDay(i)).map(item => {
                                                     const isOwner = item.data.user_id === data.profile?.id;
-                                                    const colorClass = (item.data.color || 'blue') === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : (item.data.color || 'blue') === 'gray' ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 border-l-slate-500' : (item.data.color || 'blue') === 'red' ? 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 border-l-red-500' : (item.data.color || 'blue') === 'purple' ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 border-l-purple-500' : (item.data.color || 'blue') === 'orange' ? 'bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 border-l-orange-500' : 'bg-blue-100 dark:bg-blue-900/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 border-l-blue-500';
+                                                    const colorClass = (item.data.color || 'blue') === 'green' ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 border-l-emerald-500' : (item.data.color || 'blue') === 'gray' ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 border-l-zinc-500' : (item.data.color || 'blue') === 'red' ? 'bg-red-100 dark:bg-red-900/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 border-l-red-500' : (item.data.color || 'blue') === 'purple' ? 'bg-purple-100 dark:bg-purple-900/40 border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-300 border-l-purple-500' : (item.data.color || 'blue') === 'orange' ? 'bg-orange-100 dark:bg-orange-900/40 border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-300 border-l-orange-500' : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white border-l-white';
                                                     const isPending = (item.data.my_status || item.data.status) === 'pending' && !isOwner;
-                                                    return (<div key={item.data.id} draggable={isOwner} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-bold px-2 py-1 rounded shadow-sm border border-l-[3px] truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
+                                                    return (<div key={item.data.id} draggable={isOwner} onDragStart={(e) => onDragStart(e, item.data)} onClick={(e) => handleEventClick(e, item.data)} className={`text-[10px] font-semibold px-2 py-1 rounded border border-l-[3px] truncate cursor-pointer hover:opacity-80 transition-all ${colorClass} ${isPending ? 'border-dashed opacity-70' : ''}`}>{isPending && '🔔 '}{item.data.title}</div>);
                                                 })}
                                             </div>
-                                            <div className={`relative h-[1440px] transition-colors bg-white dark:bg-slate-900 ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`} onDragOver={(e) => onDragOverGrid(e, dayIndex)} onDrop={(e) => onDropGrid(e, day)}>
-                                                {Array.from({length: 24}).map((_, i) => <div key={i} className="absolute w-full border-t border-gray-100 dark:border-slate-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
-                                                {isToday && (<div className="absolute w-full border-t-2 border-red-500 z-10 pointer-events-none flex items-center shadow-[0_0_10px_rgba(239,68,68,0.5)]" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2.5 h-2.5 bg-red-500 rounded-full -ml-[5px] shadow-[0_0_5px_rgba(239,68,68,0.8)]"></div></div>)}
-                                                {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-blue-500/10 border-2 border-blue-500 border-dashed pointer-events-none flex items-center justify-center text-xs font-bold text-blue-600" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
+                                            <div className={`relative h-[1440px] transition-colors bg-white dark:bg-[#111113] ${draggedItem && previewSlot?.dayIndex !== dayIndex ? 'hover:bg-zinc-50 dark:hover:bg-[#141416]' : ''}`} onDragOver={(e) => onDragOverGrid(e, dayIndex)} onDrop={(e) => onDropGrid(e, day)}>
+                                                {Array.from({length: 24}).map((_, i) => <div key={i} className="absolute w-full border-t border-zinc-100 dark:border-zinc-800/60 h-[60px]" style={{ top: `${i*60}px` }}></div>)}
+                                                {isToday && (<div className="absolute w-full border-t border-red-500 z-10 pointer-events-none flex items-center" style={{ top: `${(getHours(new Date()) * 60 + getMinutes(new Date()))}px` }}><div className="w-2 h-2 bg-red-500 rounded-full -ml-[4px]"></div></div>)}
+                                                {previewSlot && previewSlot.dayIndex === dayIndex && (<div className="absolute z-0 rounded-lg bg-white/10 border border-dashed border-white pointer-events-none flex items-center justify-center text-xs font-mono font-bold text-white" style={{ top: `${previewSlot.top}px`, height: `${previewSlot.height}px`, left: '2px', right: '2px' }}>{previewSlot.timeLabel}</div>)}
                                                 {layoutItems.map((item) => {
                                                     const dataItem = item.data; 
                                                     const isOwner = dataItem.user_id === data.profile?.id;
@@ -424,24 +424,24 @@ export default function PlanningManager({ data, updateData }) {
                                                     const isDeclined = (dataItem.my_status || dataItem.status) === 'declined';
                                                     
                                                     const colorClass = (dataItem.color || 'blue') === 'green' 
-                                                        ? 'bg-emerald-100 dark:bg-emerald-900/60 border-l-emerald-500 text-emerald-900 dark:text-emerald-100 shadow-emerald-500/20' 
+                                                        ? 'bg-emerald-100 dark:bg-emerald-950/60 border-l-emerald-500 text-emerald-900 dark:text-emerald-100' 
                                                         : (dataItem.color || 'blue') === 'gray' 
-                                                            ? 'bg-slate-100 dark:bg-slate-800 border-l-slate-500 text-slate-700 dark:text-slate-300 shadow-slate-500/20' 
+                                                            ? 'bg-zinc-100 dark:bg-zinc-900 border-l-zinc-500 text-zinc-700 dark:text-zinc-300' 
                                                             : (dataItem.color || 'blue') === 'red' 
-                                                                ? 'bg-red-100 dark:bg-red-900/60 border-l-red-500 text-red-900 dark:text-red-100 shadow-red-500/20' 
+                                                                ? 'bg-red-100 dark:bg-red-950/60 border-l-red-500 text-red-900 dark:text-red-100' 
                                                                 : (dataItem.color || 'blue') === 'purple' 
-                                                                    ? 'bg-purple-100 dark:bg-purple-900/60 border-l-purple-500 text-purple-900 dark:text-purple-100 shadow-purple-500/20' 
+                                                                    ? 'bg-purple-100 dark:bg-purple-950/60 border-l-purple-500 text-purple-900 dark:text-purple-100' 
                                                                     : (dataItem.color || 'blue') === 'orange' 
-                                                                        ? 'bg-orange-100 dark:bg-orange-900/60 border-l-orange-500 text-orange-900 dark:text-orange-100 shadow-orange-500/20' 
-                                                                        : 'bg-blue-100 dark:bg-blue-900/60 border-l-blue-500 text-blue-900 dark:text-blue-100 shadow-blue-500/20';
+                                                                        ? 'bg-orange-100 dark:bg-orange-950/60 border-l-orange-500 text-orange-900 dark:text-orange-100' 
+                                                                        : 'bg-zinc-100 dark:bg-[#18181b] border-l-zinc-900 dark:border-l-white text-zinc-900 dark:text-white';
                                                     
                                                     const isResizingThis = resizingEvent && String(dataItem.id) === String(resizingEvent.id);
                                                     const displayEnd = isResizingThis ? format(addMinutes(parseISO(item.startStr), resizingEvent.currentDuration), 'HH:mm') : format(parseISO(item.endStr), 'HH:mm');
 
                                                     return (
-                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded p-2 text-xs cursor-pointer hover:brightness-95 dark:hover:brightness-125 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none shadow-sm hover:shadow-md border border-gray-200/50 dark:border-slate-700/50 border-l-[3px] ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
-                                                            <span className="font-bold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-blue-500"/>}{dataItem.title}</span>
-                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-80 mb-1"><span className="text-[10px] font-mono font-semibold">{format(parseISO(item.startStr), 'HH:mm')} - {displayEnd}</span>{!!dataItem.recurrence_group_id && <Repeat size={10} />}</div>
+                                                        <div key={item.data.id} style={{ ...item.style, opacity: (isDeclined ? 0.3 : isPending ? 0.6 : 1) }} draggable={isOwner && !resizeRef.current} onDragStart={(e) => onDragStart(e, dataItem)} onClick={(e) => handleEventClick(e, dataItem)} className={`absolute rounded p-2 text-xs cursor-pointer hover:brightness-110 hover:z-30 transition-all z-10 overflow-hidden flex flex-col group/item select-none border border-zinc-200/60 dark:border-zinc-800 border-l-[3px] ${colorClass} ${isPending ? 'border-dashed' : ''} ${isDeclined ? 'grayscale line-through' : ''}`}>
+                                                            <span className="font-semibold truncate leading-tight text-[11px] flex items-center gap-1">{isPending && <Bell size={10} className="text-white"/>}{dataItem.title}</span>
+                                                            <div className="flex items-center gap-1 mt-auto pt-1 opacity-75 mb-1"><span className="text-[10px] font-mono">{format(parseISO(item.startStr), 'HH:mm')} - {displayEnd}</span>{!!dataItem.recurrence_group_id && <Repeat size={10} />}</div>
                                                             {isOwner && !isPending && !isDeclined && (<div className="absolute bottom-0 left-0 w-full h-3 cursor-s-resize hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50 flex items-center justify-center opacity-0 group-hover/item:opacity-100" onMouseDown={(e) => startResize(e, dataItem)}><div className="w-8 h-1 bg-black/20 dark:bg-white/30 rounded-full"></div></div>)}
                                                         </div>
                                                     );
@@ -458,60 +458,60 @@ export default function PlanningManager({ data, updateData }) {
 
             {/* MODALS */}
             {isCreating && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
                         {confirmMode === 'ask_update' ? (
                             <div className="text-center space-y-4">
-                                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-2"><Repeat size={24}/></div>
+                                <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-full flex items-center justify-center mx-auto mb-2"><Repeat size={22}/></div>
                                 <h3 className="font-bold text-lg dark:text-white">Modifier la récurrence ?</h3>
-                                <div className="grid gap-3">
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="w-full py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white">Juste celui-là</button>
-                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700">Toute la série</button>
-                                    <button onClick={() => setIsCreating(false)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
+                                <div className="grid gap-2.5">
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'single')} className="w-full py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 dark:text-white">Juste celui-là</button>
+                                    <button onClick={() => applyUpdate(eventForm.id, pendingUpdate.newStart, pendingUpdate.newEnd, pendingUpdate, 'series')} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl font-semibold text-sm">Toute la série</button>
+                                    <button onClick={() => setIsCreating(false)} className="text-xs text-zinc-500 hover:underline mt-2">Annuler</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <h3 className="text-xl font-bold mb-6 text-slate-800 dark:text-white flex items-center gap-2"><Calendar className="text-blue-500"/>{eventForm.id ? 'Modifier' : 'Planifier'}</h3>
+                                <h3 className="text-lg font-bold mb-5 text-zinc-900 dark:text-white flex items-center gap-2"><Calendar size={18}/>{eventForm.id ? 'Modifier' : 'Planifier'}</h3>
                                 <div className="space-y-4">
-                                    <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white" placeholder="Titre..." /></div>
+                                    <div><label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wide">Titre</label><input autoFocus type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:border-zinc-500 dark:text-white text-sm" placeholder="Titre..." /></div>
                                     {!eventForm.recurrence && !eventForm.recurrenceGroupId && (
-                                        <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-blue-500 dark:text-white text-sm" placeholder="" /></div></div>
+                                        <div><label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wide">Inviter (Emails, virgule)</label><div className="relative"><UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={15}/><input type="text" value={eventForm.invitedEmail} onChange={e => setEventForm({...eventForm, invitedEmail: e.target.value})} className="w-full mt-1.5 pl-9 pr-3 py-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:border-zinc-500 dark:text-white text-sm" placeholder="" /></div></div>
                                     )}
-                                    <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"/></div>
-                                    <div className="flex items-center gap-2 py-2"><input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-5 h-5 text-blue-600 rounded"/><label htmlFor="allDay" className="text-sm font-bold text-slate-700 dark:text-slate-300">Toute la journée</label></div>
+                                    <div><label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wide">Date</label><input type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm dark:text-white outline-none"/></div>
+                                    <div className="flex items-center gap-2 py-1"><input type="checkbox" id="allDay" checked={eventForm.isAllDay} onChange={e => setEventForm({...eventForm, isAllDay: e.target.checked})} className="w-4 h-4 accent-white rounded"/><label htmlFor="allDay" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Toute la journée</label></div>
                                     {!eventForm.isAllDay && (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{Array.from({length: 24}).map((_, i) => <option key={i} value={i}>{i}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-sm dark:text-white outline-none">{durationOptions}</select></div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div><label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wide">Heure</label><div className="flex gap-2"><select value={eventForm.startHour} onChange={e => setEventForm({...eventForm, startHour: parseInt(e.target.value)})} className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm dark:text-white outline-none">{Array.from({length: 24}).map((_, i) => <option key={i} value={i}>{i}h</option>)}</select><select value={eventForm.startMin} onChange={e => setEventForm({...eventForm, startMin: parseInt(e.target.value)})} className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm dark:text-white outline-none"><option value={0}>00</option><option value={15}>15</option><option value={30}>30</option><option value={45}>45</option></select></div></div>
+                                            <div><label className="text-[11px] font-mono text-zinc-500 uppercase tracking-wide">Durée</label><select value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: parseInt(e.target.value)})} className="w-full mt-1.5 p-2.5 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 text-sm dark:text-white outline-none">{durationOptions}</select></div>
                                         </div>
                                     )}
                                     {!eventForm.id && (
-                                        <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="p-3 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800">
                                             <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 rounded text-blue-600"/>
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Répéter l'événement</span>
+                                                <input type="checkbox" checked={eventForm.recurrence} onChange={e => setEventForm({...eventForm, recurrence: e.target.checked, invitedEmail: e.target.checked ? '' : eventForm.invitedEmail})} className="w-4 h-4 accent-white rounded"/>
+                                                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Répéter l'événement</span>
                                             </label>
                                             {eventForm.recurrence && (
                                                 <div className="flex items-center gap-2 mt-3 flex-wrap">
-                                                    <select value={eventForm.recurrenceType} onChange={e => setEventForm({...eventForm, recurrenceType: e.target.value})} className="p-1.5 bg-white dark:bg-slate-800 border rounded text-sm dark:text-white outline-none">
+                                                    <select value={eventForm.recurrenceType} onChange={e => setEventForm({...eventForm, recurrenceType: e.target.value})} className="p-1.5 bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 rounded text-sm dark:text-white outline-none">
                                                         <option value="daily">Quotidien</option>
                                                         <option value="weekly">Hebdomadaire</option>
                                                         <option value="monthly">Mensuel</option>
                                                     </select>
-                                                    <span className="text-xs text-slate-500 ml-2">Pendant</span>
-                                                    <input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-slate-800 border rounded text-sm dark:text-white outline-none"/>
-                                                    <span className="text-xs text-slate-500">fois</span>
+                                                    <span className="text-xs text-zinc-500 ml-2">Pendant</span>
+                                                    <input type="number" min="1" max="52" value={eventForm.recurrenceWeeks} onChange={e => setEventForm({...eventForm, recurrenceWeeks: e.target.value})} className="w-16 p-1 text-center bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 rounded text-sm dark:text-white outline-none"/>
+                                                    <span className="text-xs text-zinc-500">fois</span>
                                                 </div>
                                             )}
                                         </div>
                                     )}
-                                    <div className="flex gap-2 flex-wrap pt-2">
+                                    <div className="flex gap-2 flex-wrap pt-1">
                                         {['blue', 'green', 'gray', 'red', 'purple', 'orange'].map(c => (
-                                            <button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`w-8 h-8 rounded-full transition-transform ${eventForm.color === c ? 'scale-110 ring-2 ring-offset-2 ring-slate-800 dark:ring-white dark:ring-offset-slate-800' : 'opacity-60 hover:opacity-100'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : c === 'red' ? 'bg-red-500' : c === 'purple' ? 'bg-purple-500' : c === 'orange' ? 'bg-orange-500' : 'bg-slate-500'}`}></button>
+                                            <button key={c} onClick={() => setEventForm({...eventForm, color: c})} className={`w-7 h-7 rounded-full transition-transform ${eventForm.color === c ? 'scale-110 ring-2 ring-offset-2 ring-zinc-900 dark:ring-white dark:ring-offset-[#111113]' : 'opacity-60 hover:opacity-100'} ${c === 'blue' ? 'bg-blue-500' : c === 'green' ? 'bg-emerald-500' : c === 'red' ? 'bg-red-500' : c === 'purple' ? 'bg-purple-500' : c === 'orange' ? 'bg-orange-500' : 'bg-zinc-500'}`}></button>
                                         ))}
                                     </div>
-                                    <div className="flex gap-3 pt-4"><button onClick={() => setIsCreating(false)} className="flex-1 py-3 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-bold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-bold text-sm">{eventForm.id ? 'Sauver' : 'Créer'}</button></div>
+                                    <div className="flex gap-3 pt-3"><button onClick={() => setIsCreating(false)} className="flex-1 py-2.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl font-semibold text-sm">Annuler</button><button onClick={handleSave} className="flex-1 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl font-semibold text-sm">{eventForm.id ? 'Sauver' : 'Créer'}</button></div>
                                 </div>
                             </>
                         )}
@@ -520,42 +520,42 @@ export default function PlanningManager({ data, updateData }) {
             )}
 
             {selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-in zoom-in-95">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95">
                         {confirmMode === 'ask_delete' || confirmMode === 'ask_cancel_series' ? (
                             <div className="text-center space-y-4">
-                                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><Trash2 size={24}/></div>
+                                <div className="w-12 h-12 bg-red-500/10 border border-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2"><Trash2 size={22}/></div>
                                 <h3 className="font-bold text-lg dark:text-white">{confirmMode === 'ask_delete' ? 'Supprimer la récurrence ?' : 'Quitter la récurrence ?'}</h3>
-                                <div className="grid gap-3">
-                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, false) : handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-700 dark:text-white">Juste celui-là</button>
-                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, true) : handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700">Toute la série</button>
-                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-slate-400 hover:underline mt-2">Annuler</button>
+                                <div className="grid gap-2.5">
+                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, false) : handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-2.5 border border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 dark:text-white">Juste celui-là</button>
+                                    <button onClick={() => confirmMode === 'ask_delete' ? performDelete(selectedEvent.data, true) : handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-2.5 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700">Toute la série</button>
+                                    <button onClick={() => setConfirmMode(null)} className="text-xs text-zinc-500 hover:underline mt-2">Annuler</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-start mb-6"><h3 className="text-xl font-bold text-slate-800 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full"><X size={20} className="text-slate-400"/></button></div>
+                                <div className="flex justify-between items-start mb-5"><h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight pr-4">{selectedEvent.data.title}</h3><button onClick={() => { setSelectedEvent(null); setConfirmMode(null); }} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg"><X size={18} className="text-zinc-400"/></button></div>
                                 
                                 {(selectedEvent.data.my_status || selectedEvent.data.status) === 'pending' && selectedEvent.data.invited_email?.toLowerCase().includes(data.profile?.email?.toLowerCase()) ? (
-                                    <div className="space-y-6">
-                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl text-sm flex gap-3 text-blue-700 dark:text-blue-300"><Bell size={20}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
-                                        <div className="grid gap-3">
+                                    <div className="space-y-5">
+                                        <div className="p-4 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm flex gap-3 text-zinc-700 dark:text-zinc-300"><Bell size={18}/><span>Invitation reçue de <strong>{selectedEvent.data.organizer_email || 'un collaborateur'}</strong>.</span></div>
+                                        <div className="grid gap-2.5">
                                             {selectedEvent.data.recurrence_group_id ? (
-                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter toute la série</button><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 border border-emerald-600 text-emerald-600 rounded-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">Juste ce jour</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold hover:bg-red-100 transition-colors">Refuser tout</button></>
+                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', true)} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"><Check size={16}/> Accepter toute la série</button><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-2.5 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white rounded-xl font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">Juste ce jour</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', true)} className="w-full py-2.5 bg-red-500/10 text-red-500 rounded-xl font-semibold hover:bg-red-500/20 transition-colors">Refuser tout</button></>
                                             ) : (
-                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors"><Check size={18}/> Accepter l'invitation</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Ban size={18}/> Refuser</button></>
+                                                <><button onClick={() => handleInvitation(selectedEvent.data, 'accepted', false)} className="w-full py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"><Check size={16}/> Accepter l'invitation</button><button onClick={() => handleInvitation(selectedEvent.data, 'declined', false)} className="w-full py-2.5 bg-red-500/10 text-red-500 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors"><Ban size={16}/> Refuser</button></>
                                             )}
                                         </div>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 flex gap-4 items-center"><div className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm text-blue-600"><Clock size={24}/></div><div><p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-slate-700 dark:text-slate-300">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
-                                        <div className="mb-6 space-y-4">
-                                            <div className="flex items-center gap-2 text-xs text-slate-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
+                                        <div className="mb-5 p-4 bg-zinc-50 dark:bg-[#09090b] rounded-xl border border-zinc-200 dark:border-zinc-800 flex gap-3.5 items-center"><div className="p-2.5 bg-white dark:bg-[#141416] border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-900 dark:text-white"><Clock size={20}/></div><div><p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wide">Horaire</p><p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{selectedEvent.data.is_all_day ? "Toute la journée" : format(parseISO(selectedEvent.data.start_time), 'EEEE d MMMM HH:mm', { locale: fr })}</p></div></div>
+                                        <div className="mb-5 space-y-4">
+                                            <div className="flex items-center gap-2 text-xs text-zinc-500"><Users size={14}/><span>Organisé par : <strong>{selectedEvent.data.organizer_email || 'Collaborateur'}</strong></span></div>
                                             
                                             {selectedEvent.data.invited_email && (
-                                                <div className="flex flex-col gap-2 border-t border-slate-100 dark:border-slate-700 pt-4">
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Participants :</div>
+                                                <div className="flex flex-col gap-2 border-t border-zinc-200 dark:border-zinc-800 pt-4">
+                                                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Participants :</div>
                                                     <div className="space-y-2">
                                                         {selectedEvent.data.invited_email.split(',').map((email, idx) => {
                                                             const cleanEmail = email.trim().toLowerCase();
@@ -565,13 +565,13 @@ export default function PlanningManager({ data, updateData }) {
                                                             return (
                                                                 <div key={idx} className="flex items-center justify-between group/user">
                                                                     <div className="flex items-center gap-2">
-                                                                        <div className={`p-1 rounded-full ${status === 'accepted' ? 'bg-emerald-100 text-emerald-600' : status === 'declined' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                        <div className={`p-1 rounded-full ${status === 'accepted' ? 'bg-emerald-500/20 text-emerald-400' : status === 'declined' ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-zinc-400'}`}>
                                                                             {status === 'accepted' ? <Check size={10}/> : status === 'declined' ? <X size={10}/> : <Clock size={10}/>}
                                                                         </div>
-                                                                        <span className={`text-[11px] font-medium truncate max-w-[150px] ${status === 'declined' ? 'line-through text-slate-400' : 'dark:text-slate-300'}`}>{cleanEmail}</span>
+                                                                        <span className={`text-[11px] font-medium truncate max-w-[150px] ${status === 'declined' ? 'line-through text-zinc-500' : 'dark:text-zinc-300'}`}>{cleanEmail}</span>
                                                                     </div>
                                                                     {selectedEvent.data.user_id === data.profile?.id && (
-                                                                        <button onClick={() => handleUninviteSingle(selectedEvent.data, cleanEmail)} className="opacity-0 group-hover/user:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all" title="Retirer l'invité">
+                                                                        <button onClick={() => handleUninviteSingle(selectedEvent.data, cleanEmail)} className="opacity-0 group-hover/user:opacity-100 p-1 text-zinc-400 hover:text-red-500 transition-all" title="Retirer l'invité">
                                                                             <UserX size={14}/>
                                                                         </button>
                                                                     )}
@@ -584,9 +584,9 @@ export default function PlanningManager({ data, updateData }) {
                                         </div>
                                         <div className="flex gap-3">
                                             {selectedEvent.data.user_id === data.profile?.id && (
-                                                <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-3 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"><Pencil size={16}/> Modifier</button>
+                                                <button onClick={() => openEditModal(selectedEvent.data)} className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors text-sm"><Pencil size={15}/> Modifier</button>
                                             )}
-                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"><Trash2 size={18}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Quitter'}</button>
+                                            <button onClick={() => handleDeleteRequest(selectedEvent.data)} className="flex-1 py-2.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-red-500/20 transition-colors text-sm"><Trash2 size={15}/> {selectedEvent.data.user_id === data.profile?.id ? 'Supprimer' : 'Quitter'}</button>
                                         </div>
                                     </>
                                 )}

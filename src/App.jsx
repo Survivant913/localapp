@@ -28,6 +28,7 @@ const POP_SOUND = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI
 
 // --- NOUVEAU : PALETTE DE COULEURS ---
 const THEME_COLORS = {
+ mono:    { primary: '#ffffff', hover: '#e4e4e7', light: '#18181b', text: '#ffffff', textLight: '#d4d4d8', border: '#27272a', badge: '#27272a', onPrimary: '#09090b' },
  blue:    { primary: '#2563eb', hover: '#1d4ed8', light: '#eff6ff', text: '#2563eb', textLight: '#3b82f6', border: '#bfdbfe', badge: '#dbeafe' },
  violet:  { primary: '#7c3aed', hover: '#6d28d9', light: '#f5f3ff', text: '#7c3aed', textLight: '#8b5cf6', border: '#ddd6fe', badge: '#ede9fe' },
  emerald: { primary: '#059669', hover: '#047857', light: '#ecfdf5', text: '#059669', textLight: '#10b981', border: '#a7f3d0', badge: '#d1fae5' },
@@ -90,8 +91,8 @@ export default function App() {
  const audioRef = useRef(typeof window !== 'undefined' ? new Audio(POP_SOUND) : null);
 
  const getInitialTheme = () => {
-   if (typeof window !== 'undefined') return localStorage.getItem('freelanceCockpitTheme') || 'light';
-   return 'light';
+   if (typeof window !== 'undefined') return localStorage.getItem('freelanceCockpitTheme') || 'dark';
+   return 'dark';
  };
 
  const [data, setData] = useState({
@@ -101,7 +102,7 @@ export default function App() {
    calendar_events: [], 
    habits: [], // AJOUT : Initialisation de habits
    budget: { transactions: [], recurring: [], scheduled: [], accounts: [], planner: { base: 0, items: [] } },
-   events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'blue' }, customLabels: {},
+   events: [], notes: [], mainNote: "", settings: { theme: getInitialTheme(), accentColor: 'mono' }, customLabels: {},
    clients: [], quotes: [], invoices: [], catalog: [], profile: {},
    ventures: [], venture_shares: [],
    venture_analytics: [], // --- NOUVEAU : Ajout de la table d'analyse
@@ -625,7 +626,7 @@ export default function App() {
 
  // --- NOUVEAU : MOTEUR DE THÈME DYNAMIQUE (CORRIGÉ POUR ÉVITER LES CONFLITS) ---
  useEffect(() => {
-   const colorKey = data.settings?.accentColor || 'blue';
+   const colorKey = data.settings?.accentColor || 'mono';
    
    if (colorKey === 'blue') {
        const existingStyle = document.getElementById('dynamic-theme-style');
@@ -638,17 +639,16 @@ export default function App() {
 
    // MODIFICATION CRITIQUE : On ne surcharge QUE les éléments principaux (Boutons, Liens actifs).
    // On NE TOUCHE PAS aux teintes claires (50, 100, 200) ni aux textes secondaires pour ne pas casser le calendrier.
-   const css = `
+   const css = colorKey === 'mono' ? `
+     .dark .bg-blue-600 { background-color: #ffffff !important; color: #09090b !important; }
+     .dark .hover\\:bg-blue-700:hover { background-color: #e4e4e7 !important; color: #09090b !important; }
+     .dark .text-blue-600 { color: #ffffff !important; }
+     .focus\\:border-blue-500:focus { border-color: #71717a !important; }
+     .ring-blue-500 { --tw-ring-color: #71717a !important; }
+   ` : `
      .bg-blue-600 { background-color: ${theme.primary} !important; }
      .hover\\:bg-blue-700:hover { background-color: ${theme.hover} !important; }
      .text-blue-600 { color: ${theme.text} !important; }
-     
-     /* Les lignes ci-dessous sont retirées pour éviter le bug d'affichage (texte blanc sur fond blanc) */
-     /* .text-blue-500 { color: ${theme.textLight} !important; } */
-     /* .bg-blue-50 { background-color: ${theme.light} !important; } */
-     /* .border-blue-200 { border-color: ${theme.border} !important; } */
-     /* .bg-blue-100 { background-color: ${theme.badge} !important; } */
-     /* .text-blue-700 { color: ${theme.hover} !important; } */
      
      .focus\\:border-blue-500:focus { border-color: ${theme.textLight} !important; }
      .ring-blue-500 { --tw-ring-color: ${theme.textLight} !important; }
@@ -916,7 +916,7 @@ export default function App() {
      const mappedProjects = (projects || []).map(p => ({ ...p, linkedAccountId: p.linked_account_id, notes: p.internal_notes || '' }));
      const mappedNotes = (notes || []).map(n => ({ ...n, linkedProjectId: n.linked_project_id, isPinned: n.is_pinned }));
      
-     const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'light';
+     const loadedTheme = localStorage.getItem('freelanceCockpitTheme') || profile?.settings?.theme || 'dark';
      
      const newData = {
        todos: todos || [], 
@@ -1110,7 +1110,7 @@ export default function App() {
 
    const unreadNotificationsCount = (data.notifications || []).filter(n => !n.is_read).length;
 
- if (loading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-white"><Loader2 className="animate-spin w-10 h-10 text-blue-500"/></div>;
+ if (loading) return <div className="h-screen flex items-center justify-center bg-[#09090b] text-white"><Loader2 className="animate-spin w-8 h-8 text-white"/></div>;
  if (!session) return <Login />;
 
  // --- RENDU CONTENT : TOUTES LES VUES RÉTABLIES (AUCUNE LIGNE EN MOINS) ---
@@ -1137,21 +1137,21 @@ export default function App() {
  const isWorkspace = currentView === 'workspace' || currentView === 'planning' || currentView === 'journal' || currentView === 'habits' || currentView === 'chat'; 
 
  return (
-   <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+   <div className="flex h-screen overflow-hidden bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans transition-colors duration-200">
      
      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
-       {(isSaving || unsavedChanges) && <div className={`w-3 h-3 rounded-full shadow-sm transition-all duration-500 ${isSaving ? 'bg-blue-500 animate-pulse' : 'bg-orange-400'}`}></div>}
+       {(isSaving || unsavedChanges) && <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${isSaving ? 'bg-white animate-pulse' : 'bg-zinc-500'}`}></div>}
        {notifMessage && notifMessage.includes('Erreur') && (
-           <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-red-900 border-red-700 text-red-100">
+           <div className="px-3 py-1.5 rounded-lg border shadow-xl text-xs font-medium animate-in slide-in-from-bottom-2 fade-in bg-zinc-950 border-red-900/70 text-red-400">
                {notifMessage}
            </div>
        )}
      </div>
 
      {isLocked && (
-       <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-4">
-          <div className="mb-4 bg-blue-600 p-4 rounded-full"><Lock size={32} className="text-white"/></div>
-          <input type="password" maxLength="4" className="text-center text-2xl tracking-widest p-2 rounded bg-slate-800 text-white border border-slate-700 w-40 outline-none" onChange={(e) => { if(e.target.value === data.settings.pin) setIsLocked(false); }} autoFocus />
+       <div className="fixed inset-0 z-[100] bg-[#09090b] flex flex-col items-center justify-center p-4">
+          <div className="mb-5 bg-white p-4 rounded-xl"><Lock size={28} className="text-[#09090b]"/></div>
+          <input type="password" maxLength="4" className="text-center text-2xl font-mono tracking-widest p-2.5 rounded-lg bg-[#111113] text-white border border-zinc-800 focus:border-zinc-500 w-40 outline-none" onChange={(e) => { if(e.target.value === data.settings.pin) setIsLocked(false); }} autoFocus />
        </div>
      )}
 
@@ -1213,9 +1213,9 @@ export default function App() {
      )}
      
      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
-       {!isWorkspaceFocus && <header className="md:hidden bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 p-4 flex justify-between items-center z-20">
-         <h1 className="font-bold text-lg text-gray-800 dark:text-white">{data.customLabels?.appName || 'Freelance Cockpit'}</h1>
-         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg">Menu</button>
+       {!isWorkspaceFocus && <header className="md:hidden bg-white dark:bg-[#09090b] border-b border-zinc-200 dark:border-zinc-800/80 p-4 flex justify-between items-center z-20">
+         <h1 className="font-semibold text-base tracking-tight text-zinc-900 dark:text-white">{data.customLabels?.appName || 'Freelance Cockpit'}</h1>
+         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="px-3 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 bg-zinc-100 dark:bg-[#141416] border border-zinc-200 dark:border-zinc-800 rounded-lg">Menu</button>
        </header>}
        
        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isWorkspace ? 'p-0 overflow-hidden' : ''}`}>

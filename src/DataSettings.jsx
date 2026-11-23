@@ -11,7 +11,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
     const [appName, setAppName] = useState(data.customLabels?.appName || 'Mon Espace');
     
     // Sécurisation : on s'assure qu'une couleur est toujours définie (défaut 'blue')
-    const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'blue');
+    const [accentColor, setAccentColor] = useState(data.settings?.accentColor || 'mono');
     const [grayShade, setGrayShade] = useState(data.settings?.grayShade || 'slate');
 
     // VISIBILITÉ SIDEBAR
@@ -192,6 +192,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
 
     // --- OPTIONS DE COULEURS (FIXÉES EN HEXADÉCIMAL) ---
     const accents = [
+        { id: 'mono',    hex: '#ffffff', label: 'Brut' },
         { id: 'blue',    hex: '#2563eb', label: 'Océan' },
         { id: 'violet',  hex: '#7c3aed', label: 'Cosmic' },
         { id: 'emerald', hex: '#059669', label: 'Finance' },
@@ -206,46 +207,46 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             {/* EN-TÊTE */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-slate-200 dark:bg-slate-700 rounded-xl">
-                        <Settings size={24} className="text-slate-700 dark:text-white" />
+                    <div className="p-3 bg-zinc-200 dark:bg-[#111113] border border-zinc-300 dark:border-zinc-800 rounded-xl">
+                        <Settings size={22} className="text-zinc-900 dark:text-white" />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Paramètres</h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">Personnalisation & Identité</p>
+                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Paramètres</h2>
+                        <p className="text-zinc-500 text-xs font-mono uppercase tracking-wider mt-0.5">Personnalisation & Identité</p>
                     </div>
                 </div>
                 
-                <button onClick={handleSaveProfile} className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold text-white transition-all shadow-md ${isSaved ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                    {isSaved ? <CheckCircle2 size={18}/> : <RefreshCw size={18}/>} {isSaved ? 'Enregistré' : 'Sauvegarder'}
+                <button onClick={handleSaveProfile} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${isSaved ? 'bg-emerald-500 text-white' : 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] hover:opacity-90'}`}>
+                    {isSaved ? <CheckCircle2 size={16}/> : <RefreshCw size={16}/>} {isSaved ? 'Enregistré' : 'Sauvegarder'}
                 </button>
             </div>
 
             {/* --- SECTION APPARENCE & THÈMES --- */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                        <Palette size={20} className="text-purple-500"/> Thèmes & Couleurs
+            <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b]">
+                    <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2">
+                        <Palette size={18}/> Thèmes & Couleurs
                     </h3>
                 </div>
-                <div className="p-8 space-y-8">
+                <div className="p-6 md:p-8 space-y-8">
                     
                     {/* Mode Clair / Sombre */}
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div>
-                            <h4 className="font-bold text-slate-700 dark:text-slate-200">Mode d'affichage</h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Choisissez l'ambiance générale de l'application.</p>
+                            <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Mode d'affichage</h4>
+                            <p className="text-xs text-zinc-500">Choisissez l'ambiance générale de l'application.</p>
                         </div>
-                        <div className="flex bg-slate-100 dark:bg-slate-900 p-1.5 rounded-xl">
-                            <button onClick={() => handleThemeChange('light')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${!darkMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
-                                <Sun size={16}/> Clair
+                        <div className="flex bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl">
+                            <button onClick={() => handleThemeChange('light')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${!darkMode ? 'bg-white shadow text-zinc-900' : 'text-zinc-500 hover:text-zinc-200'}`}>
+                                <Sun size={14}/> Clair
                             </button>
-                            <button onClick={() => handleThemeChange('dark')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${darkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}>
-                                <Moon size={16}/> Sombre
+                            <button onClick={() => handleThemeChange('dark')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${darkMode ? 'bg-white text-[#09090b]' : 'text-zinc-500 hover:text-zinc-900'}`}>
+                                <Moon size={14}/> Sombre
                             </button>
                         </div>
                     </div>
 
-                    <hr className="border-slate-100 dark:border-slate-700"/>
+                    <hr className="border-zinc-200 dark:border-zinc-800"/>
 
                     {/* Couleur d'Accentuation */}
                     <div>
@@ -261,7 +262,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                     className={`
                                         group relative flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all w-24
                                         ${accentColor === acc.id 
-                                            ? 'border-slate-800 dark:border-white bg-slate-50 dark:bg-slate-700' 
+                                            ? 'border-slate-800 dark:border-white bg-slate-50 dark:bg-zinc-800' 
                                             : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50'
                                         }
                                     `}
@@ -281,10 +282,10 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                     {/* Nom de l'App */}
                     <div className="pt-4">
                         <label className="text-xs font-bold text-slate-500 block mb-2">Nom de l'application (Barre latérale)</label>
-                        <input type="text" value={appName} onChange={(e) => setAppName(e.target.value)} className="w-full max-w-md px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none dark:text-white text-sm" />
+                        <input type="text" value={appName} onChange={(e) => setAppName(e.target.value)} className="w-full max-w-md px-4 py-2 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none dark:text-white text-sm" />
                     </div>
 
-                    <hr className="border-slate-100 dark:border-slate-700 my-6"/>
+                    <hr className="border-slate-100 dark:border-zinc-800 my-6"/>
 
                     {/* Visibilité Barre Latérale */}
                     <div>
@@ -310,7 +311,7 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                                 { label: 'Tâches Rapides', desc: 'To-Do list', state: showTodo, setter: setShowTodo },
                                 { label: 'Recherche Globale', desc: 'Omnibar', state: showGlobalSearch, setter: setShowGlobalSearch }
                             ].map((mod, i) => (
-                                <label key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
+                                <label key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
                                     <div>
                                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{mod.label}</p>
                                         <p className="text-xs text-slate-500">{mod.desc}</p>
@@ -327,10 +328,10 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             </div>
 
             {/* --- SECTION DASHBOARD CONFIG --- */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden mt-8">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                        <LayoutDashboard size={20} className="text-indigo-500"/> Configuration du Dashboard
+            <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden mt-8">
+                <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b]">
+                    <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2">
+                        <LayoutDashboard size={18}/> Configuration du Dashboard
                     </h3>
                 </div>
                 <div className="p-8">
@@ -346,14 +347,14 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
                             { label: "Agenda", desc: "Vos prochains rendez-vous", state: dcAgenda, setter: setDcAgenda },
                             { label: "Priorités", desc: "Tâches urgentes", state: dcPriorites, setter: setDcPriorites }
                         ].map((mod, i) => (
-                            <label key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
+                            <label key={i} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-xl cursor-pointer hover:border-indigo-500/30 transition-all">
                                 <div>
                                     <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{mod.label}</p>
                                     <p className="text-xs text-slate-500">{mod.desc}</p>
                                 </div>
                                 <div className="relative inline-flex items-center">
                                     <input type="checkbox" checked={mod.state} onChange={(e) => mod.setter(e.target.checked)} className="sr-only peer" />
-                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-zinc-900 dark:peer-checked:bg-white"></div>
                                 </div>
                             </label>
                         ))}
@@ -362,52 +363,52 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
             </div>
 
             {/* --- SECTION ENTREPRISE --- */}
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden mt-8">
-                <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
-                    <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                        <Building2 size={20} className="text-amber-500"/> Mon Entreprise
+            <div className="bg-white dark:bg-[#111113] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden mt-8">
+                <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b]">
+                    <h3 className="font-bold text-base text-zinc-900 dark:text-white flex items-center gap-2">
+                        <Building2 size={18}/> Mon Entreprise
                     </h3>
                 </div>
                 
                 <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
                     {/* COLONNE GAUCHE */}
                     <div className="space-y-6">
-                        <h4 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-4">Identité & Logo</h4>
-                        <div className="p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-900/50 flex items-center gap-6 relative group">
-                            <div className="w-24 h-24 shrink-0 bg-slate-200 dark:bg-slate-800 rounded-lg flex items-center justify-center overflow-hidden border border-slate-300 dark:border-slate-700 relative">
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest mb-4">Identité & Logo</h4>
+                        <div className="p-4 border border-dashed border-slate-300 dark:border-zinc-700 rounded-xl bg-slate-50 dark:bg-[#09090b] flex items-center gap-6 relative group">
+                            <div className="w-24 h-24 shrink-0 bg-slate-200 dark:bg-[#141416] rounded-lg flex items-center justify-center overflow-hidden border border-slate-300 dark:border-zinc-800 relative">
                                 {companyData.logo ? <img src={companyData.logo} alt="Logo" className="w-full h-full object-contain" /> : <ImageIcon size={32} className="text-slate-400" />}
                                 {companyData.logo && <button onClick={removeLogo} className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"><Trash2 size={20}/></button>}
                             </div>
                             <div className="flex-1">
                                 <p className="font-bold text-slate-800 dark:text-white mb-1">Votre Logo</p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Apparaîtra sur les factures.</p>
-                                <label className="cursor-pointer bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-2">
+                                <label className="cursor-pointer bg-slate-800 dark:bg-zinc-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-2">
                                     <Upload size={14}/> Choisir
                                     <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
                                 </label>
                             </div>
                         </div>
                         <div className="space-y-4">
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Complet (Vous)</label><input type="text" value={companyData.user_name} onChange={e => setCompanyData({...companyData, user_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" placeholder="" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Entreprise</label><input type="text" value={companyData.company_name} onChange={e => setCompanyData({...companyData, company_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" placeholder="" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">SIRET</label><input type="text" value={companyData.siret} onChange={e => setCompanyData({...companyData, siret: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">N° TVA</label><input type="text" value={companyData.tva_number} onChange={e => setCompanyData({...companyData, tva_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Complet (Vous)</label><input type="text" value={companyData.user_name} onChange={e => setCompanyData({...companyData, user_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white" placeholder="" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Nom Entreprise</label><input type="text" value={companyData.company_name} onChange={e => setCompanyData({...companyData, company_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white" placeholder="" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">SIRET</label><input type="text" value={companyData.siret} onChange={e => setCompanyData({...companyData, siret: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white font-mono" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">N° TVA</label><input type="text" value={companyData.tva_number} onChange={e => setCompanyData({...companyData, tva_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white font-mono" /></div>
                         </div>
                     </div>
 
                     {/* COLONNE DROITE */}
                     <div className="space-y-6">
-                        <h4 className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-4">Coordonnées</h4>
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest mb-4">Coordonnées</h4>
                         <div className="space-y-4">
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Adresse</label><textarea value={companyData.address} onChange={e => setCompanyData({...companyData, address: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white min-h-[100px] resize-none" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Adresse</label><textarea value={companyData.address} onChange={e => setCompanyData({...companyData, address: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white min-h-[100px] resize-none" /></div>
                             
                             {/* CORRECTION VARIABLES : on lie à 'email' et 'phone' */}
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Email</label><input type="email" value={companyData.email} onChange={e => setCompanyData({...companyData, email: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Téléphone</label><input type="text" value={companyData.phone} onChange={e => setCompanyData({...companyData, phone: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Email</label><input type="email" value={companyData.email} onChange={e => setCompanyData({...companyData, email: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">Téléphone</label><input type="text" value={companyData.phone} onChange={e => setCompanyData({...companyData, phone: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white" /></div>
                             
-                            <hr className="border-slate-100 dark:border-slate-700 my-6"/>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">IBAN</label><input type="text" value={companyData.iban} onChange={e => setCompanyData({...companyData, iban: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
-                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">BIC</label><input type="text" value={companyData.bic} onChange={e => setCompanyData({...companyData, bic: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-amber-500 dark:text-white font-mono" /></div>
+                            <hr className="border-slate-100 dark:border-zinc-800 my-6"/>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">IBAN</label><input type="text" value={companyData.iban} onChange={e => setCompanyData({...companyData, iban: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white font-mono" /></div>
+                            <div className="space-y-1"><label className="text-xs font-bold text-slate-500 dark:text-slate-400">BIC</label><input type="text" value={companyData.bic} onChange={e => setCompanyData({...companyData, bic: e.target.value})} className="w-full px-4 py-3 bg-slate-50 dark:bg-[#09090b] border border-slate-200 dark:border-zinc-800 rounded-lg outline-none focus:border-zinc-500 dark:text-white font-mono" /></div>
                         </div>
                     </div>
                 </div>

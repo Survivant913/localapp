@@ -26,7 +26,7 @@ const MODULES = [
 
 // --- COULEURS ---
 const NODE_COLORS = [
-    { id: 'white', bg: 'bg-white dark:bg-slate-800', border: 'border-slate-300 dark:border-slate-600', header: 'bg-slate-100 dark:bg-slate-700' },
+    { id: 'white', bg: 'bg-white dark:bg-[#141416]', border: 'border-slate-300 dark:border-zinc-700', header: 'bg-slate-100 dark:bg-zinc-800' },
     { id: 'blue', bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-400 dark:border-blue-700', header: 'bg-blue-100 dark:bg-blue-800' },
     { id: 'green', bg: 'bg-emerald-50 dark:bg-emerald-900/20', border: 'border-emerald-400 dark:border-emerald-700', header: 'bg-emerald-100 dark:bg-emerald-800' },
     { id: 'yellow', bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-400 dark:border-amber-700', header: 'bg-amber-100 dark:bg-amber-800' },
@@ -138,10 +138,10 @@ const MindmapNode = ({ node, selectedId, setSelectedId, updateLabel, handleMouse
                 {hasChildren && (
                     <button 
                         onClick={(e) => toggleCollapse(e, node.id)} 
-                        className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm z-50" 
+                        className="absolute -right-3 top-1/2 -translate-y-1/2 w-5 h-5 bg-white dark:bg-[#141416] border border-slate-300 dark:border-zinc-700 rounded-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-zinc-800 shadow-sm z-50" 
                         title={node.collapsed ? "Afficher" : "Masquer"}
                     >
-                        {node.collapsed ? <Plus size={10} className="text-indigo-500"/> : <Minus size={10} className="text-slate-500"/>}
+                        {node.collapsed ? <Plus size={10} className="text-zinc-900 dark:text-white"/> : <Minus size={10} className="text-slate-500"/>}
                     </button>
                 )}
             </div>
@@ -253,22 +253,22 @@ const EditorModule = ({ venture, currentUserEmail }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className={`flex h-full w-full bg-white dark:bg-slate-900 ${isZenMode ? 'fixed inset-0 z-[100]' : ''}`}>
+        <div className={`flex h-full w-full bg-white dark:bg-[#111113] ${isZenMode ? 'fixed inset-0 z-[100]' : ''}`}>
             {!isZenMode && !isSidebarCollapsed && (
-                <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 animate-in slide-in-from-left-4 duration-300">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <div className="w-64 bg-slate-50 dark:bg-[#09090b] border-r border-slate-200 dark:border-zinc-800 flex flex-col shrink-0 animate-in slide-in-from-left-4 duration-300">
+                    <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pages</span>
                         <div className="flex items-center gap-1">
-                            <button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Nouvelle page"><Plus size={16}/></button>
-                            <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
+                            <button onClick={createPage} className="p-1.5 hover:bg-white dark:hover:bg-zinc-900 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Nouvelle page"><Plus size={16}/></button>
+                            <button onClick={() => setIsSidebarCollapsed(true)} className="p-1.5 hover:bg-white dark:hover:bg-zinc-900 rounded-lg text-slate-600 dark:text-slate-400 transition-colors" title="Masquer le panneau"><Menu size={16}/></button>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1">{pages.map((page, index) => (<div key={page.id} onClick={() => setActivePageId(page.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activePageId === page.id ? 'bg-white dark:bg-[#141416] shadow-sm text-zinc-900 dark:text-white font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}><div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1"><button onClick={(e) => movePage(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-zinc-900 dark:text-white disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button><button onClick={(e) => movePage(index, 'down', e)} disabled={index === pages.length - 1} className="text-slate-400 hover:text-zinc-900 dark:text-white disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button></div><span className="truncate flex-1">{page.title || 'Sans titre'}</span><button onClick={(e) => deletePage(page.id, e)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500"><Trash2 size={12}/></button></div>))}</div>
                 </div>
             )}
             <div className="flex-1 flex flex-col relative min-w-0 bg-white dark:bg-black transition-all duration-300">
                 {!isZenMode && isSidebarCollapsed && (
-                    <button onClick={() => setIsSidebarCollapsed(false)} className="absolute top-16 left-4 z-50 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors" title="Afficher les pages">
+                    <button onClick={() => setIsSidebarCollapsed(false)} className="absolute top-16 left-4 z-50 p-2 bg-white dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 shadow-sm rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors" title="Afficher les pages">
                         <Menu size={18}/>
                     </button>
                 )}
@@ -448,16 +448,16 @@ const StrategyModule = ({ venture }) => {
     const activeBoard = structure.find(b => b.id === activeBoardId);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
-            <div className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center px-6 shrink-0 gap-2 overflow-x-auto scrollbar-none">
+        <div className="flex flex-col h-full bg-slate-50 dark:bg-[#09090b] overflow-hidden relative">
+            <div className="h-14 border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#111113] flex items-center px-6 shrink-0 gap-2 overflow-x-auto scrollbar-none">
                 {structure.map(board => (
                     <div key={board.id} className="flex items-center group">
                         {isEditingBoard === board.id ? (
-                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-md p-1">
+                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#141416] rounded-md p-1">
                                 <input 
                                     autoFocus
                                     type="text" 
-                                    className="bg-white dark:bg-slate-900 text-sm px-2 py-1 rounded outline-none border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white"
+                                    className="bg-white dark:bg-[#111113] text-sm px-2 py-1 rounded outline-none border border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-white"
                                     value={newBoardName}
                                     onChange={e => setNewBoardName(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleRenameBoard(board.id)}
@@ -470,15 +470,15 @@ const StrategyModule = ({ venture }) => {
                             <button 
                                 onClick={() => setActiveBoardId(board.id)} 
                                 onDoubleClick={() => { setNewBoardName(board.title); setIsEditingBoard(board.id); }}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeBoardId === board.id ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${activeBoardId === board.id ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                             >
                                 {board.title}
-                                <Settings size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-500" onClick={(e) => { e.stopPropagation(); setNewBoardName(board.title); setIsEditingBoard(board.id); }} />
+                                <Settings size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-zinc-900 dark:text-white" onClick={(e) => { e.stopPropagation(); setNewBoardName(board.title); setIsEditingBoard(board.id); }} />
                             </button>
                         )}
                     </div>
                 ))}
-                <button onClick={handleAddBoard} className="p-1.5 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-colors"><Plus size={16}/></button>
+                <button onClick={handleAddBoard} className="p-1.5 text-slate-400 hover:text-zinc-900 dark:text-white hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-md transition-colors"><Plus size={16}/></button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -487,19 +487,19 @@ const StrategyModule = ({ venture }) => {
                         {activeBoard.windows.map(win => {
                             const Icon = AVAILABLE_ICONS[win.icon] || Box;
                             return (
-                                <div key={win.id} className={`${win.col || 'md:col-span-5'} bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-hidden relative group`}>
+                                <div key={win.id} className={`${win.col || 'md:col-span-5'} bg-white dark:bg-[#111113] p-3 rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden relative group`}>
                                     <h3 className="font-bold text-slate-700 dark:text-gray-200 flex items-center justify-between text-xs uppercase mb-2 shrink-0">
                                         <div className="flex items-center gap-2"><Icon size={14} className={`text-${win.color}-500`}/> {win.label}</div>
-                                        <button onClick={() => { setWindowForm({ label: win.label, icon: win.icon, color: win.color, col: win.col || 'md:col-span-5' }); setIsEditingWindow(win.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all"><Settings size={12}/></button>
+                                        <button onClick={() => { setWindowForm({ label: win.label, icon: win.icon, color: win.color, col: win.col || 'md:col-span-5' }); setIsEditingWindow(win.id); }} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-zinc-900 dark:text-white hover:bg-slate-100 dark:hover:bg-zinc-900 rounded transition-all"><Settings size={12}/></button>
                                     </h3>
                                     <div className="flex-1 overflow-y-auto min-h-0 pr-1 custom-scrollbar space-y-2">
                                         {data[win.id]?.map(i => <PostIt key={i.id} item={i} color={win.color} update={(id, f, v) => handleUpdate(win.id, data[win.id].map(x => x.id === id ? { ...x, [f]: v } : x))} remove={(id) => handleUpdate(win.id, data[win.id].filter(x => x.id !== id))} />)}
                                     </div>
-                                    <button onClick={() => handleUpdate(win.id, [...(data[win.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded border border-dashed border-slate-200 dark:border-slate-800 shrink-0"><Plus size={12} className="inline mr-1"/> Ajouter</button>
+                                    <button onClick={() => handleUpdate(win.id, [...(data[win.id] || []), { id: Date.now(), text: '' }])} className="mt-2 w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-zinc-900 rounded border border-dashed border-slate-200 dark:border-zinc-800 shrink-0"><Plus size={12} className="inline mr-1"/> Ajouter</button>
                                 </div>
                             );
                         })}
-                        <div onClick={() => { setWindowForm({ label: 'Nouvelle Fenêtre', icon: 'Box', color: 'blue', col: 'md:col-span-5' }); setIsEditingWindow('new'); }} className="md:col-span-2 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-xl flex items-center justify-center cursor-pointer text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all min-h-[200px]">
+                        <div onClick={() => { setWindowForm({ label: 'Nouvelle Fenêtre', icon: 'Box', color: 'blue', col: 'md:col-span-5' }); setIsEditingWindow('new'); }} className="md:col-span-2 border-2 border-dashed border-slate-300 dark:border-zinc-800 hover:border-indigo-500 rounded-xl flex items-center justify-center cursor-pointer text-slate-400 hover:text-zinc-900 dark:text-white hover:bg-indigo-50 dark:hover:bg-indigo-900/10 transition-all min-h-[200px]">
                             <div className="flex flex-col items-center"><Plus size={24} className="mb-2"/> <span className="text-sm font-bold">Nouvelle Fenêtre</span></div>
                         </div>
                     </div>
@@ -511,18 +511,18 @@ const StrategyModule = ({ venture }) => {
             {/* MODAL EDIT WINDOW */}
             {isEditingWindow && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 w-full max-w-md">
+                    <div className="bg-white dark:bg-[#111113] rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-800 p-6 w-full max-w-md">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">{isEditingWindow === 'new' ? 'Nouvelle Fenêtre' : 'Modifier la Fenêtre'}</h2>
                         
                         <div className="space-y-4 mb-6">
                             <div>
                                 <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Nom de la fenêtre</label>
-                                <input type="text" value={windowForm.label} onChange={e => setWindowForm(prev => ({...prev, label: e.target.value}))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
+                                <input type="text" value={windowForm.label} onChange={e => setWindowForm(prev => ({...prev, label: e.target.value}))} className="w-full bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500" />
                             </div>
                             
                             <div>
                                 <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Largeur (Colonnes sur 10)</label>
-                                <select value={windowForm.col} onChange={e => setWindowForm(prev => ({...prev, col: e.target.value}))} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                                <select value={windowForm.col} onChange={e => setWindowForm(prev => ({...prev, col: e.target.value}))} className="w-full bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-zinc-500">
                                     <option value="md:col-span-2">20% (Très petit)</option>
                                     <option value="md:col-span-3">30% (Petit)</option>
                                     <option value="md:col-span-4">40%</option>
@@ -549,7 +549,7 @@ const StrategyModule = ({ venture }) => {
                                     {Object.keys(AVAILABLE_ICONS).map(iconName => {
                                         const Icon = AVAILABLE_ICONS[iconName];
                                         return (
-                                            <button key={iconName} onClick={() => setWindowForm(prev => ({...prev, icon: iconName}))} className={`p-2 rounded-lg border ${windowForm.icon === iconName ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-600' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                            <button key={iconName} onClick={() => setWindowForm(prev => ({...prev, icon: iconName}))} className={`p-2 rounded-lg border ${windowForm.icon === iconName ? 'bg-zinc-100 dark:bg-zinc-900 border-indigo-500 text-indigo-600' : 'border-slate-200 dark:border-zinc-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-zinc-900'}`}>
                                                 <Icon size={18}/>
                                             </button>
                                         );
@@ -558,13 +558,13 @@ const StrategyModule = ({ venture }) => {
                             </div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-800">
+                        <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-zinc-800">
                             {isEditingWindow !== 'new' ? (
                                 <button onClick={() => handleDeleteWindow(isEditingWindow)} className="px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold rounded-lg transition-colors">Supprimer</button>
                             ) : <div></div>}
                             <div className="flex gap-2">
-                                <button onClick={() => setIsEditingWindow(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg font-bold transition-colors">Annuler</button>
-                                <button onClick={handleSaveWindow} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-colors">Sauvegarder</button>
+                                <button onClick={() => setIsEditingWindow(null)} className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg font-bold transition-colors">Annuler</button>
+                                <button onClick={handleSaveWindow} className="px-4 py-2 text-sm bg-zinc-900 dark:bg-white hover:opacity-90 text-white dark:text-[#09090b] rounded-lg font-bold shadow-md transition-colors">Sauvegarder</button>
                             </div>
                         </div>
                     </div>
@@ -688,9 +688,9 @@ const MindmapModule = ({ venture }) => {
     const renderLines = () => nodes.map(node => { if (!isVisible(node.id)) return null; if (!node.parentId) return null; const parent = nodes.find(n => n.id === node.parentId); if (!parent) return null; const w = 180; const startX = parent.x + w; const startY = parent.y + 40; const endX = node.x; const endY = node.y + 40; const dist = Math.abs(endX - startX) / 2; const pathData = `M ${startX} ${startY} C ${startX + dist} ${startY}, ${endX - dist} ${endY}, ${endX} ${endY}`; return (<path key={`link-${node.id}`} d={pathData} fill="none" stroke="#cbd5e1" strokeWidth="2" className="dark:stroke-slate-700" />); });
 
     return (
-        <div className="h-full w-full bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex flex-col">
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2"><div className="flex gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors"><GitCommit size={20}/></button><button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors"><Plus size={20}/></button><div className="w-px bg-slate-200 dark:bg-slate-700 mx-1"></div><button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`}><Trash2 size={20}/></button></div>{selectedId && (<div className="flex gap-1 p-2 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 animate-in slide-in-from-left-2 fade-in duration-200">{NODE_COLORS.map(c => (<button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>))}</div>)}</div>
-            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800"><button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button><button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button><button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button></div>
+        <div className="h-full w-full bg-slate-100 dark:bg-[#09090b] relative overflow-hidden flex flex-col">
+            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2"><div className="flex gap-2 p-1 bg-white dark:bg-[#111113] rounded-xl shadow-lg border border-slate-200 dark:border-zinc-800"><button onClick={addNode} className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 rounded-lg transition-colors"><GitCommit size={20}/></button><button onClick={addRoot} className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 rounded-lg transition-colors"><Plus size={20}/></button><div className="w-px bg-slate-200 dark:bg-zinc-800 mx-1"></div><button onClick={deleteNode} className={`p-2 hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 rounded-lg transition-colors ${!selectedId ? 'opacity-30' : ''}`}><Trash2 size={20}/></button></div>{selectedId && (<div className="flex gap-1 p-2 bg-white dark:bg-[#111113] rounded-xl shadow-lg border border-slate-200 dark:border-zinc-800 animate-in slide-in-from-left-2 fade-in duration-200">{NODE_COLORS.map(c => (<button key={c.id} onClick={() => updateColor(c.id)} className={`w-6 h-6 rounded-full border shadow-sm ${c.bg.split(' ')[0]} ${c.border.split(' ')[0]}`}/>))}</div>)}</div>
+            <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2 p-1 bg-white dark:bg-[#111113] rounded-xl shadow-lg border border-slate-200 dark:border-zinc-800"><button onClick={() => setScale(s => Math.min(s + 0.1, 2))} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomIn size={20}/></button><button onClick={() => { setScale(1); setPan({x:0,y:0}); }} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-600 dark:text-slate-300 rounded-lg"><Maximize size={20}/></button><button onClick={() => setScale(s => Math.max(s - 0.1, 0.5))} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-600 dark:text-slate-300 rounded-lg"><ZoomOut size={20}/></button></div>
             <div ref={containerRef} className={`w-full h-full cursor-grab ${isPanning || draggingNode ? 'cursor-grabbing select-none' : ''}`} onMouseDown={(e) => handleMouseDown(e)} onWheel={(e) => {
                 if (!containerRef.current) return;
                 const zoomSensitivity = 0.002;
@@ -806,18 +806,18 @@ const FinanceModule = ({ venture }) => {
     const ptTarget = { x: xToPx(s.target), y: yToPx(projectedRevenue) };
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-            <div className="h-16 px-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
-                <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-[#09090b] overflow-hidden">
+            <div className="h-16 px-6 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-white dark:bg-[#111113]">
+                <div className="flex gap-2 p-1 bg-slate-100 dark:bg-[#141416] rounded-lg">
                     {['realistic', 'optimistic', 'pessimistic'].map(key => (
-                        <button key={key} onClick={() => setActiveScenario(key)} className={`px-4 py-1.5 rounded-md text-sm font-bold capitalize transition-all ${activeScenario === key ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>
+                        <button key={key} onClick={() => setActiveScenario(key)} className={`px-4 py-1.5 rounded-md text-sm font-bold capitalize transition-all ${activeScenario === key ? 'bg-white dark:bg-zinc-800 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>
                             {key === 'realistic' ? 'Réaliste' : key === 'optimistic' ? 'Optimiste' : 'Pessimiste'}
                         </button>
                     ))}
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-xs font-bold text-slate-400 uppercase">Capital Départ</span>
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-1.5 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center bg-slate-100 dark:bg-[#141416] rounded-lg px-3 py-1.5 border border-slate-200 dark:border-zinc-800">
                         <Wallet size={16} className="text-slate-400 mr-2"/>
                         <input type="number" value={data.capital} onChange={e => updateData('capital', e.target.value, true)} className="w-20 bg-transparent text-sm font-bold text-right outline-none text-slate-800 dark:text-white"/>
                         <span className="text-xs font-bold text-slate-400 ml-1">€</span>
@@ -830,21 +830,21 @@ const FinanceModule = ({ venture }) => {
 
             <div className="flex-1 overflow-y-auto p-6 flex flex-col">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 shrink-0">
-                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="bg-white dark:bg-[#111113] p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
                         <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><Menu size={16}/> Paramètres ({activeScenario})</h3>
                         <div className="space-y-4">
-                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coûts Fixes (Mensuel)</label><input type="number" value={s.fixed} onChange={e => updateData('fixed', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
-                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coût Variable (Unitaire)</label><input type="number" value={s.var} onChange={e => updateData('var', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
-                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Prix de Vente</label><input type="number" value={s.price} onChange={e => updateData('price', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-indigo-500"/></div>
-                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Objectif Ventes (Unités)</label><input type="number" value={s.target} onChange={e => updateData('target', e.target.value)} className="w-full p-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-sm font-bold text-indigo-700 dark:text-indigo-300 outline-none focus:border-indigo-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coûts Fixes (Mensuel)</label><input type="number" value={s.fixed} onChange={e => updateData('fixed', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-zinc-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Coût Variable (Unitaire)</label><input type="number" value={s.var} onChange={e => updateData('var', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-zinc-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Prix de Vente</label><input type="number" value={s.price} onChange={e => updateData('price', e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm font-bold text-slate-700 dark:text-white outline-none focus:border-zinc-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-400 mb-1 block">Objectif Ventes (Unités)</label><input type="number" value={s.target} onChange={e => updateData('target', e.target.value)} className="w-full p-2 bg-zinc-100 dark:bg-zinc-900 border border-indigo-200 dark:border-indigo-800 rounded-lg text-sm font-bold text-indigo-700 dark:text-indigo-300 outline-none focus:border-zinc-500"/></div>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center text-center">
+                    <div className="bg-white dark:bg-[#111113] p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col items-center justify-center text-center">
                         <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Seuil de Rentabilité</h3>
                         <div className="text-5xl font-black text-slate-800 dark:text-white mb-1">{breakevenQty}</div>
                         <div className="text-sm font-medium text-slate-400">unités à vendre</div>
-                        <div className="mt-4 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-bold text-slate-500">soit {breakevenRev} € de CA</div>
+                        <div className="mt-4 px-3 py-1 bg-slate-100 dark:bg-[#141416] rounded-full text-xs font-bold text-slate-500">soit {breakevenRev} € de CA</div>
                     </div>
 
                     <div className={`p-5 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center ${profit >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'}`}>
@@ -854,7 +854,7 @@ const FinanceModule = ({ venture }) => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-h-[400px] relative flex flex-col">
+                <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex-1 min-h-[400px] relative flex flex-col">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 shrink-0">Analyse du Point Mort</h3>
                     <div className="flex-1 w-full h-full relative">
                         <svg className="w-full h-full overflow-hidden rounded-lg" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="xMidYMid meet">
@@ -1005,22 +1005,22 @@ const CompetitorModule = ({ venture }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+        <div className="h-full flex flex-col bg-slate-50 dark:bg-[#09090b] overflow-hidden relative">
             {showConfig && (
                 <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-zinc-800">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-800 dark:text-white">Gérer les Critères</h3>
                             <button onClick={() => setShowConfig(false)}><X size={20}/></button>
                         </div>
                         <div className="flex gap-2 mb-4">
-                            <input type="text" value={newCriterion} onChange={e => setNewCriterion(e.target.value)} placeholder="Nouveau critère..." className="flex-1 p-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none text-sm"/>
-                            <button onClick={addCriterion} className="p-2 bg-indigo-600 text-white rounded-lg"><Plus size={18}/></button>
+                            <input type="text" value={newCriterion} onChange={e => setNewCriterion(e.target.value)} placeholder="Nouveau critère..." className="flex-1 p-2 bg-slate-100 dark:bg-[#141416] rounded-lg outline-none text-sm"/>
+                            <button onClick={addCriterion} className="p-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg"><Plus size={18}/></button>
                         </div>
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {criteria.map(c => (
-                                <div key={c} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                                    <span onClick={() => renameCriterion(c)} className="text-sm font-medium cursor-pointer hover:text-indigo-500">{c}</span>
+                                <div key={c} className="flex justify-between items-center p-2 bg-slate-50 dark:bg-[#141416] rounded-lg border border-slate-200 dark:border-zinc-800">
+                                    <span onClick={() => renameCriterion(c)} className="text-sm font-medium cursor-pointer hover:text-zinc-900 dark:text-white">{c}</span>
                                     <button onClick={() => removeCriterion(c)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                                 </div>
                             ))}
@@ -1029,16 +1029,16 @@ const CompetitorModule = ({ venture }) => {
                 </div>
             )}
 
-            <div className="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white dark:bg-slate-900 shrink-0">
-                <h3 className="font-bold text-slate-700 dark:text-white flex items-center gap-2"><Trophy size={18} className="text-indigo-500"/> Radar de Positionnement</h3>
+            <div className="h-16 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between px-6 bg-white dark:bg-[#111113] shrink-0">
+                <h3 className="font-bold text-slate-700 dark:text-white flex items-center gap-2"><Trophy size={18} className="text-zinc-900 dark:text-white"/> Radar de Positionnement</h3>
                 <div className="flex gap-2">
-                    <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500" title="Configurer Critères"><Settings size={18}/></button>
+                    <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg text-slate-500" title="Configurer Critères"><Settings size={18}/></button>
                     <button onClick={addCompetitor} className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-black text-xs font-bold rounded-lg flex items-center gap-2"><Plus size={14}/> Ajouter Concurrent</button>
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-center min-h-[400px]">
+                <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex items-center justify-center min-h-[400px]">
                     <svg viewBox="0 0 300 300" className="w-full h-full max-h-[600px] overflow-visible" preserveAspectRatio="xMidYMid meet">
                         {[1, 2, 3, 4, 5].map(level => (
                             <polygon key={level} points={criteria.map((_, i) => `${getCoords(level, i).x},${getCoords(level, i).y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1" className="text-slate-200 dark:text-slate-700" />
@@ -1062,10 +1062,10 @@ const CompetitorModule = ({ venture }) => {
                 </div>
                 <div className="space-y-4">
                     {competitors.map(c => (
-                        <div key={c.id} className={`p-4 rounded-xl border ${c.is_primary ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-800' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-800'} transition-opacity ${!c.is_visible ? 'opacity-60' : ''}`}>
+                        <div key={c.id} className={`p-4 rounded-xl border ${c.is_primary ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/10 dark:border-indigo-800' : 'bg-white border-slate-200 dark:bg-[#111113] dark:border-zinc-800'} transition-opacity ${!c.is_visible ? 'opacity-60' : ''}`}>
                             <div className="flex justify-between items-center mb-4">
                                 <div className="flex items-center gap-2">
-                                    <button onClick={() => toggleVisibility(c.id)} className="text-slate-400 hover:text-indigo-500">{c.is_visible ? <Eye size={16}/> : <EyeOff size={16}/>}</button>
+                                    <button onClick={() => toggleVisibility(c.id)} className="text-slate-400 hover:text-zinc-900 dark:text-white">{c.is_visible ? <Eye size={16}/> : <EyeOff size={16}/>}</button>
                                     <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: c.color === 'blue' ? '#3b82f6' : c.color === 'red' ? '#ef4444' : c.color === 'green' ? '#10b981' : c.color === 'orange' ? '#f97316' : c.color === 'purple' ? '#8b5cf6' : c.color === 'pink' ? '#ec4899' : c.color === 'cyan' ? '#06b6d4' : c.color === 'yellow' ? '#eab308' : c.color }}></div>
                                     <input type="text" value={c.name} onChange={e => handleUpdate(c.id, 'name', e.target.value)} className="font-bold bg-transparent outline-none text-slate-800 dark:text-white text-sm"/>
                                 </div>
@@ -1082,8 +1082,8 @@ const CompetitorModule = ({ venture }) => {
                                         ))}
                                     </div>
                                     <div className="grid grid-cols-3 gap-2">
-                                        <textarea value={c.strengths || ''} onChange={e => handleUpdate(c.id, 'strengths', e.target.value)} placeholder="Forces..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
-                                        <textarea value={c.weaknesses || ''} onChange={e => handleUpdate(c.id, 'weaknesses', e.target.value)} placeholder="Faiblesses..." className="w-full bg-white dark:bg-slate-800 p-2 rounded border border-slate-100 dark:border-slate-700 text-xs resize-none h-16 outline-none"/>
+                                        <textarea value={c.strengths || ''} onChange={e => handleUpdate(c.id, 'strengths', e.target.value)} placeholder="Forces..." className="w-full bg-white dark:bg-[#141416] p-2 rounded border border-slate-100 dark:border-zinc-800 text-xs resize-none h-16 outline-none"/>
+                                        <textarea value={c.weaknesses || ''} onChange={e => handleUpdate(c.id, 'weaknesses', e.target.value)} placeholder="Faiblesses..." className="w-full bg-white dark:bg-[#141416] p-2 rounded border border-slate-100 dark:border-zinc-800 text-xs resize-none h-16 outline-none"/>
                                         <textarea value={c.notes || ''} onChange={e => handleUpdate(c.id, 'notes', e.target.value)} placeholder="Notes / Stratégie..." className="w-full bg-yellow-50 dark:bg-yellow-900/10 p-2 rounded border border-yellow-100 dark:border-yellow-900/20 text-xs resize-none h-16 outline-none text-slate-700 dark:text-slate-300"/>
                                     </div>
                                 </div>
@@ -1351,18 +1351,18 @@ const AnalyticsModule = ({ venture }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-slate-900">
-            <div className="w-64 bg-slate-50 dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+        <div className="flex h-full w-full bg-white dark:bg-[#111113]">
+            <div className="w-64 bg-slate-50 dark:bg-[#09090b] border-r border-slate-200 dark:border-zinc-800 flex flex-col shrink-0">
+                <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Graphiques</span>
-                    <button onClick={addChart} className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button>
+                    <button onClick={addChart} className="p-1.5 hover:bg-white dark:hover:bg-zinc-900 rounded-lg text-slate-600 dark:text-slate-400 transition-colors"><Plus size={16}/></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {charts.map((c, index) => (
-                        <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
+                        <div key={c.id} onClick={() => setActiveChartId(c.id)} className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all ${activeChartId === c.id ? 'bg-white dark:bg-[#141416] shadow-sm text-zinc-900 dark:text-white font-medium' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-900'}`}>
                             <div className="flex flex-col gap-0.5 opacity-30 group-hover:opacity-100 mr-1">
-                                <button onClick={(e) => moveChart(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button>
-                                <button onClick={(e) => moveChart(index, 'down', e)} disabled={index === charts.length - 1} className="text-slate-400 hover:text-indigo-500 disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button>
+                                <button onClick={(e) => moveChart(index, 'up', e)} disabled={index === 0} className="text-slate-400 hover:text-zinc-900 dark:text-white disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronUp size={12}/></button>
+                                <button onClick={(e) => moveChart(index, 'down', e)} disabled={index === charts.length - 1} className="text-slate-400 hover:text-zinc-900 dark:text-white disabled:text-slate-200 dark:disabled:text-slate-700 p-0.5"><ChevronDown size={12}/></button>
                             </div>
                             <div className="flex items-center gap-2 truncate flex-1">
                                 {c.chart_type === 'pie' ? <PieChart size={14}/> : c.chart_type === 'bar' ? <BarChart2 size={14}/> : <TrendingUp size={14}/>}
@@ -1375,21 +1375,21 @@ const AnalyticsModule = ({ venture }) => {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-slate-950 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 flex flex-col relative min-w-0 bg-slate-50 dark:bg-[#09090b] overflow-y-auto custom-scrollbar">
                 {activeChart ? (
                     <div className="p-6 max-w-[1400px] mx-auto w-full flex flex-col gap-6 min-h-full">
                         
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                        <div className="bg-white dark:bg-[#111113] p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-wrap gap-4 items-center justify-between">
                             <input type="text" value={activeChart.title} onChange={e => updateChart(activeChart.id, 'title', e.target.value)} className="text-xl font-bold bg-transparent outline-none text-slate-800 dark:text-white placeholder-slate-300 dark:placeholder-slate-700 min-w-[200px]"/>
                             
                             <div className="flex flex-wrap items-center gap-4">
-                                <select value={activeChart.chart_type} onChange={e => updateChart(activeChart.id, 'chart_type', e.target.value)} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-medium rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 cursor-pointer">
+                                <select value={activeChart.chart_type} onChange={e => updateChart(activeChart.id, 'chart_type', e.target.value)} className="bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 text-sm font-medium rounded-lg px-3 py-2 outline-none text-slate-700 dark:text-slate-300 cursor-pointer">
                                     <option value="line">Courbe (Ligne)</option>
                                     <option value="bar">Barres (Histogramme)</option>
                                     <option value="pie">Camembert (Circulaire)</option>
                                 </select>
                                 
-                                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                                <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-2">
                                     <Target size={14} className="text-slate-400"/>
                                     <input type="number" placeholder="Objectif (Ligne cible)" value={activeChart.target_value || ''} onChange={e => updateChart(activeChart.id, 'target_value', parseFloat(e.target.value) || null)} className="bg-transparent w-32 text-sm font-medium outline-none text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500"/>
                                 </div>
@@ -1402,15 +1402,15 @@ const AnalyticsModule = ({ venture }) => {
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                            <div className="bg-white dark:bg-[#111113] p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Cumulé</span>
                                 <span className="text-2xl font-black text-slate-800 dark:text-white">{total.toLocaleString('fr-FR')}</span>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                            <div className="bg-white dark:bg-[#111113] p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Moyenne</span>
                                 <span className="text-2xl font-black text-slate-800 dark:text-white">{avg.toLocaleString('fr-FR', {maximumFractionDigits: 1})}</span>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                            <div className="bg-white dark:bg-[#111113] p-4 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex flex-col">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Pic Maximum</span>
                                 <span className="text-2xl font-black text-slate-800 dark:text-white">{max.toLocaleString('fr-FR')}</span>
                             </div>
@@ -1423,31 +1423,31 @@ const AnalyticsModule = ({ venture }) => {
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-h-[400px] flex flex-col">
+                        <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm flex-1 min-h-[400px] flex flex-col">
                             <div className="flex-1 w-full flex items-center justify-center">
                                 {renderSVG()}
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <div className="bg-white dark:bg-[#111113] p-6 rounded-2xl border border-slate-200 dark:border-zinc-800 shadow-sm">
                             <h3 className="font-bold text-slate-700 dark:text-white mb-4">Valeurs du graphique</h3>
                             
                             <div className="flex gap-2 mb-6">
-                                <input type="text" placeholder="Libellé (ex: Janvier, Produit A...)" value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 text-slate-700 dark:text-white"/>
-                                <input type="number" placeholder="Valeur" value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="w-32 px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium outline-none focus:border-indigo-500 text-slate-700 dark:text-white"/>
-                                <button onClick={addDataPoint} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-bold flex items-center gap-2"><Plus size={18}/> Ajouter</button>
+                                <input type="text" placeholder="Libellé (ex: Janvier, Produit A...)" value={newLabel} onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="flex-1 px-4 py-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm font-medium outline-none focus:border-zinc-500 text-slate-700 dark:text-white"/>
+                                <input type="number" placeholder="Valeur" value={newVal} onChange={e => setNewVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDataPoint()} className="w-32 px-4 py-2 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm font-medium outline-none focus:border-zinc-500 text-slate-700 dark:text-white"/>
+                                <button onClick={addDataPoint} className="px-5 py-2 bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-lg hover:bg-indigo-700 transition-colors font-bold flex items-center gap-2"><Plus size={18}/> Ajouter</button>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {pts.map((p, i) => (
-                                    <div key={p.id} className="flex justify-between items-center px-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                                    <div key={p.id} className="flex justify-between items-center px-4 py-3 bg-slate-50 dark:bg-[#141416] rounded-xl border border-slate-100 dark:border-zinc-800">
                                         <div className="flex items-center gap-3">
                                             <span className="text-slate-400 font-black text-xs opacity-50">{i+1}</span>
                                             <span className="font-bold text-sm text-slate-700 dark:text-slate-200 truncate max-w-[100px]">{p.label}</span>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <span className="font-black text-indigo-600 dark:text-indigo-400">{p.value.toLocaleString('fr-FR')}</span>
-                                            <button onClick={() => removeDataPoint(p.id)} className="text-slate-400 hover:text-red-500 transition-colors bg-white dark:bg-slate-900 p-1.5 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"><Trash2 size={14}/></button>
+                                            <span className="font-black text-zinc-900 dark:text-white">{p.value.toLocaleString('fr-FR')}</span>
+                                            <button onClick={() => removeDataPoint(p.id)} className="text-slate-400 hover:text-red-500 transition-colors bg-white dark:bg-[#111113] p-1.5 rounded-lg shadow-sm border border-slate-100 dark:border-zinc-800"><Trash2 size={14}/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -1510,20 +1510,20 @@ const ShareModal = ({ venture, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col max-h-[80vh]">
-                <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <div className="bg-white dark:bg-[#111113] rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-zinc-800 flex flex-col max-h-[80vh]">
+                <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-zinc-800 shrink-0">
                     <h3 className="font-bold text-slate-800 dark:white flex items-center gap-2"><Share2 size={18}/> Partager "{venture?.title}"</h3>
                     <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg"><X size={20}/></button>
                 </div>
                 <div className="p-4 flex-1 overflow-y-auto">
                     <form onSubmit={addShare} className="flex gap-2 mb-6">
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email du collaborateur" className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-indigo-500" />
-                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Inviter</button>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email du collaborateur" className="flex-1 bg-slate-50 dark:bg-[#141416] border border-slate-200 dark:border-zinc-800 px-4 py-2 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-zinc-500" />
+                        <button type="submit" className="bg-zinc-900 dark:bg-white hover:opacity-90 text-white dark:text-[#09090b] px-4 py-2 rounded-lg text-sm font-bold transition-colors">Inviter</button>
                     </form>
                     <div className="space-y-2">
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Collaborateurs ({shares.length})</h4>
                         {loading ? <p className="text-sm text-slate-500">Chargement...</p> : shares.length === 0 ? <p className="text-sm text-slate-500">Aucun collaborateur.</p> : shares.map(s => (
-                            <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#141416]/50 rounded-xl border border-slate-100 dark:border-zinc-800">
                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{s.user_email}</span>
                                 <button onClick={() => removeShare(s.id)} className="text-slate-400 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
                             </div>
@@ -1593,7 +1593,7 @@ const KanbanModule = ({ venture, currentUserEmail }) => {
     };
 
     const cols = [
-        { id: 'todo', label: 'À faire', color: 'bg-slate-100 dark:bg-slate-800' },
+        { id: 'todo', label: 'À faire', color: 'bg-slate-100 dark:bg-[#141416]' },
         { id: 'in_progress', label: 'En cours', color: 'bg-blue-50 dark:bg-blue-900/20' },
         { id: 'done', label: 'Terminé', color: 'bg-emerald-50 dark:bg-emerald-900/20' }
     ];
@@ -1601,18 +1601,18 @@ const KanbanModule = ({ venture, currentUserEmail }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="h-full flex flex-col bg-white dark:bg-slate-950 p-6 overflow-hidden">
+        <div className="h-full flex flex-col bg-white dark:bg-[#09090b] p-6 overflow-hidden">
             <div className="flex gap-2 mb-6 shrink-0 max-w-sm">
-                <input type="text" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Nouvelle tâche..." className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-indigo-500" />
-                <button onClick={addTask} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Plus size={16}/></button>
+                <input type="text" value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Nouvelle tâche..." className="flex-1 px-4 py-2 bg-slate-50 dark:bg-[#111113] border border-slate-200 dark:border-zinc-800 rounded-lg text-sm outline-none focus:border-zinc-500" />
+                <button onClick={addTask} className="bg-zinc-900 dark:bg-white hover:opacity-90 text-white dark:text-[#09090b] px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Plus size={16}/></button>
             </div>
             <div className="flex-1 flex gap-6 overflow-x-auto overflow-y-hidden pb-4">
                 {cols.map(col => (
-                    <div key={col.id} className={`flex-1 min-w-[280px] rounded-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 ${col.color}`} onDragOver={handleDragOver} onDrop={e => handleDrop(e, col.id)}>
-                        <div className="p-4 border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between shrink-0"><h3 className="font-bold text-slate-700 dark:text-slate-300">{col.label}</h3><span className="text-xs font-bold bg-white dark:bg-slate-800 px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">{tasks.filter(t => t.status === col.id).length}</span></div>
+                    <div key={col.id} className={`flex-1 min-w-[280px] rounded-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-zinc-800 ${col.color}`} onDragOver={handleDragOver} onDrop={e => handleDrop(e, col.id)}>
+                        <div className="p-4 border-b border-slate-200 dark:border-zinc-800/50 flex items-center justify-between shrink-0"><h3 className="font-bold text-slate-700 dark:text-slate-300">{col.label}</h3><span className="text-xs font-bold bg-white dark:bg-[#141416] px-2 py-1 rounded-full border border-slate-200 dark:border-zinc-800">{tasks.filter(t => t.status === col.id).length}</span></div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                             {tasks.filter(t => t.status === col.id).map(task => (
-                                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm cursor-grab active:cursor-grabbing group overflow-hidden">
+                                <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} className="bg-white dark:bg-[#111113] p-3 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm cursor-grab active:cursor-grabbing group overflow-hidden">
                                     <div className="flex justify-between items-start gap-2 min-w-0">
                                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200 break-words break-all whitespace-pre-wrap flex-1 min-w-0 overflow-hidden">{task.title}</p>
                                         <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"><Trash2 size={14}/></button>
@@ -1666,14 +1666,14 @@ const ChatModule = ({ venture, currentUserEmail }) => {
     if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Chargement...</div>;
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
+        <div className="h-full flex flex-col bg-zinc-50 dark:bg-[#09090b]">
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                {messages.length === 0 ? <div className="text-center text-slate-400 mt-10">Aucun message. Commencez la discussion !</div> : messages.map(msg => {
+                {messages.length === 0 ? <div className="text-center text-zinc-500 mt-10 text-sm">Aucun message. Commencez la discussion !</div> : messages.map(msg => {
                     const isMe = msg.user_email === currentUserEmail;
                     return (
                         <div key={msg.id} className={`flex flex-col max-w-[75%] min-w-0 ${isMe ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-                            <span className="text-[10px] font-bold text-slate-400 mb-1 px-1">{isMe ? 'Vous' : msg.user_email}</span>
-                            <div className={`p-3 rounded-2xl text-sm break-words break-all whitespace-pre-wrap min-w-0 ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-sm shadow-sm'}`}>
+                            <span className="text-[10px] font-mono text-zinc-500 mb-1 px-1">{isMe ? 'Vous' : msg.user_email}</span>
+                            <div className={`p-3 rounded-2xl text-sm break-words break-all whitespace-pre-wrap min-w-0 ${isMe ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] rounded-br-sm' : 'bg-white dark:bg-[#111113] border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-bl-sm'}`}>
                                 {msg.message}
                             </div>
                         </div>
@@ -1681,10 +1681,10 @@ const ChatModule = ({ venture, currentUserEmail }) => {
                 })}
                 <div ref={messagesEndRef} />
             </div>
-            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+            <div className="p-4 bg-white dark:bg-[#111113] border-t border-zinc-200 dark:border-zinc-800 shrink-0">
                 <form onSubmit={sendMessage} className="flex gap-2">
-                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Écrire un message..." className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-indigo-500" />
-                    <button type="submit" disabled={!newMessage.trim()} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white p-2 px-4 rounded-xl transition-colors"><Send size={18}/></button>
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Écrire un message..." className="flex-1 px-4 py-2 bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm outline-none focus:border-zinc-500 text-zinc-900 dark:text-white" />
+                    <button type="submit" disabled={!newMessage.trim()} className="bg-zinc-900 dark:bg-white hover:opacity-90 disabled:opacity-40 text-white dark:text-[#09090b] p-2 px-4 rounded-xl transition-all"><Send size={18}/></button>
                 </form>
             </div>
         </div>
@@ -2088,59 +2088,59 @@ export default function Workspace({ data, updateData, workspaceFocus, setWorkspa
         return (
             <div className="fade-in p-6 max-w-6xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">Workspace</h2>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white tracking-tight">Workspace</h2>
                     <button 
                         onClick={() => setWorkspaceFocus(!workspaceFocus)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${workspaceFocus ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-colors ${workspaceFocus ? 'bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] border-zinc-900 dark:border-white' : 'bg-white dark:bg-[#111113] border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600'}`}
                     >
-                        <Maximize size={16} className={workspaceFocus ? 'hidden' : 'block'}/>
-                        <Minimize size={16} className={workspaceFocus ? 'block' : 'hidden'}/>
+                        <Maximize size={15} className={workspaceFocus ? 'hidden' : 'block'}/>
+                        <Minimize size={15} className={workspaceFocus ? 'block' : 'hidden'}/>
                         {workspaceFocus ? "Quitter Focus" : "Focus"}
                     </button>
                 </div>
-                <div className="bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-slate-800 dark:text-white" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-slate-900 dark:bg-white text-white dark:text-black px-6 py-2 rounded-lg font-bold"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-slate-400">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-6">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 cursor-pointer shadow-sm relative"><button onClick={(e) => deleteVenture(v, e)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100" title={v.isShared ? "Quitter le projet" : "Supprimer le projet"}>{v.isShared ? <LogOut size={16}/> : <Trash2 size={16}/>}</button><h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">{v.title}</h3><div className="text-indigo-500 text-sm font-bold mt-4 flex items-center gap-2">Ouvrir <ArrowLeft size={16} className="rotate-180"/></div></div>))}</div>)}</div>
+                <div className="bg-white dark:bg-[#111113] p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 flex gap-2"><input type="text" value={newVentureTitle} onChange={(e) => setNewVentureTitle(e.target.value)} placeholder="Nouveau projet..." className="flex-1 bg-transparent px-4 outline-none text-zinc-900 dark:text-white text-sm" onKeyDown={(e) => e.key === 'Enter' && createVenture()} /><button onClick={createVenture} className="bg-zinc-900 dark:bg-white text-white dark:text-[#09090b] px-5 py-2 rounded-lg font-semibold hover:opacity-90 transition-all"><Plus size={18}/></button></div>{loading ? <div className="text-center py-20 text-zinc-500">Chargement...</div> : (<div className="grid grid-cols-1 md:grid-cols-3 gap-5">{ventures.map(v => (<div key={v.id} onClick={() => setActiveVenture(v)} className="group bg-white dark:bg-[#111113] p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 cursor-pointer relative transition-all"><button onClick={(e) => deleteVenture(v, e)} className="absolute top-4 right-4 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" title={v.isShared ? "Quitter le projet" : "Supprimer le projet"}>{v.isShared ? <LogOut size={16}/> : <Trash2 size={16}/>}</button><h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">{v.title}</h3><div className="text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white text-xs font-mono uppercase tracking-wider mt-4 flex items-center gap-2 transition-colors">Ouvrir <ArrowLeft size={14} className="rotate-180"/></div></div>))}</div>)}</div>
         );
     }
 
     return (
-        <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
-            <header className="h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="h-full flex flex-col bg-zinc-50 dark:bg-[#09090b]">
+            <header className="h-12 bg-white dark:bg-[#111113] border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-4 shrink-0 z-20">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setActiveVenture(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500"><ArrowLeft size={20}/></button>
-                    <h2 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <button onClick={() => setActiveVenture(null)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white"><ArrowLeft size={18}/></button>
+                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                         {activeVenture.title}
-                        {activeVenture.isShared && <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Partagé</span>}
+                        {activeVenture.isShared && <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[10px] px-2 py-0.5 rounded font-mono uppercase">Partagé</span>}
                     </h2>
                 </div>
                 <div className="flex items-center gap-2">
                     {!activeVenture.isShared && (
                         <button 
                             onClick={() => setShowShareModal(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-semibold hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
                         >
-                            <Share2 size={14}/> Partager
+                            <Share2 size={13}/> Partager
                         </button>
                     )}
                     <button 
                         onClick={() => setWorkspaceFocus(!workspaceFocus)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-semibold hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
                         title={workspaceFocus ? "Quitter le mode focus" : "Mode focus"}
                     >
-                        <Maximize size={14}/>
+                        <Maximize size={13}/>
                         {workspaceFocus ? "Quitter Focus" : "Focus"}
                     </button>
                     <button 
                         onClick={generateBusinessPlan} 
                         disabled={isExporting}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-semibold hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
                     >
-                        {isExporting ? <Loader2 size={14} className="animate-spin"/> : <Printer size={14}/>}
+                        {isExporting ? <Loader2 size={13} className="animate-spin"/> : <Printer size={13}/>}
                         Imprimer
                     </button>
                 </div>
             </header>
             {showShareModal && <ShareModal venture={activeVenture} onClose={() => setShowShareModal(false)} />}
-            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-slate-900 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-3 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-800'}`} title={module.label}><module.icon size={20}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-black">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'kanban' && <KanbanModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'chat' && <ChatModule venture={activeVenture} currentUserEmail={currentUserEmail} />}</main></div>
+            <div className="flex-1 flex overflow-hidden"><nav className="w-14 bg-[#09090b] border-r border-zinc-800/80 flex flex-col items-center py-4 gap-2 z-30 shrink-0">{MODULES.map(module => (<button key={module.id} onClick={() => setActiveModuleId(module.id)} className={`p-2.5 rounded-xl transition-all ${activeModuleId === module.id ? 'bg-white text-[#09090b]' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`} title={module.label}><module.icon size={18}/></button>))}</nav><main className="flex-1 overflow-hidden relative bg-white dark:bg-[#09090b]">{activeModuleId === 'editor' && <EditorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'business' && <StrategyModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'mindmap' && <MindmapModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'finance' && <FinanceModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'competitors' && <CompetitorModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'kanban' && <KanbanModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'analytics' && <AnalyticsModule venture={activeVenture} currentUserEmail={currentUserEmail} />}{activeModuleId === 'chat' && <ChatModule venture={activeVenture} currentUserEmail={currentUserEmail} />}</main></div>
         </div>
     );
 }
