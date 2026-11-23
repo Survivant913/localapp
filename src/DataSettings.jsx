@@ -62,7 +62,6 @@ export default function DataSettings({ data, loadExternalData, toggleTheme, dark
         // MODIFICATION 2 : 'Mon Espace' par défaut ici aussi pour la synchro
         if (data.customLabels) setAppName(data.customLabels.appName || 'Mon Espace');
         if (data.settings) {
-            setAccentColor(data.settings.accentColor || 'blue');
             setGrayShade(data.settings.grayShade || 'slate');
             setShowClients(data.settings.showClients ?? false);
             setShowGoals(data.settings.showGoals ?? false);
